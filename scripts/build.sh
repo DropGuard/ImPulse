@@ -4,6 +4,7 @@ DIR=build
 
 cd ..
 #just in case
+rm -r ${DIR}
 mkdir ${DIR}
 
 cd build
