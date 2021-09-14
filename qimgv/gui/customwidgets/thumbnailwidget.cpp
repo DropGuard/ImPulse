@@ -18,11 +18,9 @@ ThumbnailWidget::ThumbnailWidget(QGraphicsItem *parent) :
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     setAcceptHoverEvents(true);
-    fontName.setBold(false);
-    fontInfo.setBold(false);
-    QFontMetrics fm(fontName);
+    font.setBold(false);
+    QFontMetrics fm(font);
     textHeight = fm.height();
-    shadowColor.setRgb(0,0,0,60);
 }
 
 void ThumbnailWidget::setThumbnailSize(int size) {
@@ -64,17 +62,6 @@ void ThumbnailWidget::reset() {
 
 void ThumbnailWidget::setThumbStyle(ThumbnailStyle _style) {
     if(thumbStyle != _style) {
-        if(_style == THUMB_COMPACT) {
-            fontName.setBold(true);
-            fontInfo.setBold(true);
-            if(fontName.pointSizeF() > 14.0) // for some weird setups
-                fontInfo.setPointSizeF(fontName.pointSizeF() * 0.85f);
-            else
-                fontInfo.setPointSizeF(fontName.pointSizeF() - 1.0f);
-        } else {
-            fontName.setBold(false);
-            fontInfo = fontName;
-        }
         thumbStyle = _style;
         updateBoundingRect();
         updateThumbnailDrawPosition();
@@ -119,21 +106,11 @@ void ThumbnailWidget::unsetThumbnail() {
 }
 
 void ThumbnailWidget::setupTextLayout() {
-    if(thumbStyle == THUMB_NORMAL || thumbStyle == THUMB_NORMAL_CENTERED) {
+    if(thumbStyle != THUMB_SIMPLE) {
         nameRect = QRect(padding + marginX,
                           padding + marginY + mThumbnailSize + labelSpacing,
                           mThumbnailSize, textHeight);
         infoRect = nameRect.adjusted(0, textHeight + 2, 0, textHeight + 2);
-    } else if(thumbStyle == THUMB_COMPACT) {
-        nameRect = QRect(marginX, marginY, width() - marginX * 2, textHeight * 1.7).adjusted(4, 0, -4, 0);
-        if(thumbnail) {
-            QFontMetrics fm(fontInfo);
-            infoRect.setWidth(fm.horizontalAdvance(thumbnail->info()));
-            infoRect.setHeight(nameRect.height());
-            infoRect.moveTop(nameRect.top());
-            infoRect.moveRight(nameRect.right());
-            nameRect.adjust(0, 0, -infoRect.width() - 3, 0);
-        }
     }
 }
 
@@ -182,7 +159,7 @@ void ThumbnailWidget::updateBoundingRect() {
     mBoundingRect = QRectF(0, 0,
                            mThumbnailSize + (padding + marginX) * 2,
                            mThumbnailSize + (padding + marginY) * 2);
-    if(thumbStyle == THUMB_NORMAL || thumbStyle == THUMB_NORMAL_CENTERED)
+    if(thumbStyle != THUMB_SIMPLE)
         mBoundingRect.adjust(0, 0, 0, labelSpacing + textHeight * 2);
 }
 
@@ -199,7 +176,7 @@ void ThumbnailWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
     Q_UNUSED(option)
     painter->setRenderHints(QPainter::Antialiasing);
     qreal dpr = painter->paintEngine()->paintDevice()->devicePixelRatioF();
-    if(isHovered() && (!isHighlighted() || thumbStyle == THUMB_COMPACT))
+    if(isHovered() && !isHighlighted())
         drawHoverBg(painter);
     if(isHighlighted())
         drawHighlight(painter);
@@ -234,22 +211,18 @@ void ThumbnailWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
 
 void ThumbnailWidget::drawHighlight(QPainter *painter) {
     if(isHighlighted()) {
-        if(thumbStyle == THUMB_COMPACT) {
-            painter->fillRect(QRect(marginX, 0, width() - marginX * 2, marginY), settings->colorScheme().accent);
-        } else {
-            auto hints = painter->renderHints();
-            auto op = painter->opacity();
-            painter->setRenderHint(QPainter::Antialiasing);
-            painter->setOpacity(0.40f * op);
-            painter->fillRect(bgRect, settings->colorScheme().accent);
-            painter->setOpacity(0.70f * op);
-            QPen pen(settings->colorScheme().accent, 2);
-            painter->setPen(pen);
-            painter->drawRect(bgRect.adjusted(1,1,-1,-1)); // 2px pen
-            //painter->drawRect(highlightRect.adjusted(0.5,0.5,-0.5,-0.5)); // 1px pen
-            painter->setOpacity(op);
-            painter->setRenderHints(hints);
-        }
+        auto hints = painter->renderHints();
+        auto op = painter->opacity();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setOpacity(0.40f * op);
+        painter->fillRect(bgRect, settings->colorScheme().accent);
+        painter->setOpacity(0.70f * op);
+        QPen pen(settings->colorScheme().accent, 2);
+        painter->setPen(pen);
+        painter->drawRect(bgRect.adjusted(1,1,-1,-1)); // 2px pen
+        //painter->drawRect(highlightRect.adjusted(0.5,0.5,-0.5,-0.5)); // 1px pen
+        painter->setOpacity(op);
+        painter->setRenderHints(hints);
     }
 }
 
@@ -271,33 +244,23 @@ void ThumbnailWidget::drawHoverHighlight(QPainter *painter) {
 
 void ThumbnailWidget::drawLabel(QPainter *painter) {
     if(thumbnail) {
-        bool centerName = true;
-        if(thumbStyle == THUMB_COMPACT) {
-            painter->setOpacity(0.94);
-            painter->fillRect(QRect(marginX, nameRect.top(), width() - marginX * 2, nameRect.height()), QColor(20,20,20,255));
-            painter->setOpacity(1.0);
-            centerName = false;
-        }
-        drawSingleLineText(painter, fontName, nameRect, thumbnail->name(), settings->colorScheme().text_hc2, centerName);
+        drawSingleLineText(painter, nameRect, thumbnail->name(), settings->colorScheme().text_hc2);
         auto op = painter->opacity();
         painter->setOpacity(op * 0.62f);
-        drawSingleLineText(painter, fontInfo, infoRect, thumbnail->info(), settings->colorScheme().text_hc2);
+        drawSingleLineText(painter, infoRect, thumbnail->info(), settings->colorScheme().text_hc2);
         painter->setOpacity(op);
     }
 }
 
-void ThumbnailWidget::drawSingleLineText(QPainter *painter, QFont &_fnt, QRect rect, QString text, const QColor &color, bool center) {
+void ThumbnailWidget::drawSingleLineText(QPainter *painter, QRect rect, QString text, const QColor &color) {
     qreal dpr = qApp->devicePixelRatio();
-    QFontMetrics fm(_fnt);
+    QFontMetrics fm(font);
     bool fits = !(fm.horizontalAdvance(text) > rect.width());
     // filename
     int flags;
-    painter->setFont(_fnt);
+    painter->setFont(font);
     if(fits) {
-        if(center)
-            flags = Qt::TextSingleLine | Qt::AlignVCenter | Qt::AlignHCenter;
-        else
-            flags = Qt::TextSingleLine | Qt::AlignVCenter | Qt::AlignLeft;
+        flags = Qt::TextSingleLine | Qt::AlignVCenter | Qt::AlignHCenter;
         painter->setPen(color);
         painter->drawText(rect, flags, text);
     } else {
@@ -306,7 +269,7 @@ void ThumbnailWidget::drawSingleLineText(QPainter *painter, QFont &_fnt, QRect r
         textLayer.fill(Qt::transparent);
         textLayer.setDevicePixelRatio(dpr);
         QPainter textPainter(&textLayer);
-        textPainter.setFont(_fnt);
+        textPainter.setFont(font);
         // paint text onto tmp layer
         flags = Qt::TextSingleLine | Qt::AlignVCenter;
         textPainter.setPen(color);
@@ -342,8 +305,8 @@ void ThumbnailWidget::drawDropHover(QPainter *painter) {
 }
 
 void ThumbnailWidget::drawThumbnail(QPainter* painter, const QPixmap *pixmap) {
-    if(!thumbnail->hasAlphaChannel() && thumbStyle != THUMB_COMPACT)
-        painter->fillRect(drawRectCentered.adjusted(3,3,3,3), shadowColor);
+    if(!thumbnail->hasAlphaChannel())
+        painter->fillRect(drawRectCentered.adjusted(3,3,3,3), QColor(0,0,0, 60));
     painter->drawPixmap(drawRectCentered, *pixmap);
 }
 
@@ -390,20 +353,13 @@ void ThumbnailWidget::updateThumbnailDrawPosition() {
         else
             pixmapSize = thumbnail->pixmap()->size().scaled(mThumbnailSize, mThumbnailSize, Qt::KeepAspectRatio);
         bool verticalFit = (pixmapSize.height() >= pixmapSize.width());
-        if(thumbStyle == THUMB_SIMPLE || thumbStyle == THUMB_COMPACT) {
-            topLeft.setX((width()  - pixmapSize.width())  / 2.0);
+        topLeft.setX((width()  - pixmapSize.width())  / 2.0);
+        if(thumbStyle == THUMB_SIMPLE)
             topLeft.setY((height() - pixmapSize.height()) / 2.0);
-        } else if(thumbStyle == THUMB_NORMAL_CENTERED && !verticalFit) {
-            topLeft.setX((width()  - pixmapSize.width())  / 2.0);
+        else if(thumbStyle == THUMB_NORMAL_CENTERED && !verticalFit)
             topLeft.setY((height() - pixmapSize.height()) / 2.0 - textHeight);
-        } else { // THUMB_NORMAL
-            // snap thumbnail to the filename label
-            topLeft.setX((width()  - pixmapSize.width())  / 2.0);
+        else // THUMB_NORMAL - snap thumbnail to the filename label
             topLeft.setY(padding + marginY + mThumbnailSize - pixmapSize.height());
-        }
         drawRectCentered = QRect(topLeft, pixmapSize);
     }
-}
-
-ThumbnailWidget::~ThumbnailWidget() {
 }
