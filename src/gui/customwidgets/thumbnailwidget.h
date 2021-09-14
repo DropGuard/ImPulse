@@ -16,8 +16,7 @@
 enum ThumbnailStyle {
     THUMB_SIMPLE,
     THUMB_NORMAL,
-    THUMB_NORMAL_CENTERED,
-    THUMB_COMPACT
+    THUMB_NORMAL_CENTERED
 };
 
 class ThumbnailWidget : public QGraphicsWidget {
@@ -25,7 +24,6 @@ class ThumbnailWidget : public QGraphicsWidget {
 
 public:
     ThumbnailWidget(QGraphicsItem *parent = nullptr);
-    ~ThumbnailWidget() override;
 
     enum { Type = UserType + 1 };
     int type() const { return Type; }
@@ -65,7 +63,7 @@ protected:
     void drawHoverHighlight(QPainter *painter);
     void drawLabel(QPainter *painter);
     void drawDropHover(QPainter *painter);
-    void drawSingleLineText(QPainter *painter, QFont &_fnt, QRect rect, QString text, const QColor &color, bool center = true);
+    void drawSingleLineText(QPainter *painter, QRect rect, QString text, const QColor &color);
     void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override;
     void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *item, QWidget *widget) override;
@@ -80,8 +78,7 @@ protected:
     bool highlighted, hovered, dropHovered;
     int mThumbnailSize, padding, marginX, marginY, labelSpacing, textHeight;
     QRectF bgRect, mBoundingRect;
-    QColor shadowColor;
-    QFont fontName, fontInfo;
+    QFont font, fontInfo;
     QRect drawRectCentered, nameRect, infoRect;
     void updateBoundingRect();
     ThumbnailStyle thumbStyle;
