@@ -767,13 +767,16 @@ void Core::showInDirectory() {
     if(!model)
         return;
 #if defined(__linux__) || defined(__FreeBSD__)
-    // org.freedesktop.FileManager1 first: the session's real file manager
-    // shows and selects, whatever it is. The mime query cannot be trusted
-    // here — when this app is itself the inode/directory default, the query
-    // answers "impulse" and the old fallback asked the desktop to open the
-    // directory, which meant this app's folder view recursing into itself.
+    // org.freedesktop.FileManager1 is the whole mechanism: the session's
+    // real file manager shows and selects, whatever it is — on the author's
+    // machine the name is owned by a running dolphin while the activation
+    // file launches nautilus, so no application-side guess can track it.
+    // The mime query cannot be trusted either: when this app is itself the
+    // inode/directory default it answers "impulse", and the hardcoded
+    // fallback ladder then made folder view recurse into itself — twice.
     // An empty selection reveals the directory itself (selected in its
-    // parent) rather than handing it back to this app.
+    // parent); a session without the contract gets a message, not a list
+    // of guessed binaries.
     QString reveal = selectedPath().isEmpty() ? model->directoryPath()
                                              : selectedPath();
     QDBusMessage msg = QDBusMessage::createMethodCall(
@@ -782,18 +785,17 @@ void Core::showInDirectory() {
         QStringLiteral("org.freedesktop.FileManager1"),
         QStringLiteral("ShowItems"));
     // QStringList, not QList<QUrl>: QtDBus has no marshaller for the latter,
-    // the call died before reaching the bus, and the fallback answered
-    // "impulse" — the self-loop that brought the user here twice
+    // the call died before reaching the bus
     msg.setArguments({QStringList{QUrl::fromLocalFile(reveal).toString()},
                       QString()});
     auto *watcher = new QDBusPendingCallWatcher(
         QDBusConnection::sessionBus().asyncCall(msg), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
-            [this, reveal](QDBusPendingCallWatcher *w) {
+            [this](QDBusPendingCallWatcher *w) {
         w->deleteLater();
         QDBusPendingReply<> reply = *w;
         if(reply.isError())
-            revealInFileBrowser(reveal);
+            mw->showMessage(tr("No file manager is available to reveal the file"));
     });
 #elif __WIN32
     QStringList args;
@@ -813,32 +815,6 @@ void Core::showInDirectory() {
 #else
     QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
 #endif
-}
-
-// the pre-DBus chain, kept as the DBus failure path — and hardened: the mime
-// default may be this very app (a viewer may claim inode/directory), and
-// handing the path to the desktop then means folder view opening itself.
-// When the default is unusable, any installed manager that speaks --select
-// beats looping back into this one
-void Core::revealInFileBrowser(const QString &path) {
-    QString fm = ScriptManager::runCommand("xdg-mime query default inode/directory");
-    if(!fm.contains("impulse")) {
-        if(fm.contains("dolphin")) {
-            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("dolphin", path));
-            return;
-        }
-        if(fm.contains("nautilus")) {
-            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("nautilus", path));
-            return;
-        }
-    }
-    for(const QString &candidate : {QStringLiteral("dolphin"), QStringLiteral("nautilus"), QStringLiteral("nemo")}) {
-        if(!QStandardPaths::findExecutable(candidate).isEmpty()) {
-            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand(candidate, path));
-            return;
-        }
-    }
-    mw->showMessage(tr("No file manager found to reveal the file"));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
