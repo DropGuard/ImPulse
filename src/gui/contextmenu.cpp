@@ -72,17 +72,14 @@ ContextMenu::ContextMenu(QWidget *parent) :
     ui->trash->setAction("moveToTrash");
     ui->trash->setText(tr("Move to trash"));
     ui->trash->setIconPath(":/res/icons/common/menuitem/trash16.png");
-    ui->trash->setShortcutText("");
     // -------------------------------------------------------------------------
     ui->open->setAction("open");
     ui->open->setText(tr("Open"));
     ui->open->setIconPath(":/res/icons/common/menuitem/open16.png");
-    ui->open->setShortcutText("");
 
     ui->folderView->setAction("folderView");
     ui->folderView->setText(tr("Folder View"));
     ui->folderView->setIconPath(":/res/icons/common/menuitem/folderview16.png");
-    ui->folderView->setShortcutText("");
 
     ui->slideshow->setAction("toggleSlideshow");
     ui->slideshow->setText(tr("Slideshow"));
