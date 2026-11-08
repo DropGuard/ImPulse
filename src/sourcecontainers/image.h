@@ -22,6 +22,11 @@ public:
     virtual int height() = 0;
     virtual int width() = 0;
     virtual QSize size() = 0;
+    // the file's own dimensions, from the header — known before any pixel
+    // decode. Differs from size() only when the decode is a scaled tier
+    // (JPEG); the title/info surfaces report this so a tier-2 upgrade never
+    // rewrites what they show
+    virtual QSize originalSize() { return size(); }
     virtual bool save(QString destPath, int jpegQuality) = 0;
     QString fileName() const;
     QString baseName() const;
@@ -38,5 +43,4 @@ protected:
     // is the only question that distinguishes the two, and Core::guiSetImage asks it.
     bool mLoadAttempted, mEdited;
     QString mPath;
-    QSize resolution;
 };

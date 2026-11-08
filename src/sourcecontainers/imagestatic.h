@@ -23,6 +23,7 @@ public:
     int height() override;
     int width() override;
     QSize size() override;
+    QSize originalSize() override;
 
     bool setEditedImage(std::unique_ptr<const QImage> imageEditedNew);
     bool discardEditedImage();
@@ -34,6 +35,7 @@ public slots:
 private:
     bool mScaledRequest = false;
     bool mScaledApplied = false;
+    QSize mOriginalSize;
     int mAllocationLimitMb;
     void load() override;
     std::shared_ptr<const QImage> image, imageEdited;

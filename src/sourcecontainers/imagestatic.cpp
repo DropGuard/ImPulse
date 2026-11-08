@@ -2,6 +2,7 @@
 
 #include "utils/fileoperations.h"
 
+#include <QImageIOHandler>
 #include <QScreen>
 #include <time.h>
 
@@ -40,6 +41,13 @@ void ImageStatic::loadGeneric() {
      */
     QImageReader r(mPath, mDocInfo->format().toStdString().c_str());
     r.setAllocationLimit(mAllocationLimitMb);
+    // the file's own dimensions, read from the header — available before any
+    // pixel decode; the title/info surfaces report these so a tier-2 upgrade
+    // never rewrites them. Rotating transformations (EXIF 6/8 arrive as the
+    // Rotate90 flag) swap what the header calls width and height
+    mOriginalSize = r.size();
+    if(mOriginalSize.isValid() && (mDocInfo->exifOrientation() & QImageIOHandler::TransformationRotate90))
+        mOriginalSize.transpose();
     if(mScaledRequest && mDocInfo->format() == "jpg") {
         // tier-1: decode at screen resolution via libjpeg DCT scaling
         // (1/2 edge = 1/4 pixels). Full-res follows as tier-2 upgrade.
@@ -128,6 +136,10 @@ int ImageStatic::width() {
 
 QSize ImageStatic::size() {
     return isEdited()?imageEdited->size():image->size();
+}
+
+QSize ImageStatic::originalSize() {
+    return mOriginalSize.isValid() ? mOriginalSize : size();
 }
 
 bool ImageStatic::setEditedImage(std::unique_ptr<const QImage> imageEditedNew) {

@@ -1610,7 +1610,7 @@ void Core::updateInfoString() {
 
     if(model->isLoaded(state.currentFilePath)) {
         auto img = model->getImage(state.currentFilePath);
-        imageSize = img->size();
+        imageSize = img->originalSize();
         fileSize  = img->fileSize();
         edited = img->isEdited();
     }
