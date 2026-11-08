@@ -119,15 +119,27 @@ jobs:
           cp qimgv/distrib/impulse.appdata.xml "$APPDIR/usr/share/metainfo/"
           cp qimgv/distrib/hicolor/scalable/apps/impulse.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
           cp build-appimage/qimgv/translations/*.qm "$APPDIR/usr/share/impulse/translations/"
-      - name: linuxdeploy (gathers the shared-library closure, writes its own AppRun)
+      - name: linuxdeploy with the Qt plugin deployer (one 6.9.1 world inside)
         run: |
-          curl -L -o linuxdeploy.AppImage \
+          curl -sL --retry 5 --retry-all-errors -o linuxdeploy.AppImage \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          curl -L -o appimagetool.AppImage \
+          curl -sL --retry 5 --retry-all-errors -o linuxdeploy-plugin-qt.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          curl -sL --retry 5 --retry-all-errors -o appimagetool.AppImage \
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x linuxdeploy.AppImage appimagetool.AppImage
+          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-qt.AppImage appimagetool.AppImage
           export APPIMAGE_EXTRACT_AND_RUN=1
-          ./linuxdeploy.AppImage --appdir AppDir
+          # plugin-qt drives qtpaths/qmake to deploy Qt's whole closure — the
+          # dlopen'd companions (libQt6XcbQpa, libQt6WaylandClient, ...) that
+          # ldd against the binary cannot see. Without them the bundled
+          # platform plugins resolve those sonames from the host, and a
+          # process already running 6.9.1 Core refuses an older host 6.x:
+          # both xcb and wayland died "found but could not load" on a real
+          # desktop whose ldconfig HAS every file. The job's PATH decides
+          # which Qt gets deployed — pin it.
+          export PATH="$PWD:/opt/qt/6.9.1/gcc_64/bin:$PATH"
+          ./linuxdeploy.AppImage --appdir AppDir --plugin qt
+          cat AppDir/usr/bin/qt.conf
           # linuxdeploy's --exclude-library matches exact sonames only, so the
           # system-provided libraries ride the closure and are deleted here:
           # they exist on every desktop system, and bundling them drags a glibc
@@ -135,16 +147,9 @@ jobs:
           rm -f AppDir/usr/lib/libsystemd.so* \
                 AppDir/usr/lib/libgcc_s.so* \
                 AppDir/usr/lib/libstdc++.so*
-      - name: Qt plugins via a qt.conf beside the binary, then pack
+      - name: pack
         run: |
           VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' qimgv/appversion.cpp | tr ',' '.')
-          for d in platforms imageformats iconengines; do
-              cp -r "/opt/qt/6.9.1/gcc_64/plugins/$d" "AppDir/usr/bin/plugins/$d"
-          done
-          # QLibraryInfo resolves a qt.conf sitting next to the executable; the
-          # relative Plugins entry keeps the bundle relocatable with no AppRun
-          # script and no environment
-          printf '[Paths]\nPlugins=plugins\n' > AppDir/usr/bin/qt.conf
           export APPIMAGE_EXTRACT_AND_RUN=1
           ./appimagetool.AppImage --appimage-extract-and-run AppDir "ImPulse-${VERSION}-x86_64.AppImage"
       - name: smoke (the bundle must survive a headless start)
