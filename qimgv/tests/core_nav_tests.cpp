@@ -1541,6 +1541,38 @@ private slots:
         }
     }
 
+    // upstream issue #612: dragging a directory onto another one corrupted
+    // every dotted directory name ("1. What" -> "1") — the dir move built
+    // its destination from baseName() — and let a directory be dropped into
+    // its own subtree, recursing until the reporter's 5000 entries shredded.
+    void directoryMoveKeepsDottedNamesAndRefusesSelfMoves() {
+        QString base = QDir(home.path()).filePath("issue612");
+        QDir().mkpath(base + "/thetop/1. What/3. This is weird/X. Okay whatever");
+        QDir().mkpath(base + "/thetop/1. What/5. Another one/Normal name works");
+        QDir().mkpath(base + "/thetop/Another normal name/This works");
+        makeTxt(base, "thetop/Another normal name/5. This is a file with a prefix but no extension", "x");
+        makeTxt(base, "thetop/Another normal name/6. This is a file with a prefix and extension.png", "x");
+        QVERIFY(QDir().mkpath(base + "/otherdir"));
+
+        Core core;
+        FakeInteractions fake;
+        core.ui_ = &fake;
+        core.interactiveMove({QDir(base).filePath("thetop")}, QDir(base).filePath("otherdir"));
+
+        // dotted directory names survive the move whole
+        QVERIFY(QDir(base + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
+        QVERIFY(QDir(base + "/otherdir/thetop/1. What/5. Another one/Normal name works").exists());
+        QVERIFY(QFileInfo(base + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension").exists());
+        QVERIFY(!QDir(base + "/otherdir/thetop/1").exists()); // the corruption signature
+        QVERIFY(!QFileInfo(base + "/thetop").exists());       // moved, not copied
+
+        // a directory dropped into its own subtree is refused flat
+        core.interactiveMove({base + "/otherdir/thetop"}, base + "/otherdir/thetop/1. What");
+        QVERIFY(QDir(base + "/otherdir/thetop/1. What/3. This is weird").exists());
+        QVERIFY(!QDir(base + "/otherdir/thetop/1. What/thetop").exists());
+        QVERIFY(!QDir(base + "/otherdir/thetop/1. What/1").exists());
+    }
+
     void removePermanentDeletesAfterScriptedConfirmation() {
         Core core;
         FakeInteractions fake;
