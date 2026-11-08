@@ -1,7 +1,37 @@
 #include "settingsdialog.h"
 
+#include "appversion.h"
+
 #include <utility>
 #include "ui_settingsdialog.h"
+
+// the about text's single home: the version line is dynamic, and a second
+// copy living in the .ui would be the next change-one-miss-the-rest drift
+static QString aboutHtml() {
+    return QStringLiteral(
+        "<p><b>ImPulse %1</b></p>"
+        "<p>A fast and easy to use image viewer. Video support via libmpv.</p>"
+        "<p>ImPulse is a fork of qimgv: the backend now runs on a Rust engine "
+        "that owns the directory listing and the decode schedule — it decides "
+        "which decode runs next, while the C++ side submits the requests and "
+        "executes the work.</p>"
+        "<p><b>GitHub page:</b> "
+        "<a href=\"https://github.com/DropGuard/ImPulse\">"
+        "https://github.com/DropGuard/ImPulse</a></p>"
+        "<p><b>Based on qimgv</b> by "
+        "<a href=\"https://github.com/easymodo/qimgv\">easymodo</a> and "
+        "<a href=\"https://github.com/easymodo/qimgv/graphs/contributors\">"
+        "contributors</a> — the interface and the artwork come from there.</p>"
+        "<p>OpenCV enabled builds use "
+        "<a href=\"https://github.com/dbzhang800/QtOpenCV\">QtOpenCV</a> "
+        "by dbzhang800</p>"
+        "<p>ImPulse is licensed under the "
+        "<a href=\"https://www.gnu.org/licenses/gpl-3.0.en.html\">"
+        "GNU GPL Version 3</a>.</p>"
+        "<p>Report any issues / request features "
+        "<a href=\"https://github.com/DropGuard/ImPulse/issues\">here</a>.</p>")
+        .arg(appVersion.toString());
+}
 
 SettingsDialog::SettingsDialog(QWidget *parent) :
     QDialog(parent),
@@ -46,8 +76,9 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
 
     this->setWindowTitle(tr("Preferences — ") + qApp->applicationName());
 
-    ui->shortcutsTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);   
+    ui->shortcutsTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->aboutAppTextBrowser->viewport()->setAutoFillBackground(false);
+    ui->aboutAppTextBrowser->setHtml(aboutHtml());
     ui->versionLabel->setText("" + QApplication::applicationVersion());
     ui->qtVersionLabel->setText(qVersion());
     ui->appIconLabel->setPixmap(QIcon(":/res/icons/common/logo/app/22.png").pixmap(22,22));
