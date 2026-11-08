@@ -94,6 +94,12 @@ public:
         replaceArgs.append({src, dst});
         return replaceAnswers.isEmpty() ? DialogResult{} : replaceAnswers.dequeue();
     }
+    int messageCalls = 0;
+    QString lastMessage;
+    void showMessage(const QString &text) override {
+        ++messageCalls;
+        lastMessage = text;
+    }
 };
 
 class TestableFolderGridView : public FolderGridView {
@@ -1596,6 +1602,28 @@ private slots:
         QVERIFY(QDir(base + "/otherdir/thetop/1. What/3. This is weird").exists());
         QVERIFY(!QDir(base + "/otherdir/thetop/1. What/thetop").exists());
         QVERIFY(!QDir(base + "/otherdir/thetop/1. What/1").exists());
+    }
+
+    // upstream issue #505: a preload failing for a file the user is not
+    // viewing used to surface "Load failed" over the image on screen. Only
+    // the on-screen file may announce its own failure.
+    void loadFailureOfUnviewedFileStaysSilent() {
+        writeImage(QDir(base).filePath("keep.png"));
+        Core core;
+        FakeInteractions fake;
+        core.ui_ = &fake;
+        QVERIFY(core.loadPath(QDir(base).filePath("keep.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("keep.png"), 10000);
+        int before = fake.messageCalls;
+
+        // a failure for a file the user never opened stays silent
+        emit core.model->loadFailed(QDir(base).filePath("never-seen.png"));
+        QCOMPARE(fake.messageCalls, before);
+
+        // the on-screen file's own failure announces itself and closes the view
+        emit core.model->loadFailed(QDir(base).filePath("keep.png"));
+        QCOMPARE(fake.messageCalls, before + 1);
+        QVERIFY(fake.lastMessage.contains(QStringLiteral("Load failed")));
     }
 
     void removePermanentDeletesAfterScriptedConfirmation() {

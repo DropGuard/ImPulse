@@ -1618,9 +1618,17 @@ void Core::jumpToLast() {
 }
 
 void Core::onLoadFailed(const QString &path) {
-    mw->showMessage(tr("Load failed: ") + path);
-    if(path == state.currentFilePath)
-        mw->closeImage();
+    // upstream issue #505: a preload failing for a file the user is not
+    // viewing used to surface "Load failed" over the image on screen —
+    // noise from a file they never opened. Only the file the view actually
+    // needs closed may announce its own failure; everything else is a debug
+    // note (navigating to it retries the load and reports then).
+    if(path != state.currentFilePath) {
+        qDebug() << "Load failed (not on screen):" << path;
+        return;
+    }
+    ui_->showMessage(tr("Load failed: ") + path);
+    mw->closeImage();
 }
 
 void Core::onModelItemReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
