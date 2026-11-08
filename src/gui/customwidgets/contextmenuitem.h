@@ -11,6 +11,8 @@ public:
     ContextMenuItem(QWidget *parent = nullptr);
     ~ContextMenuItem() override;
     void setAction(QString mAction);
+    // keyboard activation: the same path a mouse press takes
+    void activate() { onPress(); }
 
 signals:
     void pressed();

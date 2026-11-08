@@ -602,13 +602,14 @@ bool ViewerWidget::focusNextPrevChild(bool mode) {
     return false;
 }
 
-void ViewerWidget::keyPressEvent(QKeyEvent *event) {
-    event->accept();
-    if(currentWidget == VIDEOPLAYER && event->key() == Qt::Key_Space) {
+// keyboard events are not handled here: an unhandled press propagates to
+// MW, whose keyPressEvent is the single funnel into the action system.
+// The video-mode Space intercept that used to live in this door moved to
+// MW::switchFitMode, which owns the context now.
+
+void ViewerWidget::toggleVideoPlayback() {
+    if(currentWidget == VIDEOPLAYER)
         videoPlayer->pauseResume();
-        return;
-    }
-    actionManager->processEvent(event);
 }
 
 void ViewerWidget::leaveEvent(QEvent *event) {
