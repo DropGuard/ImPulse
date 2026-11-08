@@ -19,8 +19,14 @@ VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent)
 #ifdef _WIN32
     libDirs << QApplication::applicationDirPath() + "/plugins";
 #else
-    QDir libPath(QApplication::applicationDirPath() + "/../lib/qimgv");
-    libDirs << (libPath.makeAbsolute() ? libPath.path() : ".") << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
+    // the plugin layout follows the app's name; the lib/qimgv variants stay
+    // as fallbacks so installs that predate the rename keep playing video
+    QDir impulseLib(QApplication::applicationDirPath() + "/../lib/impulse");
+    QDir legacyLib(QApplication::applicationDirPath() + "/../lib/qimgv");
+    libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".")
+            << "/usr/lib/impulse" << "/usr/lib64/impulse"
+            << (legacyLib.makeAbsolute() ? legacyLib.path() : ".")
+            << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
 #endif
 }
 
