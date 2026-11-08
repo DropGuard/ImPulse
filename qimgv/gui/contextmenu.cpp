@@ -86,7 +86,7 @@ ContextMenu::ContextMenu(QWidget *parent) :
 
     ui->slideshow->setAction("toggleSlideshow");
     ui->slideshow->setText(tr("Slideshow"));
-    ui->slideshow->setIconPath(":/res/icons/common/menuitem/play16.png");
+    ui->slideshow->setIconPath(":/res/icons/common/menuitem/slideshow16.png");
 
     ui->settings->setAction("openSettings");
     ui->settings->setText(tr("Settings"));
