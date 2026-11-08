@@ -5,8 +5,10 @@ of [qimgv](https://github.com/easymodo/qimgv). GPL-3.0 · v0.1.0
 
 ## What changed from upstream
 
-- **A Rust engine owns the backend.** Directory watching and decode scheduling
-  left the C++ UI thread entirely — the multithreading crash class and the
+- **A Rust engine owns the backend.** Directory watching and the decode
+  schedule left the C++ UI thread entirely — the engine decides which decode
+  runs next and lets stale batches die, while the C++ side submits the
+  requests and executes the work. The multithreading crash class and the
   directory-update races of the original watcher are structurally gone, not
   patched over.
 - **Renames are atomic.** The engine pairs the kernel's inotify cookies

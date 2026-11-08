@@ -6,8 +6,10 @@ the worst place to store rules. Read it before editing it.
 ## What this repo is
 
 ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux-only). The binary is `impulse`. `rustcore` is the integration trunk: the
-Rust engine (`engine/qimgv-engine`) is the sole writer of directory and
-decode scheduling; the C++ side is a read-only mirror plus Qt rendering.
+Rust engine (`engine/qimgv-engine`) is the sole writer of the directory
+listing and the decode schedule — it decides which decode runs next;
+the C++ side submits the requests and executes the work, plus Qt
+rendering.
 Mirror content and order are decided by the engine — mutation events carry
 engine-side indices and watcher-statted data, C++ only splices (contract:
 `mirrorStaysAFaithfulProjectionOfTheEngineListing`), and the contract is
@@ -15,7 +17,8 @@ absolute: the only listing writers are `applyArena` and the two event-apply
 helpers, mechanically enforced (R7). Architecture rules are enforced by
 `qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
-redeclaration, R7 mirror-writer monopoly) — **structural rules live in the
+redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
+single-Thumbnailer owner, R10 fd-shell purity) — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree
 owns every widget and every other pointer only observes (the generalized
