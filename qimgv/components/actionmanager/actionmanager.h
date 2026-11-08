@@ -110,6 +110,7 @@ signals:
     void toggleShuffle();
     void toggleScalingFilter();
     void showInDirectory();
+    void quickCopy();
     void toggleMute();
     void volumeUp();
     void volumeDown();

@@ -201,6 +201,7 @@ private slots:
     void outputError(const FileOpResult &error) const;
     void showOpenDialog();
     void showInDirectory();
+    void quickCopyToFixedDirectory();
     void onDirectoryViewFileActivated(const QString & filePath);
     bool loadFileIndex(int index, bool async, bool preload);
     void enableDocumentView();

@@ -320,6 +320,7 @@ void SettingsDialog::readSettings() {
         ui->folderEndSwitchFolder->setChecked(true);
 
     ui->mpvLineEdit->setText(settings->mpvBinary());
+    ui->quickCopyLineEdit->setText(settings->quickCopyDirectory());
 
     ui->zoomStepSlider->setValue(static_cast<int>(settings->zoomStep() * 100.f));
     onZoomStepSliderChanged(ui->zoomStepSlider->value());
@@ -451,6 +452,7 @@ void SettingsDialog::saveSettings() {
         settings->setFolderEndAction(FOLDER_END_GOTO_ADJACENT);
 
     settings->setMpvBinary(ui->mpvLineEdit->text());
+    settings->setQuickCopyDirectory(ui->quickCopyLineEdit->text());
     settings->setScalingFilter(static_cast<ScalingFilter>(ui->scalingQualityComboBox->currentIndex()));
     settings->setImageScrolling(static_cast<ImageScrolling>(ui->imageScrollingComboBox->currentIndex()));
     settings->setShowSaveOverlay(ui->saveOverlayCheckBox->isChecked());
