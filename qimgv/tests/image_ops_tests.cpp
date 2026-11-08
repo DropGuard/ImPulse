@@ -10,6 +10,31 @@ public:
 private slots:
     void initTestCase() { init(); }
 
+    // tier-1 decodes a large JPEG at screen size via libjpeg DCT scaling, and
+    // the full-res upgrade rewrites the pixels later; the file's own
+    // dimensions must survive both — the header knows them before any decode,
+    // and the title reports them
+    void originalSizeSurvivesTheScaledTier() {
+        resetFixture();
+        QImage big(4000, 3000, QImage::Format_RGB32);
+        big.fill(Qt::red);
+        const QString path = fixtureDir + "/big.jpg";
+        QImageWriter w(path, "jpg");
+        QVERIFY2(w.write(big), qPrintable(w.errorString()));
+
+        auto scaledImg = ImageFactory::createImage(path, true, loadPolicy());
+        QVERIFY(scaledImg.has_value());
+        QVERIFY((*scaledImg)->isScaledResult());
+        QCOMPARE((*scaledImg)->originalSize(), QSize(4000, 3000));
+        QVERIFY((*scaledImg)->size().width() < 4000);
+
+        auto fullImg = ImageFactory::createImage(path, false, loadPolicy());
+        QVERIFY(fullImg.has_value());
+        QVERIFY(!(*fullImg)->isScaledResult());
+        QCOMPARE((*fullImg)->size(), QSize(4000, 3000));
+        QCOMPARE((*fullImg)->originalSize(), QSize(4000, 3000));
+    }
+
     // The single save-with-rollback implementation ImageStatic and the
     // clipboard import now share. Both cases matter: a successful overwrite
     // must not leave its backup lying next to the file, and a write that fails
