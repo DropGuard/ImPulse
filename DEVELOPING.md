@@ -141,9 +141,17 @@ green suite is only evidence if the test you think ran actually ran.
 
 ## AppImage
 
-`scripts/build-appimage.sh` builds the self-contained bundle in a ubuntu:22.04
-container (the glibc floor the bundle inherits: 2.35 — it covers Debian 12+ and
-Ubuntu 22.04+). Everything rides inside: Qt 6.9, OpenCV, exiv2, libmpv and the
-engine. Requires docker; no FUSE needed (appimagetool runs in extract-and-run
-mode). The result lands in the repository root as
-`ImPulse-<version>-x86_64.AppImage`.
+The self-contained bundle is built by the `appimage` job in
+`.github/workflows/ci.yml`, inside a ubuntu:22.04 container (the glibc floor
+the bundle inherits: 2.35 — it covers Debian 12+ and Ubuntu 22.04+).
+Everything rides inside: Qt 6.9, OpenCV, exiv2, libmpv and the engine. The job
+runs on `v*` tag pushes, `workflow_dispatch` and the nightly schedule; the
+pipeline itself was validated locally through `act` (build, pack and the
+headless smoke green there), but the release step needs the real GitHub API
+and is only proven on a runner.
+
+A tag push lands a **draft** release with `ImPulse-<version>-x86_64.AppImage`
+and its sha256; the tag must match the version in `qimgv/appversion.cpp`.
+Publish the draft only after the bundle has survived a start on a real
+desktop — that check is the one thing CI cannot do
+(`gh release edit <tag> --draft=false`, or the web UI).
