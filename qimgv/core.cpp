@@ -781,8 +781,11 @@ void Core::showInDirectory() {
         QStringLiteral("/org/freedesktop/FileManager1"),
         QStringLiteral("org.freedesktop.FileManager1"),
         QStringLiteral("ShowItems"));
-    msg.setArguments({QVariant::fromValue(QList<QUrl>{QUrl::fromLocalFile(reveal)}),
-                      QVariant(QString())});
+    // QStringList, not QList<QUrl>: QtDBus has no marshaller for the latter,
+    // the call died before reaching the bus, and the fallback answered
+    // "impulse" — the self-loop that brought the user here twice
+    msg.setArguments({QStringList{QUrl::fromLocalFile(reveal).toString()},
+                      QString()});
     auto *watcher = new QDBusPendingCallWatcher(
         QDBusConnection::sessionBus().asyncCall(msg), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
@@ -812,18 +815,30 @@ void Core::showInDirectory() {
 #endif
 }
 
-// the pre-DBus chain, kept as the DBus failure path: dolphin and nautilus
-// understand --select; anything else gets the directory via the desktop
-// default — which may be this app, and folder view is then the answer the
-// platform gives
+// the pre-DBus chain, kept as the DBus failure path — and hardened: the mime
+// default may be this very app (a viewer may claim inode/directory), and
+// handing the path to the desktop then means folder view opening itself.
+// When the default is unusable, any installed manager that speaks --select
+// beats looping back into this one
 void Core::revealInFileBrowser(const QString &path) {
     QString fm = ScriptManager::runCommand("xdg-mime query default inode/directory");
-    if(fm.contains("dolphin"))
-        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("dolphin", path));
-    else if(fm.contains("nautilus"))
-        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("nautilus", path));
-    else
-        QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    if(!fm.contains("impulse")) {
+        if(fm.contains("dolphin")) {
+            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("dolphin", path));
+            return;
+        }
+        if(fm.contains("nautilus")) {
+            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("nautilus", path));
+            return;
+        }
+    }
+    for(const QString &candidate : {QStringLiteral("dolphin"), QStringLiteral("nautilus"), QStringLiteral("nemo")}) {
+        if(!QStandardPaths::findExecutable(candidate).isEmpty()) {
+            ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand(candidate, path));
+            return;
+        }
+    }
+    mw->showMessage(tr("No file manager found to reveal the file"));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
