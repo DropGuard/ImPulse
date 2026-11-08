@@ -18,7 +18,8 @@ helpers, mechanically enforced (R7). Architecture rules are enforced by
 `qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
-single-Thumbnailer owner, R10 fd-shell purity) — **structural rules live in the
+single-Thumbnailer owner, R10 fd-shell purity, R11 key-door whitelist)
+— **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree
 owns every widget and every other pointer only observes (the generalized

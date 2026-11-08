@@ -35,6 +35,7 @@
 #include "utils/actions.h"
 #include "utils/inputmap.h"
 #include "gui/dialogs/settingsdialog.h"
+#include "gui/contextmenu.h"
 #include "themestore.h"
 #include "testhelpers.h"
 #include "gui/customwidgets/floatingwidget.h"
@@ -99,6 +100,16 @@ public:
     void showMessage(const QString &text) override {
         ++messageCalls;
         lastMessage = text;
+    }
+};
+
+class TestableContextMenu : public ContextMenu {
+public:
+    using ContextMenu::keyPressEvent;
+    using ContextMenu::showAt;
+    void pressKey(Qt::Key k) {
+        QKeyEvent press(QEvent::KeyPress, k, Qt::NoModifier);
+        keyPressEvent(&press);
     }
 };
 
@@ -340,6 +351,24 @@ private slots:
         // second press: the same-name file is skipped, still exactly one copy
         actionManager->invokeAction(QStringLiteral("quickCopy"));
         QCOMPARE(QDir(dest).entryList(QDir::Files).size(), 1);
+    }
+
+    // the popup owns the keyboard while open: Up/Down move a selection over
+    // the visible items with wrap-around, and Enter activates the selected
+    // row through the same path a mouse press takes
+    void contextMenuKeyboardNavigationMovesAndWraps() {
+        TestableContextMenu menu;
+        menu.showAt(QPoint(40, 40));
+        QCOMPARE(menu.navigationIndex(), -1);
+
+        menu.pressKey(Qt::Key_Down);   // from nothing: the first item
+        QCOMPARE(menu.navigationIndex(), 0);
+        menu.pressKey(Qt::Key_Up);     // wrap backwards: the last item
+        QVERIFY(menu.navigationIndex() > 0);
+        menu.pressKey(Qt::Key_Down);   // wrap forwards: back to the first
+        QCOMPARE(menu.navigationIndex(), 0);
+        menu.pressKey(Qt::Key_Down);
+        QCOMPARE(menu.navigationIndex(), 1);
     }
 
     void preloaderFollowsTheDirectionOfTravel() {

@@ -303,6 +303,34 @@ else:
                         "and fake their coverage; tests for fd behavior live in watcher_tests.rs "
                         "(the real-machinery pins) or in pair.rs/apply.rs (the pure layer)")
 
+# Rule 11: keyboard policy is a closed list of doors. Every keyPressEvent
+# override must live in ALLOWED_KEY_DOORS — a new door outside the list is
+# exactly how the up-arrow fit-width easter egg stayed invisible for years:
+# it intercepted keys before the action system, in a door no reader suspected.
+ALLOWED_KEY_DOORS = {
+    'gui/mainwindow.cpp',                    # the terminal funnel
+    'gui/contextmenu.cpp',                   # popup: item navigation, no forwarding
+    'gui/folderview/foldergridview.cpp',     # widget-standard grid navigation
+    'gui/customwidgets/thumbnailview.cpp',   # shift state for range selection
+    'gui/folderview/treeviewcustom.cpp',     # widget-standard tree navigation
+    'gui/folderview/fvoptionspopup.cpp',     # Esc-only popup
+    'gui/panels/croppanel/croppanel.cpp',    # modal editing surface: crop workflow keys
+    'gui/overlays/cropoverlay.cpp',          # modal editing surface: crop workflow keys
+    'gui/overlays/renameoverlay.cpp',        # modal input with a curated passthrough
+    'gui/overlays/copyoverlay.cpp',          # modal surface with its own per-destination hotkeys
+    'gui/dialogs/resizedialog.cpp',          # modal dialog: Enter applies, Esc rejects
+    'gui/overlays/changelogwindow.cpp',      # Esc-only window
+    'gui/customwidgets/styledcombobox.cpp',  # input routing (ignore-all)
+    'gui/customwidgets/spinboxinputfix.cpp', # numeric input guard
+    'gui/customwidgets/keysequenceedit.cpp', # the keymap's capture device
+}
+for path, rel in sources():
+    if rel.startswith('tests/'):
+        continue
+    scanned['R11'] = scanned.get('R11', 0) + 1
+    if '::keyPressEvent(' in text_of(path) and rel not in ALLOWED_KEY_DOORS:
+        failures.append(f"R11 unauthorized key door: {rel} (add to ALLOWED_KEY_DOORS only after review)")
+
 if failures:
     print("architecture violations:")
     for f in failures:

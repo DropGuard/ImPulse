@@ -218,6 +218,13 @@ void MW::fitWindowStretch() {
 // switch between 1:1 and Fit All
 // TODO: move to viewerWidget?
 void MW::switchFitMode() {
+    // Space in video mode is play/pause — the context check used to live in
+    // ViewerWidget::keyPressEvent, an input side door; the action handler
+    // owns the context now
+    if(viewerWidget->currentWidgetType() == VIDEOPLAYER) {
+        viewerWidget->toggleVideoPlayback();
+        return;
+    }
     if(viewerWidget->fitMode() == FIT_WINDOW)
         viewerWidget->setFitMode(FIT_ORIGINAL);
     else
