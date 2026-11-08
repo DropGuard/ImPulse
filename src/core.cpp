@@ -851,8 +851,21 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     }
 // DIR COPY (RECURSIVE) =======================================================================
     QDir srcDir(srcFi.absoluteFilePath());
-    QFileInfo dstFi(destDirectory + "/" + srcFi.baseName());
+    // a directory has no extension to re-attach: baseName() here truncated
+    // every dotted name at its first dot ("1. What" -> "1") — upstream
+    // issue #612's corruption signature. fileName() keeps the whole name.
+    QFileInfo dstFi(destDirectory + "/" + srcFi.fileName());
     QDir dstDir(dstFi.absoluteFilePath());
+    // moving a directory into itself (or its own subtree) recurses forever,
+    // each pass re-entering the tree it is copying — issue #612's second
+    // bug, the one that shredded 5000 directories. Canonical paths, so
+    // symlinks and ../ cannot sneak a self-move past the check.
+    QString srcCanon = srcDir.canonicalPath();
+    QString dstCanon = dstDir.canonicalPath();
+    if(dstCanon.isEmpty())
+        dstCanon = dstDir.absolutePath();
+    if(dstCanon == srcCanon || dstCanon.startsWith(srcCanon + "/"))
+        return;
     if(dstFi.exists() && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
@@ -925,8 +938,15 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     }
 // DIR MOVE (RECURSIVE) =======================================================================
     QDir srcDir(srcFi.absoluteFilePath());
-    QFileInfo dstFi(destDirectory + "/" + srcFi.baseName());
+    // same two fixes as the dir copy above: whole name, no self-subtree
+    QFileInfo dstFi(destDirectory + "/" + srcFi.fileName());
     QDir dstDir(dstFi.absoluteFilePath());
+    QString srcCanon = srcDir.canonicalPath();
+    QString dstCanon = dstDir.canonicalPath();
+    if(dstCanon.isEmpty())
+        dstCanon = dstDir.absolutePath();
+    if(dstCanon == srcCanon || dstCanon.startsWith(srcCanon + "/"))
+        return;
     if(dstFi.exists() && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
