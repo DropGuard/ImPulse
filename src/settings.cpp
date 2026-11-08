@@ -1024,14 +1024,6 @@ void Settings::setShowSaveOverlay(bool mode) {
     store(K_ShowSaveOverlay, mode);
 }
 //------------------------------------------------------------------------------
-bool Settings::confirmDelete() {
-    return load<bool>(K_ConfirmDelete);
-}
-
-void Settings::setConfirmDelete(bool mode) {
-    store(K_ConfirmDelete, mode);
-}
-//------------------------------------------------------------------------------
 bool Settings::confirmTrash() {
     return load<bool>(K_ConfirmTrash);
 }

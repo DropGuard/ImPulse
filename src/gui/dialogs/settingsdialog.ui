@@ -4578,18 +4578,6 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QCheckBox" name="confirmDeleteCheckBox">
-                    <property name="font">
-                     <font>
-                      <bold>true</bold>
-                     </font>
-                    </property>
-                    <property name="text">
-                     <string>Confirm file delete (!)</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
                    <widget class="QWidget" name="widget_27" native="true">
                     <property name="accessibleName">
                      <string notr="true">SLine</string>

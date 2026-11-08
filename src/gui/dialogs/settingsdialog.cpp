@@ -25,7 +25,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         {ui->expandImageCheckBox, &Settings::expandImage, &Settings::setExpandImage},
         {ui->smoothAnimatedImagesCheckBox, &Settings::smoothAnimatedImages, &Settings::setSmoothAnimatedImages},
         {ui->blurBackgroundCheckBox, &Settings::blurBackground, &Settings::setBlurBackground},
-        {ui->confirmDeleteCheckBox, &Settings::confirmDelete, &Settings::setConfirmDelete},
         {ui->confirmTrashCheckBox, &Settings::confirmTrash, &Settings::setConfirmTrash},
         {ui->unlockMinZoomCheckBox, &Settings::unlockMinZoom, &Settings::setUnlockMinZoom},
         {ui->trackpadDetectionCheckBox, &Settings::trackpadDetection, &Settings::setTrackpadDetection},
@@ -238,7 +237,6 @@ void SettingsDialog::readSettings() {
     ui->bgOpacitySlider->setValue(static_cast<int>(settings->backgroundOpacity() * 100));
     ui->blurBackgroundCheckBox->setChecked(settings->blurBackground());
     ui->sortingComboBox->setCurrentIndex(settings->sortingMode());
-    ui->confirmDeleteCheckBox->setChecked(settings->confirmDelete());
     ui->confirmTrashCheckBox->setChecked(settings->confirmTrash());
     ui->unlockMinZoomCheckBox->setChecked(settings->unlockMinZoom());
     ui->trackpadDetectionCheckBox->setChecked(settings->trackpadDetection());
@@ -383,7 +381,6 @@ void SettingsDialog::saveSettings() {
     settings->setBackgroundOpacity(static_cast<qreal>(ui->bgOpacitySlider->value()) / 100.f);
     settings->setBlurBackground(ui->blurBackgroundCheckBox->isChecked());
     settings->setSortingMode(static_cast<SortingMode>(ui->sortingComboBox->currentIndex()));
-    settings->setConfirmDelete(ui->confirmDeleteCheckBox->isChecked());
     settings->setConfirmTrash(ui->confirmTrashCheckBox->isChecked());
     settings->setUnlockMinZoom(ui->unlockMinZoomCheckBox->isChecked());
     settings->setTrackpadDetection(ui->trackpadDetectionCheckBox->isChecked());
