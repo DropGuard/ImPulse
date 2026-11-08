@@ -116,7 +116,6 @@ inline constexpr SettingDesc K_WindowTitleExtendedInfo = BOOL("windowTitleExtend
 inline constexpr SettingDesc K_CursorAutohide         = BOOL("cursorAutohiding", true);
 inline constexpr SettingDesc K_FirstRun               = BOOL("firstRun", true);
 inline constexpr SettingDesc K_ShowSaveOverlay        = BOOL("showSaveOverlay", true);
-inline constexpr SettingDesc K_ConfirmDelete          = BOOL("confirmDelete", true);
 inline constexpr SettingDesc K_ConfirmTrash           = BOOL("confirmTrash", true);
 inline constexpr SettingDesc K_UnloadThumbs           = BOOL("unloadThumbs", true);
 inline constexpr SettingDesc K_JxlAnimation           = BOOL("jxlAnimation", false);
@@ -166,7 +165,7 @@ inline constexpr const SettingDesc *kAllSettings[] = {
     &K_SquareThumbnails, &K_TransparencyGrid, &K_EnableSmoothScroll, &K_UseThumbnailCache,
     &K_SmoothUpscaling, &K_ExpandImage, &K_SmoothAnimatedImages, &K_InfoBarFullscreen,
     &K_InfoBarWindowed, &K_WindowTitleExtendedInfo, &K_CursorAutohide, &K_FirstRun,
-    &K_ShowSaveOverlay, &K_ConfirmDelete, &K_ConfirmTrash, &K_UnloadThumbs,
+    &K_ShowSaveOverlay, &K_ConfirmTrash, &K_UnloadThumbs,
     &K_JxlAnimation, &K_AutoResizeWindow, &K_UseFixedZoomLevels, &K_UnlockMinZoom,
     &K_TrackpadDetection, &K_ClickableEdges, &K_ClickableEdgesVisible, &K_ShowHiddenFiles,
     &K_SortingMode, &K_FolderEndAction, &K_FolderViewMode, &K_ThumbPanelStyle,
