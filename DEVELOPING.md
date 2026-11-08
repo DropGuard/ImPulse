@@ -38,12 +38,10 @@ boundary, so remove+add remains a shape consumers must tolerate.
 per request on the UI thread and travels with the work (`LoadPolicy`); pool
 threads receive values instead of reaching for global configuration.
 
-**Quality machinery, as tests.** Eleven structural architecture rules (R1–R11) run as
-a ctest suite: GUI isolation, the FFI caller whitelist, the Rust seal, settings
-dereferencing off the UI thread, the ABI layout pin, the signal re-declaration ban,
-the mirror-writer monopoly, the settings-table bypass ban, the single Thumbnailer
-owner, the ban on decision logic inside the syscall shell, and the key-door
-whitelist. A static-analysis
+**Quality machinery, as tests.** Eleven structural architecture rules run as
+a ctest suite — the authoritative enumeration, with the incidents that earned
+each rule, lives in [AGENTS.md](AGENTS.md); the enforcing instrument is
+`qimgv/tests/architecture_rules.py`. A static-analysis
 gate counts findings per family and pins its own instrument: the scanned
 `(file, command)` set plus the versions of the tools that judged it. A
 re-configured build tree or a compiler upgrade therefore fails the gate by name
