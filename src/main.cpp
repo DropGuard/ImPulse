@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     QCoreApplication::setOrganizationName("ImPulse");
-    QCoreApplication::setOrganizationDomain("github.com/easymodo/qimgv");
+    QCoreApplication::setOrganizationDomain("github.com/DropGuard/ImPulse");
     QCoreApplication::setApplicationName("impulse");
     QCoreApplication::setApplicationVersion(appVersion.toString());
     QApplication::setEffectEnabled(Qt::UI_AnimateCombo, false);
