@@ -138,6 +138,11 @@ jobs:
           # desktop whose ldconfig HAS every file. The job's PATH decides
           # which Qt gets deployed — pin it.
           export PATH="$PWD:/opt/qt/6.9.1/gcc_64/bin:$PATH"
+          # plugin-qt deploys libqxcb.so and nothing else by default; the
+          # wayland pair and the offscreen plugin the smoke runs under must
+          # be requested explicitly or the bundle is X11-only and the smoke
+          # dies with "Available platform plugins are: xcb"
+          export EXTRA_PLATFORM_PLUGINS="libqwayland-egl.so;libqwayland-generic.so;libqoffscreen.so"
           ./linuxdeploy.AppImage --appdir AppDir --plugin qt
           cat AppDir/usr/bin/qt.conf
           # linuxdeploy's --exclude-library matches exact sonames only, so the
