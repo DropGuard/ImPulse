@@ -12,6 +12,11 @@
 #include <QThread>
 #include <QDrag>
 #include <QTemporaryFile>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 
 #ifdef __WIN32
 #include <tchar.h>
@@ -761,18 +766,32 @@ void Core::showOpenDialog() {
 void Core::showInDirectory() {
     if(!model)
         return;
-    if(selectedPath().isEmpty()) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
-        return;
-    }
 #if defined(__linux__) || defined(__FreeBSD__)
-    QString fm = ScriptManager::runCommand("xdg-mime query default inode/directory");
-    if(fm.contains("dolphin"))
-        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("dolphin", selectedPath()));
-    else if(fm.contains("nautilus"))
-        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("nautilus", selectedPath()));
-    else
-        QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
+    // org.freedesktop.FileManager1 first: the session's real file manager
+    // shows and selects, whatever it is. The mime query cannot be trusted
+    // here — when this app is itself the inode/directory default, the query
+    // answers "impulse" and the old fallback asked the desktop to open the
+    // directory, which meant this app's folder view recursing into itself.
+    // An empty selection reveals the directory itself (selected in its
+    // parent) rather than handing it back to this app.
+    QString reveal = selectedPath().isEmpty() ? model->directoryPath()
+                                             : selectedPath();
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QStringLiteral("org.freedesktop.FileManager1"),
+        QStringLiteral("/org/freedesktop/FileManager1"),
+        QStringLiteral("org.freedesktop.FileManager1"),
+        QStringLiteral("ShowItems"));
+    msg.setArguments({QVariant::fromValue(QList<QUrl>{QUrl::fromLocalFile(reveal)}),
+                      QVariant(QString())});
+    auto *watcher = new QDBusPendingCallWatcher(
+        QDBusConnection::sessionBus().asyncCall(msg), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, reveal](QDBusPendingCallWatcher *w) {
+        w->deleteLater();
+        QDBusPendingReply<> reply = *w;
+        if(reply.isError())
+            revealInFileBrowser(reveal);
+    });
 #elif __WIN32
     QStringList args;
     args << "/select," << QDir::toNativeSeparators(selectedPath());
@@ -791,6 +810,20 @@ void Core::showInDirectory() {
 #else
     QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
 #endif
+}
+
+// the pre-DBus chain, kept as the DBus failure path: dolphin and nautilus
+// understand --select; anything else gets the directory via the desktop
+// default — which may be this app, and folder view is then the answer the
+// platform gives
+void Core::revealInFileBrowser(const QString &path) {
+    QString fm = ScriptManager::runCommand("xdg-mime query default inode/directory");
+    if(fm.contains("dolphin"))
+        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("dolphin", path));
+    else if(fm.contains("nautilus"))
+        ScriptManager::runCommandDetached(ScriptManager::fileManagerSelectCommand("nautilus", path));
+    else
+        QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
