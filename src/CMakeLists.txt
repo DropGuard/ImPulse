@@ -65,6 +65,7 @@ target_link_libraries(qimgv_nongui PUBLIC
     Qt6::Widgets
     Qt6::Svg
     Qt6::PrintSupport
+    Qt6::DBus
     qimgv_engine_ffi
     qimgv_sanitizers)
 

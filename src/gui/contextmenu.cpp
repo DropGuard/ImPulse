@@ -84,6 +84,10 @@ ContextMenu::ContextMenu(QWidget *parent) :
     ui->folderView->setIconPath(":/res/icons/common/menuitem/folderview16.png");
     ui->folderView->setShortcutText("");
 
+    ui->slideshow->setAction("toggleSlideshow");
+    ui->slideshow->setText(tr("Slideshow"));
+    ui->slideshow->setIconPath(":/res/icons/common/menuitem/play16.png");
+
     ui->settings->setAction("openSettings");
     ui->settings->setText(tr("Settings"));
     ui->settings->setIconPath(":/res/icons/common/menuitem/settings16.png");

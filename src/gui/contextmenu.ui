@@ -505,6 +505,9 @@
           <widget class="ContextMenuItem" name="folderView" native="true"/>
          </item>
          <item>
+          <widget class="ContextMenuItem" name="slideshow" native="true"/>
+         </item>
+         <item>
           <widget class="ContextMenuItem" name="settings" native="true"/>
          </item>
          <item>
