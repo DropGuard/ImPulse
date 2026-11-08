@@ -10,8 +10,9 @@ discipline (each rule mapped to the incident that earned it) lives in
 
 The directory listing belongs to a Rust engine whose watcher is inotify. On other
 platforms the event channel is `never()`, the old `QFileSystemWatcher` fallback is
-gone, and `inotify`/`libc` are unconditional dependencies — so live folder updates,
-and the build itself, are not expected to work elsewhere. Picking another platform
+gone, and the `inotify` crate is an unconditional dependency (`libc` rides the
+linux target gate) — so live folder updates, and the build itself, are not
+expected to work elsewhere. Picking another platform
 up starts with `cargo check --target x86_64-pc-windows-gnu`: it does not link, so it
 runs here and reports how much is missing before anything is written.
 
@@ -20,9 +21,11 @@ Distro packages named `qimgv` install upstream, not this fork.
 ## Architecture: what changed underneath
 
 **One writer for the listing.** The Rust engine (`engine/qimgv-engine`) owns the
-directory listing and decode scheduling. The C++ side is a read-only mirror plus
-Qt rendering: mutation events carry engine-side indices and watcher-statted data,
-and C++ only splices. The monopoly is enforced by a test, not by convention.
+directory listing and the decode schedule — it decides which decode runs next;
+the C++ side submits the requests and executes the work. The C++ side is
+otherwise a read-only mirror plus Qt rendering: mutation events carry
+engine-side indices and watcher-statted data, and C++ only splices. The
+monopoly is enforced by a test, not by convention.
 
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
