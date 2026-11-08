@@ -81,6 +81,7 @@ void Actions::init() {
     mActions.insert("volumeDown", QVersionNumber(0,8,7));
     mActions.insert("toggleSlideshow", QVersionNumber(0,8,81));
     mActions.insert("showInDirectory", QVersionNumber(0,8,82));
+    mActions.insert("quickCopy", QVersionNumber(0,9,2));
     mActions.insert("goUp", QVersionNumber(0,9,2));
     mActions.insert("discardEdits", QVersionNumber(0,9,2));
     mActions.insert("nextDirectory", QVersionNumber(0,9,2));

@@ -398,6 +398,14 @@ void Settings::fillVideoFormats() {
     mVideoFormatsMap.insert("video/x-flv",      "flv");
 }
 //------------------------------------------------------------------------------
+QString Settings::quickCopyDirectory() {
+    return load<QString>(K_QuickCopyDirectory);
+}
+
+void Settings::setQuickCopyDirectory(const QString &dir) {
+    store(K_QuickCopyDirectory, dir);
+}
+//------------------------------------------------------------------------------
 QString Settings::mpvBinary() {
     QString mpvPath = settingsConf->value("mpvBinary", "").toString();
     if(!QFile::exists(mpvPath)) {

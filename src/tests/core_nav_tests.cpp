@@ -311,6 +311,31 @@ private slots:
                  QStringLiteral("ImPulse"));
     }
 
+    // upstream issue #636, promoted from the author's own external script:
+    // one keypress copies the current file into the configured folder —
+    // no dialog, no clobbering. Unconfigured, it says so instead of
+    // guessing a destination.
+    void quickCopyLandsInTheConfiguredFolder() {
+        QString dest = QDir(home.path()).filePath("quickcopy-dest");
+        settings->setQuickCopyDirectory(dest);
+        QVERIFY(QDir().mkpath(dest));
+
+        Core core;
+        FakeInteractions fake;
+        core.ui_ = &fake;
+        QString img = QDir(base).filePath("qc.png");
+        writeImage(img);
+        QVERIFY(core.loadPath(img));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), img, 10000);
+
+        actionManager->invokeAction(QStringLiteral("quickCopy"));
+        QTRY_COMPARE_WITH_TIMEOUT(QFileInfo(QDir(dest).filePath("qc.png")).exists(), true, 10000);
+
+        // second press: the same-name file is skipped, still exactly one copy
+        actionManager->invokeAction(QStringLiteral("quickCopy"));
+        QCOMPARE(QDir(dest).entryList(QDir::Files).size(), 1);
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());

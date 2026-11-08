@@ -155,6 +155,7 @@ inline constexpr SettingDesc K_BackgroundOpacity      = REAL("backgroundOpacity"
 
 inline constexpr SettingDesc K_PanelPosition          = STR("panelPosition", "top");
 inline constexpr SettingDesc K_MpvBinary              = STR("mpvBinary", "");
+inline constexpr SettingDesc K_QuickCopyDirectory     = STR("quickCopyDirectory", "");
 inline constexpr SettingDesc K_Language               = STR("language", "en_US");
 
 // The audit test walks this list; keep it in sync when adding a row.
