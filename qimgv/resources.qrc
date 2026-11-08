@@ -62,6 +62,8 @@
         <file>res/icons/common/menuitem/move16@2x.png</file>
         <file>res/icons/common/menuitem/open16.png</file>
         <file>res/icons/common/menuitem/open16@2x.png</file>
+        <file>res/icons/common/menuitem/play16.png</file>
+        <file>res/icons/common/menuitem/play16@2x.png</file>
         <file>res/icons/common/menuitem/resize16.png</file>
         <file>res/icons/common/menuitem/resize16@2x.png</file>
         <file>res/icons/common/menuitem/rotate-left16.png</file>
