@@ -259,6 +259,19 @@ private slots:
         writeImage(QDir(beta).filePath("b.png"));
     }
 
+    void pagingKeysHaveNamesAndDefaults() {
+        // a press with no name in the scancode table cannot reach the action
+        // layer at all; a name with no default never fires for a config that
+        // predates the binding — pin both halves, plus the lookup itself
+        QVERIFY(inputMap->keys().value(112) == "PgUp");
+        QVERIFY(inputMap->keys().value(117) == "PgDown");
+        QVERIFY(actionManager->actionForShortcut("PgUp") == "prevImage");
+        QVERIFY(actionManager->actionForShortcut("PgDown") == "nextImage");
+        QVERIFY(actionManager->invokeAction(actionManager->actionForShortcut("PgDown")));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForShortcut("PgUp")));
+        QVERIFY(actionManager->actionForShortcut("F13").isEmpty());
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());

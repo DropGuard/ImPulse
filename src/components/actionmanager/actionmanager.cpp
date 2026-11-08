@@ -67,6 +67,8 @@ void ActionManager::initDefaults() {
     defaults.insert("M", "moveFile");
     defaults.insert("Home", "jumpToFirst");
     defaults.insert("End", "jumpToLast");
+    defaults.insert("PgUp", "prevImage");
+    defaults.insert("PgDown", "nextImage");
     defaults.insert(InputMap::keyNameCtrl() + "+Right", "seekVideoForward");
     defaults.insert(InputMap::keyNameCtrl() + "+Left", "seekVideoBackward");
     defaults.insert(",", "frameStepBack");
@@ -102,10 +104,12 @@ void ActionManager::initDefaults() {
 
 //------------------------------------------------------------------------------
 void ActionManager::initShortcuts() {
+    // defaults are the base layer, user entries overlay them: a config
+    // written before a default existed — or carrying only a few entries —
+    // still picks the new default up. The old all-or-nothing copy left any
+    // config holding at least one entry permanently pinned to its own era.
+    shortcuts = defaults;
     readShortcuts();
-    if(shortcuts.isEmpty()) {
-        resetDefaults();
-    }
 }
 //------------------------------------------------------------------------------
 void ActionManager::addShortcut(const QString &keys, const QString &action) {
