@@ -229,6 +229,7 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
     connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
     connect(actionManager, &ActionManager::copyFile, mw, &MW::triggerCopyOverlay);
+    connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
     connect(actionManager, &ActionManager::moveFile, mw, &MW::triggerMoveOverlay);
     connect(actionManager, &ActionManager::jumpToFirst, this, &Core::jumpToFirst);
     connect(actionManager, &ActionManager::jumpToLast, this, &Core::jumpToLast);
@@ -815,6 +816,36 @@ void Core::showInDirectory() {
 #else
     QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
 #endif
+}
+
+// upstream issue #636, promoted from the author's own external script: one
+// keypress copies the current file into the configured folder — no dialog,
+// no clobbering. Unconfigured, it says so instead of guessing.
+void Core::quickCopyToFixedDirectory() {
+    if(!model || model->isEmpty() || selectedPath().isEmpty())
+        return;
+    QString destDir = settings->quickCopyDirectory();
+    if(destDir.isEmpty()) {
+        mw->showMessage(tr("Set the quick copy folder in settings first"));
+        return;
+    }
+    QFileInfo srcFi(selectedPath());
+    if(!srcFi.isFile()) {
+        mw->showMessage(tr("Quick copy: not a regular file"));
+        return;
+    }
+    QDir(destDir).mkpath(".");
+    QFileInfo dstFi(destDir + "/" + srcFi.fileName());
+    if(dstFi.exists()) {
+        mw->showMessage(tr("Already in the quick copy folder"));
+        return;
+    }
+    FileOpResult result;
+    FileOperations::copyFileTo(selectedPath(), destDir, false, result);
+    if(result == FileOpResult::SUCCESS)
+        mw->showMessage(tr("Copied to ") + destDir);
+    else
+        mw->showError(FileOperations::decodeResult(result));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {

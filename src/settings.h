@@ -135,6 +135,8 @@ public:
     QString thumbnailCacheDir();
     QString mpvBinary();
     void setMpvBinary(const QString& path);
+    QString quickCopyDirectory();
+    void setQuickCopyDirectory(const QString &dir);
     PanelPosition panelPosition();
     void setPanelPosition(PanelPosition);
     bool loopSlideshow();
