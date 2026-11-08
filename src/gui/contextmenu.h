@@ -11,12 +11,16 @@ namespace Ui {
 class ContextMenu;
 }
 
+class ContextMenuItem;
+
 class ContextMenu : public QWidget {
     Q_OBJECT
 public:
     explicit ContextMenu(QWidget *parent = nullptr);
     ~ContextMenu() override;
     void setImageEntriesEnabled(bool mode);
+    // keyboard navigation state, for tests and for the keymap docs
+    int navigationIndex() const { return selectedIndex; }
 
 public slots:
     void showAt(QPoint pos);
@@ -25,7 +29,13 @@ public slots:
 private:
     Ui::ContextMenu *ui;
     QTimer mTimer;
+    int selectedIndex = -1;
 
+    QList<ContextMenuItem*> visibleItems() const;
+    void moveSelection(int delta);
+    void activateSelected();
+    void applySelection();
+    void clearSelection();
     void fillOpenWithMenu();
 
 signals:

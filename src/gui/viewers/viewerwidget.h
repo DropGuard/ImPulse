@@ -35,6 +35,8 @@ public:
     bool lockZoomEnabled();
     bool lockViewEnabled();
     ScalingFilter scalingFilter();
+    CurrentWidget currentWidgetType() const { return currentWidget; }
+    void toggleVideoPlayback();
 
 private:
     QVBoxLayout layout;
@@ -126,7 +128,6 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 
-    void keyPressEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
     bool focusNextPrevChild(bool mode) override;
 };

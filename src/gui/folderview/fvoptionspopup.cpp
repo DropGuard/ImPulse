@@ -74,10 +74,10 @@ void FVOptionsPopup::paintEvent(QPaintEvent *event) {
 }
 
 void FVOptionsPopup::keyPressEvent(QKeyEvent *event) {
+    // an open popup must not fire global actions — keys used to forward to
+    // the action system, so F behind this popup toggled fullscreen
     if(event->key() == Qt::Key_Escape)
         hide();
-    else
-        actionManager->processEvent(event);
 }
 
 void FVOptionsPopup::setViewMode(FolderViewMode mode) {
