@@ -69,7 +69,11 @@ void ImageStatic::loadGeneric() {
     // it rare enough so lets just convert it to the closest working thing
     if(img->format() == QImage::Format_Mono) {
         QImage *imgConverted = new QImage();
-        *imgConverted = img->convertToFormat(QImage::Format_Grayscale8);
+        // a 1-bit BMP carries a real color palette — Grayscale8 threw the
+        // palette away and colored art opened as black and white (upstream
+        // issue #653). RGB32 keeps the palette while still dodging the
+        // transparent-background scaling that motivated the conversion.
+        *imgConverted = img->convertToFormat(QImage::Format_RGB32);
         image.reset(imgConverted);
     } else {
         // set image

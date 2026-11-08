@@ -14,6 +14,53 @@ private slots:
     // the full-res upgrade rewrites the pixels later; the file's own
     // dimensions must survive both — the header knows them before any decode,
     // and the title reports them
+    // upstream issue #653: a 1-bit BMP carries a real color palette, and the
+    // Mono conversion used to flatten it to Grayscale8 — colored art opened
+    // as black and white while the folder view (no such conversion) was
+    // correct. RGB32 keeps the palette AND the scaling workaround.
+    void monoBitmapPaletteColorsSurviveTheLoad() {
+        resetFixture();
+        // hand-assembled 1-bit BMP: 8x8, two palette entries (blue, red),
+        // alternating pixels. Qt's BMP writer does not do 1-bit, so the
+        // fixture is raw bytes — the way machinery_tests writes its EXIF jpeg.
+        QByteArray bmp;
+        auto u32le = [&bmp](quint32 v) {
+            for(int i = 0; i < 4; ++i) bmp.append(char((v >> (8 * i)) & 0xFF));
+        };
+        auto u16le = [&bmp](quint16 v) {
+            bmp.append(char(v & 0xFF)); bmp.append(char((v >> 8) & 0xFF));
+        };
+        bmp.append("BM");
+        u32le(14 + 40 + 8 + 32);            // file size: headers + palette + rows
+        u16le(0); u16le(0); u32le(62);      // reserved, pixel data offset
+        u32le(40); u32le(8); u32le(8);      // info header size, width, height
+        u16le(1); u16le(1);                 // planes, 1 bpp
+        u32le(0); u32le(32);                // BI_RGB, image size
+        u32le(0); u32le(0); u32le(2); u32le(0); // ppm, clrUsed=2, clrImportant
+        // palette: entry0 blue, entry1 red (B,G,R,reserved)
+        bmp.append(char(220)); bmp.append(char(90));  bmp.append(char(30));  bmp.append(char(0));
+        bmp.append(char(40));  bmp.append(char(40));  bmp.append(char(220)); bmp.append(char(0));
+        // bottom-up rows, alternating 0xAA / 0x55, each padded to 4 bytes
+        for(int r = 0; r < 8; ++r) {
+            bmp.append(r % 2 == 0 ? char(0xAA) : char(0x55));
+            bmp.append(char(0)); bmp.append(char(0)); bmp.append(char(0));
+        }
+        const QString path = fixtureDir + "/palette-mono.bmp";
+        QFile out(path);
+        QVERIFY2(out.open(QIODevice::WriteOnly), qPrintable(out.errorString()));
+        out.write(bmp);
+        out.close();
+
+        auto img = ImageFactory::createImage(path, false, loadPolicy());
+        QVERIFY(img.has_value());
+        auto src = (*img)->getImage();
+        QVERIFY(src != nullptr);
+        QVERIFY(src->format() != QImage::Format_Mono);
+        QVERIFY(src->format() != QImage::Format_Grayscale8);
+        QCOMPARE(src->pixelColor(0, 0), QColor(30, 90, 220));
+        QCOMPARE(src->pixelColor(1, 0), QColor(220, 40, 40));
+    }
+
     void originalSizeSurvivesTheScaledTier() {
         resetFixture();
         QImage big(4000, 3000, QImage::Format_RGB32);
