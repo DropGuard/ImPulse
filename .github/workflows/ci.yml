@@ -23,8 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # the apt Qt on noble is 6.4.x and the floor is 6.6 (the test suites
-      # hard-require it); aqt pins a real 6.8 instead
+      # the apt Qt on noble is 6.4.x and the hard floor is 6.9 (CMakeLists
+      # pins it); aqt supplies 6.9.1
       - name: install qt (aqtinstall directly — the wrapper action breaks under act)
         run: |
           python3 -m venv /opt/aqt-venv
