@@ -46,7 +46,7 @@ endif()
 # Qt6 only, and 6.9 is the floor: the fork has long stopped being buildable
 # against Qt5 (the test suites hard-required Qt6, and OpenGLWidgets is linked
 # unconditionally), so the selection dance only made both builds half-broken.
-find_package(Qt6 6.9 REQUIRED COMPONENTS Core Widgets Svg PrintSupport OpenGLWidgets)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Core Widgets Svg PrintSupport OpenGLWidgets DBus)
 message(STATUS "Qt Version: " ${Qt6_VERSION})
 
 if(EXIV2)
