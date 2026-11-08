@@ -265,8 +265,6 @@ public:
 
     bool showSaveOverlay();
     void setShowSaveOverlay(bool mode);
-    bool confirmDelete();
-    void setConfirmDelete(bool mode);
     bool confirmTrash();
     void setConfirmTrash(bool mode);
 

@@ -396,15 +396,15 @@ void Core::removePermanent() {
     auto paths = currentSelection();
     if(!paths.count())
         return;
-    if(settings->confirmDelete()) {
-        QString msg;
-        if(paths.count() > 1)
-            msg = tr("Delete ") + QString::number(paths.count()) + tr(" items permanently?");
-        else
-            msg = tr("Delete item permanently?");
-        if(!ui_->showConfirmation(tr("Delete permanently"), msg))
-            return;
-    }
+    // unconditional: the confirmDelete setting is gone — an unrecoverable
+    // action never runs silently, whatever the config carries
+    QString msg;
+    if(paths.count() > 1)
+        msg = tr("Delete ") + QString::number(paths.count()) + tr(" items permanently?");
+    else
+        msg = tr("Delete item permanently?");
+    if(!ui_->showConfirmation(tr("Delete permanently"), msg))
+        return;
     FileOpResult result;
     int successCount = 0;
     for(const auto &path : paths) {

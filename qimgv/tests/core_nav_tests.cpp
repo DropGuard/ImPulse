@@ -402,23 +402,26 @@ private slots:
 
     void dialogCheckboxBindingsAreSymmetric() {
         FreshSettings fresh;
-        settings->setConfirmDelete(false);
+        settings->setTrackpadDetection(true);
 
         SettingsDialog dlg;
-        auto *cb = dlg.findChild<QCheckBox *>("confirmDeleteCheckBox");
+        auto *cb = dlg.findChild<QCheckBox *>("trackpadDetectionCheckBox");
         QVERIFY(cb != nullptr);
         // read half: the widget reflects the setting
-        QCOMPARE(cb->isChecked(), false);
+        QCOMPARE(cb->isChecked(), true);
         // save half: the widget's state lands in the setting
-        cb->setChecked(true);
+        cb->setChecked(false);
         dlg.saveSettings();
-        QCOMPARE(settings->confirmDelete(), true);
+        QCOMPARE(settings->trackpadDetection(), false);
         // and an untouched binding round-trips without drift
-        settings->setTrackpadDetection(false);
         dlg.readSettings();
         QCOMPARE(dlg.findChild<QCheckBox *>("trackpadDetectionCheckBox")->isChecked(), false);
         dlg.saveSettings();
         QCOMPARE(settings->trackpadDetection(), false);
+        // permanent delete is confirm-gated unconditionally now: no checkbox
+        // exists for it, and the behavior pin lives in
+        // removePermanentDeletesAfterScriptedConfirmation
+        QVERIFY(dlg.findChild<QCheckBox *>("confirmDeleteCheckBox") == nullptr);
     }
 
     void dialogComboBindingFollowsTheSetting() {
