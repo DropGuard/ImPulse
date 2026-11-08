@@ -800,56 +800,29 @@ void MW::setCurrentInfo(int _index, int _fileCount, const QString &_filePath, co
 
 // todo: nuke and rewrite
 void MW::onInfoUpdated() {
-    QString posString;
-    if(info.fileCount)
-        posString = "[ " + QString::number(info.index + 1) + "/" + QString::number(info.fileCount) + " ]";
-    QString resString;
-    if(info.imageSize.width())
-        resString = QString::number(info.imageSize.width()) + " x " + QString::number(info.imageSize.height());
-    QString sizeString;
-    if(info.fileSize)
-        sizeString = this->locale().formattedDataSize(info.fileSize, 1);
+    auto parts = titleSegments(info);
+    QString states = titleStateSuffix(info.slideshow, info.shuffle,
+                                      viewerWidget->lockZoomEnabled(),
+                                      viewerWidget->lockViewEnabled());
 
     if(renameOverlay)
         renameOverlay->setName(info.fileName);
 
-    QString windowTitle;
+    QString windowTitle = assembleWindowTitle(
+        centralWidget->currentViewMode() == MODE_FOLDERVIEW, info,
+        viewerWidget->lockZoomEnabled(), viewerWidget->lockViewEnabled(),
+        settings->windowTitleExtendedInfo(), !settings->infoBarWindowed(),
+        qApp->applicationName(), tr("Folder view"));
+
     if(centralWidget->currentViewMode() == MODE_FOLDERVIEW) {
-        windowTitle = tr("Folder view");
         infoBarFullscreen->setInfo("", tr("No file opened."), "");
         infoBarWindowed->setInfo("", tr("No file opened."), "");
     } else if(info.fileName.isEmpty()) {
-        windowTitle = qApp->applicationName();
         infoBarFullscreen->setInfo("", tr("No file opened."), "");
         infoBarWindowed->setInfo("", tr("No file opened."), "");
     } else {
-        windowTitle = info.fileName;
-        if(settings->windowTitleExtendedInfo()) {
-            windowTitle.prepend(posString + "  ");
-            if(!resString.isEmpty())
-                windowTitle.append("  -  " + resString);
-            if(!sizeString.isEmpty())
-                windowTitle.append("  -  " + sizeString);
-        }
-
-        // toggleable states
-        QString states;
-        if(info.slideshow)
-            states.append(" [slideshow]");
-        if(info.shuffle)
-            states.append(" [shuffle]");
-        if(viewerWidget->lockZoomEnabled())
-            states.append(" [zoom lock]");
-        if(viewerWidget->lockViewEnabled())
-            states.append(" [view lock]");
-
-        if(!settings->infoBarWindowed() && !states.isEmpty())
-            windowTitle.append(" -" + states);
-        if(info.edited)
-            windowTitle.prepend("* ");
-
-        infoBarFullscreen->setInfo(posString, info.fileName + (info.edited ? "  *" : ""), resString + "  " + sizeString);
-        infoBarWindowed->setInfo(posString, info.fileName + (info.edited ? "  *" : ""), resString + "  " + sizeString + " " + states);
+        infoBarFullscreen->setInfo(parts.pos, info.fileName + (info.edited ? "  *" : ""), parts.res + "  " + parts.size);
+        infoBarWindowed->setInfo(parts.pos, info.fileName + (info.edited ? "  *" : ""), parts.res + "  " + parts.size + states);
     }
     setWindowTitle(windowTitle);
 }

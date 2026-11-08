@@ -8,6 +8,7 @@
 #include <QFileDialog>
 #include <QMimeData>
 #include <QImageWriter>
+#include <QLocale>
 #include <QWindow>
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
@@ -52,6 +53,56 @@ struct CurrentInfo {
     bool shuffle;
     bool edited;
 };
+
+// the title bar's string assembly, split out of MW::onInfoUpdated so one
+// test slot can sweep every state without instantiating the window
+struct TitleParts {
+    QString pos, res, size;
+};
+inline TitleParts titleSegments(const CurrentInfo &info) {
+    TitleParts parts;
+    if(info.fileCount)
+        parts.pos = "[ " + QString::number(info.index + 1) + "/" + QString::number(info.fileCount) + " ]";
+    if(info.imageSize.width())
+        parts.res = QString::number(info.imageSize.width()) + " x " + QString::number(info.imageSize.height());
+    if(info.fileSize)
+        parts.size = QLocale().formattedDataSize(info.fileSize, 1);
+    return parts;
+}
+inline QString titleStateSuffix(bool slideshow, bool shuffle, bool zoomLock, bool viewLock) {
+    QString states;
+    if(slideshow) states.append(" [slideshow]");
+    if(shuffle)   states.append(" [shuffle]");
+    if(zoomLock)  states.append(" [zoom lock]");
+    if(viewLock)  states.append(" [view lock]");
+    return states;
+}
+inline QString assembleWindowTitle(bool folderView, const CurrentInfo &info,
+                                   bool zoomLock, bool viewLock,
+                                   bool extendedInfo, bool appendStates,
+                                   const QString &appName,
+                                   const QString &folderViewTitle) {
+    if(folderView)
+        return folderViewTitle;
+    if(info.fileName.isEmpty())
+        return appName;
+    auto parts = titleSegments(info);
+    QString title = info.fileName;
+    if(extendedInfo) {
+        if(!parts.pos.isEmpty())
+            title.prepend(parts.pos + "  ");
+        if(!parts.res.isEmpty())
+            title.append("  -  " + parts.res);
+        if(!parts.size.isEmpty())
+            title.append("  -  " + parts.size);
+    }
+    QString states = titleStateSuffix(info.slideshow, info.shuffle, zoomLock, viewLock);
+    if(appendStates && !states.isEmpty())
+        title.append(" -" + states);
+    if(info.edited)
+        title.prepend("* ");
+    return title;
+}
 
 enum ActiveSidePanel {
     SIDEPANEL_CROP,

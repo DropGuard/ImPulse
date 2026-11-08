@@ -272,6 +272,45 @@ private slots:
         QVERIFY(actionManager->actionForShortcut("F13").isEmpty());
     }
 
+    // one slot sweeping the title bar's assembly across every state — the
+    // simple user-visible surfaces ride together by design, the way the user
+    // reads them: one glance, not eight test functions
+    void userVisibleTextAssemblySweepsTheStates() {
+        CurrentInfo info{};
+        info.index = 1; info.fileCount = 3;
+        info.fileName = "shot.png";
+        info.imageSize = QSize(1920, 1080);
+        info.fileSize = 3200000;
+        QString size = QLocale().formattedDataSize(3200000, 1);
+
+        // full house: extended info on, nothing toggled
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("[ 2/3 ]  shot.png  -  1920 x 1080  -  ") + size);
+        // missing dimensions and size: the segments drop out whole
+        info.imageSize = QSize(0, 0); info.fileSize = 0;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("[ 2/3 ]  shot.png"));
+        // extended info off: bare name — the position prefix lives in the same gate
+        info.imageSize = QSize(1920, 1080); info.fileSize = 3200000;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, false, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("shot.png"));
+        // toggle states ride only when the info bar is not already showing them
+        info.slideshow = info.shuffle = true;
+        QCOMPARE(assembleWindowTitle(false, info, true, true, false, true, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("shot.png - [slideshow] [shuffle] [zoom lock] [view lock]"));
+        // edited marks the front of the assembled line
+        info.slideshow = info.shuffle = false;
+        info.edited = true;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("* [ 2/3 ]  shot.png  -  1920 x 1080  -  ") + size);
+        // the two degenerate surfaces
+        QCOMPARE(assembleWindowTitle(true, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("Folder view"));
+        info.fileName.clear(); info.edited = false;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+                 QStringLiteral("ImPulse"));
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());
