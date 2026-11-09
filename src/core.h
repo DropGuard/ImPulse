@@ -8,6 +8,7 @@
 #include <QFileSystemModel>
 #include <QDesktopServices>
 #include <QTranslator>
+#include <QProperty>
 #include "appversion.h"
 #include "settings.h"
 #include "components/workerpool/workerpool.h"
@@ -25,15 +26,17 @@
 #endif
 
 struct State {
-    bool hasActiveImage = false;
+    // scalar state lives in QProperties: bindable storage for the pull-style
+    // views (P2 of the unidirectional-flow refactor), plain operator= writes
+    QProperty<bool> hasActiveImage{false};
     // the GUI is waiting for the first ready frame: main defers showGui while
     // set, and onModelItemReady raises the window with the image already in it
-    bool delayModel = false;
+    QProperty<bool> delayModel{false};
     // armed via DirectoryManager::whenListed: which image to show on a
     // folder-boundary transition is only knowable when the listing lands
-    qint64 pendingListedToken = 0;
-    QString currentFilePath = "";
-    QString directoryPath = "";
+    QProperty<qint64> pendingListedToken{0};
+    QProperty<QString> currentFilePath{QString()};
+    QProperty<QString> directoryPath{QString()};
     std::shared_ptr<Image> currentImg;
 };
 
