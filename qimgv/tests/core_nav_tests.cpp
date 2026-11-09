@@ -371,6 +371,23 @@ private slots:
         QCOMPARE(menu.navigationIndex(), 1);
     }
 
+    // the projection drives the rendered title: state write -> observer ->
+    // refresh. This is the wiring the whole pull-model rests on; without it
+    // the title freezes at the ctor default and no suite could tell.
+    void titleFollowsTheProjection() {
+        writeImage(QDir(base).filePath("t.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("t.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("t.png"), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.mw->windowTitle().contains(QStringLiteral("t.png")), 10000);
+
+        // the slideshow toggle rides the same wiring
+        core.toggleSlideshow();
+        QTRY_VERIFY_WITH_TIMEOUT(core.mw->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
+        core.toggleSlideshow();
+        QTRY_VERIFY_WITH_TIMEOUT(!core.mw->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());
@@ -1624,7 +1641,7 @@ private slots:
         QVERIFY(QDir(base + "/otherdir/thetop/1. What/5. Another one/Normal name works").exists());
         QVERIFY(QFileInfo(base + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension").exists());
         QVERIFY(!QDir(base + "/otherdir/thetop/1").exists()); // the corruption signature
-        QVERIFY(!QFileInfo(base + "/thetop").exists());       // moved, not copied
+        QVERIFY(!QFileInfo(base + "/thetop").exists());        // moved, not copied
 
         // a directory dropped into its own subtree is refused flat
         core.interactiveMove({base + "/otherdir/thetop"}, base + "/otherdir/thetop/1. What");
