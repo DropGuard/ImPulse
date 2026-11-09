@@ -2,7 +2,7 @@
 #include <stdexcept>
 
 static void wakeup(void *ctx) {
-    QMetaObject::invokeMethod(static_cast<MpvWidget*>(ctx), "on_mpv_events", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(static_cast<MpvWidget*>(ctx), "mpvEvents", Qt::QueuedConnection);
 }
 
 static void *get_proc_address(void *ctx, const char *name) {
@@ -120,7 +120,7 @@ void MpvWidget::paintGL() {
     mpv_render_context_render(mpv_gl, params);
 }
 
-void MpvWidget::on_mpv_events() {
+void MpvWidget::mpvEvents() {
     // Process all events, until the event queue is empty.
     while (mpv) {
         mpv_event *event = mpv_wait_event(mpv, 0);

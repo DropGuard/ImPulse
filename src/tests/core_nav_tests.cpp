@@ -8,7 +8,10 @@
 // Navigation is triggered by emitting ActionManager::nextImage() — the very
 // signal a bound key produces.
 
-#include <QtTest>
+#include <QtTest/QTest>
+#include <QtTest/QSignalSpy>
+#include <QtTest/qtestcase.h>
+#include <QQueue>
 #include <utility>
 #include <QApplication>
 

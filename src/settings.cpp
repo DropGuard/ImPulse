@@ -577,7 +577,7 @@ void Settings::setThumbPanelStyle(ThumbPanelStyle mode) {
     store(K_ThumbPanelStyle, static_cast<qlonglong>(mode));
 }
 //------------------------------------------------------------------------------
-const QMultiMap<QByteArray, QByteArray> Settings::videoFormats() const {
+const QMultiMap<QByteArray, QByteArray> &Settings::videoFormats() const {
     return mVideoFormatsMap;
 }
 //------------------------------------------------------------------------------

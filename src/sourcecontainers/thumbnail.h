@@ -7,8 +7,8 @@
 class Thumbnail {
 public:
     Thumbnail(QString _name, QString _info, int _size, std::shared_ptr<QPixmap> _pixmap);
-    QString name();
-    QString info();
+    const QString &name();
+    const QString &info();
     int size();
     bool hasAlphaChannel();
     std::shared_ptr<QPixmap> pixmap();

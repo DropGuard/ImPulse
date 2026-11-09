@@ -273,7 +273,7 @@ public:
     FolderViewMode folderViewMode();
     void setFolderViewMode(FolderViewMode mode);
 
-    const QMultiMap<QByteArray, QByteArray> videoFormats() const;
+    const QMultiMap<QByteArray, QByteArray> &videoFormats() const;
 
     bool printLandscape();
     void setPrintLandscape(bool mode);

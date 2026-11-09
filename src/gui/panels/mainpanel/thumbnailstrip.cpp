@@ -114,7 +114,7 @@ void ThumbnailStrip::focusOn(int index) {
 void ThumbnailStrip::focusOnSelection() {
     if(selection().isEmpty())
         return;
-    focusOn(selection().last());
+    focusOn(selection().constLast());
 }
 
 void ThumbnailStrip::readSettings() {

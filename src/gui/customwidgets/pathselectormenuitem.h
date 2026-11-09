@@ -8,8 +8,8 @@ class PathSelectorMenuItem : public MenuItem {
     Q_OBJECT
 public:
     PathSelectorMenuItem(QWidget *parent);
-    QString directory();
-    QString path();
+    const QString &directory();
+    const QString &path();
 
 public slots:
     void setDirectory(const QString& path);
