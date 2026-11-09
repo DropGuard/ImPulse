@@ -108,6 +108,10 @@ void FolderViewProxy::setDirectoryPath(QString path) {
     }
 }
 
+const QString &FolderViewProxy::directoryPath() const {
+    return stateBuf.directory;
+}
+
 void FolderViewProxy::insertItem(int index) {
     if(folderView) {
         folderView->insertItem(index);

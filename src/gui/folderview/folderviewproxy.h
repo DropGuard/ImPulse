@@ -17,6 +17,10 @@ class FolderViewProxy : public QWidget, public IDirectoryView {
 public:
     FolderViewProxy(QWidget *parent = nullptr);
     void init();
+    // the directory this view is a projection of — the buffered value until
+    // init() materializes the real widget, so tests can observe the law
+    // without entering folder view mode
+    const QString &directoryPath() const;
 
 public slots:
     void populate(int) override;
