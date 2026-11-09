@@ -1,4 +1,5 @@
 #include "thumbnailview.h"
+#include <utility>
 
 ThumbnailView::ThumbnailView(Qt::Orientation _orientation, QWidget *parent)
     : QGraphicsView(parent),
@@ -32,7 +33,8 @@ ThumbnailView::ThumbnailView(Qt::Orientation _orientation, QWidget *parent)
     loadTimer.setSingleShot(true);
 
     qreal screenMaxRefreshRate = 60;
-    for(auto screen : qApp->screens())
+    const QList<QScreen*> screens = qApp->screens();
+    for(auto screen : screens)
         if(screen->refreshRate() > screenMaxRefreshRate)
             screenMaxRefreshRate = screen->refreshRate();
     scrollRefreshRate = 1000 / screenMaxRefreshRate;
@@ -133,7 +135,7 @@ void ThumbnailView::setDirectoryPath(QString path) {
 }
 
 void ThumbnailView::select(QList<int> indices) {
-    for(auto i : mSelection)
+    for(auto i : std::as_const(mSelection))
         thumbnails.at(i)->setHighlighted(false);
     QList<int>::iterator it = indices.begin();
     while(it != indices.end()) {
@@ -190,7 +192,7 @@ QList<int> ThumbnailView::selection() {
 }
 
 void ThumbnailView::clearSelection() {
-    for(auto i : mSelection)
+    for(auto i : std::as_const(mSelection))
         thumbnails.at(i)->setHighlighted(false);
     mSelection.clear();
 }

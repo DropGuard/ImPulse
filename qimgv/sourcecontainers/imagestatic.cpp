@@ -86,9 +86,9 @@ void ImageStatic::loadGeneric() {
 void ImageStatic::loadICO() {
     // Big brain code. It's mostly for small ico files so whatever. I'm not patching Qt for this.
     QIcon icon(mPath);
-    QList<QSize> sizes = icon.availableSizes();
+    const QList<QSize> sizes = icon.availableSizes();
     QSize maxSize(0, 0);
-    for(auto sz : sizes)
+    for(const QSize &sz : sizes)
         if(maxSize.width() < sz.width())
             maxSize = sz;
     QPixmap iconPix = icon.pixmap(maxSize);
