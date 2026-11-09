@@ -75,7 +75,9 @@ mechanical staged-path check, with watcher/fd.rs and engine.rs excluded
 because their tests are the ones Miri refuses. The hook is **CMake
 self-installing**: every configure points `core.hooksPath` at
 `scripts/hooks` — clone → configure → build is itself the install step.
-`lint --gate` takes ~2m20s; run it manually before pushing. The `--no-verify`
+`lint --gate` (~2m20s) is the pre-push hook's job — it used to be a manual
+ritual, and the stretch it stayed a memory (2026-11-09/10) is what let #636's
+and #612's findings ride into history on green suites alone. The `--no-verify`
 escape hatch exists, but a red gate entering history is how f8e8b216's six
 silent regressions went unseen.
 
