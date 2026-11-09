@@ -27,7 +27,11 @@
 #   re-armed, a new by-value param in scanned code fails the gate.
 #   duplInheritedMember — Qt-style signal/slot re-declaration patterns
 #   (non-virtual shadowing is intentional in this framework).
-clazy qcolor-from-literal 50
+# qcolor-from-literal — retired at zero on 2026-11-10 (row removed per the
+# no-zero-rows rule): the theme table's 48 hex literals and the two test
+# literals now construct through QColor::fromString (the sanctioned path; the
+# implicit string ctor is the deprecated one clazy flags). Same parse, same
+# invalid-on-garbage semantics — themeColorRowsSurviveJunk pins exact values.
 # 18 -> 14, 2026-11-07: not a source change — the tip content is byte-identical to
 # what measured 18 (git diff against the pre-rewrite tip is empty). The instrument
 # moved: compile_commands.json regenerates as CMake flag/entry state evolves, and a
