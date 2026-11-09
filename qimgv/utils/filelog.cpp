@@ -8,7 +8,12 @@
 namespace FileLog {
 
 static QtMessageHandler gPrevHandler = nullptr;
-static SessionLog gSession;
+// Meyers singleton: construction on first use instead of static-init
+// order, which is what clazy non-pod-global-static flags
+static SessionLog &session() {
+    static SessionLog s;
+    return s;
+}
 
 QString formatLine(QtMsgType type, const QString &msg) {
     const char lvl[] = "DWCFI"; // enum order: Debug Warning Critical Fatal Info
@@ -83,7 +88,7 @@ void SessionLog::write(const QString &line) {
 static void fileLogHandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg) {
     if(gPrevHandler)
         gPrevHandler(type, ctx, msg); // console keeps working
-    gSession.write(formatLine(type, msg));
+    session().write(formatLine(type, msg));
 }
 
 bool install(const QString &dir) {
@@ -91,9 +96,9 @@ bool install(const QString &dir) {
     pruneOldSessions(dir, 10);
     const QString base = dir + "/impulse-"
                          + QDateTime::currentDateTime().toString("MMdd-hhmmss") + ".log";
-    if(!gSession.open(base)) {
+    if(!session().open(base)) {
         fprintf(stderr, "[log] open failed: %s\n",
-                gSession.lastError().toLocal8Bit().constData());
+                session().lastError().toLocal8Bit().constData());
         return false;
     }
     fprintf(stderr, "[log] handler installed: %s\n", base.toLocal8Bit().constData());

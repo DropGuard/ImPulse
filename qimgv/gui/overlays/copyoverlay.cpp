@@ -138,7 +138,7 @@ void CopyOverlay::createDefaultPaths() {
                 if(mfi.fileName() == "."  
                 || mfi.fileName() ==  ".."
                 // hide directory
-                || mfi.fileName()[0] ==  '.' 
+                || mfi.fileName().startsWith('.')
                 // windows system directory
                 || mfi.fileName() ==  "3D Objects"
                 || mfi.fileName() ==  "Contacts"

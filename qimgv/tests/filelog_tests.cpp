@@ -13,7 +13,7 @@ private slots:
     // pieces it composes are drivable here with tiny limits.
 
     void fileLogFormatCarriesLevelCharAndTimestamp() {
-        QRegularExpression shape("^\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+ I hello\\n$");
+        static const QRegularExpression shape("^\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d+ I hello\\n$");
         QString info = FileLog::formatLine(QtInfoMsg, "hello");
         if(!shape.match(info).hasMatch())
             qWarning() << "formatLine produced:" << info;

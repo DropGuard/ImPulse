@@ -72,18 +72,8 @@ instrument 75c782e6e3a156fc
 # mSelection (setHighlighted emits nothing, so no reentrancy can detach it
 # under the loop) — and element copies of QUrl/QString became const refs.
 # The sweep also bought cppcheck's iterateByValue, retired alongside.
-clazy qproperty-without-notify 3
-clazy detaching-temporary 3
-clazy container-anti-pattern 2
-clazy no-module-include 1
-clazy use-static-qregularexpression 2
-clazy const-signal-or-slot 1
-clazy non-pod-global-static 1
-clazy connect-by-name 1
-cppcheck returnByReference 9
 # 10 -> 9, 2026-11-10: one site dissolved in the #612 dir-move rework; recorded
 # alongside the fingerprint re-record that re-measured the whole tree.
 # iterateByValue — retired at zero on 2026-11-10: the range-loop sweep's
 # const-ref elements removed cppcheck's one site (its own view of the same
 # disease range-loop-reference counted).
-cppcheck useInitializationList 1

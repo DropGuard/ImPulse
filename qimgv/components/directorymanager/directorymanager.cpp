@@ -129,7 +129,7 @@ bool DirectoryManager::directoryUsable(const QString &dirPath) {
     return true;
 }
 
-QString DirectoryManager::directoryPath() const {
+const QString &DirectoryManager::directoryPath() const {
     return mDirectoryPath;
 }
 

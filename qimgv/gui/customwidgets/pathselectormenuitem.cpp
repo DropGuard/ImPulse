@@ -21,11 +21,11 @@ PathSelectorMenuItem::PathSelectorMenuItem(QWidget *parent)
     });
 }
 
-QString PathSelectorMenuItem::directory() {
+const QString &PathSelectorMenuItem::directory() {
     return mDirectory;
 }
 
-QString PathSelectorMenuItem::path() {
+const QString &PathSelectorMenuItem::path() {
     return mPath;
 }
 

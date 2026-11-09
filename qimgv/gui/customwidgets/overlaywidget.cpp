@@ -31,6 +31,7 @@ qreal OverlayWidget::opacity() const {
 void OverlayWidget::setOpacity(qreal opacity) {
     opacityEffect->setOpacity(opacity);
     update();
+    emit opacityChanged();
 }
 
 void OverlayWidget::setHorizontalMargin(int margin) {

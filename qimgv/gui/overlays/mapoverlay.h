@@ -9,8 +9,8 @@
 class MapOverlay : public QWidget
 {
     Q_OBJECT
-    Q_PROPERTY (float opacity READ opacity WRITE setOpacity)
-    Q_PROPERTY (int y READ y WRITE setY)
+    Q_PROPERTY (float opacity READ opacity WRITE setOpacity NOTIFY opacityChanged)
+    Q_PROPERTY (int y READ y WRITE setY NOTIFY yChanged)
 public:
     enum Location 
     {
@@ -56,6 +56,10 @@ public:
      */
     QSizeF inner() const;
     QSizeF outer() const;
+
+signals:
+    void opacityChanged();
+    void yChanged();
 
 protected:
     void paintEvent(QPaintEvent *event) override;

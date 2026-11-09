@@ -18,7 +18,7 @@ public:
     virtual bool isScaledResult() const { return false; }
     virtual std::shared_ptr<const QImage> getImage() = 0;
     DocumentType type() const;
-    QString filePath() const;
+    const QString &filePath() const;
     virtual int height() = 0;
     virtual int width() = 0;
     virtual QSize size() = 0;

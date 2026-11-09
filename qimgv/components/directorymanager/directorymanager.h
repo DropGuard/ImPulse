@@ -65,7 +65,7 @@ public:
     // exists (Core's folder-boundary load). Returns the cancel token.
     qint64 whenListed(const QString &dirPath, std::function<void()> action);
     bool cancelListed(qint64 token);
-    QString directoryPath() const;
+    const QString &directoryPath() const;
     int indexOfFile(const QString &filePath) const;
     int indexOfDir(const QString &dirPath) const;
     QString filePathAt(int index) const;

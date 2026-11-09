@@ -201,7 +201,7 @@ int ThumbnailView::lastSelected() {
     if(!selection().count())
         return -1;
     else
-        return selection().last();
+        return selection().constLast();
 }
 
 int ThumbnailView::itemCount() {

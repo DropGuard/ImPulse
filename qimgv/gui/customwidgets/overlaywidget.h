@@ -25,7 +25,7 @@ enum FloatingWidgetPosition {
 class OverlayWidget : public FloatingWidget
 {
     Q_OBJECT
-    Q_PROPERTY (qreal opacity READ opacity WRITE setOpacity)
+    Q_PROPERTY (qreal opacity READ opacity WRITE setOpacity NOTIFY opacityChanged)
 public:
     OverlayWidget(FloatingWidgetContainer *parent);
     ~OverlayWidget() override;
@@ -42,6 +42,9 @@ public slots:
     void hide();
     void hideAnimated();
 
+signals:
+    void opacityChanged();
+
 private:
     QGraphicsOpacityEffect *opacityEffect;
     int mHorizontalMargin, mVerticalMargin;
@@ -50,6 +53,8 @@ private:
 
 private slots:
     void setOpacity(qreal opacity);
+
+private:
     qreal opacity() const;
 
 protected:

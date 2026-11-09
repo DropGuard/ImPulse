@@ -50,7 +50,7 @@ protected:
     void paintGL() override;
 
 private slots:
-    void on_mpv_events();
+    void mpvEvents();
     void maybeUpdate();
 
 private:

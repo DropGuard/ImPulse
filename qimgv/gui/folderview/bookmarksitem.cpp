@@ -35,7 +35,7 @@ BookmarksItem::BookmarksItem(QString _dirName, QString _dirPath, QWidget *parent
     setLayout(&layout);
 }
 
-QString BookmarksItem::path() {
+const QString &BookmarksItem::path() {
     return dirPath;
 }
 
