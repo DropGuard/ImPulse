@@ -33,7 +33,7 @@ clazy qcolor-from-literal 50
 # moved: compile_commands.json regenerates as CMake flag/entry state evolves, and a
 # fresh-configure scan of the SAME content reads 13-14. The four sites were an
 # artifact of the older flag set, recorded here twice-verified gone.
-instrument cf9533c3642678cd
+instrument 75c782e6e3a156fc
 
 # The fingerprint is the scanned (file, command) set from compile_commands.json
 # PLUS the --version output of every tool that judged it (the compilers named in
@@ -49,6 +49,14 @@ instrument cf9533c3642678cd
 # third line, after LLVM's, so the whole output is hashed, not the first line.
 # Re-recorded 2026-11-07 from 13c13a73392739c9 with every count re-verified
 # identical (range-loop-detach 14, qcolor-from-literal 50, cppcheck 10/1/1).
+# Re-recorded 2026-11-10 from cf9533c3642678cd: the instrument moved again
+# (compile_commands regeneration across the P1/P2 configure). Every surviving
+# count re-verified identical. The new instrument also surfaced three families
+# the old one was silent on — two at sites our own 2026-11-09 commits added
+# (#636 temporary QFileInfo::exists in tests, #612 local `base` shadowing the
+# fixture member), one at an upstream-age site (MW::showMessage missing
+# override) — all three fixed to zero in the same commit as this re-record,
+# which is also why returnByReference reads 9.
 clazy range-loop-detach 14
 #   connect-3arg-lambda — retired at zero on 2026-11-06: every lambda
 #   connect now names a context object, so the connection dies with the
@@ -64,6 +72,8 @@ clazy use-static-qregularexpression 2
 clazy const-signal-or-slot 1
 clazy non-pod-global-static 1
 clazy connect-by-name 1
-cppcheck returnByReference 10
+cppcheck returnByReference 9
+# 10 -> 9, 2026-11-10: one site dissolved in the #612 dir-move rework; recorded
+# alongside the fingerprint re-record that re-measured the whole tree.
 cppcheck iterateByValue 1
 cppcheck useInitializationList 1

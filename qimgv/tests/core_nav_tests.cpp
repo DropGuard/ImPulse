@@ -346,7 +346,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), img, 10000);
 
         actionManager->invokeAction(QStringLiteral("quickCopy"));
-        QTRY_COMPARE_WITH_TIMEOUT(QFileInfo(QDir(dest).filePath("qc.png")).exists(), true, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(QFileInfo::exists(QDir(dest).filePath("qc.png")), true, 10000);
 
         // second press: the same-name file is skipped, still exactly one copy
         actionManager->invokeAction(QStringLiteral("quickCopy"));
@@ -1623,31 +1623,31 @@ private slots:
     // its destination from baseName() — and let a directory be dropped into
     // its own subtree, recursing until the reporter's 5000 entries shredded.
     void directoryMoveKeepsDottedNamesAndRefusesSelfMoves() {
-        QString base = QDir(home.path()).filePath("issue612");
-        QDir().mkpath(base + "/thetop/1. What/3. This is weird/X. Okay whatever");
-        QDir().mkpath(base + "/thetop/1. What/5. Another one/Normal name works");
-        QDir().mkpath(base + "/thetop/Another normal name/This works");
-        makeTxt(base, "thetop/Another normal name/5. This is a file with a prefix but no extension", "x");
-        makeTxt(base, "thetop/Another normal name/6. This is a file with a prefix and extension.png", "x");
-        QVERIFY(QDir().mkpath(base + "/otherdir"));
+        QString root = QDir(home.path()).filePath("issue612");
+        QDir().mkpath(root + "/thetop/1. What/3. This is weird/X. Okay whatever");
+        QDir().mkpath(root + "/thetop/1. What/5. Another one/Normal name works");
+        QDir().mkpath(root + "/thetop/Another normal name/This works");
+        makeTxt(root, "thetop/Another normal name/5. This is a file with a prefix but no extension", "x");
+        makeTxt(root, "thetop/Another normal name/6. This is a file with a prefix and extension.png", "x");
+        QVERIFY(QDir().mkpath(root + "/otherdir"));
 
         Core core;
         FakeInteractions fake;
         core.ui_ = &fake;
-        core.interactiveMove({QDir(base).filePath("thetop")}, QDir(base).filePath("otherdir"));
+        core.interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
 
         // dotted directory names survive the move whole
-        QVERIFY(QDir(base + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
-        QVERIFY(QDir(base + "/otherdir/thetop/1. What/5. Another one/Normal name works").exists());
-        QVERIFY(QFileInfo(base + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension").exists());
-        QVERIFY(!QDir(base + "/otherdir/thetop/1").exists()); // the corruption signature
-        QVERIFY(!QFileInfo(base + "/thetop").exists());        // moved, not copied
+        QVERIFY(QDir(root + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
+        QVERIFY(QDir(root + "/otherdir/thetop/1. What/5. Another one/Normal name works").exists());
+        QVERIFY(QFileInfo::exists(root + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension"));
+        QVERIFY(!QDir(root + "/otherdir/thetop/1").exists()); // the corruption signature
+        QVERIFY(!QFileInfo::exists(root + "/thetop"));         // moved, not copied
 
         // a directory dropped into its own subtree is refused flat
-        core.interactiveMove({base + "/otherdir/thetop"}, base + "/otherdir/thetop/1. What");
-        QVERIFY(QDir(base + "/otherdir/thetop/1. What/3. This is weird").exists());
-        QVERIFY(!QDir(base + "/otherdir/thetop/1. What/thetop").exists());
-        QVERIFY(!QDir(base + "/otherdir/thetop/1. What/1").exists());
+        core.interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
+        QVERIFY(QDir(root + "/otherdir/thetop/1. What/3. This is weird").exists());
+        QVERIFY(!QDir(root + "/otherdir/thetop/1. What/thetop").exists());
+        QVERIFY(!QDir(root + "/otherdir/thetop/1. What/1").exists());
     }
 
     // upstream issue #505: a preload failing for a file the user is not

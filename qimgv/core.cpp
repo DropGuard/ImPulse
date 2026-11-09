@@ -833,8 +833,7 @@ void Core::quickCopyToFixedDirectory() {
         return;
     }
     QDir(destDir).mkpath(".");
-    QFileInfo dstFi(destDir + "/" + srcFi.fileName());
-    if(dstFi.exists()) {
+    if(QFileInfo::exists(destDir + "/" + srcFi.fileName())) {
         mw->showMessage(tr("Already in the quick copy folder"));
         return;
     }
@@ -895,7 +894,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         dstCanon = dstDir.absolutePath();
     if(dstCanon == srcCanon || dstCanon.startsWith(srcCanon + "/"))
         return;
-    if(dstFi.exists() && !dstFi.isDir()) { // overwriting file with a folder
+    if(QFileInfo::exists(dstFi.absoluteFilePath()) && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
@@ -976,7 +975,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
         dstCanon = dstDir.absolutePath();
     if(dstCanon == srcCanon || dstCanon.startsWith(srcCanon + "/"))
         return;
-    if(dstFi.exists() && !dstFi.isDir()) { // overwriting file with a folder
+    if(QFileInfo::exists(dstFi.absoluteFilePath()) && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
