@@ -1,5 +1,15 @@
 #include "themestore.h"
 
+namespace {
+// the theme table speaks in hex literals; fromString is the sanctioned
+// constructor — the implicit string ctor is what clazy qcolor-from-literal
+// flags (and what Qt deprecates), with identical parsing and the same
+// invalid-color-on-garbage semantics
+QColor hexColor(const char *s) {
+    return QColor::fromString(QLatin1String(s));
+}
+}
+
 ColorScheme ThemeStore::colorScheme(ColorSchemes name) {
     BaseColorScheme base;
     base.tid = -1;
@@ -20,63 +30,63 @@ ColorScheme ThemeStore::colorScheme(ColorSchemes name) {
             base.tid = static_cast<int>(name);
             break;
         case COLORS_LIGHT: // v2, works with w10 titlebars
-            base.accent = "#719ccd";
-            base.background = "#1a1a1a";
-            base.background_fullscreen = "#1a1a1a";
-            base.folderview = "#f2f2f2";
-            base.folderview_topbar = "#ffffff";
-            base.icons = "#656768";
-            base.overlay = "#1a1a1a";
-            base.overlay_text = "#d2d2d2";
-            base.text = "#353535";
-            base.scrollbar = "#aaaaaa";
-            base.widget = "#ffffff";
-            base.widget_border = "#c3c3c3";
+            base.accent = hexColor("#719ccd");
+            base.background = hexColor("#1a1a1a");
+            base.background_fullscreen = hexColor("#1a1a1a");
+            base.folderview = hexColor("#f2f2f2");
+            base.folderview_topbar = hexColor("#ffffff");
+            base.icons = hexColor("#656768");
+            base.overlay = hexColor("#1a1a1a");
+            base.overlay_text = hexColor("#d2d2d2");
+            base.text = hexColor("#353535");
+            base.scrollbar = hexColor("#aaaaaa");
+            base.widget = hexColor("#ffffff");
+            base.widget_border = hexColor("#c3c3c3");
             base.tid = static_cast<int>(name);
             break;
         case COLORS_DARKBLUE:
-            base.background = "#18191a";
-            base.background_fullscreen = "#18191a";
-            base.text = "#cdd2d7";
-            base.icons = "#babec3";
-            base.widget = "#232629";
-            base.widget_border = "#26292d";
-            base.accent = "#336ca5";
-            base.folderview = "#232629";
-            base.folderview_topbar = "#31363b";
-            base.scrollbar = "#4f565c";
-            base.overlay_text = "#d2d2d2";
-            base.overlay = "#1a1a1a";
+            base.background = hexColor("#18191a");
+            base.background_fullscreen = hexColor("#18191a");
+            base.text = hexColor("#cdd2d7");
+            base.icons = hexColor("#babec3");
+            base.widget = hexColor("#232629");
+            base.widget_border = hexColor("#26292d");
+            base.accent = hexColor("#336ca5");
+            base.folderview = hexColor("#232629");
+            base.folderview_topbar = hexColor("#31363b");
+            base.scrollbar = hexColor("#4f565c");
+            base.overlay_text = hexColor("#d2d2d2");
+            base.overlay = hexColor("#1a1a1a");
             base.tid = static_cast<int>(name);
             break;
         case COLORS_BLACK:
-            base.background = "#000000";
-            base.background_fullscreen = "#000000";
-            base.text = "#b0b0b0";
-            base.icons = "#999999";
-            base.widget = "#080808";
-            base.widget_border = "#181818";
-            base.accent = "#5a5a5a";
-            base.folderview = "#111111";
-            base.folderview_topbar = "#111111";
-            base.scrollbar = "#343434";
-            base.overlay_text = "#999999";
-            base.overlay = "#000000";
+            base.background = hexColor("#000000");
+            base.background_fullscreen = hexColor("#000000");
+            base.text = hexColor("#b0b0b0");
+            base.icons = hexColor("#999999");
+            base.widget = hexColor("#080808");
+            base.widget_border = hexColor("#181818");
+            base.accent = hexColor("#5a5a5a");
+            base.folderview = hexColor("#111111");
+            base.folderview_topbar = hexColor("#111111");
+            base.scrollbar = hexColor("#343434");
+            base.overlay_text = hexColor("#999999");
+            base.overlay = hexColor("#000000");
             base.tid = static_cast<int>(name);
             break;
         case COLORS_DARK:
-            base.background = "#1a1a1a";
-            base.background_fullscreen = "#1a1a1a";
-            base.text = "#b6b6b6";
-            base.icons = "#a4a4a4";
-            base.widget = "#252525";
-            base.widget_border = "#2c2c2c";
-            base.accent = "#8c9b81";
-            base.folderview = "#242424";
-            base.folderview_topbar = "#383838";
-            base.scrollbar = "#5a5a5a";
-            base.overlay_text = "#d2d2d2";
-            base.overlay = "#1a1a1a";
+            base.background = hexColor("#1a1a1a");
+            base.background_fullscreen = hexColor("#1a1a1a");
+            base.text = hexColor("#b6b6b6");
+            base.icons = hexColor("#a4a4a4");
+            base.widget = hexColor("#252525");
+            base.widget_border = hexColor("#2c2c2c");
+            base.accent = hexColor("#8c9b81");
+            base.folderview = hexColor("#242424");
+            base.folderview_topbar = hexColor("#383838");
+            base.scrollbar = hexColor("#5a5a5a");
+            base.overlay_text = hexColor("#d2d2d2");
+            base.overlay = hexColor("#1a1a1a");
             base.tid = static_cast<int>(name);
             break;
     }
