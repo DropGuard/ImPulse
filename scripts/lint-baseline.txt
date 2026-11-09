@@ -61,13 +61,17 @@ instrument 75c782e6e3a156fc
 # fixture member), one at an upstream-age site (MW::showMessage missing
 # override) — all three fixed to zero in the same commit as this re-record,
 # which is also why returnByReference reads 9.
-clazy range-loop-detach 14
 #   connect-3arg-lambda — retired at zero on 2026-11-06: every lambda
 #   connect now names a context object, so the connection dies with the
 #   receiver instead of outliving it whenever the sender lives longer
 #   (the app-lifetime `settings` case was live-crashing on a destroyed
 #   widget as early as the first settingsChanged after the widget died).
-clazy range-loop-reference 3
+# range-loop-detach 14 and range-loop-reference 3 — retired at zero on
+# 2026-11-10 (rows removed per the no-zero-rows rule): every site now
+# iterates a const container — const locals, std::as_const on the member
+# mSelection (setHighlighted emits nothing, so no reentrancy can detach it
+# under the loop) — and element copies of QUrl/QString became const refs.
+# The sweep also bought cppcheck's iterateByValue, retired alongside.
 clazy qproperty-without-notify 3
 clazy detaching-temporary 3
 clazy container-anti-pattern 2
@@ -79,5 +83,7 @@ clazy connect-by-name 1
 cppcheck returnByReference 9
 # 10 -> 9, 2026-11-10: one site dissolved in the #612 dir-move rework; recorded
 # alongside the fingerprint re-record that re-measured the whole tree.
-cppcheck iterateByValue 1
+# iterateByValue — retired at zero on 2026-11-10: the range-loop sweep's
+# const-ref elements removed cppcheck's one site (its own view of the same
+# disease range-loop-reference counted).
 cppcheck useInitializationList 1

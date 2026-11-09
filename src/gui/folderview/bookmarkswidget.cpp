@@ -13,8 +13,8 @@ BookmarksWidget::~BookmarksWidget() {
 }
 
 void BookmarksWidget::readSettings() {
-    QStringList _paths = settings->bookmarks();
-    for(auto path : _paths)
+    const QStringList _paths = settings->bookmarks();
+    for(const QString &path : _paths)
         addBookmark(path);
     if(_paths.empty())
         addBookmark(QDir::homePath());

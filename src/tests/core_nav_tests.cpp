@@ -9,6 +9,7 @@
 // signal a bound key produces.
 
 #include <QtTest>
+#include <utility>
 #include <QApplication>
 
 #include <cerrno>
@@ -2869,7 +2870,7 @@ int main(int argc, char **argv) {
             testSlots << QString::fromUtf8(name);
     }
     int failures = 0;
-    for (const QString &slot : testSlots) {
+    for (const QString &slot : std::as_const(testSlots)) {
         fflush(nullptr); // fork would duplicate whatever is buffered in stdout
         pid_t pid = fork();
         if (pid == 0) {
