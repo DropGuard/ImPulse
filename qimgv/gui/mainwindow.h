@@ -75,7 +75,10 @@ private:
     ViewerWidget *viewerWidget = nullptr;
     QHBoxLayout layout;
     QTimer windowGeometryChangeTimer;
-    State *appState = nullptr;
+    // const by construction: the views read state, they never write it. The
+    // one non-const use — wiring the notifiers — happens in the constructor
+    // through the State* parameter, and never again.
+    const State *appState = nullptr;
     int currentDisplay;
 
     bool cropPanelActive, showInfoBarFullscreen, showInfoBarWindowed, maximized;
@@ -101,6 +104,7 @@ private:
     QPropertyNotifier infoObserver;
     QPropertyNotifier slideshowObserver;
     QPropertyNotifier shuffleObserver;
+    QPropertyNotifier directoryObserver;
     void saveWindowGeometry();
     void restoreWindowGeometry();
     void saveCurrentDisplay();
@@ -236,7 +240,6 @@ public slots:
     void setFilterBilinear();
     void setFilter(ScalingFilter filter);
     void toggleScalingFilter();
-    void setDirectoryPath(const QString &path);
     void toggleLockZoom();
     void toggleLockView();
     void toggleFullscreenInfoBar();

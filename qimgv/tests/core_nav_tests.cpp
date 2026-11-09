@@ -388,6 +388,20 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!core.mw->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
     }
 
+    // the folder view learns its directory through the state projection, the
+    // same law the title rides — a state write is the only thing that moves
+    // it. The write happens after the model has accepted the directory: a
+    // refused load must not move the view. (This replaced a direct
+    // Core->MW::setDirectoryPath push that never wrote state on next/prev
+    // directory navigation at all.)
+    void folderViewFollowsTheDirectoryState() {
+        QDir().mkpath(QDir(base).filePath("projdir"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("projdir")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.mw->getFolderView()->directoryPath(),
+                                  QDir(base).filePath("projdir"), 10000);
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());

@@ -52,16 +52,23 @@ MW::MW(State *state, QWidget *parent)
 
     // the projection drives the views: any rewrite of the snapshot
     // re-derives title/info bars/overlay names (issue #505 semantics live
-    // in onLoadFailed). addNotifier, never onValueChanged: the latter returns
+    // in onLoadFailed), and the folder view re-derives its directory the
+    // same way. addNotifier, never onValueChanged: the latter returns
     // a temporary QPropertyChangeHandler whose functor lives inside the
     // handler object — moving it into a bare QPropertyObserver member leaves
     // the trampoline reading adjacent member bytes as the lambda, i.e. calling
     // refreshInfoViews with a tagged null as `this` (titleFollowsTheProjection
     // SIGSEGV, 18420f70 follow-up). Notifiers own their functor; they die with
-    // this window, before the State they watch does.
-    infoObserver = appState->currentInfo.addNotifier([this]{ refreshInfoViews(); });
-    slideshowObserver = appState->slideshow.addNotifier([this]{ refreshInfoViews(); });
-    shuffleObserver = appState->shuffle.addNotifier([this]{ refreshInfoViews(); });
+    // this window, before the State they watch does. The wiring is the one
+    // non-const touch of State — it goes through the constructor parameter,
+    // because appState itself is stored const.
+    infoObserver = state->currentInfo.addNotifier([this]{ refreshInfoViews(); });
+    slideshowObserver = state->slideshow.addNotifier([this]{ refreshInfoViews(); });
+    shuffleObserver = state->shuffle.addNotifier([this]{ refreshInfoViews(); });
+    directoryObserver = state->directoryPath.addNotifier([this]{
+        folderView->setDirectoryPath(appState->directoryPath.value());
+        refreshInfoViews();
+    });
 }
 
 /*                                                             |--[ImageViewer]
@@ -324,12 +331,6 @@ void MW::onSortingChanged(SortingMode mode) {
             case SortingMode::SORT_SIZE_DESC: showMessage("Sorting: By File Size (desc.)"); break;
         }
     }
-}
-
-void MW::setDirectoryPath(const QString &path) {
-    //closeImage();
-    folderView->setDirectoryPath(path);
-    refreshInfoViews();
 }
 
 void MW::toggleLockZoom() {

@@ -116,7 +116,6 @@ struct State {
     QProperty<CurrentInfo> currentInfo;
     QProperty<bool> slideshow{false};
     QProperty<bool> shuffle{false};
-    std::shared_ptr<Image> currentImg;
 };
 
 enum MimeDataTarget {

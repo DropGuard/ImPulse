@@ -1360,20 +1360,25 @@ bool Core::loadPath(QString path) {
     stopSlideshow();
     state.delayModel = false;
     QFileInfo fileInfo(path);
+    // the target lives in a local until the model has accepted it — the
+    // state.directoryPath write is the commit point inside setDirectory, and
+    // the folder view re-derives from that write's notify. Writing the
+    // property here would move the view before the load could be refused.
+    QString dir;
     if(fileInfo.isDir()) {
-        state.directoryPath = QDir(path).absolutePath();
+        dir = QDir(path).absolutePath();
     } else if(fileInfo.isFile()) {
-        state.directoryPath = fileInfo.absolutePath();
+        dir = fileInfo.absolutePath();
         // delayModel now means exactly one thing: the GUI is still hidden and
         // the first ready item must raise it. It no longer defers the listing
         // — the open path below arms to the landing instead of racing it
-        state.delayModel = (model->directoryPath() != state.directoryPath);
+        state.delayModel = (model->directoryPath() != dir);
     } else {
         mw->showError(tr("Could not open path: ") + path);
         qDebug() << "Could not open path: " << path;
         return false;
     }
-    if(!setDirectory(state.directoryPath))
+    if(!setDirectory(dir))
         return false;
 
     // load file / folderview
@@ -1393,7 +1398,7 @@ bool Core::loadPath(QString path) {
         // that exception is what hid the fact that the open path had no
         // landing-driven form at all.
         const QString filePath = fileInfo.absoluteFilePath();
-        state.pendingListedToken = model->whenListed(state.directoryPath, [this, filePath] {
+        state.pendingListedToken = model->whenListed(dir, [this, filePath] {
             state.pendingListedToken = 0;
             int idx = model->indexOfFile(filePath);
             if(idx != -1)
@@ -1415,7 +1420,13 @@ bool Core::setDirectory(const QString &path) {
             mw->showError(tr("Could not load folder: ") + path);
             return false;
         }
-        mw->setDirectoryPath(path);
+        // the state write is the commit point: the folder view re-derives
+        // from this notify, so it must not fire before the model has accepted
+        // the directory — a refused load leaves the view where it was. This
+        // replaces the direct mw->setDirectoryPath push, and also writes
+        // state on the next/prev directory paths, which never touched
+        // state.directoryPath and left it stale.
+        state.directoryPath = QDir(path).absolutePath();
     }
     return true;
 }
@@ -1630,7 +1641,6 @@ void Core::onLoadFailed(const QString &path) {
 
 void Core::onModelItemReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
     if(path == state.currentFilePath) {
-        state.currentImg = img;
         guiSetImage(img);
         updateInfoString();
         if(state.delayModel) {
