@@ -142,7 +142,7 @@ void ImageViewerV2::readSettings() {
     if( (useFixedZoomLevels = settings->useFixedZoomLevels()) ) {
         // zoomlevels are stored as a string, parse into list
         zoomLevels.clear();
-        auto levelsStr = settings->zoomLevels().split(',');
+        const auto levelsStr = settings->zoomLevels().split(',');
         for(const auto& i : levelsStr)
             zoomLevels.append(i.toFloat());
         std::sort(zoomLevels.begin(), zoomLevels.end());

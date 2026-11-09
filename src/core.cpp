@@ -6,6 +6,7 @@
  */
 
 #include "core.h"
+#include <utility>
 
 #include "utils/folderend.h"
 
@@ -397,7 +398,7 @@ void Core::close() {
 }
 
 void Core::removePermanent() {
-    auto paths = currentSelection();
+    const auto paths = currentSelection();
     if(!paths.count())
         return;
     // unconditional: the confirmDelete setting is gone — an unrecoverable
@@ -431,7 +432,7 @@ void Core::removePermanent() {
 }
 
 void Core::moveToTrash() {
-    auto paths = currentSelection();
+    const auto paths = currentSelection();
     if(!paths.count())
         return;
     if(settings->confirmTrash()) {
@@ -924,7 +925,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     // copy all contents
     // TODO: skip symlinks? test
     QStringList entryList = srcDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-    for(const auto &entry : entryList) {
+    for(const auto &entry : std::as_const(entryList)) {
         doInteractiveCopy(srcDir.absolutePath() + "/" + entry, dstDir.absolutePath(), overwriteFiles);
         if(overwriteFiles.cancel)
             return;
@@ -1005,7 +1006,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     // move all contents
     // TODO: skip symlinks? test
     QStringList entryList = srcDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-    for(const auto &entry : entryList) {
+    for(const auto &entry : std::as_const(entryList)) {
         doInteractiveMove(srcDir.absolutePath() + "/" + entry, dstDir.absolutePath(), overwriteFiles);
         if(overwriteFiles.cancel)
             return;
@@ -1104,7 +1105,8 @@ void Core::edit_template(bool save, const QString &action, const std::function<s
         return;
     if(save && !ui_->showConfirmation(action, tr("Perform action \"") + action + "\"? \n\n" + tr("Changes will be saved immediately.")))
         return;
-    for(const auto &path : currentSelection()) {
+    const auto selection = currentSelection();
+    for(const auto &path : selection) {
         auto img = getEditableImage(path);
         if(!img)
             continue;
