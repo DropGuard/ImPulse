@@ -52,7 +52,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions
 {
     Q_OBJECT
 public:
-    explicit MW(const State *state, QWidget *parent = nullptr);
+    explicit MW(State *state, QWidget *parent = nullptr);
     ~MW() override;
     bool isCropPanelActive();
     void onScalingFinished(std::unique_ptr<QPixmap>scaled);
@@ -75,7 +75,7 @@ private:
     ViewerWidget *viewerWidget = nullptr;
     QHBoxLayout layout;
     QTimer windowGeometryChangeTimer;
-    const State *appState = nullptr;
+    State *appState = nullptr;
     int currentDisplay;
 
     bool cropPanelActive, showInfoBarFullscreen, showInfoBarWindowed, maximized;
@@ -98,7 +98,9 @@ private:
     InfoBarProxy *infoBarWindowed = nullptr;
 
     PanelPosition panelPosition;
-    QPropertyObserver infoObserver;
+    QPropertyNotifier infoObserver;
+    QPropertyNotifier slideshowObserver;
+    QPropertyNotifier shuffleObserver;
     void saveWindowGeometry();
     void restoreWindowGeometry();
     void saveCurrentDisplay();

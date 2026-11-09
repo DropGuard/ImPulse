@@ -3,7 +3,7 @@
 
 // TODO: nuke this and rewrite
 
-MW::MW(const State *state, QWidget *parent)
+MW::MW(State *state, QWidget *parent)
     : FloatingWidgetContainer(parent),
       appState(state),
       currentDisplay(0),
@@ -49,6 +49,19 @@ MW::MW(const State *state, QWidget *parent)
     currentDisplay = settings->lastDisplay();
     maximized = settings->maximizedWindow();
     restoreWindowGeometry();
+
+    // the projection drives the views: any rewrite of the snapshot
+    // re-derives title/info bars/overlay names (issue #505 semantics live
+    // in onLoadFailed). addNotifier, never onValueChanged: the latter returns
+    // a temporary QPropertyChangeHandler whose functor lives inside the
+    // handler object — moving it into a bare QPropertyObserver member leaves
+    // the trampoline reading adjacent member bytes as the lambda, i.e. calling
+    // refreshInfoViews with a tagged null as `this` (titleFollowsTheProjection
+    // SIGSEGV, 18420f70 follow-up). Notifiers own their functor; they die with
+    // this window, before the State they watch does.
+    infoObserver = appState->currentInfo.addNotifier([this]{ refreshInfoViews(); });
+    slideshowObserver = appState->slideshow.addNotifier([this]{ refreshInfoViews(); });
+    shuffleObserver = appState->shuffle.addNotifier([this]{ refreshInfoViews(); });
 }
 
 /*                                                             |--[ImageViewer]
