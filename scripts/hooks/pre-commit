@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The fast gate on every commit: incremental build + the five suites.
-# lint --gate (2m20s, measured) stays a push-time ritual — too slow to sit
+# lint --gate (2m20s, measured) is the pre-push hook's job — too slow to sit
 # between a human and a commit. Escape hatch: git commit --no-verify, but a
 # red gate in history is how f8e8b216's six regressions landed unseen.
 set -e
