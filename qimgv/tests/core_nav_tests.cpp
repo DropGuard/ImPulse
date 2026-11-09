@@ -755,7 +755,7 @@ private slots:
         QVERIFY(loop.isValid());
 
         core.startSlideshow();
-        QVERIFY(core.slideshow);
+        QVERIFY(core.state.slideshow);
         QCOMPARE(loop.count(), 1);
         QCOMPARE(loop.at(0).at(0).toBool(), false);
 
@@ -765,7 +765,7 @@ private slots:
         QCOMPARE(loop.count(), 1);
 
         core.stopSlideshow();
-        QVERIFY(!core.slideshow);
+        QVERIFY(!core.state.slideshow);
         QCOMPARE(loop.count(), 2);
         QCOMPARE(loop.at(1).at(0).toBool(), true);
 
@@ -804,7 +804,7 @@ private slots:
         core.jumpToLast();
         QCOMPARE(core.currentFilePath(), files.at(3));
         // jumpToLast stops the show, so the state below is a fresh arm
-        QVERIFY(!core.slideshow);
+        QVERIFY(!core.state.slideshow);
 
         core.jumpToFirst();
         QCOMPARE(core.currentFilePath(), files.at(0));
@@ -812,12 +812,12 @@ private slots:
         core.startSlideshow();
         core.jumpToLast();
         core.startSlideshow();
-        QVERIFY(core.slideshow);
+        QVERIFY(core.state.slideshow);
         const QString atEnd = core.currentFilePath();
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), atEnd);
-        QVERIFY2(!core.slideshow,
+        QVERIFY2(!core.state.slideshow,
                  "a non-looping slideshow must stop itself at the end of the directory");
         QVERIFY(!core.slideshowTimer.isActive());
     }
@@ -827,20 +827,20 @@ private slots:
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.shuffle);
+        QVERIFY(!core.state.shuffle);
 
         core.toggleShuffle();
-        QVERIFY(core.shuffle);          // this is what syncRandomizer sized for
+        QVERIFY(core.state.shuffle);          // this is what syncRandomizer sized for
 
         core.startSlideshow();
         core.jumpToLast();
         core.startSlideshow();
-        QVERIFY(core.slideshow);
+        QVERIFY(core.state.slideshow);
 
         // the sequential branch would have stopped here (pinned above with the
         // same setup); the randomizer branch starts a new cycle instead
         core.nextImageSlideshow();
-        QVERIFY2(core.slideshow, "shuffle mode stopped at the end of the listing");
+        QVERIFY2(core.state.slideshow, "shuffle mode stopped at the end of the listing");
         QVERIFY(files.contains(core.currentFilePath()));
     }
 
@@ -974,14 +974,14 @@ private slots:
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.slideshow);
+        QVERIFY(!core.state.slideshow);
 
         core.toggleSlideshow();
-        QVERIFY(core.slideshow);
+        QVERIFY(core.state.slideshow);
         QVERIFY(core.slideshowTimer.isActive());
 
         core.toggleSlideshow();
-        QVERIFY2(!core.slideshow, "the second toggle did not stop the slideshow");
+        QVERIFY2(!core.state.slideshow, "the second toggle did not stop the slideshow");
         QVERIFY(!core.slideshowTimer.isActive());
     }
 

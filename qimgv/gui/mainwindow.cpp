@@ -1,9 +1,11 @@
+#include "core.h"
 #include "mainwindow.h"
 
 // TODO: nuke this and rewrite
 
-MW::MW(QWidget *parent)
+MW::MW(const State *state, QWidget *parent)
     : FloatingWidgetContainer(parent),
+      appState(state),
       currentDisplay(0),
       maximized(false),
       activeSidePanel(SIDEPANEL_NONE),
@@ -146,7 +148,7 @@ void MW::setupSaveOverlay() {
 
 void MW::setupRenameOverlay() {
     renameOverlay = new RenameOverlay(this);
-    renameOverlay->setName(info.fileName);
+    renameOverlay->setName(QString());
     connect(renameOverlay, &RenameOverlay::renameRequested, this, &MW::renameRequested);
 }
 
@@ -159,7 +161,7 @@ void MW::toggleFolderView() {
     docWidget->hideFloatingPanel();
     imageInfoOverlay->hide();
     centralWidget->toggleViewMode();
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 void MW::enableFolderView() {
@@ -171,12 +173,12 @@ void MW::enableFolderView() {
     docWidget->hideFloatingPanel();
     imageInfoOverlay->hide();
     centralWidget->showFolderView();
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 void MW::enableDocumentView() {
     centralWidget->showDocumentView();
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 ViewMode MW::currentViewMode() {
@@ -242,8 +244,6 @@ void MW::cycleFitMode() {
 }
 
 void MW::closeImage() {
-    info.fileName = "";
-    info.filePath = "";
     viewerWidget->closeImage();
 }
 
@@ -315,10 +315,8 @@ void MW::onSortingChanged(SortingMode mode) {
 
 void MW::setDirectoryPath(const QString &path) {
     //closeImage();
-    info.directoryPath = path;
-    info.directoryName = path.split("/").last();
     folderView->setDirectoryPath(path);
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 void MW::toggleLockZoom() {
@@ -327,7 +325,7 @@ void MW::toggleLockZoom() {
         showMessage("Zoom lock: ON");
     else
         showMessage("Zoom lock: OFF");
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 void MW::toggleLockView() {
@@ -336,7 +334,7 @@ void MW::toggleLockView() {
         showMessage("View lock: ON");
     else
         showMessage("View lock: OFF");
-    onInfoUpdated();
+    refreshInfoViews();
 }
 
 void MW::toggleFullscreenInfoBar() {
@@ -791,23 +789,10 @@ void MW::closeFullScreenOrExit() {
     }
 }
 
-// todo: this is crap, use shared state object
-void MW::setCurrentInfo(int _index, int _fileCount, const QString &_filePath, const QString &_fileName, QSize _imageSize, qint64 _fileSize, bool slideshow, bool shuffle, bool edited) {
-    info.index = _index;
-    info.fileCount = _fileCount;
-    info.fileName = _fileName;
-    info.filePath = _filePath;
-    info.imageSize = _imageSize;
-    info.fileSize = _fileSize;
-    info.slideshow = slideshow;
-    info.shuffle = shuffle;
-    info.edited = edited;
-    onInfoUpdated();
-}
-
-// todo: nuke and rewrite
-void MW::onInfoUpdated() {
-    auto parts = titleSegments(info);
+// the view is a projection: everything shown is re-derived here from the
+// state Core owns and this window's own modes — nothing is stored
+void MW::refreshInfoViews() {
+    const CurrentInfo &info = appState->currentInfo.value();
     QString states = titleStateSuffix(info.slideshow, info.shuffle,
                                       viewerWidget->lockZoomEnabled(),
                                       viewerWidget->lockViewEnabled());
@@ -828,8 +813,10 @@ void MW::onInfoUpdated() {
         infoBarFullscreen->setInfo("", tr("No file opened."), "");
         infoBarWindowed->setInfo("", tr("No file opened."), "");
     } else {
-        infoBarFullscreen->setInfo(parts.pos, info.fileName + (info.edited ? "  *" : ""), parts.res + "  " + parts.size);
-        infoBarWindowed->setInfo(parts.pos, info.fileName + (info.edited ? "  *" : ""), parts.res + "  " + parts.size + states);
+        QString pos, res, size;
+        titleSegments(info, &pos, &res, &size);
+        infoBarFullscreen->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size);
+        infoBarWindowed->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size + states);
     }
     setWindowTitle(windowTitle);
 }

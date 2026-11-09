@@ -9,7 +9,10 @@
 #include <QMimeData>
 #include <QImageWriter>
 #include <QLocale>
+#include <QProperty>
 #include <QWindow>
+
+struct State;
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/iuserinteractions.h"
@@ -40,70 +43,6 @@
 #include <KWindowEffects>
 #endif
 
-struct CurrentInfo {
-    int index;
-    int fileCount;
-    QString fileName;
-    QString filePath;
-    QString directoryName;
-    QString directoryPath;
-    QSize imageSize;
-    qint64 fileSize;
-    bool slideshow;
-    bool shuffle;
-    bool edited;
-};
-
-// the title bar's string assembly, split out of MW::onInfoUpdated so one
-// test slot can sweep every state without instantiating the window
-struct TitleParts {
-    QString pos, res, size;
-};
-inline TitleParts titleSegments(const CurrentInfo &info) {
-    TitleParts parts;
-    if(info.fileCount)
-        parts.pos = "[ " + QString::number(info.index + 1) + "/" + QString::number(info.fileCount) + " ]";
-    if(info.imageSize.width())
-        parts.res = QString::number(info.imageSize.width()) + " x " + QString::number(info.imageSize.height());
-    if(info.fileSize)
-        parts.size = QLocale().formattedDataSize(info.fileSize, 1);
-    return parts;
-}
-inline QString titleStateSuffix(bool slideshow, bool shuffle, bool zoomLock, bool viewLock) {
-    QString states;
-    if(slideshow) states.append(" [slideshow]");
-    if(shuffle)   states.append(" [shuffle]");
-    if(zoomLock)  states.append(" [zoom lock]");
-    if(viewLock)  states.append(" [view lock]");
-    return states;
-}
-inline QString assembleWindowTitle(bool folderView, const CurrentInfo &info,
-                                   bool zoomLock, bool viewLock,
-                                   bool extendedInfo, bool appendStates,
-                                   const QString &appName,
-                                   const QString &folderViewTitle) {
-    if(folderView)
-        return folderViewTitle;
-    if(info.fileName.isEmpty())
-        return appName;
-    auto parts = titleSegments(info);
-    QString title = info.fileName;
-    if(extendedInfo) {
-        if(!parts.pos.isEmpty())
-            title.prepend(parts.pos + "  ");
-        if(!parts.res.isEmpty())
-            title.append("  -  " + parts.res);
-        if(!parts.size.isEmpty())
-            title.append("  -  " + parts.size);
-    }
-    QString states = titleStateSuffix(info.slideshow, info.shuffle, zoomLock, viewLock);
-    if(appendStates && !states.isEmpty())
-        title.append(" -" + states);
-    if(info.edited)
-        title.prepend("* ");
-    return title;
-}
-
 enum ActiveSidePanel {
     SIDEPANEL_CROP,
     SIDEPANEL_NONE
@@ -113,7 +52,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions
 {
     Q_OBJECT
 public:
-    explicit MW(QWidget *parent = nullptr);
+    explicit MW(const State *state, QWidget *parent = nullptr);
     ~MW() override;
     bool isCropPanelActive();
     void onScalingFinished(std::unique_ptr<QPixmap>scaled);
@@ -121,7 +60,6 @@ public:
     void showAnimation(const std::shared_ptr<QMovie>& movie);
     void showVideo(const QString &file);
 
-    void setCurrentInfo(int fileIndex, int fileCount, const QString &filePath, const QString &fileName, QSize imageSize, qint64 fileSize, bool slideshow, bool shuffle, bool edited);
     void setExifInfo(const QMap<QString, QString> &exifInfo);
     FolderViewProxy *getFolderView();
     ThumbnailStripProxy *getThumbnailPanel();
@@ -137,6 +75,7 @@ private:
     ViewerWidget *viewerWidget = nullptr;
     QHBoxLayout layout;
     QTimer windowGeometryChangeTimer;
+    const State *appState = nullptr;
     int currentDisplay;
 
     bool cropPanelActive, showInfoBarFullscreen, showInfoBarWindowed, maximized;
@@ -159,7 +98,7 @@ private:
     InfoBarProxy *infoBarWindowed = nullptr;
 
     PanelPosition panelPosition;
-    CurrentInfo info;
+    QPropertyObserver infoObserver;
     void saveWindowGeometry();
     void restoreWindowGeometry();
     void saveCurrentDisplay();
@@ -181,7 +120,7 @@ private slots:
     void readSettings();
     void adaptToWindowState();
     void onWindowGeometryChanged();
-    void onInfoUpdated();
+    void refreshInfoViews();
     void showScriptSettings();
 
 protected:

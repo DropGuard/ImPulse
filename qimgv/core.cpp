@@ -35,8 +35,6 @@ Core::Core()
       pool_(workerPoolThreadCount()),
       folderEndAction(FOLDER_END_NO_ACTION),
       loopSlideshow(false),
-      slideshow(false),
-      shuffle(false),
       thumbnailer(pool_, EngineBridge::instance()),
       thumbPanelPresenter(thumbnailer),
       folderViewPresenter(thumbnailer)
@@ -103,7 +101,7 @@ void Core::readSettings() {
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
     if(folderViewPresenter.showDirs() != showDirs)
         folderViewPresenter.setShowDirs(showDirs);
-    if(shuffle)
+    if(state.shuffle)
         syncRandomizer();
 }
 
@@ -118,7 +116,7 @@ void Core::showGui() {
 
 // create MainWindow and all widgets
 void Core::initGui() {
-    mw = new MW();
+    mw = new MW(&state);
     mw->hide();
 }
 
@@ -128,7 +126,7 @@ void Core::attachModel(DirectoryModel *_model) {
     folderViewPresenter.setModel(model);
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
     folderViewPresenter.setShowDirs(showDirs);
-    if(shuffle)
+    if(state.shuffle)
         syncRandomizer();
 }
 
@@ -317,18 +315,18 @@ void Core::onFirstRun() {
 }
 
 void Core::toggleShuffle() {
-    if(shuffle) {
+    if(state.shuffle) {
         mw->showMessage(tr("Shuffle mode: OFF"));
     } else {
         syncRandomizer();
         mw->showMessage(tr("Shuffle mode: ON"));
     }
-    shuffle = !shuffle;
+    state.shuffle = !state.shuffle;
     updateInfoString();
 }
 
 void Core::toggleSlideshow() {
-    if(slideshow) {
+    if(state.slideshow) {
         stopSlideshow();
         mw->showMessage(tr("Slideshow: OFF"));
 
@@ -339,8 +337,8 @@ void Core::toggleSlideshow() {
 }
 
 void Core::startSlideshow() {
-    if(!slideshow) {
-        slideshow = true;
+    if(!state.slideshow) {
+        state.slideshow = true;
         emit mw->setLoopPlayback(false);
         enableDocumentView();
         startSlideshowTimer();
@@ -349,8 +347,8 @@ void Core::startSlideshow() {
 }
 
 void Core::stopSlideshow() {
-    if(slideshow) {
-        slideshow = false;
+    if(state.slideshow) {
+        state.slideshow = false;
         emit mw->setLoopPlayback(true);
         slideshowTimer.stop();
         updateInfoString();
@@ -358,7 +356,7 @@ void Core::stopSlideshow() {
 }
 
 void Core::onPlaybackFinished() {
-    if(slideshow) {
+    if(state.slideshow) {
         nextImageSlideshow();
     }
 }
@@ -376,7 +374,7 @@ void Core::onModelLoaded() {
     folderViewPresenter.reloadModel();
     thumbPanelPresenter.selectAndFocus(state.currentFilePath);
     folderViewPresenter.selectAndFocus(state.currentFilePath);
-    if(shuffle)
+    if(state.shuffle)
         syncRandomizer();
 }
 
@@ -1522,7 +1520,7 @@ void Core::nextImage() {
     if(mw->currentViewMode() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
-    if(shuffle) {
+    if(state.shuffle) {
         loadFileIndex(randomizer.next(), true, false);
         return;
     }
@@ -1546,7 +1544,7 @@ void Core::prevImage() {
     if(mw->currentViewMode() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
-    if(shuffle) {
+    if(state.shuffle) {
         loadFileIndex(randomizer.prev(), true, false);
         return;
     }
@@ -1570,7 +1568,7 @@ void Core::prevImage() {
 void Core::nextImageSlideshow() {
     if(model->isEmpty() || mw->currentViewMode() == MODE_FOLDERVIEW)
         return;
-    if(shuffle) {
+    if(state.shuffle) {
         loadFileIndex(randomizer.next(), false, false);
     } else {
         int newIndex = model->indexOfFile(state.currentFilePath) + 1;
@@ -1687,24 +1685,22 @@ void Core::guiSetImage(std::shared_ptr<Image> img) {
 }
 
 void Core::updateInfoString() {
-    QSize imageSize(0,0);
-    qint64 fileSize = 0;
-    bool edited = false;
-
+    CurrentInfo ci;
+    ci.index = model->indexOfFile(state.currentFilePath);
+    ci.fileCount = model->fileCount();
+    ci.fileName = model->fileNameAt(ci.index);
+    ci.filePath = model->filePathAt(ci.index);
+    ci.directoryPath = model->directoryPath();
+    ci.directoryName = ci.directoryPath.split("/").last();
     if(model->isLoaded(state.currentFilePath)) {
         auto img = model->getImage(state.currentFilePath);
-        imageSize = img->originalSize();
-        fileSize  = img->fileSize();
-        edited = img->isEdited();
+        ci.imageSize = img->originalSize();
+        ci.fileSize = img->fileSize();
+        ci.edited = img->isEdited();
     }
-    int index = model->indexOfFile(state.currentFilePath);
-    mw->setCurrentInfo(index,
-                       model->fileCount(),
-                       model->filePathAt(index),
-                       model->fileNameAt(index),
-                       imageSize,
-                       fileSize,
-                       slideshow,
-                       shuffle,
-                       edited);
+    ci.slideshow = state.slideshow;
+    ci.shuffle = state.shuffle;
+    // the assignment is the notification: MW re-derives its views from the
+    // projection on change (issue #505 semantics live in onLoadFailed)
+    state.currentInfo = ci;
 }
