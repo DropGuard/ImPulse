@@ -8,5 +8,5 @@ Icon=impulse
 Terminal=false
 Type=Application
 Categories=Qt;Graphics;Viewer;
-MimeType=inode/directory;video/webm;image/jpeg;image/gif;image/png;image/bmp;image/webp;image/jxl;image/avif;image/heif;image/heic;image/x-ico;image/tiff;image/x-exr;
+MimeType=video/webm;image/jpeg;image/gif;image/png;image/bmp;image/webp;image/jxl;image/avif;image/heif;image/heic;image/x-ico;image/tiff;image/x-exr;
 Keywords=image;view;impulse;qimgv;picture;gif;jpeg;webm;png;jpg;gallery;
