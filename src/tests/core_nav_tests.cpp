@@ -526,8 +526,8 @@ private slots:
         theme.endGroup();
         theme.sync();
         settings->loadTheme();
-        QCOMPARE(settings->colorScheme().background, QColor("#1a1a1a"));
-        QCOMPARE(settings->colorScheme().accent, QColor("#ff0000"));
+        QCOMPARE(settings->colorScheme().background, QColor::fromString(QStringLiteral("#1a1a1a")));
+        QCOMPARE(settings->colorScheme().accent, QColor::fromString(QStringLiteral("#ff0000")));
     }
 
     void dialogCheckboxBindingsAreSymmetric() {
