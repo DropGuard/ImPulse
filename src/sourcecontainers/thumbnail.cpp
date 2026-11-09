@@ -10,11 +10,11 @@ Thumbnail::Thumbnail(QString _name, QString _info, int _size, std::shared_ptr<QP
         mHasAlphaChannel = _pixmap->hasAlphaChannel();
 }
 
-QString Thumbnail::name() {
+const QString &Thumbnail::name() {
     return mName;
 }
 
-QString Thumbnail::info() {
+const QString &Thumbnail::info() {
     return mInfo;
 }
 

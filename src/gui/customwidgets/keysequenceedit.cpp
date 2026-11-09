@@ -4,7 +4,7 @@ KeySequenceEdit::KeySequenceEdit(QWidget *parent) : QPushButton(parent), mSequen
     QPushButton::setText(tr("[Enter sequence]"));
 }
 
-QString KeySequenceEdit::sequence() {
+const QString &KeySequenceEdit::sequence() {
     return mSequence;
 }
 

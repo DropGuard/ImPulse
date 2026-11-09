@@ -11,7 +11,7 @@ Image::Image(std::unique_ptr<DocumentInfo> _info)
 Image::~Image() {
 }
 
-QString Image::filePath() const {
+const QString &Image::filePath() const {
     return mPath;
 }
 

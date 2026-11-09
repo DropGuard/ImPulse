@@ -96,6 +96,7 @@ void MapOverlay::enableVisibility(bool mode) {
 void MapOverlay::setOpacity(float opacity) {
     d->opacity = opacity;
     update();
+    emit opacityChanged();
 }
 
 void MapOverlay::animateVisible(bool isVisible) {
@@ -142,6 +143,7 @@ void MapOverlay::resize(int size) {
 
 void MapOverlay::setY(int y) {
     move(x(), y);
+    emit yChanged();
 }
 
 int MapOverlay::y() const {

@@ -3,8 +3,7 @@
 CacheItem::CacheItem() : sem(1) {
 }
 
-CacheItem::CacheItem(std::shared_ptr<Image> _contents) : sem(1) {
-    contents = std::move(_contents);
+CacheItem::CacheItem(std::shared_ptr<Image> _contents) : contents(std::move(_contents)), sem(1) {
 }
 
 std::shared_ptr<Image> CacheItem::getContents() {
