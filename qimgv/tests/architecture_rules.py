@@ -331,6 +331,19 @@ for path, rel in sources():
     if '::keyPressEvent(' in text_of(path) and rel not in ALLOWED_KEY_DOORS:
         failures.append(f"R11 unauthorized key door: {rel} (add to ALLOWED_KEY_DOORS only after review)")
 
+# Rule 12: every registered action must be connected. invokeAction resolves
+# ACTION_NORMAL by emitting the signal of the same name — a registration
+# without a connect is an action that shows in the keymap, is invokable, and
+# does absolutely nothing. The reverse (connected but unregistered) is
+# runScript, the dynamic carrier for script actions, and is expected.
+actions_text = text_of(os.path.join(SRC, 'utils', 'actions.cpp'))
+registered_actions = set(re.findall(r'mActions\.insert\("([^"]+)"', actions_text))
+connected_actions = set(re.findall(r'&ActionManager::(\w+),', text_of(os.path.join(SRC, 'core.cpp'))))
+for name in sorted(registered_actions - connected_actions):
+    failures.append(f"R12 registered action is never connected: {name} — add the ActionManager "
+                    "connect in core.cpp or remove the registration")
+scanned['R12'] = scanned.get('R12', 0) + 1
+
 if failures:
     print("architecture violations:")
     for f in failures:
