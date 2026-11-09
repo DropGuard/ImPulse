@@ -207,7 +207,7 @@ public slots:
     void showFullScreen();
     void showWindowed();
     void triggerCopyOverlay();
-    void showMessage(const QString &text);
+    void showMessage(const QString &text) override;
     void showMessage(const QString &text, int duration);
     void showMessageSuccess(const QString &text);
     void showWarning(const QString &text);
