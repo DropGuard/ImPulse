@@ -572,11 +572,33 @@ class TestCoreNav : public QObject {
         // the selection itself does not move or scale
         QCOMPARE(overlay->imageScale(), viewer->currentScale());
 
-        // fit remains blocked while framing
+        // panning works while framing: the image rect moves under the
+        // overlay, and the mapping re-derives (canvasViewportChanged)
+        QRect rectBefore = viewer->imageRect();
+        viewer->scrollLeft();
+        // scrollSmooth animates through a QTimeLine — poll until it moves
+        QTRY_VERIFY_WITH_TIMEOUT(viewer->imageRect() != rectBefore, 2000);
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+
+        // fit remains blocked while framing — a fit would reset the very
+        // view the user is framing in
         float scale = viewer->currentScale();
         viewer->fitWindow();
         QVERIFY(qAbs(viewer->currentScale() - scale) < 0.001f);
         QVERIFY(core.mw->crop()->isCropPanelActive());
+
+        // leaving crop releases the policy: the fit keys work again — the
+        // mode semantics were never vetoed, only deferred while the overlay
+        // held the canvas. (No navigation assert here: fork-per-slot means
+        // this fork's directory holds only the files this test created, and
+        // a cross-test file assumption is exactly what the isolation
+        // forbids — prevImage in a one-file directory legitimately no-ops.
+        // The arrows' navigation is pinned in
+        // fitOriginalPersistsAndArrowsStayInInspectMode.)
+        core.mw->crop()->trigger();
+        QVERIFY(!core.mw->crop()->isCropPanelActive());
+        viewer->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
     }
 
     void cropPanelSurvivesAnEarlyTrigger() {
