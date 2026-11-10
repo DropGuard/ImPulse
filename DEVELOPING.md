@@ -115,7 +115,7 @@ impulse /path/to/image-or-directory
 Verify a build:
 
 ```bash
-cd build && ctest                       # six suites, including the architecture rules
+cd build && ctest -j4                 # six suites, including the architecture rules
 cd engine/qimgv-engine && cargo test    # the engine's own suites
 ```
 
