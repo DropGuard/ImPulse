@@ -11,28 +11,28 @@
 #include "components/actionmanager/actionmanager.h"
 
 namespace Ui {
-    class ChangelogWindow;
+class ChangelogWindow;
 }
 
 class ChangelogWindow : public OverlayWidget {
     Q_OBJECT
-public:
+  public:
     explicit ChangelogWindow(FloatingWidgetContainer *parent);
     ~ChangelogWindow() override;
-    void setText(const QString& text);
+    void setText(const QString &text);
 
-public slots:
+  public slots:
     void show();
     void hide();
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *) override;
     void wheelEvent(QWheelEvent *) override;
     void keyPressEvent(QKeyEvent *) override;
 
-private:
+  private:
     Ui::ChangelogWindow *ui;
 
-private slots:
+  private slots:
     void hideAndShutUp();
 };

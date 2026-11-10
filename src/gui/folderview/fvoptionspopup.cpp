@@ -1,10 +1,7 @@
 #include "fvoptionspopup.h"
 #include "ui_fvoptionspopup.h"
 
-FVOptionsPopup::FVOptionsPopup(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::FVOptionsPopup)
-{
+FVOptionsPopup::FVOptionsPopup(QWidget *parent) : QWidget(parent), ui(new Ui::FVOptionsPopup) {
     ui->setupUi(this);
 
     setWindowFlags(Qt::Popup);
@@ -14,9 +11,9 @@ FVOptionsPopup::FVOptionsPopup(QWidget *parent) :
     ui->viewExtendedButton->setText(QObject::tr("Extended"));
     ui->viewFoldersButton->setText(QObject::tr("Extended + Folders"));
 
-    connect(ui->viewSimpleButton,   &ContextMenuItem::pressed, this, &FVOptionsPopup::selectSimpleView);
+    connect(ui->viewSimpleButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectSimpleView);
     connect(ui->viewExtendedButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectExtendedView);
-    connect(ui->viewFoldersButton,  &ContextMenuItem::pressed, this, &FVOptionsPopup::selectFoldersView);
+    connect(ui->viewFoldersButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectFoldersView);
 
     // force size recalculation
     this->adjustSize();
@@ -26,7 +23,6 @@ FVOptionsPopup::FVOptionsPopup(QWidget *parent) :
 
     hide();
 }
-
 
 FVOptionsPopup::~FVOptionsPopup() {
     delete ui;
@@ -100,7 +96,7 @@ void FVOptionsPopup::showAt(QPoint pos) {
     show();
 }
 
-void FVOptionsPopup::hideEvent(QHideEvent* event) {
+void FVOptionsPopup::hideEvent(QHideEvent *event) {
     event->accept();
     emit dismissed();
 }

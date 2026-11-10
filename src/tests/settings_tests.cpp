@@ -1,17 +1,20 @@
 #include "engine_stack_fixture.h"
 
 #include <functional>
-#include <utility>          // std::as_const: a range loop over a non-const QList may detach
+#include <utility> // std::as_const: a range loop over a non-const QList may detach
 
 // the declarative settings table: clamps, junk values, and the config isolation
 // the binding table stands on
 class TestSettingsTable : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestSettingsTable() : EngineStackFixture("settings") {}
+  public:
+    TestSettingsTable() : EngineStackFixture("settings") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // Every row of settings_table.h is walked, so a new setting inherits this
     // coverage the moment it is added to the table: missing key -> default,
@@ -25,18 +28,10 @@ private slots:
         // missing key: every row serves its default
         for(const SettingDesc *d : kAllSettings) {
             switch(d->kind) {
-            case SettingDesc::Kind::Bool:
-                QCOMPARE(settings->load<bool>(*d), d->defB);
-                break;
-            case SettingDesc::Kind::Int:
-                QCOMPARE(settings->load<qlonglong>(*d), d->defI);
-                break;
-            case SettingDesc::Kind::Real:
-                QCOMPARE(settings->load<double>(*d), d->defR);
-                break;
-            case SettingDesc::Kind::Str:
-                QCOMPARE(settings->load<QString>(*d), QString::fromUtf8(d->defS));
-                break;
+            case SettingDesc::Kind::Bool: QCOMPARE(settings->load<bool>(*d), d->defB); break;
+            case SettingDesc::Kind::Int: QCOMPARE(settings->load<qlonglong>(*d), d->defI); break;
+            case SettingDesc::Kind::Real: QCOMPARE(settings->load<double>(*d), d->defR); break;
+            case SettingDesc::Kind::Str: QCOMPARE(settings->load<QString>(*d), QString::fromUtf8(d->defS)); break;
             }
         }
 
@@ -50,15 +45,9 @@ private slots:
             case SettingDesc::Kind::Bool:
                 settings->load<bool>(*d); // defined, do not pin QVariant's whim
                 break;
-            case SettingDesc::Kind::Int:
-                QCOMPARE(settings->load<qlonglong>(*d), d->defI);
-                break;
-            case SettingDesc::Kind::Real:
-                QCOMPARE(settings->load<double>(*d), d->defR);
-                break;
-            case SettingDesc::Kind::Str:
-                QCOMPARE(settings->load<QString>(*d), QStringLiteral("banana"));
-                break;
+            case SettingDesc::Kind::Int: QCOMPARE(settings->load<qlonglong>(*d), d->defI); break;
+            case SettingDesc::Kind::Real: QCOMPARE(settings->load<double>(*d), d->defR); break;
+            case SettingDesc::Kind::Str: QCOMPARE(settings->load<QString>(*d), QStringLiteral("banana")); break;
             }
         }
 
@@ -75,24 +64,27 @@ private slots:
         for(const SettingDesc *d : kAllSettings) {
             if(!d->clamped())
                 continue;
-            QList<double> outside;                    // only the declared side
-            if(d->hasLo) outside << d->lo - 1000.0;
-            if(d->hasHi) outside << d->hi + 1000.0;
+            QList<double> outside; // only the declared side
+            if(d->hasLo)
+                outside << d->lo - 1000.0;
+            if(d->hasHi)
+                outside << d->hi + 1000.0;
             for(const double bad : std::as_const(outside)) {
                 if(d->kind == SettingDesc::Kind::Int) {
                     junk.setValue(d->key, QVariant(static_cast<qlonglong>(bad)));
                     junk.sync();
-                    const qlonglong want = d->resetOnRange ? d->defI
-                                             : qBound<qlonglong>(static_cast<qlonglong>(d->lo),
-                                                                 static_cast<qlonglong>(bad),
-                                                                 static_cast<qlonglong>(d->hi));
+                    const qlonglong want =
+                        d->resetOnRange ? d->defI
+                                        : qBound<qlonglong>(static_cast<qlonglong>(d->lo), static_cast<qlonglong>(bad),
+                                                            static_cast<qlonglong>(d->hi));
                     const qlonglong got = settings->load<qlonglong>(*d);
                     if(got != want)
                         policyMismatch << QStringLiteral("%1 stored=%2 got=%3 want=%4 (%5)")
                                               .arg(QString::fromUtf8(d->key))
-                                              .arg(bad).arg(got).arg(want)
-                                              .arg(d->resetOnRange ? QStringLiteral("reset")
-                                                                   : QStringLiteral("clamp"));
+                                              .arg(bad)
+                                              .arg(got)
+                                              .arg(want)
+                                              .arg(d->resetOnRange ? QStringLiteral("reset") : QStringLiteral("clamp"));
                 } else if(d->kind == SettingDesc::Kind::Real) {
                     junk.setValue(d->key, QVariant(bad));
                     junk.sync();
@@ -101,15 +93,16 @@ private slots:
                     if(qAbs(got - want) > 1e-9)
                         policyMismatch << QStringLiteral("%1 stored=%2 got=%3 want=%4 (%5)")
                                               .arg(QString::fromUtf8(d->key))
-                                              .arg(bad).arg(got).arg(want)
-                                              .arg(d->resetOnRange ? QStringLiteral("reset")
-                                                                   : QStringLiteral("clamp"));
+                                              .arg(bad)
+                                              .arg(got)
+                                              .arg(want)
+                                              .arg(d->resetOnRange ? QStringLiteral("reset") : QStringLiteral("clamp"));
                 }
             }
         }
         QVERIFY2(policyMismatch.isEmpty(),
-                 qPrintable(QStringLiteral("rows did not apply their declared range policy:\n  ")
-                            + policyMismatch.join(QStringLiteral("\n  "))));
+                 qPrintable(QStringLiteral("rows did not apply their declared range policy:\n  ") +
+                            policyMismatch.join(QStringLiteral("\n  "))));
     }
 
     // QSettings' second argument only covers a MISSING key: a junk value
@@ -130,7 +123,7 @@ private slots:
 
         junk.setValue("JPEGSaveQuality", QVariant(static_cast<qlonglong>(140)));
         junk.sync();
-        QCOMPARE(settings->JPEGSaveQuality(), 100);   // the row's hi bound
+        QCOMPARE(settings->JPEGSaveQuality(), 100); // the row's hi bound
     }
 
     // The accessors that used to read QSettings by hand and disagreed with
@@ -140,34 +133,27 @@ private slots:
     void junkFallsBackToTheDeclaredDefaultNotToSomeOtherValue() {
         FreshSettings fresh;
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-        const QList<QByteArray> keys { "backgroundOpacity", "folderViewMode", "thumbPanelStyle",
-                                       "memoryAllocationLimit", "imageScrolling",
-                                       "focusPointIn1to1Mode" };
+        const QList<QByteArray> keys{"backgroundOpacity",     "folderViewMode", "thumbPanelStyle",
+                                     "memoryAllocationLimit", "imageScrolling", "focusPointIn1to1Mode"};
         for(const QByteArray &k : keys)
             junk.setValue(QString::fromUtf8(k), QVariant(QStringLiteral("banana")));
         junk.sync();
 
-        QStringList got {
-            QStringLiteral("backgroundOpacity=%1").arg(settings->backgroundOpacity()),
-            QStringLiteral("folderViewMode=%1").arg(settings->folderViewMode()),
-            QStringLiteral("thumbPanelStyle=%1").arg(settings->thumbPanelStyle()),
-            QStringLiteral("memoryAllocationLimit=%1").arg(settings->memoryAllocationLimit()),
-            QStringLiteral("imageScrolling=%1").arg(settings->imageScrolling()),
-            QStringLiteral("focusPointIn1to1Mode=%1").arg(settings->focusPointIn1to1Mode())
-        };
-        const QStringList want {
-            QStringLiteral("backgroundOpacity=1"), QStringLiteral("folderViewMode=2"),
-            QStringLiteral("thumbPanelStyle=1"), QStringLiteral("memoryAllocationLimit=1024"),
-            QStringLiteral("imageScrolling=1"), QStringLiteral("focusPointIn1to1Mode=1")
-        };
+        QStringList got{QStringLiteral("backgroundOpacity=%1").arg(settings->backgroundOpacity()),
+                        QStringLiteral("folderViewMode=%1").arg(settings->folderViewMode()),
+                        QStringLiteral("thumbPanelStyle=%1").arg(settings->thumbPanelStyle()),
+                        QStringLiteral("memoryAllocationLimit=%1").arg(settings->memoryAllocationLimit()),
+                        QStringLiteral("imageScrolling=%1").arg(settings->imageScrolling()),
+                        QStringLiteral("focusPointIn1to1Mode=%1").arg(settings->focusPointIn1to1Mode())};
+        const QStringList want{QStringLiteral("backgroundOpacity=1"), QStringLiteral("folderViewMode=2"),
+                               QStringLiteral("thumbPanelStyle=1"),   QStringLiteral("memoryAllocationLimit=1024"),
+                               QStringLiteral("imageScrolling=1"),    QStringLiteral("focusPointIn1to1Mode=1")};
         QStringList wrong;
         for(int i = 0; i < got.size(); ++i)
             if(got.at(i) != want.at(i))
-                wrong << QStringLiteral("%1 (row wants %2)")
-                             .arg(got.at(i), want.at(i).section('=', 1));
-        QVERIFY2(wrong.isEmpty(),
-                 qPrintable(QStringLiteral("junk values did not land on the declared defaults: ")
-                            + wrong.join(QStringLiteral("; "))));
+                wrong << QStringLiteral("%1 (row wants %2)").arg(got.at(i), want.at(i).section('=', 1));
+        QVERIFY2(wrong.isEmpty(), qPrintable(QStringLiteral("junk values did not land on the declared defaults: ") +
+                                             wrong.join(QStringLiteral("; "))));
     }
 
     // The reset-policy rows, pinned through their production accessors against
@@ -181,42 +167,87 @@ private slots:
         FreshSettings fresh;
         QSettings probe(QCoreApplication::organizationName(), QCoreApplication::applicationName());
 
-        struct Item { const SettingDesc *row; std::function<double()> get; };
-        const QList<Item> items {
-            {&K_SortingMode,          []{ return double(settings->sortingMode()); }},
-            {&K_FolderViewMode,       []{ return double(settings->folderViewMode()); }},
-            {&K_ThumbPanelStyle,      []{ return double(settings->thumbPanelStyle()); }},
-            {&K_DefaultFitMode,       []{ return double(settings->imageFitMode()); }},
-            {&K_ZoomIndicatorMode,    []{ return double(settings->zoomIndicatorMode()); }},
-            {&K_FocusPointIn1to1Mode, []{ return double(settings->focusPointIn1to1Mode()); }},
-            {&K_ImageScrolling,       []{ return double(settings->imageScrolling()); }},
-            {&K_DefaultCropAction,    []{ return double(settings->defaultCropAction()); }},
-            {&K_DefaultViewMode,      []{ return double(settings->defaultViewMode()); }},
-            {&K_FolderEndAction,      []{ return double(settings->folderEndAction()); }},
-            {&K_AutoResizeLimit,      []{ return double(settings->autoResizeLimit()); }},
-            {&K_SlideshowInterval,    []{ return double(settings->slideshowInterval()); }},
-            {&K_ThumbnailerThreads,   []{ return double(settings->thumbnailerThreadCount()); }},
+        struct Item {
+            const SettingDesc *row;
+            std::function<double()> get;
+        };
+        const QList<Item> items{
+            {&K_SortingMode,
+             [] {
+                 return double(settings->sortingMode());
+             }},
+            {&K_FolderViewMode,
+             [] {
+                 return double(settings->folderViewMode());
+             }},
+            {&K_ThumbPanelStyle,
+             [] {
+                 return double(settings->thumbPanelStyle());
+             }},
+            {&K_DefaultFitMode,
+             [] {
+                 return double(settings->imageFitMode());
+             }},
+            {&K_ZoomIndicatorMode,
+             [] {
+                 return double(settings->zoomIndicatorMode());
+             }},
+            {&K_FocusPointIn1to1Mode,
+             [] {
+                 return double(settings->focusPointIn1to1Mode());
+             }},
+            {&K_ImageScrolling,
+             [] {
+                 return double(settings->imageScrolling());
+             }},
+            {&K_DefaultCropAction,
+             [] {
+                 return double(settings->defaultCropAction());
+             }},
+            {&K_DefaultViewMode,
+             [] {
+                 return double(settings->defaultViewMode());
+             }},
+            {&K_FolderEndAction,
+             [] {
+                 return double(settings->folderEndAction());
+             }},
+            {&K_AutoResizeLimit,
+             [] {
+                 return double(settings->autoResizeLimit());
+             }},
+            {&K_SlideshowInterval,
+             [] {
+                 return double(settings->slideshowInterval());
+             }},
+            {&K_ThumbnailerThreads,
+             [] {
+                 return double(settings->thumbnailerThreadCount());
+             }},
         };
 
         QStringList wrong;
         for(const Item &it : items) {
             const SettingDesc *d = it.row;
-            QList<qlonglong> outside;                 // only the declared side:
-            if(d->hasLo) outside << static_cast<qlonglong>(d->lo) - 1000;
-            if(d->hasHi) outside << static_cast<qlonglong>(d->hi) + 1000;
+            QList<qlonglong> outside; // only the declared side:
+            if(d->hasLo)
+                outside << static_cast<qlonglong>(d->lo) - 1000;
+            if(d->hasHi)
+                outside << static_cast<qlonglong>(d->hi) + 1000;
             // a row without hi has no upper violation to probe
             for(const qlonglong bad : std::as_const(outside)) {
                 probe.setValue(d->key, QVariant(bad));
                 probe.sync();
                 if(it.get() != static_cast<double>(d->defI))
                     wrong << QStringLiteral("%1 stored=%2 accessor gave %3, row default is %4")
-                                 .arg(QString::fromUtf8(d->key)).arg(bad)
-                                 .arg(it.get()).arg(d->defI);
+                                 .arg(QString::fromUtf8(d->key))
+                                 .arg(bad)
+                                 .arg(it.get())
+                                 .arg(d->defI);
             }
         }
-        QVERIFY2(wrong.isEmpty(),
-                 qPrintable(QStringLiteral("reset-policy settings did not serve their default:\n  ")
-                            + wrong.join(QStringLiteral("\n  "))));
+        QVERIFY2(wrong.isEmpty(), qPrintable(QStringLiteral("reset-policy settings did not serve their default:\n  ") +
+                                             wrong.join(QStringLiteral("\n  "))));
     }
 
     void settingsEnumGettersClampJunkConfigValues() {
@@ -243,11 +274,11 @@ private slots:
     // state config (IsolatedHome keeps this off the developer's real state)
     void bookmarksAndSavedPathsRoundTrip() {
         FreshSettings fresh;
-        QStringList paths = { "/tmp/a", "/tmp/b with space" };
+        QStringList paths = {"/tmp/a", "/tmp/b with space"};
         settings->setBookmarks(paths);
-        settings->setSavedPaths({ "/home/user/pictures" });
+        settings->setSavedPaths({"/home/user/pictures"});
         QCOMPARE(settings->bookmarks(), paths);
-        QCOMPARE(settings->savedPaths(), QStringList { "/home/user/pictures" });
+        QCOMPARE(settings->savedPaths(), QStringList{"/home/user/pictures"});
         settings->setBookmarks({});
         QVERIFY(settings->bookmarks().isEmpty());
     }
@@ -266,7 +297,8 @@ private slots:
 
     // the shortcut map's round trip through the ini, including the "eq" escape
     // for names that would collide with the k=v encoding
-    void shortcutRoundTripEscapesTrailingEquals() {        FreshSettings fresh;
+    void shortcutRoundTripEscapesTrailingEquals() {
+        FreshSettings fresh;
         QMap<QString, QString> shortcuts;
         shortcuts.insert("ctrl+x", "25");
         shortcuts.insert("ctrl+=", "26"); // the "=" key needs the escape
@@ -315,7 +347,8 @@ private slots:
         QVERIFY(raw.toString().startsWith('{'));
     }
 
-    void scriptsFallBackToPreJsonPlainKeys() {        FreshSettings fresh;
+    void scriptsFallBackToPreJsonPlainKeys() {
+        FreshSettings fresh;
         QSettings conf(QCoreApplication::organizationName(), QCoreApplication::applicationName());
         conf.beginGroup("Scripts");
         conf.beginWriteArray("script");
@@ -337,7 +370,8 @@ private slots:
         // exists; a configured cacheDir must be honored there exactly as it
         // is inside setupCache, or logs and thumbnails split across dirs
         FreshSettings fresh;
-        const QString alt = QDir::tempPath() + QStringLiteral("/qimgv-cache-alt-%1").arg(QCoreApplication::applicationPid());
+        const QString alt =
+            QDir::tempPath() + QStringLiteral("/qimgv-cache-alt-%1").arg(QCoreApplication::applicationPid());
         QSettings conf;
         conf.setValue(QStringLiteral("cacheDir"), alt);
         conf.sync();
@@ -386,7 +420,6 @@ private slots:
         // and the legacy conf the user kept editing upstream is untouched
         QCOMPARE(readTestFile(legacyConf + "/qimgv.conf"), QByteArray("theConf=edited-after\n"));
     }
-
 };
 
 #include "settings_tests.moc"

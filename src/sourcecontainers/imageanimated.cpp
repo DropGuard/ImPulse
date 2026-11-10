@@ -3,9 +3,7 @@
 
 // TODO: this class is kinda useless now. redesign?
 
-ImageAnimated::ImageAnimated(std::unique_ptr<DocumentInfo> _info)
-    : Image(std::move(_info))
-{
+ImageAnimated::ImageAnimated(std::unique_ptr<DocumentInfo> _info) : Image(std::move(_info)) {
     mSize.setWidth(0);
     mSize.setHeight(0);
     load();

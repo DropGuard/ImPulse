@@ -8,15 +8,15 @@ enum ShrIcon {
     SHR_ICON_LOADING
 };
 
-class SharedResources
-{
-public:
+class SharedResources {
+  public:
     SharedResources();
-    static SharedResources* getInstance();
+    static SharedResources *getInstance();
     ~SharedResources();
 
     QPixmap *getPixmap(ShrIcon icon, qreal dpr);
-private:
+
+  private:
     QPixmap *mLoadingIcon72 = nullptr;
     QPixmap *mLoadingErrorIcon72 = nullptr;
 };

@@ -56,25 +56,30 @@ inline QString titleSegments(const CurrentInfo &info, QString *posOut, QString *
     QString size;
     if(info.fileSize)
         size = QLocale().formattedDataSize(info.fileSize, 1);
-    if(posOut) *posOut = pos;
-    if(resOut) *resOut = res;
-    if(sizeOut) *sizeOut = size;
+    if(posOut)
+        *posOut = pos;
+    if(resOut)
+        *resOut = res;
+    if(sizeOut)
+        *sizeOut = size;
     return pos;
 }
 
 inline QString titleStateSuffix(bool slideshow, bool shuffle, bool zoomLock, bool viewLock) {
     QString states;
-    if(slideshow) states.append(" [slideshow]");
-    if(shuffle)   states.append(" [shuffle]");
-    if(zoomLock)  states.append(" [zoom lock]");
-    if(viewLock)  states.append(" [view lock]");
+    if(slideshow)
+        states.append(" [slideshow]");
+    if(shuffle)
+        states.append(" [shuffle]");
+    if(zoomLock)
+        states.append(" [zoom lock]");
+    if(viewLock)
+        states.append(" [view lock]");
     return states;
 }
 
-inline QString assembleWindowTitle(bool folderView, const CurrentInfo &info,
-                                   bool zoomLock, bool viewLock,
-                                   bool extendedInfo, bool appendStates,
-                                   const QString &appName,
+inline QString assembleWindowTitle(bool folderView, const CurrentInfo &info, bool zoomLock, bool viewLock,
+                                   bool extendedInfo, bool appendStates, const QString &appName,
                                    const QString &folderViewTitle) {
     if(folderView)
         return folderViewTitle;
@@ -125,7 +130,7 @@ enum MimeDataTarget {
 
 class Core : public QObject {
     Q_OBJECT
-public:
+  public:
     Core();
     ~Core() override;
     void showGui();
@@ -137,11 +142,11 @@ public:
     // about what the listing contains, so it cannot substitute for an assert.
     bool isSettled() const;
 
-public slots:
+  public slots:
     void updateInfoString();
     bool loadPath(QString);
 
-private:
+  private:
     QElapsedTimer t;
 
     void initGui();
@@ -187,7 +192,7 @@ private:
 
     void rotateByDegrees(int degrees);
     void reset();
-    bool setDirectory(const QString & path);
+    bool setDirectory(const QString &path);
 
     QMimeData *getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget target);
     QMimeData *mimeDataForPaths(const QList<QString> &paths);
@@ -211,21 +216,23 @@ private:
     std::shared_ptr<ImageStatic> getEditableImage(const QString &filePath);
     QList<QString> currentSelection();
 
-    template<typename... Args>
-    void edit_template(bool save, const QString & actionName, const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)>& func, Args&&... as);
+    template <typename... Args>
+    void edit_template(bool save, const QString &actionName,
+                       const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
+                       Args &&...as);
 
-    void doInteractiveCopy(const QString & path, const QString & destDirectory, DialogResult &overwriteAllFiles);
-    void doInteractiveMove(const QString & path, const QString & destDirectory, DialogResult &overwriteAllFiles);
+    void doInteractiveCopy(const QString &path, const QString &destDirectory, DialogResult &overwriteAllFiles);
+    void doInteractiveMove(const QString &path, const QString &destDirectory, DialogResult &overwriteAllFiles);
 
-private slots:
+  private slots:
     void readSettings();
     void nextImage();
     void prevImage();
     void nextImageSlideshow();
     void jumpToFirst();
     void jumpToLast();
-    void onModelItemReady(std::shared_ptr<Image>, const QString&, bool scaled);
-    void onModelItemUpdated(const QString & fileName);
+    void onModelItemReady(std::shared_ptr<Image>, const QString &, bool scaled);
+    void onModelItemUpdated(const QString &fileName);
     void onModelSortingChanged(SortingMode mode);
     void onLoadFailed(const QString &path);
     void rotateLeft();
@@ -233,17 +240,17 @@ private slots:
     void close();
     void scalingRequest(QSize, ScalingFilter);
     void onScalingFinished(QPixmap scaled, const ScalerRequest &req);
-    void copyCurrentFile(const QString & destDirectory);
-    void moveCurrentFile(const QString & destDirectory);
-    void copyPathsTo(const QList<QString> & paths, const QString & destDirectory);
-    void interactiveCopy(const QList<QString> & paths, const QString & destDirectory);
-    void interactiveMove(const QList<QString> & paths, const QString & destDirectory);
-    void movePathsTo(const QList<QString> & paths, const QString & destDirectory);
-    FileOpResult removeFile(const QString & fileName, bool trash);
-    void onFileRemoved(const QString & filePath, int index);
-    void onFileAdded(const QString & filePath);
-    void onFileModified(const QString & filePath);
-    void onFileRenamed(const QString & filePath, const QString & newPath, int oldIndex);
+    void copyCurrentFile(const QString &destDirectory);
+    void moveCurrentFile(const QString &destDirectory);
+    void copyPathsTo(const QList<QString> &paths, const QString &destDirectory);
+    void interactiveCopy(const QList<QString> &paths, const QString &destDirectory);
+    void interactiveMove(const QList<QString> &paths, const QString &destDirectory);
+    void movePathsTo(const QList<QString> &paths, const QString &destDirectory);
+    FileOpResult removeFile(const QString &fileName, bool trash);
+    void onFileRemoved(const QString &filePath, int index);
+    void onFileAdded(const QString &filePath);
+    void onFileModified(const QString &filePath);
+    void onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
     void showResizeDialog();
     void resize(QSize size);
     void flipH();
@@ -256,33 +263,33 @@ private slots:
     void requestSavePath();
     void saveCurrentFile();
     void saveCurrentFileAs(const QString &);
-    void runScript(const QString&);
+    void runScript(const QString &);
     void setWallpaper();
     // the wallpaperCommand dispatch, exposed for the audit test
     static QPair<QString, QStringList> wallpaperCommand(const QString &session, const QString &path);
     void removePermanent();
     void moveToTrash();
     void reloadImage();
-    void reloadImage(const QString & fileName);
+    void reloadImage(const QString &fileName);
     void copyFileClipboard();
     void copyPathClipboard();
     void openFromClipboard();
-    void renameCurrentSelection(const QString & newName);
+    void renameCurrentSelection(const QString &newName);
     void sortBy(SortingMode mode);
     void sortByName();
     void sortByTime();
     void sortBySize();
     void showRenameDialog();
     void onDraggedOut();
-    void onDraggedOut(const QList<QString> & paths);
-    void onDropIn(const QMimeData *mimeData, QObject* source);
+    void onDraggedOut(const QList<QString> &paths);
+    void onDropIn(const QMimeData *mimeData, QObject *source);
     void toggleShuffle();
     void onModelLoaded();
     void outputError(const FileOpResult &error) const;
     void showOpenDialog();
     void showInDirectory();
     void quickCopyToFixedDirectory();
-    void onDirectoryViewFileActivated(const QString & filePath);
+    void onDirectoryViewFileActivated(const QString &filePath);
     bool loadFileIndex(int index, bool async, bool preload);
     void enableDocumentView();
     void enableFolderView();

@@ -3,10 +3,9 @@
 #include <utility>
 
 BookmarksItem::BookmarksItem(QString _dirName, QString _dirPath, QWidget *parent)
-    : QWidget(parent), dirName(std::move(_dirName)), dirPath(std::move(_dirPath)), mHighlighted(false)
-{
-    this->setContentsMargins(0,0,0,0);
-    layout.setContentsMargins(10,6,10,6);
+    : QWidget(parent), dirName(std::move(_dirName)), dirPath(std::move(_dirPath)), mHighlighted(false) {
+    this->setContentsMargins(0, 0, 0, 0);
+    layout.setContentsMargins(10, 6, 10, 6);
     setAcceptDrops(true);
     dirNameLabel.setText(dirName);
 

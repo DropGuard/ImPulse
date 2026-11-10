@@ -24,16 +24,21 @@
 
 #include <QImageReader>
 
-enum DocumentType { NONE, STATIC, ANIMATED, VIDEO };
+enum DocumentType {
+    NONE,
+    STATIC,
+    ANIMATED,
+    VIDEO
+};
 
 class DocumentInfo {
-public:
+  public:
     // classification consults the CARRIED policy (jxl animation, video
     // playback/formats), never the settings global — this constructor runs
     // on the loader pool
     DocumentInfo(QString path, const LoadPolicy &policy);
     ~DocumentInfo();
-    
+
     QString directoryPath() const;
     QString filePath() const;
     QString fileName() const;
@@ -51,7 +56,7 @@ public:
     void loadExifTags();
     QMap<QString, QString> getExifTags();
 
-private:
+  private:
     QFileInfo fileInfo;
     DocumentType mDocumentType;
     int mOrientation;

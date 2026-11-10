@@ -15,7 +15,7 @@
 
 class DirectoryPresenter : public QObject {
     Q_OBJECT
-public:
+  public:
     explicit DirectoryPresenter(Thumbnailer &_thumbnailer, QObject *parent = nullptr);
 
     // The view is an IDirectoryView, which is not a QObject, so a
@@ -26,12 +26,11 @@ public:
     // signals itself. That makes the compiler check every signal/slot pair, and
     // it retires the SIGNAL()/SLOT() strings this used to be - strings that also
     // forced disconnectView to mirror all five signatures by hand.
-    template<typename View>
-    void setView(View *newView) {
+    template <typename View> void setView(View *newView) {
         if(view)
-            return;                        // the binding is already live
+            return; // the binding is already live
         view = newView;
-        viewSender = newView;              // a QPointer: it goes null with the widget
+        viewSender = newView; // a QPointer: it goes null with the widget
         if(model)
             view->populate(mShowDirs ? model->totalCount() : model->fileCount());
 
@@ -77,18 +76,17 @@ public:
 
     QList<QString> selectedPaths() const;
 
-
-signals:
+  signals:
     void dirActivated(const QString &dirPath);
     void fileActivated(const QString &filePath);
     void draggedOut(QList<QString>);
     void droppedInto(QList<QString>, QString);
 
-public slots:
+  public slots:
     void disconnectView();
     void reloadModel();
 
-private slots:
+  private slots:
     void generateThumbnails(const QList<int> &, int, bool, bool);
     void onThumbnailReady(std::shared_ptr<Thumbnail> thumb, const QString &filePath);
     void populateView();
@@ -97,7 +95,8 @@ private slots:
     void onDraggedOver(int index);
 
     void onDroppedInto(const QMimeData *data, QObject *source, int targetIndex);
-private:
+
+  private:
     // observes; the Qt parent tree owns the view widget
     IDirectoryView *view = nullptr;
     // the same widget, seen as the QObject it also is: the teardown needs to

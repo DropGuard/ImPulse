@@ -1,13 +1,11 @@
 #include "saveconfirmoverlay.h"
 #include "ui_saveconfirmoverlay.h"
 
-SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::SaveConfirmOverlay)
-{
+SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), ui(new Ui::SaveConfirmOverlay) {
     ui->setupUi(this);
-    connect(ui->saveButton,    &QPushButton::clicked, this, &SaveConfirmOverlay::saveClicked);
-    connect(ui->saveAsButton,  &QPushButton::clicked, this, &SaveConfirmOverlay::saveAsClicked);
+    connect(ui->saveButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveClicked);
+    connect(ui->saveAsButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveAsClicked);
     connect(ui->discardButton, &QPushButton::clicked, this, &SaveConfirmOverlay::discardClicked);
     this->setFocusPolicy(Qt::NoFocus);
     ui->closeButton->setIconPath(":res/icons/common/overlay/close-dim16.png");
@@ -31,7 +29,6 @@ void SaveConfirmOverlay::readSettings() {
     update();
 }
 
-SaveConfirmOverlay::~SaveConfirmOverlay()
-{
+SaveConfirmOverlay::~SaveConfirmOverlay() {
     delete ui;
 }

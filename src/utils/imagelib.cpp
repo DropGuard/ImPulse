@@ -141,7 +141,8 @@ QImage *ImageLib::cropped(QRect newRect, QRect targetRes, bool upscaled) {
 }
 */
 
-std::unique_ptr<QImage> ImageLib::scaled(const std::shared_ptr<const QImage> &source, QSize destSize, ScalingFilter filter) {
+std::unique_ptr<QImage> ImageLib::scaled(const std::shared_ptr<const QImage> &source, QSize destSize,
+                                         ScalingFilter filter) {
     if(!source)
         return std::make_unique<QImage>();
     auto scaleTarget = source;
@@ -155,21 +156,15 @@ std::unique_ptr<QImage> ImageLib::scaled(const std::shared_ptr<const QImage> &so
     if(filter > 1 && !QtOcv::isSupported(scaleTarget->format()))
         filter = QI_FILTER_BILINEAR;
 #endif
-    switch (filter) {
-        case QI_FILTER_NEAREST:
-            return scaled_Qt(scaleTarget, destSize, false);
-        case QI_FILTER_BILINEAR:
-            return scaled_Qt(scaleTarget, destSize, true);
+    switch(filter) {
+    case QI_FILTER_NEAREST: return scaled_Qt(scaleTarget, destSize, false);
+    case QI_FILTER_BILINEAR: return scaled_Qt(scaleTarget, destSize, true);
 #ifdef USE_OPENCV
-        case QI_FILTER_CV_BILINEAR_SHARPEN:
-            return scaled_CV(scaleTarget, destSize, cv::INTER_LINEAR, 0);
-        case QI_FILTER_CV_CUBIC:
-            return scaled_CV(scaleTarget, destSize, cv::INTER_CUBIC, 0);
-        case QI_FILTER_CV_CUBIC_SHARPEN:
-            return scaled_CV(scaleTarget, destSize, cv::INTER_CUBIC, 1);
+    case QI_FILTER_CV_BILINEAR_SHARPEN: return scaled_CV(scaleTarget, destSize, cv::INTER_LINEAR, 0);
+    case QI_FILTER_CV_CUBIC: return scaled_CV(scaleTarget, destSize, cv::INTER_CUBIC, 0);
+    case QI_FILTER_CV_CUBIC_SHARPEN: return scaled_CV(scaleTarget, destSize, cv::INTER_CUBIC, 1);
 #endif
-        default:
-            return scaled_Qt(scaleTarget, destSize, true);
+    default: return scaled_Qt(scaleTarget, destSize, true);
     }
 }
 
@@ -177,13 +172,13 @@ std::unique_ptr<QImage> ImageLib::scaled_Qt(const std::shared_ptr<const QImage> 
     if(!source)
         return std::make_unique<QImage>();
     Qt::TransformationMode mode = smooth ? Qt::SmoothTransformation : Qt::FastTransformation;
-    return std::make_unique<QImage>(source->scaled(destSize.width(), destSize.height(),
-                                                         Qt::IgnoreAspectRatio, mode));
+    return std::make_unique<QImage>(source->scaled(destSize.width(), destSize.height(), Qt::IgnoreAspectRatio, mode));
 }
 
 #ifdef USE_OPENCV
 // this probably leaks, needs checking
-std::unique_ptr<QImage> ImageLib::scaled_CV(const std::shared_ptr<const QImage> &source, QSize destSize, cv::InterpolationFlags filter, int sharpen) {
+std::unique_ptr<QImage> ImageLib::scaled_CV(const std::shared_ptr<const QImage> &source, QSize destSize,
+                                            cv::InterpolationFlags filter, int sharpen) {
     if(!source)
         return std::make_unique<QImage>();
     QtOcv::MatColorOrder order;

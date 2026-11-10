@@ -4,25 +4,15 @@
 // TODO: nuke this and rewrite
 
 MW::MW(State *state, QWidget *parent)
-    : FloatingWidgetContainer(parent),
-      appState(state),
-      currentDisplay(0),
-      maximized(false),
-      activeSidePanel(SIDEPANEL_NONE),
-      copyOverlay(nullptr),
-      saveOverlay(nullptr),
-      renameOverlay(nullptr),
-      infoBarFullscreen(nullptr),
-      imageInfoOverlay(nullptr),
-      floatingMessage(nullptr),
-      cropPanel(nullptr),
-      cropOverlay(nullptr)
-{
+    : FloatingWidgetContainer(parent), appState(state), currentDisplay(0), maximized(false),
+      activeSidePanel(SIDEPANEL_NONE), copyOverlay(nullptr), saveOverlay(nullptr), renameOverlay(nullptr),
+      infoBarFullscreen(nullptr), imageInfoOverlay(nullptr), floatingMessage(nullptr), cropPanel(nullptr),
+      cropOverlay(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
-    layout.setContentsMargins(0,0,0,0);
+    layout.setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
 
-    setMinimumSize(10,10);
+    setMinimumSize(10, 10);
 
     // do not steal focus when clicked
     // this is just a container. accept key events only
@@ -31,8 +21,7 @@ MW::MW(State *state, QWidget *parent)
 
     this->setLayout(&layout);
 
-    setWindowTitle(QGuiApplication::applicationDisplayName() + " " +
-                   QCoreApplication::applicationVersion());
+    setWindowTitle(QGuiApplication::applicationDisplayName() + " " + QCoreApplication::applicationVersion());
 
     this->setMouseTracking(true);
     this->setAcceptDrops(true);
@@ -62,10 +51,16 @@ MW::MW(State *state, QWidget *parent)
     // this window, before the State they watch does. The wiring is the one
     // non-const touch of State — it goes through the constructor parameter,
     // because appState itself is stored const.
-    infoObserver = state->currentInfo.addNotifier([this]{ refreshInfoViews(); });
-    slideshowObserver = state->slideshow.addNotifier([this]{ refreshInfoViews(); });
-    shuffleObserver = state->shuffle.addNotifier([this]{ refreshInfoViews(); });
-    directoryObserver = state->directoryPath.addNotifier([this]{
+    infoObserver = state->currentInfo.addNotifier([this] {
+        refreshInfoViews();
+    });
+    slideshowObserver = state->slideshow.addNotifier([this] {
+        refreshInfoViews();
+    });
+    shuffleObserver = state->shuffle.addNotifier([this] {
+        refreshInfoViews();
+    });
+    directoryObserver = state->directoryPath.addNotifier([this] {
         folderView->setDirectoryPath(appState->directoryPath.value());
         refreshInfoViews();
     });
@@ -112,25 +107,25 @@ void MW::setupUi() {
     connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
     connect(viewerWidget, &ViewerWidget::showScriptSettings, this, &MW::showScriptSettings);
-    connect(this, &MW::zoomIn,        viewerWidget, &ViewerWidget::zoomIn);
-    connect(this, &MW::zoomOut,       viewerWidget, &ViewerWidget::zoomOut);
-    connect(this, &MW::zoomInCursor,  viewerWidget, &ViewerWidget::zoomInCursor);
+    connect(this, &MW::zoomIn, viewerWidget, &ViewerWidget::zoomIn);
+    connect(this, &MW::zoomOut, viewerWidget, &ViewerWidget::zoomOut);
+    connect(this, &MW::zoomInCursor, viewerWidget, &ViewerWidget::zoomInCursor);
     connect(this, &MW::zoomOutCursor, viewerWidget, &ViewerWidget::zoomOutCursor);
-    connect(this, &MW::scrollUp,    viewerWidget, &ViewerWidget::scrollUp);
-    connect(this, &MW::scrollDown,  viewerWidget, &ViewerWidget::scrollDown);
-    connect(this, &MW::scrollLeft,  viewerWidget, &ViewerWidget::scrollLeft);
+    connect(this, &MW::scrollUp, viewerWidget, &ViewerWidget::scrollUp);
+    connect(this, &MW::scrollDown, viewerWidget, &ViewerWidget::scrollDown);
+    connect(this, &MW::scrollLeft, viewerWidget, &ViewerWidget::scrollLeft);
     connect(this, &MW::scrollRight, viewerWidget, &ViewerWidget::scrollRight);
-    connect(this, &MW::pauseVideo,     viewerWidget, &ViewerWidget::pauseResumePlayback);
-    connect(this, &MW::stopPlayback,   viewerWidget, &ViewerWidget::stopPlayback);
+    connect(this, &MW::pauseVideo, viewerWidget, &ViewerWidget::pauseResumePlayback);
+    connect(this, &MW::stopPlayback, viewerWidget, &ViewerWidget::stopPlayback);
     connect(this, &MW::seekVideoForward, viewerWidget, &ViewerWidget::seekForward);
-    connect(this, &MW::seekVideoBackward,  viewerWidget, &ViewerWidget::seekBackward);
-    connect(this, &MW::frameStep,      viewerWidget, &ViewerWidget::frameStep);
-    connect(this, &MW::frameStepBack,  viewerWidget, &ViewerWidget::frameStepBack);
-    connect(this, &MW::toggleMute,  viewerWidget, &ViewerWidget::toggleMute);
-    connect(this, &MW::volumeUp,  viewerWidget, &ViewerWidget::volumeUp);
-    connect(this, &MW::volumeDown,  viewerWidget, &ViewerWidget::volumeDown);
+    connect(this, &MW::seekVideoBackward, viewerWidget, &ViewerWidget::seekBackward);
+    connect(this, &MW::frameStep, viewerWidget, &ViewerWidget::frameStep);
+    connect(this, &MW::frameStepBack, viewerWidget, &ViewerWidget::frameStepBack);
+    connect(this, &MW::toggleMute, viewerWidget, &ViewerWidget::toggleMute);
+    connect(this, &MW::volumeUp, viewerWidget, &ViewerWidget::volumeUp);
+    connect(this, &MW::volumeDown, viewerWidget, &ViewerWidget::volumeDown);
     connect(this, &MW::toggleTransparencyGrid, viewerWidget, &ViewerWidget::toggleTransparencyGrid);
-    connect(this, &MW::setLoopPlayback,  viewerWidget, &ViewerWidget::setLoopPlayback);
+    connect(this, &MW::setLoopPlayback, viewerWidget, &ViewerWidget::setLoopPlayback);
 }
 
 void MW::setupFullUi() {
@@ -147,8 +142,8 @@ void MW::setupCropPanel() {
     cropOverlay = new CropOverlay(viewerWidget);
     cropPanel = new CropPanel(cropOverlay, this);
     connect(cropPanel, &CropPanel::cancel, this, &MW::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop,   this, &MW::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop,   this, &MW::cropRequested);
+    connect(cropPanel, &CropPanel::crop, this, &MW::hideCropPanel);
+    connect(cropPanel, &CropPanel::crop, this, &MW::cropRequested);
     connect(cropPanel, &CropPanel::cropAndSave, this, &MW::hideCropPanel);
     connect(cropPanel, &CropPanel::cropAndSave, this, &MW::cropAndSaveRequested);
 }
@@ -161,8 +156,8 @@ void MW::setupCopyOverlay() {
 
 void MW::setupSaveOverlay() {
     saveOverlay = new SaveConfirmOverlay(viewerWidget);
-    connect(saveOverlay, &SaveConfirmOverlay::saveClicked,    this, &MW::saveRequested);
-    connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked,  this, &MW::saveAsClicked);
+    connect(saveOverlay, &SaveConfirmOverlay::saveClicked, this, &MW::saveRequested);
+    connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &MW::saveAsClicked);
     connect(saveOverlay, &SaveConfirmOverlay::discardClicked, this, &MW::discardEditsRequested);
 }
 
@@ -284,7 +279,7 @@ void MW::preShowResize(QSize sz) {
     } else {
         sz = maxSz;
     }
-    QRect newGeom(0,0, sz.width(), sz.height());
+    QRect newGeom(0, 0, sz.width(), sz.height());
     newGeom.moveCenter(availableGeom.center());
     newGeom.translate(0, decorationSize / 2);
 
@@ -302,7 +297,7 @@ void MW::showImage(std::unique_ptr<QPixmap> pixmap) {
     updateCropPanelData();
 }
 
-void MW::showAnimation(const std::shared_ptr<QMovie>& movie) {
+void MW::showAnimation(const std::shared_ptr<QMovie> &movie) {
     if(settings->autoResizeWindow())
         preShowResize(movie->frameRect().size());
     viewerWidget->showAnimation(movie);
@@ -323,12 +318,12 @@ void MW::onSortingChanged(SortingMode mode) {
     folderView->onSortingChanged(mode);
     if(centralWidget->currentViewMode() == ViewMode::MODE_DOCUMENT) {
         switch(mode) {
-            case SortingMode::SORT_NAME:      showMessage("Sorting: By Name");              break;
-            case SortingMode::SORT_NAME_DESC: showMessage("Sorting: By Name (desc.)");      break;
-            case SortingMode::SORT_TIME:      showMessage("Sorting: By Time");              break;
-            case SortingMode::SORT_TIME_DESC: showMessage("Sorting: By Time (desc.)");      break;
-            case SortingMode::SORT_SIZE:      showMessage("Sorting: By File Size");         break;
-            case SortingMode::SORT_SIZE_DESC: showMessage("Sorting: By File Size (desc.)"); break;
+        case SortingMode::SORT_NAME: showMessage("Sorting: By Name"); break;
+        case SortingMode::SORT_NAME_DESC: showMessage("Sorting: By Name (desc.)"); break;
+        case SortingMode::SORT_TIME: showMessage("Sorting: By Time"); break;
+        case SortingMode::SORT_TIME_DESC: showMessage("Sorting: By Time (desc.)"); break;
+        case SortingMode::SORT_SIZE: showMessage("Sorting: By File Size"); break;
+        case SortingMode::SORT_SIZE_DESC: showMessage("Sorting: By File Size (desc.)"); break;
         }
     }
 }
@@ -386,8 +381,7 @@ void MW::toggleScalingFilter() {
     ScalingFilter configuredFilter = settings->scalingFilter();
     if(viewerWidget->scalingFilter() == configuredFilter) {
         setFilterNearest();
-    }
-    else {
+    } else {
         setFilter(configuredFilter);
     }
 }
@@ -404,25 +398,13 @@ void MW::setFilterBilinear() {
 
 void MW::setFilter(ScalingFilter filter) {
     QString filterName;
-    switch (filter) {
-        case QI_FILTER_NEAREST:
-            filterName = "nearest";
-            break;
-        case ScalingFilter::QI_FILTER_BILINEAR:
-            filterName = "bilinear";
-            break;
-        case QI_FILTER_CV_BILINEAR_SHARPEN:
-            filterName = "bilinear + sharpen";
-            break;
-        case QI_FILTER_CV_CUBIC:
-            filterName = "bicubic";
-            break;
-        case QI_FILTER_CV_CUBIC_SHARPEN:
-            filterName = "bicubic + sharpen";
-            break;
-        default:
-            filterName = "configured " + QString::number(static_cast<int>(filter));
-            break;
+    switch(filter) {
+    case QI_FILTER_NEAREST: filterName = "nearest"; break;
+    case ScalingFilter::QI_FILTER_BILINEAR: filterName = "bilinear"; break;
+    case QI_FILTER_CV_BILINEAR_SHARPEN: filterName = "bilinear + sharpen"; break;
+    case QI_FILTER_CV_CUBIC: filterName = "bicubic"; break;
+    case QI_FILTER_CV_CUBIC_SHARPEN: filterName = "bicubic + sharpen"; break;
+    default: filterName = "configured " + QString::number(static_cast<int>(filter)); break;
     }
     showMessage("Filter " + filterName, 600);
     emit viewerWidget->setScalingFilter(filter);
@@ -505,14 +487,8 @@ void MW::mouseReleaseEvent(QMouseEvent *event) {
 
 void MW::mouseDoubleClickEvent(QMouseEvent *event) {
     event->accept();
-    QMouseEvent *fakePressEvent = new QMouseEvent(
-        QEvent::MouseButtonPress,
-        event->pos(),
-        event->globalPosition(),
-        event->button(),
-        event->buttons(),
-        event->modifiers()
-    );
+    QMouseEvent *fakePressEvent = new QMouseEvent(QEvent::MouseButtonPress, event->pos(), event->globalPosition(),
+                                                  event->button(), event->buttons(), event->modifiers());
     actionManager->processEvent(fakePressEvent);
     actionManager->processEvent(event);
 }
@@ -564,29 +540,43 @@ void MW::showSaveDialog(const QString &filePath) {
         emit saveAsRequested(newFilePath);
 }
 
-QString MW::getSaveFileName(const QString& filePath) {
+QString MW::getSaveFileName(const QString &filePath) {
     docWidget->hideFloatingPanel();
     QStringList filters;
     // generate filter for writable images
     // todo: some may need to be blacklisted
     auto writerFormats = QImageWriter::supportedImageFormats();
-    if(writerFormats.contains("jpg"))  filters.append("JPEG (*.jpg *.jpeg *jpe *jfif)");
-    if(writerFormats.contains("png"))  filters.append("PNG (*.png)");
-    if(writerFormats.contains("webp")) filters.append("WebP (*.webp)");
+    if(writerFormats.contains("jpg"))
+        filters.append("JPEG (*.jpg *.jpeg *jpe *jfif)");
+    if(writerFormats.contains("png"))
+        filters.append("PNG (*.png)");
+    if(writerFormats.contains("webp"))
+        filters.append("WebP (*.webp)");
     // may not work..
-    if(writerFormats.contains("jp2"))  filters.append("JPEG 2000 (*.jp2 *.j2k *.jpf *.jpx *.jpm *.jpgx)");
-    if(writerFormats.contains("jxl"))  filters.append("JPEG-XL (*.jxl)");
-    if(writerFormats.contains("avif")) filters.append("AVIF (*.avif *.avifs)");
-    if(writerFormats.contains("tif"))  filters.append("TIFF (*.tif *.tiff)");
-    if(writerFormats.contains("bmp"))  filters.append("BMP (*.bmp)");
+    if(writerFormats.contains("jp2"))
+        filters.append("JPEG 2000 (*.jp2 *.j2k *.jpf *.jpx *.jpm *.jpgx)");
+    if(writerFormats.contains("jxl"))
+        filters.append("JPEG-XL (*.jxl)");
+    if(writerFormats.contains("avif"))
+        filters.append("AVIF (*.avif *.avifs)");
+    if(writerFormats.contains("tif"))
+        filters.append("TIFF (*.tif *.tiff)");
+    if(writerFormats.contains("bmp"))
+        filters.append("BMP (*.bmp)");
 #ifdef _WIN32
-    if(writerFormats.contains("ico"))  filters.append("Icon Files (*.ico)");
+    if(writerFormats.contains("ico"))
+        filters.append("Icon Files (*.ico)");
 #endif
-    if(writerFormats.contains("ppm"))  filters.append("PPM (*.ppm)");
-    if(writerFormats.contains("xbm"))  filters.append("XBM (*.xbm)");
-    if(writerFormats.contains("xpm"))  filters.append("XPM (*.xpm)");
-    if(writerFormats.contains("dds"))  filters.append("DDS (*.dds)");
-    if(writerFormats.contains("wbmp")) filters.append("WBMP (*.wbmp)");
+    if(writerFormats.contains("ppm"))
+        filters.append("PPM (*.ppm)");
+    if(writerFormats.contains("xbm"))
+        filters.append("XBM (*.xbm)");
+    if(writerFormats.contains("xpm"))
+        filters.append("XPM (*.xpm)");
+    if(writerFormats.contains("dds"))
+        filters.append("DDS (*.dds)");
+    if(writerFormats.contains("wbmp"))
+        filters.append("WBMP (*.wbmp)");
     // add everything else from imagewriter
     for(const auto &fmt : std::as_const(writerFormats)) {
         if(filters.filter(fmt).isEmpty())
@@ -603,11 +593,12 @@ QString MW::getSaveFileName(const QString& filePath) {
             break;
         }
     }
-    QString newFilePath = QFileDialog::getSaveFileName(this, tr("Save File as..."), filePath, filterString, &selectedFilter);
+    QString newFilePath =
+        QFileDialog::getSaveFileName(this, tr("Save File as..."), filePath, filterString, &selectedFilter);
     return newFilePath;
 }
 
-void MW::showOpenDialog(const QString& path) {
+void MW::showOpenDialog(const QString &path) {
     docWidget->hideFloatingPanel();
 
     QFileDialog dialog(this);
@@ -671,8 +662,7 @@ void MW::showFullScreen() {
     int _currentDisplay = screens.indexOf(this->window()->screen());
     //move to target screen
     if(screens.count() > currentDisplay && currentDisplay != _currentDisplay) {
-        this->move(screens.at(currentDisplay)->geometry().x(),
-                   screens.at(currentDisplay)->geometry().y());
+        this->move(screens.at(currentDisplay)->geometry().x(), screens.at(currentDisplay)->geometry().y());
     }
     QWidget::showFullScreen();
     // try to repaint sooner
@@ -807,18 +797,16 @@ void MW::closeFullScreenOrExit() {
 // state Core owns and this window's own modes — nothing is stored
 void MW::refreshInfoViews() {
     const CurrentInfo &info = appState->currentInfo.value();
-    QString states = titleStateSuffix(info.slideshow, info.shuffle,
-                                      viewerWidget->lockZoomEnabled(),
+    QString states = titleStateSuffix(info.slideshow, info.shuffle, viewerWidget->lockZoomEnabled(),
                                       viewerWidget->lockViewEnabled());
 
     if(renameOverlay)
         renameOverlay->setName(info.fileName);
 
-    QString windowTitle = assembleWindowTitle(
-        centralWidget->currentViewMode() == MODE_FOLDERVIEW, info,
-        viewerWidget->lockZoomEnabled(), viewerWidget->lockViewEnabled(),
-        settings->windowTitleExtendedInfo(), !settings->infoBarWindowed(),
-        qApp->applicationName(), tr("Folder view"));
+    QString windowTitle =
+        assembleWindowTitle(centralWidget->currentViewMode() == MODE_FOLDERVIEW, info, viewerWidget->lockZoomEnabled(),
+                            viewerWidget->lockViewEnabled(), settings->windowTitleExtendedInfo(),
+                            !settings->infoBarWindowed(), qApp->applicationName(), tr("Folder view"));
 
     if(centralWidget->currentViewMode() == MODE_FOLDERVIEW || info.fileName.isEmpty()) {
         infoBarFullscreen->setInfo("", tr("No file opened."), "");
@@ -874,7 +862,7 @@ void MW::showMessageFitOriginal() {
 }
 
 void MW::showMessage(const QString &text) {
-    floatingMessage->showMessage(text,  FloatingMessageIcon::NO_ICON, 1500);
+    floatingMessage->showMessage(text, FloatingMessageIcon::NO_ICON, 1500);
 }
 
 void MW::showMessage(const QString &text, int duration) {
@@ -882,18 +870,18 @@ void MW::showMessage(const QString &text, int duration) {
 }
 
 void MW::showMessageSuccess(const QString &text) {
-    floatingMessage->showMessage(text,  FloatingMessageIcon::ICON_SUCCESS, 1500);
+    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_SUCCESS, 1500);
 }
 
 void MW::showWarning(const QString &text) {
-    floatingMessage->showMessage(text,  FloatingMessageIcon::ICON_WARNING, 1500);
+    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_WARNING, 1500);
 }
 
 void MW::showError(const QString &text) {
-    floatingMessage->showMessage(text,  FloatingMessageIcon::ICON_ERROR, 2800);
+    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_ERROR, 2800);
 }
 
-bool MW::showConfirmation(const QString& title, const QString& msg) {
+bool MW::showConfirmation(const QString &title, const QString &msg) {
     QMessageBox msgBox(this);
     msgBox.setWindowTitle(title);
     msgBox.setText(msg);
@@ -917,7 +905,7 @@ void MW::readSettings() {
 // todo: remove/rename?
 void MW::applyWindowedBackground() {
 #ifdef USE_KDE_BLUR
-    QWindow* window = this->windowHandle();
+    QWindow *window = this->windowHandle();
     if(window) {
         if(settings->backgroundOpacity() == 1.0)
             KWindowEffects::enableBlurBehind(window, false);
@@ -929,7 +917,7 @@ void MW::applyWindowedBackground() {
 
 void MW::applyFullscreenBackground() {
 #ifdef USE_KDE_BLUR
-    QWindow* window = this->windowHandle();
+    QWindow *window = this->windowHandle();
     if(window)
         KWindowEffects::enableBlurBehind(window, false);
 #endif

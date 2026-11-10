@@ -2,21 +2,19 @@
 
 #include <utility>
 
-DirectoryPresenter::DirectoryPresenter(Thumbnailer &_thumbnailer, QObject *parent) :
-    QObject(parent),
-    thumbnailer(_thumbnailer),
-    mShowDirs(false) {
+DirectoryPresenter::DirectoryPresenter(Thumbnailer &_thumbnailer, QObject *parent)
+    : QObject(parent), thumbnailer(_thumbnailer), mShowDirs(false) {
     connect(&thumbnailer, &Thumbnailer::thumbnailReady, this, &DirectoryPresenter::onThumbnailReady);
 }
 
 void DirectoryPresenter::unsetModel() {
-    disconnect(model.get(), &DirectoryModel::fileRemoved,  this, &DirectoryPresenter::onFileRemoved);
-    disconnect(model.get(), &DirectoryModel::fileAdded,    this, &DirectoryPresenter::onFileAdded);
+    disconnect(model.get(), &DirectoryModel::fileRemoved, this, &DirectoryPresenter::onFileRemoved);
+    disconnect(model.get(), &DirectoryModel::fileAdded, this, &DirectoryPresenter::onFileAdded);
     disconnect(model.get(), &DirectoryModel::fileModified, this, &DirectoryPresenter::onFileModified);
-    disconnect(model.get(), &DirectoryModel::fileRenamed,  this, &DirectoryPresenter::onFileRenamed);
-    disconnect(model.get(), &DirectoryModel::dirRemoved,   this, &DirectoryPresenter::onDirRemoved);
-    disconnect(model.get(), &DirectoryModel::dirAdded,     this, &DirectoryPresenter::onDirAdded);
-    disconnect(model.get(), &DirectoryModel::dirRenamed,   this, &DirectoryPresenter::onDirRenamed);
+    disconnect(model.get(), &DirectoryModel::fileRenamed, this, &DirectoryPresenter::onFileRenamed);
+    disconnect(model.get(), &DirectoryModel::dirRemoved, this, &DirectoryPresenter::onDirRemoved);
+    disconnect(model.get(), &DirectoryModel::dirAdded, this, &DirectoryPresenter::onDirAdded);
+    disconnect(model.get(), &DirectoryModel::dirRenamed, this, &DirectoryPresenter::onDirRenamed);
     model = nullptr;
     // also empty view?
 }
@@ -30,13 +28,13 @@ void DirectoryPresenter::setModel(std::shared_ptr<DirectoryModel> newModel) {
     populateView();
 
     // filesystem changes
-    connect(model.get(), &DirectoryModel::fileRemoved,  this, &DirectoryPresenter::onFileRemoved);
-    connect(model.get(), &DirectoryModel::fileAdded,    this, &DirectoryPresenter::onFileAdded);
+    connect(model.get(), &DirectoryModel::fileRemoved, this, &DirectoryPresenter::onFileRemoved);
+    connect(model.get(), &DirectoryModel::fileAdded, this, &DirectoryPresenter::onFileAdded);
     connect(model.get(), &DirectoryModel::fileModified, this, &DirectoryPresenter::onFileModified);
-    connect(model.get(), &DirectoryModel::fileRenamed,  this, &DirectoryPresenter::onFileRenamed);
-    connect(model.get(), &DirectoryModel::dirRemoved,   this, &DirectoryPresenter::onDirRemoved);
-    connect(model.get(), &DirectoryModel::dirAdded,     this, &DirectoryPresenter::onDirAdded);
-    connect(model.get(), &DirectoryModel::dirRenamed,   this, &DirectoryPresenter::onDirRenamed);
+    connect(model.get(), &DirectoryModel::fileRenamed, this, &DirectoryPresenter::onFileRenamed);
+    connect(model.get(), &DirectoryModel::dirRemoved, this, &DirectoryPresenter::onDirRemoved);
+    connect(model.get(), &DirectoryModel::dirAdded, this, &DirectoryPresenter::onDirAdded);
+    connect(model.get(), &DirectoryModel::dirRenamed, this, &DirectoryPresenter::onDirRenamed);
 }
 
 void DirectoryPresenter::reloadModel() {
@@ -96,8 +94,7 @@ void DirectoryPresenter::onFileRenamed(const QString &filePath, const QString &n
     int index = model->indexOfFile(newPath);
     if(index < 0)
         return;
-    view->renameItem(mShowDirs ? model->dirCount() + oldIndex : oldIndex,
-                     mShowDirs ? model->dirCount() + index : index,
+    view->renameItem(mShowDirs ? model->dirCount() + oldIndex : oldIndex, mShowDirs ? model->dirCount() + index : index,
                      model->fileNameAt(index));
 }
 
@@ -186,10 +183,8 @@ void DirectoryPresenter::generateThumbnails(const QList<int> &indexes, int size,
 
             ImageLib::recolor(*pixmap, settings->colorScheme().icons);
 
-            std::shared_ptr<Thumbnail> thumb(new Thumbnail(model->dirNameAt(i),
-                                                           "Folder",
-                                                           size,
-                                                           std::shared_ptr<QPixmap>(pixmap)));
+            std::shared_ptr<Thumbnail> thumb(
+                new Thumbnail(model->dirNameAt(i), "Folder", size, std::shared_ptr<QPixmap>(pixmap)));
             // ^----------------------------------------------------------------
             view->setThumbnail(i, thumb);
         } else {
@@ -230,7 +225,6 @@ void DirectoryPresenter::onDraggedOver(int index) {
         return;
     if(showDirs() && index < model->dirCount())
         view->setDragHover(index);
-
 }
 
 void DirectoryPresenter::onDroppedInto(const QMimeData *data, QObject *source, int targetIndex) {
@@ -238,7 +232,7 @@ void DirectoryPresenter::onDroppedInto(const QMimeData *data, QObject *source, i
         return;
 
     // ignore drops into selected / current folder when we are the source of dropEvent
-    if(source && (view->selection().contains(targetIndex) || targetIndex == -1) )
+    if(source && (view->selection().contains(targetIndex) || targetIndex == -1))
         return;
     // ignore drops into a file
     // todo: drop into a current dir when target is a file
@@ -254,7 +248,7 @@ void DirectoryPresenter::onDroppedInto(const QMimeData *data, QObject *source, i
     // get target dir path
     QString destDir;
     if(showDirs() && targetIndex < model->dirCount())
-       destDir = model->dirPathAt(targetIndex);
+        destDir = model->dirPathAt(targetIndex);
     if(destDir.isEmpty()) // fallback to the current dir
         destDir = model->directoryPath();
     pathList.removeAll(destDir); // remove target dir from source list

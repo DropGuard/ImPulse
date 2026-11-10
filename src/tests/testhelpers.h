@@ -21,8 +21,7 @@
 inline QString writeTestFile(const QString &path, const QByteArray &content) {
     QFile f(path);
     if(!f.open(QIODevice::WriteOnly)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot create %1: %2").arg(path, f.errorString())),
-                     __FILE__, __LINE__);
+        QTest::qFail(qPrintable(QStringLiteral("cannot create %1: %2").arg(path, f.errorString())), __FILE__, __LINE__);
         return {};
     }
     f.write(content);
@@ -32,15 +31,14 @@ inline QString writeTestFile(const QString &path, const QByteArray &content) {
 inline QByteArray readTestFile(const QString &path) {
     QFile f(path);
     if(!f.open(QIODevice::ReadOnly)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot read %1: %2").arg(path, f.errorString())),
-                     __FILE__, __LINE__);
+        QTest::qFail(qPrintable(QStringLiteral("cannot read %1: %2").arg(path, f.errorString())), __FILE__, __LINE__);
         return {};
     }
     return f.readAll();
 }
 
 class IsolatedHome {
-public:
+  public:
     IsolatedHome() {
         dir.setAutoRemove(true);
         Q_ASSERT(dir.isValid());
@@ -49,9 +47,11 @@ public:
         QCoreApplication::setApplicationName("impulse");
     }
 
-    QString path() const { return dir.path(); }
+    QString path() const {
+        return dir.path();
+    }
 
-private:
+  private:
     QTemporaryDir dir;
 };
 
@@ -60,14 +60,13 @@ private:
 // other test and to the original instance. The original pointer (and its
 // live state) is restored on destruction.
 class FreshSettings {
-public:
+  public:
     FreshSettings() {
         saved = ::settings;
         // a unique application name means a config file nothing else reads or
         // has cached: the fresh instance starts from defaults, deterministically
-        const QString fresh = QStringLiteral("qimgv-test-%1-%2")
-                                  .arg(QCoreApplication::applicationPid())
-                                  .arg(++counter, 0, 16);
+        const QString fresh =
+            QStringLiteral("qimgv-test-%1-%2").arg(QCoreApplication::applicationPid()).arg(++counter, 0, 16);
         QCoreApplication::setApplicationName(fresh);
         ::settings = new Settings();
     }
@@ -80,7 +79,7 @@ public:
     FreshSettings(const FreshSettings &) = delete;
     FreshSettings &operator=(const FreshSettings &) = delete;
 
-private:
+  private:
     inline static int counter = 0;
     Settings *saved = nullptr;
 };

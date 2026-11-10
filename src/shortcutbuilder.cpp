@@ -16,7 +16,7 @@ QString ShortcutBuilder::fromEvent(QInputEvent *event) {
 //------------------------------------------------------------------------------
 QString ShortcutBuilder::processWheelEvent(QWheelEvent *event) {
     QString sequence;
-    if(event->angleDelta() == QPoint(0,0))
+    if(event->angleDelta() == QPoint(0, 0))
         return "";
     if(event->angleDelta().ry() < 0)
         sequence = "WheelDown";
@@ -52,9 +52,8 @@ QString ShortcutBuilder::processMouseEvent(QMouseEvent *event) {
         sequence.append("_DoubleClick");
         return sequence;
     }
-    if((event->type() == QEvent::MouseButtonPress   && event->button() != Qt::RightButton) ||
-       (event->type() == QEvent::MouseButtonRelease && event->button() == Qt::RightButton))
-    {
+    if((event->type() == QEvent::MouseButtonPress && event->button() != Qt::RightButton) ||
+       (event->type() == QEvent::MouseButtonRelease && event->button() == Qt::RightButton)) {
         return sequence;
     }
 
@@ -71,7 +70,7 @@ QString ShortcutBuilder::processKeyEvent(QKeyEvent *event) {
 #endif
 }
 //------------------------------------------------------------------------------
-QString ShortcutBuilder::modifierKeys(QInputEvent *event){
+QString ShortcutBuilder::modifierKeys(QInputEvent *event) {
     QString mods;
     QMapIterator<QString, Qt::KeyboardModifier> i(inputMap->modifiers());
     while(i.hasNext()) {
@@ -83,14 +82,8 @@ QString ShortcutBuilder::modifierKeys(QInputEvent *event){
 }
 //------------------------------------------------------------------------------
 bool ShortcutBuilder::isModifier(Qt::Key key) {
-    if(key == Qt::Key_Control ||
-       key == Qt::Key_Super_L ||
-       key == Qt::Key_Super_R ||
-       key == Qt::Key_AltGr   ||
-       key == Qt::Key_Shift   ||
-       key == Qt::Key_Meta    ||
-       key == Qt::Key_Alt     )
-    {
+    if(key == Qt::Key_Control || key == Qt::Key_Super_L || key == Qt::Key_Super_R || key == Qt::Key_AltGr ||
+       key == Qt::Key_Shift || key == Qt::Key_Meta || key == Qt::Key_Alt) {
         return true;
     }
     return false;
@@ -119,7 +112,8 @@ QString ShortcutBuilder::fromEventNativeScanCode(QKeyEvent *event) {
     QChar keyChr = eventText.isEmpty() ? QChar() : eventText.at(0);
 
     // use alt characters accessed by shift (punctuation on the numbers row etc.)
-    bool useAltChr = (event->modifiers() == Qt::ShiftModifier) && !(keyChr.isLetter() || !keyChr.isPrint() || keyChr.isSpace());
+    bool useAltChr =
+        (event->modifiers() == Qt::ShiftModifier) && !(keyChr.isLetter() || !keyChr.isPrint() || keyChr.isSpace());
     if(useAltChr) {
         sequence = eventText;
     } else if(!sequence.isEmpty()) {
@@ -138,7 +132,7 @@ QString ShortcutBuilder::fromEventText(QKeyEvent *event) {
     QString sequence = QVariant::fromValue(Qt::Key(event->key())).toString();
     if(!sequence.isEmpty()) {
         // remove "Key_" at the beginning
-        sequence.remove(0,4);
+        sequence.remove(0, 4);
         // rename some keys to match the ones from inputmap
         // just a bandaid
         if(sequence == "Return")

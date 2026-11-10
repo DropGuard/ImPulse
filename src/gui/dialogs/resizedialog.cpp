@@ -1,11 +1,8 @@
 #include "resizedialog.h"
 #include "ui_resizedialog.h"
 
-ResizeDialog::ResizeDialog(QSize initialSize,  QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ResizeDialog),
-    lastEdited(0)
-{
+ResizeDialog::ResizeDialog(QSize initialSize, QWidget *parent)
+    : QDialog(parent), ui(new Ui::ResizeDialog), lastEdited(0) {
     ui->setupUi(this);
     setWindowModality(Qt::ApplicationModal);
     ui->percent->setFocus();
@@ -16,16 +13,14 @@ ResizeDialog::ResizeDialog(QSize initialSize,  QWidget *parent) :
     ui->width->setValue(initialSize.width());
     ui->height->setValue(initialSize.height());
 
-    ui->resetButton->setText(tr("Reset:") + " " +
-                             QString::number(initialSize.width()) +
-                             " x " +
+    ui->resetButton->setText(tr("Reset:") + " " + QString::number(initialSize.width()) + " x " +
                              QString::number(initialSize.height()));
 
     desktopSize = qApp->primaryScreen()->size();
-    connect(ui->byPercentage,   &QRadioButton::toggled, this, &ResizeDialog::onPercentageRadioButton);
+    connect(ui->byPercentage, &QRadioButton::toggled, this, &ResizeDialog::onPercentageRadioButton);
     connect(ui->byAbsoluteSize, &QRadioButton::toggled, this, &ResizeDialog::onAbsoluteSizeRadioButton);
     connect(ui->percent, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ResizeDialog::percentChanged);
-    connect(ui->width,  qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::widthChanged);
+    connect(ui->width, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::widthChanged);
     connect(ui->height, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::heightChanged);
     connect(ui->keepAspectRatio, &QCheckBox::toggled, this, &ResizeDialog::onAspectRatioCheckbox);
     connect(ui->resComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ResizeDialog::setCommonResolution);
@@ -49,18 +44,18 @@ void ResizeDialog::sizeSelect() {
 void ResizeDialog::setCommonResolution(int index) {
     QSize res;
     switch(index) {
-        case 1: res = QSize(1366, 768); break;
-        case 2: res = QSize(1440, 900); break;
-        case 3: res = QSize(1440, 1050); break;
-        case 4: res = QSize(1600, 1200); break;
-        case 5: res = QSize(1920, 1080); break;
-        case 6: res = QSize(1920, 1200); break;
-        case 7: res = QSize(2560, 1080); break;
-        case 8: res = QSize(2560, 1440); break;
-        case 9: res = QSize(2560, 1600); break;
-        case 10: res = QSize(3840, 1600); break;
-        case 11: res = QSize(3840, 2160); break;
-        default: res = originalSize; break;
+    case 1: res = QSize(1366, 768); break;
+    case 2: res = QSize(1440, 900); break;
+    case 3: res = QSize(1440, 1050); break;
+    case 4: res = QSize(1600, 1200); break;
+    case 5: res = QSize(1920, 1080); break;
+    case 6: res = QSize(1920, 1200); break;
+    case 7: res = QSize(2560, 1080); break;
+    case 8: res = QSize(2560, 1440); break;
+    case 9: res = QSize(2560, 1600); break;
+    case 10: res = QSize(3840, 1600); break;
+    case 11: res = QSize(3840, 2160); break;
+    default: res = originalSize; break;
     }
     if(ui->keepAspectRatio->isChecked())
         targetSize = originalSize.scaled(res, Qt::KeepAspectRatio);
@@ -114,7 +109,7 @@ void ResizeDialog::fillDesktop() {
 
 void ResizeDialog::onAspectRatioCheckbox() {
     resetResCheckBox();
-    (lastEdited)?heightChanged(ui->height->value()):widthChanged(ui->width->value());
+    (lastEdited) ? heightChanged(ui->height->value()) : widthChanged(ui->width->value());
 }
 
 void ResizeDialog::onAbsoluteSizeRadioButton() {
@@ -161,8 +156,8 @@ void ResizeDialog::resetResCheckBox() {
 
 void ResizeDialog::percentChanged(double newPercent) {
     double scale = newPercent / 100.;
-    targetSize.setWidth(originalSize.width()*scale);
-    targetSize.setHeight(originalSize.height()*scale);
+    targetSize.setWidth(originalSize.width() * scale);
+    targetSize.setHeight(originalSize.height() * scale);
 
     updateToTargetValues();
 }

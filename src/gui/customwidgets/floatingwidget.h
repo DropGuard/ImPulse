@@ -15,19 +15,18 @@
 
 #include <QWheelEvent>
 
-class FloatingWidget : public QWidget
-{
+class FloatingWidget : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit FloatingWidget(FloatingWidgetContainer *parent);
     QSize containerSize();
     bool acceptKeyboardFocus() const;
     void setAcceptKeyboardFocus(bool mode);
 
-public slots:
+  public slots:
     void hide();
 
-protected:
+  protected:
     // called whenever container rectangle changes
     // this does nothing, reimplement to use
     virtual void recalculateGeometry();
@@ -37,11 +36,12 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
-private:
+
+  private:
     // size of whatever widget we are overlayed on
     QSize container;
     bool mAcceptKeyboardFocus;
 
-private slots:
+  private slots:
     void onContainerResized(QSize container);
 };

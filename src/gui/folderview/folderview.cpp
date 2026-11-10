@@ -3,10 +3,7 @@
 #include <utility>
 #include "ui_folderview.h"
 
-FolderView::FolderView(QWidget *parent) :
-    FloatingWidgetContainer(parent),
-    ui(new Ui::FolderView)
-{
+FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), ui(new Ui::FolderView) {
     ui->setupUi(this);
 
     // ------- filesystem view --------
@@ -21,7 +18,7 @@ FolderView::FolderView(QWidget *parent) :
     dirModel->setFilter(QDir::NoDotAndDotDot | QDir::AllDirs);
     ui->dirTreeView->setModel(dirModel);
 
-    QHeaderView* header = ui->dirTreeView->header();
+    QHeaderView *header = ui->dirTreeView->header();
     header->hideSection(1); // size
     header->hideSection(2); // type
     header->hideSection(3); // mod date
@@ -68,12 +65,12 @@ FolderView::FolderView(QWidget *parent) :
 
     ui->splitter->setStretchFactor(1, 50);
 
-    connect(ui->thumbnailGrid, &FolderGridView::thumbnailsRequested,  this, &FolderView::thumbnailsRequested);
+    connect(ui->thumbnailGrid, &FolderGridView::thumbnailsRequested, this, &FolderView::thumbnailsRequested);
     connect(ui->thumbnailGrid, &FolderGridView::thumbnailSizeChanged, this, &FolderView::onThumbnailSizeChanged);
-    connect(ui->thumbnailGrid, &FolderGridView::itemActivated,   this, &FolderView::itemActivated);
-    connect(ui->thumbnailGrid, &FolderGridView::draggedOut,      this, &FolderView::draggedOut);
-    connect(ui->thumbnailGrid, &FolderGridView::draggedOver,     this, &FolderView::draggedOver);
-    connect(ui->thumbnailGrid, &FolderGridView::droppedInto,     this, &FolderView::droppedInto);
+    connect(ui->thumbnailGrid, &FolderGridView::itemActivated, this, &FolderView::itemActivated);
+    connect(ui->thumbnailGrid, &FolderGridView::draggedOut, this, &FolderView::draggedOut);
+    connect(ui->thumbnailGrid, &FolderGridView::draggedOver, this, &FolderView::draggedOver);
+    connect(ui->thumbnailGrid, &FolderGridView::droppedInto, this, &FolderView::droppedInto);
 
     connect(ui->bookmarksWidget, &BookmarksWidget::bookmarkClicked, this, &FolderView::onBookmarkClicked);
 
@@ -91,7 +88,8 @@ FolderView::FolderView(QWidget *parent) :
 
     connect(ui->dirTreeView, &TreeViewCustom::droppedIn, this, &FolderView::onDroppedInByIndex);
     connect(ui->dirTreeView, &TreeViewCustom::tabbedOut, this, &FolderView::onTreeViewTabOut);
-    connect(ui->bookmarksWidget, &BookmarksWidget::droppedIn, this, &FolderView::moveUrlsRequested); // ask what to do via popup? copy or move
+    connect(ui->bookmarksWidget, &BookmarksWidget::droppedIn, this,
+            &FolderView::moveUrlsRequested); // ask what to do via popup? copy or move
 
     ui->sortingComboBox->setItemDelegate(new QStyledItemDelegate(ui->sortingComboBox));
     ui->sortingComboBox->view()->setTextElideMode(Qt::ElideNone);
@@ -171,8 +169,7 @@ void FolderView::onOptionsPopupButtonToggled(bool mode) {
             ui->optionsPopupButton->setChecked(false);
             return;
         }
-        QPoint pos = ui->optionsPopupButton->geometry().bottomRight() -
-                     QPoint(optionsPopup->width(), 0);
+        QPoint pos = ui->optionsPopupButton->geometry().bottomRight() - QPoint(optionsPopup->width(), 0);
         optionsPopup->showAt(mapToGlobal(pos));
     }
 }
@@ -376,7 +373,7 @@ void FolderView::resizeEvent(QResizeEvent *event) {
     Q_UNUSED(event)
     if(width() < 600)
         ui->placesPanel->setVisible(false);
-    else if (ui->togglePlacesPanelButton->isChecked())
+    else if(ui->togglePlacesPanelButton->isChecked())
         ui->placesPanel->setVisible(true);
 
     if(width() < 510) {

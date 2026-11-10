@@ -12,10 +12,8 @@ Decision decide(FolderEndAction action, int index, unsigned long count) {
     case FOLDER_END_LOOP:
         // wrap to the far end of the same folder; the sign says which edge was hit
         return {Outcome::LoadIndex, index < 0 ? static_cast<int>(count) - 1 : 0};
-    case FOLDER_END_GOTO_ADJACENT:
-        return {Outcome::EnterAdjacentFolder, -1};
-    case FOLDER_END_NO_ACTION:
-        break;
+    case FOLDER_END_GOTO_ADJACENT: return {Outcome::EnterAdjacentFolder, -1};
+    case FOLDER_END_NO_ACTION: break;
     }
     return {Outcome::ReportBoundary, -1};
 }

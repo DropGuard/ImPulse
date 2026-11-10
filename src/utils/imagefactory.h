@@ -11,7 +11,7 @@
 #include "sourcecontainers/loadpolicy.h"
 
 class ImageFactory {
-public:
+  public:
     // nullopt when the file is not a document type this app can open, or when
     // its decode produced no pixels (an undecodable file is absence, not a
     // "loaded" object holding a null image). Not a null shared_ptr: the hops

@@ -1,18 +1,15 @@
 #include "videoplayerinitproxy.h"
 
 #ifdef _QIMGV_PLAYER_PLUGIN
-    #define QIMGV_PLAYER_PLUGIN _QIMGV_PLAYER_PLUGIN
+#define QIMGV_PLAYER_PLUGIN _QIMGV_PLAYER_PLUGIN
 #else
-    #define QIMGV_PLAYER_PLUGIN ""
+#define QIMGV_PLAYER_PLUGIN ""
 #endif
 
-VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent)
-    : VideoPlayer(parent),
-      player(nullptr)
-{
+VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent), player(nullptr) {
     setAccessibleName("VideoPlayerInitProxy");
     setMouseTracking(true);
-    layout.setContentsMargins(0,0,0,0);
+    layout.setContentsMargins(0, 0, 0, 0);
     setLayout(&layout);
     connect(settings, &Settings::settingsChanged, this, &VideoPlayerInitProxy::onSettingsChanged);
     libFile = QIMGV_PLAYER_PLUGIN;
@@ -23,10 +20,8 @@ VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent)
     // as fallbacks so installs that predate the rename keep playing video
     QDir impulseLib(QApplication::applicationDirPath() + "/../lib/impulse");
     QDir legacyLib(QApplication::applicationDirPath() + "/../lib/qimgv");
-    libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".")
-            << "/usr/lib/impulse" << "/usr/lib64/impulse"
-            << (legacyLib.makeAbsolute() ? legacyLib.path() : ".")
-            << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
+    libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".") << "/usr/lib/impulse" << "/usr/lib64/impulse"
+            << (legacyLib.makeAbsolute() ? legacyLib.path() : ".") << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
 #endif
 }
 
@@ -68,11 +63,11 @@ inline bool VideoPlayerInitProxy::initPlayer() {
         return false;
     }
 
-// load lib
-    typedef VideoPlayer* (*createPlayerWidgetFn)();
+    // load lib
+    typedef VideoPlayer *(*createPlayerWidgetFn)();
     createPlayerWidgetFn fn = reinterpret_cast<createPlayerWidgetFn>(playerLib.resolve("CreatePlayerWidget"));
     if(fn) {
-        VideoPlayer* pl = fn();
+        VideoPlayer *pl = fn();
         player = pl;
     }
     if(!player) {
@@ -93,7 +88,7 @@ inline bool VideoPlayerInitProxy::initPlayer() {
     // re-declare them — R6), and the compiler now checks every name/signature
     connect(player, &VideoPlayer::durationChanged, this, &VideoPlayer::durationChanged);
     connect(player, &VideoPlayer::positionChanged, this, &VideoPlayer::positionChanged);
-    connect(player, &VideoPlayer::videoPaused,     this, &VideoPlayer::videoPaused);
+    connect(player, &VideoPlayer::videoPaused, this, &VideoPlayer::videoPaused);
     connect(player, &VideoPlayer::playbackFinished, this, &VideoPlayer::playbackFinished);
 
     if(eventFilterObj)

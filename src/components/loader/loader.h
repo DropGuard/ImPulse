@@ -7,7 +7,7 @@
 
 class Loader : public QObject {
     Q_OBJECT
-public:
+  public:
     // the pool is injected, not owned: Core's single WorkerPool outlives every
     // component that runs on it
     explicit Loader(WorkerPool &_pool);
@@ -24,18 +24,19 @@ public:
     void clearTasks();
     bool isBusy() const;
     bool isLoading(const QString &path);
-private:
+
+  private:
     // bookkeeping only: submitted jobs belong to the pool, which destroys them
     // on the worker thread once run() returns
-    QHash<QString, LoaderRunnable*> tasks;
+    QHash<QString, LoaderRunnable *> tasks;
     WorkerPool &pool;
     void clearPool();
     void doLoadAsync(const QString &path, int priority, bool scaled, const LoadPolicy &policy);
 
-signals:
+  signals:
     void loadFinished(std::shared_ptr<Image>, const QString &path, bool scaled);
     void loadFailed(const QString &path);
 
-private slots:
-    void onLoadFinished(std::optional<std::shared_ptr<Image>>, const QString&, bool scaled);
+  private slots:
+    void onLoadFinished(std::optional<std::shared_ptr<Image>>, const QString &, bool scaled);
 };

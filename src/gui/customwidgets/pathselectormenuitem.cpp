@@ -1,10 +1,6 @@
 #include "pathselectormenuitem.h"
 
-PathSelectorMenuItem::PathSelectorMenuItem(QWidget *parent)
-    : MenuItem(parent),
-      mDirectory(""),
-      mPath("")
-{
+PathSelectorMenuItem::PathSelectorMenuItem(QWidget *parent) : MenuItem(parent), mDirectory(""), mPath("") {
     setFocusPolicy(Qt::NoFocus);
     setIconPath(":/res/icons/common/menuitem/folder16.png");
     mIconWidget.setAttribute(Qt::WA_TransparentForMouseEvents, false);
@@ -29,7 +25,7 @@ const QString &PathSelectorMenuItem::path() {
     return mPath;
 }
 
-void PathSelectorMenuItem::setDirectory(const QString& path) {
+void PathSelectorMenuItem::setDirectory(const QString &path) {
     mDirectory = path;
     mPath = path;
     QString stripped;

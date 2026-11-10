@@ -1,10 +1,7 @@
 #include "copyoverlay.h"
 #include "ui_copyoverlay.h"
 
-CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::CopyOverlay)
-{
+CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::CopyOverlay) {
     ui->setupUi(this);
     hide();
     setFadeEnabled(true);
@@ -85,7 +82,7 @@ void CopyOverlay::createShortcuts() {
         shortcuts.insert(QString::number(i + 1), i);
 }
 
-void CopyOverlay::requestFileOperation(const QString& path) {
+void CopyOverlay::requestFileOperation(const QString &path) {
     if(mode == OVERLAY_COPY)
         emit copyRequested(path);
     else
@@ -107,10 +104,10 @@ void CopyOverlay::readSettings() {
 void CopyOverlay::saveSettings() {
     paths.clear();
     QStringList temp;
-    for(int i = 0; i< pathWidgets.count(); i++) {
+    for(int i = 0; i < pathWidgets.count(); i++) {
         QString path = pathWidgets.at(i)->path();
-        if (!path.isEmpty()) {
-            if (!temp.contains(path)) {
+        if(!path.isEmpty()) {
+            if(!temp.contains(path)) {
                 temp << path;
                 paths << pathWidgets.at(i)->directory();
             }
@@ -121,37 +118,31 @@ void CopyOverlay::saveSettings() {
 
 void CopyOverlay::createDefaultPaths() {
     QString home = QDir::homePath();
-    if (paths.count() < 1 || paths.at(0).isEmpty() || paths.at(0)[0] == '@') {
+    if(paths.count() < 1 || paths.at(0).isEmpty() || paths.at(0)[0] == '@') {
         paths.clear();
         paths << home;
     }
-    if (paths.count() == 1 && paths.at(0) == home) {
+    if(paths.count() == 1 && paths.at(0) == home) {
         QDir dir(home);
         foreach(QFileInfo mfi, dir.entryInfoList()) {
-            if (paths.count() >= maxPathCount) {
+            if(paths.count() >= maxPathCount) {
                 break;
             }
             if(mfi.isFile()) {
                 continue;
-            } 
-            else {
-                if(mfi.fileName() == "."  
-                || mfi.fileName() ==  ".."
-                // hide directory
-                || mfi.fileName().startsWith('.')
-                // windows system directory
-                || mfi.fileName() ==  "3D Objects"
-                || mfi.fileName() ==  "Contacts"
-                || mfi.fileName() ==  "Favorites"
-                || mfi.fileName() ==  "Links"
-                || mfi.fileName() ==  "Saved Games"
-                || mfi.fileName() ==  "Searches"
-                ) {
+            } else {
+                if(mfi.fileName() == "." ||
+                   mfi.fileName() == ".."
+                   // hide directory
+                   || mfi.fileName().startsWith('.')
+                   // windows system directory
+                   || mfi.fileName() == "3D Objects" || mfi.fileName() == "Contacts" || mfi.fileName() == "Favorites" ||
+                   mfi.fileName() == "Links" || mfi.fileName() == "Saved Games" || mfi.fileName() == "Searches") {
                     continue;
                 }
                 QString qpath(home + "/" + mfi.fileName());
                 QFileInfo qinfo(qpath);
-                if (qinfo.permission(QFile::WriteUser | QFile::ReadGroup)) {
+                if(qinfo.permission(QFile::WriteUser | QFile::ReadGroup)) {
                     paths << qpath;
                 }
             }

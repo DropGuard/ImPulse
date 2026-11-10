@@ -9,20 +9,20 @@
 
 class ZoomIndicatorOverlay : public OverlayWidget {
     Q_OBJECT
-public:
+  public:
     explicit ZoomIndicatorOverlay(FloatingWidgetContainer *parent = nullptr);
 
     void setScale(qreal scale);
     void show();
     void show(int duration);
-protected:
+
+  protected:
     void recalculateGeometry() override;
 
-private:
+  private:
     QFontMetrics fm;
     QHBoxLayout layout;
     QLabel label;
     QTimer visibilityTimer;
     int hideDelay;
 };
-

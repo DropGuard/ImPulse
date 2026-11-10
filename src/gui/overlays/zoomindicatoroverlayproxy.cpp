@@ -1,9 +1,7 @@
 #include "zoomindicatoroverlayproxy.h"
 
 ZoomIndicatorOverlayProxy::ZoomIndicatorOverlayProxy(FloatingWidgetContainer *parent)
-    : container(parent),
-      overlay(nullptr)
-{
+    : container(parent), overlay(nullptr) {
 }
 
 ZoomIndicatorOverlayProxy::~ZoomIndicatorOverlayProxy() {

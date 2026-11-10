@@ -11,16 +11,16 @@ struct InfoOverlayStateBuffer {
 };
 
 class FullscreenInfoOverlayProxy {
-public:
+  public:
     explicit FullscreenInfoOverlayProxy(FloatingWidgetContainer *parent = nullptr);
     ~FullscreenInfoOverlayProxy();
     void init();
     void show();
     void showWhenReady();
     void hide();
-    void setInfo(const QString& position, const QString& fileName, const QString& info);
+    void setInfo(const QString &position, const QString &fileName, const QString &info);
 
-private:
+  private:
     FloatingWidgetContainer *container;
     QPointer<FullscreenInfoOverlay> infoOverlay;
     InfoOverlayStateBuffer stateBuf;

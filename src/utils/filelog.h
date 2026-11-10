@@ -27,7 +27,7 @@ void pruneOldSessions(const QString &dir, int keep);
 // boundary. Byte accounting starts at zero after the banner, exactly as the
 // main.cpp original counted (only handler writes rotate, not the banner).
 class SessionLog {
-public:
+  public:
     SessionLog(qint64 partLimitBytes = 5 * 1024 * 1024, int maxParts = 4);
     bool open(const QString &basePath); // opens "<base>", writes the banner
     bool isWriting() const;             // open, and not yet retired at the cap
@@ -36,7 +36,7 @@ public:
     QString lastError() const;
     void write(const QString &line);
 
-private:
+  private:
     QFile mFile;
     QString mBase;
     qint64 mPartLimit;

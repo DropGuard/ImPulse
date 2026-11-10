@@ -3,7 +3,7 @@
 #include <QString>
 
 class Script {
-public:
+  public:
     Script();
     Script(QString _path, bool _blocking);
     QString command;

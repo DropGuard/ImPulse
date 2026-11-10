@@ -5,15 +5,15 @@
 
 class ClickableLabel : public QLabel {
     Q_OBJECT
-public:
+  public:
     ClickableLabel();
     ClickableLabel(QWidget *parent);
     ClickableLabel(const QString &text);
     ClickableLabel(const QString &text, QWidget *parent);
 
-signals:
+  signals:
     void clicked();
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
 };

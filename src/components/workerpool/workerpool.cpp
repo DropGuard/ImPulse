@@ -4,7 +4,9 @@ WorkerPool::WorkerPool(int threadCount) {
     if(threadCount < 1)
         threadCount = 1;
     for(int i = 0; i < threadCount; ++i)
-        workers.emplace_back([this] { workerLoop(); });
+        workers.emplace_back([this] {
+            workerLoop();
+        });
 }
 
 WorkerPool::~WorkerPool() {
@@ -59,32 +61,37 @@ void WorkerPool::cancel(PoolOwner owner) {
 void WorkerPool::waitForOwner(PoolOwner owner) {
     std::unique_lock<std::mutex> lock(mutex);
     // the wait releases the lock while blocked — no state lock spans a wait
-    idle.wait(lock, [this, owner] { return ownerIdle(owner); });
+    idle.wait(lock, [this, owner] {
+        return ownerIdle(owner);
+    });
 }
 
 void WorkerPool::waitForAll() {
     std::unique_lock<std::mutex> lock(mutex);
-    idle.wait(lock, [this] { return allIdle(); });
+    idle.wait(lock, [this] {
+        return allIdle();
+    });
 }
 
 void WorkerPool::workerLoop() {
     std::unique_lock<std::mutex> lock(mutex);
     for(;;) {
-        workAvailable.wait(lock, [this] { return stopping || !queue.empty(); });
+        workAvailable.wait(lock, [this] {
+            return stopping || !queue.empty();
+        });
         if(stopping)
             return;
         // highest priority wins, ties go to the older submission
         auto best = queue.begin();
         for(auto it = std::next(queue.begin()); it != queue.end(); ++it)
-            if(it->priority > best->priority
-               || (it->priority == best->priority && it->seq < best->seq))
+            if(it->priority > best->priority || (it->priority == best->priority && it->seq < best->seq))
                 best = it;
         Entry entry = std::move(*best);
         queue.erase(best);
         PoolJob *job = entry.job.get();
         running.push_back(Running{entry.owner, job});
-        lock.unlock();       // the lock never spans run()
-        job->run();          // queued signal delivery needs nothing from us
+        lock.unlock(); // the lock never spans run()
+        job->run();    // queued signal delivery needs nothing from us
         // Retire the record and the job in that order, with the record going
         // under the lock: cancel() reaches a job only through a record and only
         // while it holds this mutex, so a live record always names a live job
@@ -98,7 +105,7 @@ void WorkerPool::workerLoop() {
         }
         idle.notify_all();
         lock.unlock();
-        entry.job.reset();   // the pool is the single deleter
+        entry.job.reset(); // the pool is the single deleter
         lock.lock();
     }
 }

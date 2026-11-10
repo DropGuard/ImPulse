@@ -8,7 +8,7 @@ struct ZoomIndicatorOverlayStateBuffer {
 };
 
 class ZoomIndicatorOverlayProxy {
-public:
+  public:
     explicit ZoomIndicatorOverlayProxy(FloatingWidgetContainer *parent = nullptr);
     ~ZoomIndicatorOverlayProxy();
     void init();
@@ -17,7 +17,7 @@ public:
     void hide();
     void setScale(qreal scale);
 
-private:
+  private:
     FloatingWidgetContainer *container;
     // QPointer rather than a raw handle: the tree owns the overlay, so it can
     // die first and the proxy has to see that instead of dereferencing it

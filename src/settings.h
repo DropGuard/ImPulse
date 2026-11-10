@@ -97,18 +97,17 @@ enum ThumbPanelStyle {
     TH_PANEL_EXTENDED
 };
 
-class Settings : public QObject
-{
+class Settings : public QObject {
     Q_OBJECT
-public:
-    static Settings* getInstance();
+  public:
+    static Settings *getInstance();
     // re-reads the theme from themeConf; public for tests and theme reloads
     void loadTheme();
     // Typed access to the declarative table (settings_table.h): read with
     // default + conversion + clamp semantics, write raw. Public because the
     // table is the typed API; the named accessors are one-line wrappers.
-    template<class T> T load(const SettingDesc &d) const;
-    template<class T> void store(const SettingDesc &d, const T &v);
+    template <class T> T load(const SettingDesc &d) const;
+    template <class T> void store(const SettingDesc &d, const T &v);
     // Direct construction is allowed: each instance binds its own QSettings
     // identity, so a test can run against an isolated config. The application
     // keeps using getInstance().
@@ -134,7 +133,7 @@ public:
     int volume();
     QString thumbnailCacheDir();
     QString mpvBinary();
-    void setMpvBinary(const QString& path);
+    void setMpvBinary(const QString &path);
     QString quickCopyDirectory();
     void setQuickCopyDirectory(const QString &dir);
     PanelPosition panelPosition();
@@ -156,7 +155,7 @@ public:
     bool useThumbnailCache();
     void setUseThumbnailCache(bool mode);
     QStringList savedPaths();
-    void setSavedPaths(const QStringList& paths);
+    void setSavedPaths(const QStringList &paths);
     QString tmpDir();
     // single source of truth for the cache location, usable before any
     // Settings instance exists (main installs the file log handler with it)
@@ -188,7 +187,7 @@ public:
     bool blurBackground();
     void setBlurBackground(bool mode);
     void setSortingMode(SortingMode mode);
-    SortingMode sortingMode();    
+    SortingMode sortingMode();
     void readScripts(QMap<QString, Script> &scripts);
     void saveScripts(const QMap<QString, Script> &scripts);
     int folderViewIconSize();
@@ -232,7 +231,7 @@ public:
     void setPlacesPanel(bool mode);
 
     QStringList bookmarks();
-    void setBookmarks(const QStringList& paths);
+    void setBookmarks(const QStringList &paths);
     bool placesPanelBookmarksExpanded();
     void setPlacesPanelBookmarksExpanded(bool mode);
     bool placesPanelTreeExpanded();
@@ -253,7 +252,7 @@ public:
     FolderEndAction folderEndAction();
     void setFolderEndAction(FolderEndAction mode);
 
-    const ColorScheme& colorScheme();
+    const ColorScheme &colorScheme();
     void setColorScheme(ColorScheme scheme);
     void setColorTid(int tid);
 
@@ -284,7 +283,7 @@ public:
     bool printFitToPage();
     void setPrintFitToPage(bool mode);
     QString lastPrinter();
-    void setLastPrinter(const QString& name);
+    void setLastPrinter(const QString &name);
     bool unloadThumbs();
     void setUnloadThumbs(bool mode);
     ThumbPanelStyle thumbPanelStyle();
@@ -304,11 +303,11 @@ public:
     bool panelCenterSelection();
     void setPanelCenterSelection(bool mode);
     QString language();
-    void setLanguage(const QString& lang);
+    void setLanguage(const QString &lang);
 
     QString defaultZoomLevels();
     QString zoomLevels();
-    void setZoomLevels(const QString& levels);
+    void setZoomLevels(const QString &levels);
     bool useFixedZoomLevels();
     void setUseFixedZoomLevels(bool mode);
     bool unlockMinZoom();
@@ -327,7 +326,7 @@ public:
     bool showHiddenFiles();
     void setShowHiddenFiles(bool mode);
 
-private:    // null-initialized: a directly-constructed instance is safe to destroy
+  private: // null-initialized: a directly-constructed instance is safe to destroy
     // even if its cache setup never ran (getInstance calls setupCache())
     QSettings *settingsConf = nullptr, *stateConf = nullptr, *themeConf = nullptr;
     QDir *mTmpDir = nullptr, *mThumbCacheDir = nullptr, *mConfDir = nullptr;
@@ -338,12 +337,11 @@ private:    // null-initialized: a directly-constructed instance is safe to dest
     void setupCache();
     void fillVideoFormats();
 
-signals:
+  signals:
     void settingsChanged();
 
-public slots:
+  public slots:
     void sendChangeNotification();
-
 };
 
 extern Settings *settings;

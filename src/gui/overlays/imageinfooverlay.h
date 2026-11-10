@@ -8,22 +8,22 @@ namespace Ui {
 class ImageInfoOverlay;
 }
 
-class ImageInfoOverlay : public OverlayWidget
-{
+class ImageInfoOverlay : public OverlayWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit ImageInfoOverlay(FloatingWidgetContainer *parent = nullptr);
     ~ImageInfoOverlay() override;
     void setExifInfo(QMap<QString, QString>);
 
-public slots:
+  public slots:
     void show();
 
-protected:
+  protected:
     void wheelEvent(QWheelEvent *event) override;
-private:
+
+  private:
     Ui::ImageInfoOverlay *ui;
-    QList<EntryInfoItem*> entries;
+    QList<EntryInfoItem *> entries;
     QLabel entryStub;
 };

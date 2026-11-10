@@ -1,11 +1,7 @@
 #include "documentinfo.h"
 
 DocumentInfo::DocumentInfo(QString path, const LoadPolicy &policy)
-    : mDocumentType(DocumentType::NONE),
-      mOrientation(0),
-      mFormat(""),
-      exifLoaded(false)
-{
+    : mDocumentType(DocumentType::NONE), mOrientation(0), mFormat(""), exifLoaded(false) {
     fileInfo.setFile(path);
     if(!fileInfo.isFile()) {
         qDebug() << "FileInfo: cannot open: " << path;
@@ -125,14 +121,14 @@ void DocumentInfo::detectFormat(const LoadPolicy &policy) {
 }
 
 inline
-// dumb apng detector
-bool DocumentInfo::detectAPNG() {
+    // dumb apng detector
+    bool DocumentInfo::detectAPNG() {
     QFile f(fileInfo.filePath());
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         const int len = 120;
         QByteArray qbuf("\0", len);
-        if (in.readRawData(qbuf.data(), len) > 0) {
+        if(in.readRawData(qbuf.data(), len) > 0) {
             return qbuf.contains("acTL");
         }
     }
@@ -145,7 +141,7 @@ bool DocumentInfo::detectAnimatedWebP() {
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         in.skipRawData(12);
-        char *buf = static_cast<char*>(malloc(5));
+        char *buf = static_cast<char *>(malloc(5));
         buf[4] = '\0';
         in.readRawData(buf, 4);
         if(strcmp(buf, "VP8X") == 0) {
@@ -173,7 +169,7 @@ bool DocumentInfo::detectAnimatedAvif() {
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         in.skipRawData(4); // skip box size
-        char *buf = static_cast<char*>(malloc(9));
+        char *buf = static_cast<char *>(malloc(9));
         buf[8] = '\0';
         in.readRawData(buf, 8);
         if(strcmp(buf, "ftypavis") == 0) {
@@ -272,19 +268,19 @@ void DocumentInfo::loadExifTags() {
 // this should work with both 0.28 and <0.28
 #if not EXIV2_TEST_VERSION(0, 28, 0)
 #ifdef __WIN32
-    catch (Exiv2::BasicError<wchar_t>& e) {
+    catch(Exiv2::BasicError<wchar_t> &e) {
         qDebug() << "Caught Exiv2::BasicError exception:\n" << e.what() << "\n";
         return;
     }
 #else
-    catch (Exiv2::BasicError<char>& e) {
+    catch(Exiv2::BasicError<char> &e) {
         qDebug() << "Caught Exiv2::BasicError exception:\n" << e.what() << "\n";
         return;
     }
 #endif
 #endif
 
-    catch (Exiv2::Error& e) {
+    catch(Exiv2::Error &e) {
         qDebug() << "Caught Exiv2 exception:\n" << e.what() << "\n";
         return;
     }

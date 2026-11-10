@@ -22,7 +22,7 @@ void Test_MapOverlay::initTestCase() {
      * width  = 100
      * height = 1200 / 14
      */
-    compare(minimap->outer(), QSizeF(100, (float) 1200 / 14));
+    compare(minimap->outer(), QSizeF(100, (float)1200 / 14));
 
     /**
      * Windows area scaled relative drawing area
@@ -30,7 +30,7 @@ void Test_MapOverlay::initTestCase() {
      * width  = 200 / 14
      * height = 100 / 14
      */
-    compare(minimap->inner(), QSizeF((float) 200 / 14, (float) 100 / 14));
+    compare(minimap->inner(), QSizeF((float)200 / 14, (float)100 / 14));
 }
 
 bool Test_MapOverlay::compare(const QSizeF &a, const QSizeF &b) const {

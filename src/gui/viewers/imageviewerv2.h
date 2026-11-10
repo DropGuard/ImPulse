@@ -30,11 +30,10 @@ enum ViewLockMode {
     LOCK_ALL
 };
 
-class ImageViewerV2 : public QGraphicsView
-{
+class ImageViewerV2 : public QGraphicsView {
     Q_OBJECT
-public:
-    ImageViewerV2(QWidget* parent = nullptr);
+  public:
+    ImageViewerV2(QWidget *parent = nullptr);
     ~ImageViewerV2() override;
     virtual ImageFitMode fitMode() const;
     virtual QRect scaledRectR() const;
@@ -57,7 +56,7 @@ public:
     void enableDrags();
     void disableDrags();
 
-signals:
+  signals:
     void scalingRequested(QSize, ScalingFilter);
     void scaleChanged(qreal);
     void draggedOut();
@@ -66,7 +65,7 @@ signals:
     void frameChanged(int);
     void durationChanged(int);
 
-public slots:
+  public slots:
     virtual void setFitMode(ImageFitMode mode);
     virtual void setFitOriginal();
     virtual void setFitWidth();
@@ -103,20 +102,20 @@ public slots:
     void toggleLockView();
     bool lockViewEnabled();
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
-    void resizeEvent(QResizeEvent* event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void showEvent(QShowEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
 
     bool eventFilter(QObject *o, QEvent *ev) override;
-protected slots:
+  protected slots:
     void onAnimationTimer();
 
-private slots:
+  private slots:
     void requestScaling();
     void scrollToX(int x);
     void scrollToY(int y);
@@ -124,7 +123,8 @@ private slots:
     void onScrollTimelineFinished();
 
     void onDPRChanged();
-private:
+
+  private:
     std::shared_ptr<QPixmap> pixmap;
     std::unique_ptr<QPixmap> pixmapScaled;
     std::shared_ptr<QMovie> movie;
@@ -132,10 +132,8 @@ private:
     QTimer *animationTimer, *scaleTimer;
     QScrollBar *hs, *vs;
     QPoint mouseMoveStartPos, mousePressPos, drawPos;
-    bool transparencyGrid, expandImage,    smoothAnimatedImages,
-         smoothUpscaling,  forceFastScale, keepFitMode,
-         loopPlayback,     mIsFullscreen,  scrollBarWorkaround,
-         useFixedZoomLevels, trackpadDetection;
+    bool transparencyGrid, expandImage, smoothAnimatedImages, smoothUpscaling, forceFastScale, keepFitMode,
+        loopPlayback, mIsFullscreen, scrollBarWorkaround, useFixedZoomLevels, trackpadDetection;
     QList<float> zoomLevels;
     MouseInteractionState mouseInteraction;
     const int SCROLL_UPDATE_RATE = 7;

@@ -18,23 +18,20 @@ static SessionLog &session() {
 QString formatLine(QtMsgType type, const QString &msg) {
     const char lvl[] = "DWCFI"; // enum order: Debug Warning Critical Fatal Info
     return QString("%1 %2 %3\n")
-        .arg(QDateTime::currentDateTime().toString("MM-dd hh:mm:ss.zzz"),
-             QString(QChar(lvl[type])), msg);
+        .arg(QDateTime::currentDateTime().toString("MM-dd hh:mm:ss.zzz"), QString(QChar(lvl[type])), msg);
 }
 
 void pruneOldSessions(const QString &dir, int keep) {
     if(keep < 1)
         return;
     // the legacy glob ages out the logs the identity migration did not carry
-    const QStringList logs = QDir(dir).entryList(QStringList() << "impulse-*.log*" << "qimgv-*.log*",
-                                                 QDir::Files, QDir::Name);
+    const QStringList logs =
+        QDir(dir).entryList(QStringList() << "impulse-*.log*" << "qimgv-*.log*", QDir::Files, QDir::Name);
     for(int i = 0; i + keep < logs.size(); ++i)
         QFile::remove(dir + "/" + logs.at(i));
 }
 
-SessionLog::SessionLog(qint64 partLimitBytes, int maxParts)
-    : mPartLimit(partLimitBytes), mMaxParts(maxParts)
-{
+SessionLog::SessionLog(qint64 partLimitBytes, int maxParts) : mPartLimit(partLimitBytes), mMaxParts(maxParts) {
 }
 
 bool SessionLog::open(const QString &basePath) {
@@ -94,11 +91,9 @@ static void fileLogHandler(QtMsgType type, const QMessageLogContext &ctx, const 
 bool install(const QString &dir) {
     QDir().mkpath(dir);
     pruneOldSessions(dir, 10);
-    const QString base = dir + "/impulse-"
-                         + QDateTime::currentDateTime().toString("MMdd-hhmmss") + ".log";
+    const QString base = dir + "/impulse-" + QDateTime::currentDateTime().toString("MMdd-hhmmss") + ".log";
     if(!session().open(base)) {
-        fprintf(stderr, "[log] open failed: %s\n",
-                session().lastError().toLocal8Bit().constData());
+        fprintf(stderr, "[log] open failed: %s\n", session().lastError().toLocal8Bit().constData());
         return false;
     }
     fprintf(stderr, "[log] handler installed: %s\n", base.toLocal8Bit().constData());

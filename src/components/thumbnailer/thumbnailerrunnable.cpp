@@ -7,15 +7,9 @@
 #include <QFileInfo>
 #include <utility>
 
-ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache* _cache, QString _path, int _size, bool _crop, bool _force,
-                                         const LoadPolicy &_policy) :
-    path(std::move(_path)),
-    size(_size),
-    crop(_crop),
-    force(_force),
-    policy(_policy),
-    cache(_cache)
-{
+ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
+                                         const LoadPolicy &_policy)
+    : path(std::move(_path)), size(_size), crop(_crop), force(_force), policy(_policy), cache(_cache) {
 }
 
 void ThumbnailerRunnable::run() {
@@ -40,20 +34,21 @@ QString ThumbnailerRunnable::videoFrameTempPath(const QString &tmpDir, const QSt
     // pid are what keeps two concurrent extractions of the SAME clip from
     // sharing one file: the grid and the strip each run their own thumbnailer,
     // and so do two app instances.
-    return tmpDir + QFileInfo(path).fileName() + "-" + QString::number(QCoreApplication::applicationPid())
-           + "-" + generateIdString(path, size, crop) + ".png";
+    return tmpDir + QFileInfo(path).fileName() + "-" + QString::number(QCoreApplication::applicationPid()) + "-" +
+           generateIdString(path, size, crop) + ".png";
 }
 
-QString ThumbnailerRunnable::generateIdString(const QString& path, int size, bool crop) {
+QString ThumbnailerRunnable::generateIdString(const QString &path, int size, bool crop) {
     QString queryStr = path + QString::number(size);
     if(crop)
         queryStr.append("s");
-    queryStr = QString("%1").arg(QString(QCryptographicHash::hash(queryStr.toUtf8(),QCryptographicHash::Md5).toHex()));
+    queryStr = QString("%1").arg(QString(QCryptographicHash::hash(queryStr.toUtf8(), QCryptographicHash::Md5).toHex()));
     return queryStr;
 }
 
-std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache* cache, const QString& path, int size, bool crop, bool force,
-                                                         const LoadPolicy &policy, const CancelToken *cancel) {
+std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, const QString &path, int size,
+                                                         bool crop, bool force, const LoadPolicy &policy,
+                                                         const CancelToken *cancel) {
     // Fast path: ONE file open (header probe) for format/animation/orientation.
     // DocumentInfo (mime sniff + per-format probes, 3-5 opens) is only used for
     // videos and formats the header parser doesn't know.
@@ -63,18 +58,18 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache* cache, 
     QString format;
     int orientation = 1;
     qimgv_probe_result pr{};
-    if(qimgv_engine_probe(fileInfo.absoluteFilePath().toUtf8().constData(), &pr) == QIMGV_OK
-       && pr.format != QIMGV_FMT_UNKNOWN) {
+    if(qimgv_engine_probe(fileInfo.absoluteFilePath().toUtf8().constData(), &pr) == QIMGV_OK &&
+       pr.format != QIMGV_FMT_UNKNOWN) {
         switch(pr.format) {
-            case QIMGV_FMT_JPEG: format = "jpg"; break;
-            case QIMGV_FMT_PNG:  format = "png"; break;
-            case QIMGV_FMT_GIF:  format = "gif"; break;
-            case QIMGV_FMT_WEBP: format = "webp"; break;
-            case QIMGV_FMT_AVIF: format = "avif"; break;
-            case QIMGV_FMT_JXL:  format = "jxl"; break;
-            case QIMGV_FMT_BMP:  format = "bmp"; break;
-            case QIMGV_FMT_TIFF: format = "tiff"; break;
-            default: break;
+        case QIMGV_FMT_JPEG: format = "jpg"; break;
+        case QIMGV_FMT_PNG: format = "png"; break;
+        case QIMGV_FMT_GIF: format = "gif"; break;
+        case QIMGV_FMT_WEBP: format = "webp"; break;
+        case QIMGV_FMT_AVIF: format = "avif"; break;
+        case QIMGV_FMT_JXL: format = "jxl"; break;
+        case QIMGV_FMT_BMP: format = "bmp"; break;
+        case QIMGV_FMT_TIFF: format = "tiff"; break;
+        default: break;
         }
         type = pr.animated ? DocumentType::ANIMATED : DocumentType::STATIC;
         orientation = (pr.orientation >= 1 && pr.orientation <= 8) ? pr.orientation : 1;
@@ -128,19 +123,16 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache* cache, 
                 cache->saveThumbnail(image.get(), thumbnailId);
         }
     }
-    auto && tmpPixmap = new QPixmap(image->size());
+    auto &&tmpPixmap = new QPixmap(image->size());
     *tmpPixmap = QPixmap::fromImage(*image);
     tmpPixmap->setDevicePixelRatio(qGuiApp->devicePixelRatio());
 
     QString label;
     if(tmpPixmap->width() == 0) {
         label = "error";
-    } else  {
+    } else {
         // put info into Thumbnail object
-        label = image->text("originalWidth") +
-                "x" +
-                image->text("originalHeight") +
-                image->text("label");
+        label = image->text("originalWidth") + "x" + image->text("originalHeight") + image->text("label");
     }
     std::shared_ptr<QPixmap> pixmapPtr(tmpPixmap);
     std::shared_ptr<Thumbnail> thumbnail(new Thumbnail(fileInfo.fileName(), label, size, pixmapPtr));
@@ -150,8 +142,9 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache* cache, 
 ThumbnailerRunnable::~ThumbnailerRunnable() {
 }
 
-std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(const QString& path, const char *format, int size, bool squared,
-                                                                              const CancelToken *cancel) {
+std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(const QString &path, const char *format,
+                                                                               int size, bool squared,
+                                                                               const CancelToken *cancel) {
     // The decode itself is one call inside QImageReader, so the checkpoint can
     // only sit in front of it. Empty means "no picture", not "no image": the
     // caller writes info into it and builds the error thumbnail from it, and a
@@ -159,8 +152,7 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
     if(cancel && cancel->requested())
         return std::make_pair(std::make_unique<QImage>(), QSize());
     QImageReader *reader = new QImageReader(path, format);
-    Qt::AspectRatioMode ARMode = squared?
-                (Qt::KeepAspectRatioByExpanding):(Qt::KeepAspectRatio);
+    Qt::AspectRatioMode ARMode = squared ? (Qt::KeepAspectRatioByExpanding) : (Qt::KeepAspectRatio);
     std::unique_ptr<QImage> result;
     QSize originalSize;
     bool indexed = (reader->imageFormat() == QImage::Format_Indexed8);
@@ -170,7 +162,7 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
         reader->setScaledSize(scaledSize);
         if(squared) {
             QRect clip(0, 0, size, size);
-            QRect scaledRect(QPoint(0,0), scaledSize);
+            QRect scaledRect(QPoint(0, 0), scaledSize);
             clip.moveCenter(scaledRect.center());
             reader->setScaledClipRect(clip);
         }
@@ -202,12 +194,13 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
         QSize scaledSize = fullSize->size().scaled(size, size, ARMode);
         if(squared) {
             QRect clip(0, 0, size, size);
-            QRect scaledRect(QPoint(0,0), scaledSize);
+            QRect scaledRect(QPoint(0, 0), scaledSize);
             clip.moveCenter(scaledRect.center());
             QImage scaled = QImage(fullSize->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
             result = ImageLib::croppedRaw(scaled, clip);
         } else {
-            result = std::make_unique<QImage>(fullSize->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+            result =
+                std::make_unique<QImage>(fullSize->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
         }
     }
     // force reader to close file so it can be deleted later
@@ -241,8 +234,9 @@ void ThumbnailerRunnable::waitForProcess(QProcess &process, const CancelToken *c
     }
 }
 
-std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbnail(const QString& path, int size, bool squared,
-                                                                                    const QString &tmpDir, const QString &mpvBinary,
+std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbnail(const QString &path, int size,
+                                                                                    bool squared, const QString &tmpDir,
+                                                                                    const QString &mpvBinary,
                                                                                     const CancelToken *cancel) {
     QImageReader reader;
     const QString tmpFilePath = videoFrameTempPath(tmpDir, path, size, squared);
@@ -250,24 +244,20 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbn
     tmpFilePathEsc.replace("%", "%%");
     QProcess process;
     process.setProcessChannelMode(QProcess::MergedChannels);
-    process.start(mpvBinary,
-                  QStringList() << "--start=30%"
-                                << "--frames=1"
-                                << "--aid=no"
-                                << "--sid=no"
-                                << "--no-config"
-                                << "--load-scripts=no"
-                                << "--no-terminal"
-                                << "--o=" + tmpFilePathEsc
-                                << path
-                  );
+    process.start(mpvBinary, QStringList() << "--start=30%"
+                                           << "--frames=1"
+                                           << "--aid=no"
+                                           << "--sid=no"
+                                           << "--no-config"
+                                           << "--load-scripts=no"
+                                           << "--no-terminal"
+                                           << "--o=" + tmpFilePathEsc << path);
     waitForProcess(process, cancel, 8000);
     process.close();
 
     reader.setFileName(tmpFilePath);
     reader.setFormat("png");
-    Qt::AspectRatioMode ARMode = squared?
-                (Qt::KeepAspectRatioByExpanding):(Qt::KeepAspectRatio);
+    Qt::AspectRatioMode ARMode = squared ? (Qt::KeepAspectRatioByExpanding) : (Qt::KeepAspectRatio);
     std::unique_ptr<QImage> result;
 
     // scale & crop
@@ -275,7 +265,7 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbn
     reader.setScaledSize(scaledSize);
     if(squared) {
         QRect clip(0, 0, size, size);
-        QRect scaledRect(QPoint(0,0), scaledSize);
+        QRect scaledRect(QPoint(0, 0), scaledSize);
         clip.moveCenter(scaledRect.center());
         reader.setScaledClipRect(clip);
     }

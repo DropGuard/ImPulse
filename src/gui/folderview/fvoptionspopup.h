@@ -14,30 +14,30 @@ class FVOptionsPopup;
 class FVOptionsPopup : public QWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit FVOptionsPopup(QWidget *parent = nullptr);
     ~FVOptionsPopup() override;
 
-public slots:
+  public slots:
     void showAt(QPoint pos);
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 
-signals:
+  signals:
     void dismissed();
     void viewModeSelected(FolderViewMode);
 
-private slots:
+  private slots:
     void readSettings();
 
     void selectSimpleView();
     void selectExtendedView();
     void selectFoldersView();
 
-private:
+  private:
     Ui::FVOptionsPopup *ui;
     void setViewMode(FolderViewMode mode);
     void setSimpleView();

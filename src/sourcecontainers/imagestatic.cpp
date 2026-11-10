@@ -7,10 +7,7 @@
 #include <time.h>
 
 ImageStatic::ImageStatic(std::unique_ptr<DocumentInfo> _info, bool scaled, const LoadPolicy &policy)
-    : Image(std::move(_info)),
-      mScaledRequest(scaled),
-      mAllocationLimitMb(policy.allocationLimitMb)
-{
+    : Image(std::move(_info)), mScaledRequest(scaled), mAllocationLimitMb(policy.allocationLimitMb) {
     load();
 }
 
@@ -27,7 +24,6 @@ void ImageStatic::load() {
     else
         loadGeneric();
 }
-
 
 void ImageStatic::loadGeneric() {
     // two-tier decode: scaled target = primary screen at devicePixelRatio
@@ -54,8 +50,7 @@ void ImageStatic::loadGeneric() {
         // JPEG-only: other formats scale AFTER full decode in Qt, which
         // costs more than it saves (measured: PNG scaled 84ms vs full 46ms).
         QSize orig = r.size();
-        QSize screen = QApplication::primaryScreen()->size()
-                       * QApplication::primaryScreen()->devicePixelRatio();
+        QSize screen = QApplication::primaryScreen()->size() * QApplication::primaryScreen()->devicePixelRatio();
         if(orig.isValid() && (orig.width() > screen.width() || orig.height() > screen.height())) {
             r.setScaledSize(orig.scaled(screen, Qt::KeepAspectRatio));
             mScaledApplied = true;
@@ -102,8 +97,7 @@ bool ImageStatic::save(QString destPath, int jpegQuality) {
     // FileOperations::saveWithBackup now, shared with the clipboard import:
     // two copies of that sequence had already diverged once.
     const bool wasEdited = isEdited();
-    const bool success = FileOperations::saveWithBackup(*(wasEdited ? imageEdited : image),
-                                                        destPath, jpegQuality);
+    const bool success = FileOperations::saveWithBackup(*(wasEdited ? imageEdited : image), destPath, jpegQuality);
     // An edit is consumed by a write that actually happened. Swapping and
     // discarding before consulting `success` threw the user's unsaved edit away
     // on every failed save, and left the in-memory image claiming it was saved.
@@ -118,7 +112,7 @@ bool ImageStatic::save(QString destPath, int jpegQuality) {
 
 std::unique_ptr<QPixmap> ImageStatic::getPixmap() {
     std::unique_ptr<QPixmap> pix(new QPixmap());
-    isEdited()?pix->convertFromImage(*imageEdited):pix->convertFromImage(*image, Qt::NoFormatConversion);
+    isEdited() ? pix->convertFromImage(*imageEdited) : pix->convertFromImage(*image, Qt::NoFormatConversion);
     return pix;
 }
 
@@ -127,19 +121,19 @@ std::shared_ptr<const QImage> ImageStatic::getSourceImage() {
 }
 
 std::shared_ptr<const QImage> ImageStatic::getImage() {
-    return isEdited()?imageEdited:image;
+    return isEdited() ? imageEdited : image;
 }
 
 int ImageStatic::height() {
-    return isEdited()?imageEdited->height():image->height();
+    return isEdited() ? imageEdited->height() : image->height();
 }
 
 int ImageStatic::width() {
-    return isEdited()?imageEdited->width():image->width();
+    return isEdited() ? imageEdited->width() : image->width();
 }
 
 QSize ImageStatic::size() {
-    return isEdited()?imageEdited->size():image->size();
+    return isEdited() ? imageEdited->size() : image->size();
 }
 
 QSize ImageStatic::originalSize() {

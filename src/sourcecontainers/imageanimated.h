@@ -5,7 +5,7 @@
 #include <QTimer>
 
 class ImageAnimated : public Image {
-public:
+  public:
     ImageAnimated(std::unique_ptr<DocumentInfo> _info);
     ~ImageAnimated() override;
 
@@ -19,10 +19,10 @@ public:
     bool isEdited();
 
     int frameCount();
-public slots:
+  public slots:
     bool save(QString destPath, int jpegQuality) override;
 
-private:
+  private:
     void load() override;
     QSize mSize;
     int mFrameCount;

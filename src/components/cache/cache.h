@@ -9,7 +9,7 @@
 #include "utils/imagefactory.h"
 
 class Cache {
-public:
+  public:
     explicit Cache();
     ~Cache();
     bool contains(const QString &path) const;
@@ -24,6 +24,6 @@ public:
     bool reserve(const QString &path);
     const QList<QString> keys() const;
 
-private:
-    QMap<QString, CacheItem*> items;
+  private:
+    QMap<QString, CacheItem *> items;
 };

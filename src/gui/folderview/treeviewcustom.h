@@ -8,18 +8,17 @@
 #include <QDebug>
 #include "settings.h"
 
-class TreeViewCustom : public QTreeView
-{
+class TreeViewCustom : public QTreeView {
     Q_OBJECT
-public:
+  public:
     TreeViewCustom(QWidget *parent = nullptr);
     QSize minimumSizeHint() const override;
 
-signals:
+  signals:
     void droppedIn(QList<QString>, QModelIndex);
     void tabbedOut();
 
-protected:
+  protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -29,9 +28,10 @@ protected:
     void showEvent(QShowEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
-private slots:
+  private slots:
     void updateScrollbarStyle();
-private:
+
+  private:
     QScrollBar overlayScrollbar;
 
     const int SCROLLBAR_WIDTH = 12;

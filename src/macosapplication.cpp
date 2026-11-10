@@ -1,2 +1,1 @@
 #include "macosapplication.h"
-

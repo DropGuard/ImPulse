@@ -1,11 +1,8 @@
 #include "folderviewproxy.h"
 
-FolderViewProxy::FolderViewProxy(QWidget *parent)
-    : QWidget(parent),
-      folderView(nullptr)
-{
+FolderViewProxy::FolderViewProxy(QWidget *parent) : QWidget(parent), folderView(nullptr) {
     stateBuf.sortingMode = settings->sortingMode();
-    layout.setContentsMargins(0,0,0,0);
+    layout.setContentsMargins(0, 0, 0, 0);
 }
 
 void FolderViewProxy::init() {
@@ -126,7 +123,7 @@ void FolderViewProxy::removeItem(int index) {
     } else {
         stateBuf.itemCount--;
         stateBuf.selection.removeAll(index);
-        for(int i=0; i < stateBuf.selection.count(); i++) {
+        for(int i = 0; i < stateBuf.selection.count(); i++) {
             if(stateBuf.selection[i] > index)
                 stateBuf.selection[i]--;
         }

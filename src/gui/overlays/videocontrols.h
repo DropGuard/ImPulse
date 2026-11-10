@@ -13,34 +13,34 @@ enum PlaybackMode {
     PLAYBACK_VIDEO
 };
 
-
-class VideoControls : public OverlayWidget
-{
+class VideoControls : public OverlayWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit VideoControls(FloatingWidgetContainer *parent = nullptr);
     ~VideoControls() override;
 
     // observability for tests: the mirror of the last applied position
-    int playbackPosition() const { return lastPosition; }
+    int playbackPosition() const {
+        return lastPosition;
+    }
 
-public slots:
+  public slots:
     void setPlaybackDuration(int);
     void setPlaybackPosition(int);
     void onPlaybackPaused(bool);
     void onVideoMuted(bool);
     void setMode(PlaybackMode _mode);
 
-signals:
+  signals:
     void seek(int pos);
     void seekForward();
     void seekBackward();
 
-private slots:
+  private slots:
     void readSettings();
 
-private:
+  private:
     Ui::VideoControls *ui;
     int lastPosition;
     PlaybackMode mode;
