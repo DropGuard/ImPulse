@@ -456,6 +456,30 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
     }
 
+    // entering crop used to force a fit window ("so CropOverlay won't go
+    // crazy") — throwing away the zoom the user had framed the crop in. The
+    // overlay's geometry is pushed from the viewer at entry and the zoom
+    // relays are physically disconnected while cropping, so there is nothing
+    // for the reset to guard: the view must be exactly where the user left it.
+    void cropEntryRespectsTheUserZoom() {
+        QImage big(2000, 1200, QImage::Format_RGB32);
+        big.fill(Qt::darkCyan);
+        QVERIFY(big.save(QDir(base).filePath("big.png"), "PNG"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("big.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("big.png"), 10000);
+        core.mw->fitOriginal();
+        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        QVERIFY(viewer);
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
+        float scaleBefore = viewer->currentScale();
+
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
+        QVERIFY2(qAbs(viewer->currentScale() - scaleBefore) < 0.001f, "the zoom must survive crop entry");
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;

@@ -39,8 +39,11 @@ void CropController::showCropPanel() {
         sidePanel->show();
         cropOverlay->show();
         activeSidePanel = SIDEPANEL_CROP;
-        // reset & lock zoom so CropOverlay won't go crazy
-        emit viewer->fitWindow();
+        // the user's zoom is the frame they picked — it stays. updateCropPanelData
+        // pushes the viewer's geometry (scale, draw rect, real size) into the
+        // overlay, and while cropping the zoom/scroll relays are physically
+        // disconnected (setInteractionEnabled), so the pushed geometry cannot
+        // go stale. The old fit window here was a reset disguised as a guard.
         viewer->setInteractionEnabled(false);
         // feed the panel current image info
         updateCropPanelData();
