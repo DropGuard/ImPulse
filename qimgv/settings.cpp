@@ -693,12 +693,17 @@ void Settings::setPanelPinned(bool mode) {
  * 3: fit window (stretch)
  */
 ImageFitMode Settings::imageFitMode() {
-    return static_cast<ImageFitMode>(load<int>(K_DefaultFitMode));
+    int modeInt = load<int>(K_DefaultFitMode);
+    // 3 was FIT_WINDOW_STRETCH, retired — stale configs clamp to the safe
+    // default instead of shifting FIT_FREE's stored value
+    if(modeInt < 0 || modeInt == 3 || modeInt > 4)
+        modeInt = 0;
+    return static_cast<ImageFitMode>(modeInt);
 }
 
 void Settings::setImageFitMode(ImageFitMode mode) {
     int modeInt = static_cast<ImageFitMode>(mode);
-    if(modeInt < 0 || modeInt > 3) {
+    if(modeInt < 0 || modeInt == 3 || modeInt > 4) {
         qDebug() << "Settings: Invalid fit mode ( " + QString::number(modeInt) + " ). Resetting to default.";
         modeInt = 0;
     }

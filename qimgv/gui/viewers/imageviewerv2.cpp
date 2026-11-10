@@ -5,7 +5,7 @@ ImageViewerV2::ImageViewerV2(QWidget *parent)
       expandImage(false), smoothAnimatedImages(true), smoothUpscaling(true), forceFastScale(false), loopPlayback(true),
       mIsFullscreen(false), scrollBarWorkaround(true), useFixedZoomLevels(false), trackpadDetection(true),
       mouseInteraction(MouseInteractionState::MOUSE_NONE), minScale(0.01f), maxScale(500.0f), fitWindowScale(0.125f),
-      fitWindowStretchScale(0.125f), mViewLock(LOCK_NONE), imageFitMode(FIT_WINDOW), mScalingFilter(QI_FILTER_BILINEAR),
+      mViewLock(LOCK_NONE), imageFitMode(FIT_WINDOW), mScalingFilter(QI_FILTER_BILINEAR),
       imageFitModeDefault(FIT_WINDOW), scene(nullptr), checkboard(":res/icons/common/other/checkerboard.png") {
     setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
     this->viewport()->setAttribute(Qt::WA_OpaquePaintEvent, true);
@@ -717,8 +717,6 @@ inline void ImageViewerV2::mouseMoveZoom(QMouseEvent *event) {
     snapToEdges();
     if(pixmapItem.scale() == fitWindowScale)
         setFitModeValue(FIT_WINDOW);
-    else if(pixmapItem.scale() == fitWindowStretchScale)
-        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 // scale at which current image fills the window
@@ -734,25 +732,10 @@ void ImageViewerV2::updateFitWindowScale() {
         fitWindowScale = expandLimit;
 }
 
-void ImageViewerV2::updateFitWindowStretchScale() {
-    if(!pixmap)
-        return;
-
-    float scaleFitY = static_cast<float>(viewport()->height()) * dpr / pixmap->height();
-
-    // For "Fit in window (stretch)", we always use height-based scaling
-    // This ensures the full image is always visible while stretching to fill the window height
-    fitWindowStretchScale = scaleFitY;
-
-    if(expandImage && fitWindowStretchScale > expandLimit)
-        fitWindowStretchScale = expandLimit;
-}
-
 void ImageViewerV2::updateMinScale() {
     if(!pixmap)
         return;
     updateFitWindowScale();
-    updateFitWindowStretchScale();
     if(settings->unlockMinZoom()) {
         if(!pixmap->isNull())
             minScale = qMax(10. / pixmap->width(), 10. / pixmap->height());
@@ -816,27 +799,6 @@ void ImageViewerV2::fitNormal() {
     fitFree(1.0f);
 }
 
-void ImageViewerV2::fitWindowStretch() {
-    if(!pixmap)
-        return;
-
-    // Update the stretch scale calculation
-    updateFitWindowStretchScale();
-
-    if(currentScale() != fitWindowStretchScale) {
-        swapToOriginalPixmap();
-        doZoom(fitWindowStretchScale);
-    }
-
-    // Handle scrollbar workaround similar to fitWindow()
-    if(scrollBarWorkaround) {
-        scrollBarWorkaround = false;
-        QTimer::singleShot(0, this, SLOT(centerOnPixmap()));
-    } else {
-        centerOnPixmap();
-    }
-}
-
 void ImageViewerV2::fitFree(float scale) {
     if(!pixmap)
         return;
@@ -865,7 +827,6 @@ void ImageViewerV2::applyFitMode() {
     case FIT_ORIGINAL: fitNormal(); break;
     case FIT_WIDTH: fitWidth(); break;
     case FIT_WINDOW: fitWindow(); break;
-    case FIT_WINDOW_STRETCH: fitWindowStretch(); break;
     default: break;
     }
 }
@@ -901,12 +862,6 @@ void ImageViewerV2::setFitWidth() {
 // public, sends scale request
 void ImageViewerV2::setFitWindow() {
     setFitMode(FIT_WINDOW);
-    requestScaling();
-}
-
-// public, sends scale request
-void ImageViewerV2::setFitWindowStretch() {
-    setFitMode(FIT_WINDOW_STRETCH);
     requestScaling();
 }
 
@@ -1090,8 +1045,6 @@ void ImageViewerV2::doZoomIn(bool atCursor) {
     setFitModeValue(FIT_FREE);
     if(pixmapItem.scale() == fitWindowScale)
         setFitModeValue(FIT_WINDOW);
-    else if(pixmapItem.scale() == fitWindowStretchScale)
-        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 // zoom out around viewport center
@@ -1131,8 +1084,6 @@ void ImageViewerV2::doZoomOut(bool atCursor) {
     setFitModeValue(FIT_FREE);
     if(pixmapItem.scale() == fitWindowScale)
         setFitModeValue(FIT_WINDOW);
-    else if(pixmapItem.scale() == fitWindowStretchScale)
-        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 void ImageViewerV2::toggleLockZoom() {

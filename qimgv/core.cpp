@@ -193,7 +193,6 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::fitWindow, mw, &MW::fitWindow);
     connect(actionManager, &ActionManager::fitWidth, mw, &MW::fitWidth);
     connect(actionManager, &ActionManager::fitNormal, mw, &MW::fitOriginal);
-    connect(actionManager, &ActionManager::fitWindowStretch, mw, &MW::fitWindowStretch);
     connect(actionManager, &ActionManager::nextFitMode, mw, &MW::cycleFitMode);
     connect(actionManager, &ActionManager::toggleFitMode, mw, &MW::switchFitMode);
     connect(actionManager, &ActionManager::toggleFullscreen, mw->shell(), &WindowShell::triggerFullScreen);

@@ -34,7 +34,6 @@ void ActionManager::initDefaults() {
     defaults.insert("1", "fitWindow");
     defaults.insert("2", "fitWidth");
     defaults.insert("3", "fitNormal");
-    defaults.insert("4", "fitWindowStretch");
     defaults.insert("R", "resize");
     defaults.insert("H", "flipH");
     defaults.insert("V", "flipV");
