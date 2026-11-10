@@ -26,7 +26,6 @@ struct State;
 #include "gui/panels/croppanel/croppanel.h"
 #include "gui/overlays/cropoverlay.h"
 #include "gui/overlays/copyoverlay.h"
-#include "gui/overlays/changelogwindow.h"
 #include "gui/overlays/imageinfooverlayproxy.h"
 #include "gui/overlays/renameoverlay.h"
 #include "gui/dialogs/resizedialog.h"
@@ -81,7 +80,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     const State *appState = nullptr;
     int currentDisplay;
 
-    bool cropPanelActive, showInfoBarFullscreen, showInfoBarWindowed, maximized;
+    bool showInfoBarFullscreen, showInfoBarWindowed, maximized;
     DocumentWidget *docWidget = nullptr;
     FolderViewProxy *folderView = nullptr;
     CentralWidget *centralWidget = nullptr;
@@ -95,12 +94,10 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     FloatingMessageProxy *floatingMessage;
     CropPanel *cropPanel;
     CropOverlay *cropOverlay;
-    ChangelogWindow *changelogWindow = nullptr;
 
     ControlsOverlay *controlsOverlay;
     InfoBarProxy *infoBarWindowed = nullptr;
 
-    PanelPosition panelPosition;
     QPropertyNotifier infoObserver;
     QPropertyNotifier slideshowObserver;
     QPropertyNotifier shuffleObserver;
@@ -174,7 +171,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void scrollLeft();
     void scrollRight();
     void pauseVideo();
-    void stopPlayback();
     void seekVideoForward();
     void seekVideoBackward();
     void frameStep();
@@ -193,7 +189,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void showDefault();
     void showCropPanel();
     void hideCropPanel();
-    void toggleFolderView();
     void enableFolderView();
     void enableDocumentView();
     void showOpenDialog(const QString &path);
@@ -203,11 +198,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void showSettings();
     void triggerFullScreen();
     void showMessageDirectory(const QString &dirName);
-    void showMessageDirectoryEnd();
-    void showMessageDirectoryStart();
-    void showMessageFitWindow();
-    void showMessageFitWidth();
-    void showMessageFitOriginal();
     void showFullScreen();
     void showWindowed();
     void triggerCopyOverlay();
@@ -223,8 +213,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void updateCropPanelData();
     void showSaveOverlay();
     void hideSaveOverlay();
-    void showChangelogWindow();
-    void showChangelogWindow(const QString &text);
     void fitWindow();
     void fitWidth();
     void fitOriginal();

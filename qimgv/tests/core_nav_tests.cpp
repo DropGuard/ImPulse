@@ -418,6 +418,20 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(core.mw->getFolderView()->directoryPath(), QDir(base).filePath("projdir"), 10000);
     }
 
+    // the crop action wiring is live from initActions, but the crop panel is
+    // built in setupFullUi — which Core schedules 50ms after showGui. showCropPanel
+    // used to dereference the not-yet-created cropPanel/sidePanel pair in that
+    // window (a guaranteed SIGSEGV on an early trigger).
+    void cropPanelSurvivesAnEarlyTrigger() {
+        writeImage(QDir(base).filePath("crop.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("crop.png")));
+        core.mw->triggerCropPanel();
+        QVERIFY(core.mw->isCropPanelActive());
+        core.mw->triggerCropPanel();
+        QVERIFY(!core.mw->isCropPanelActive());
+    }
+
     void preloaderFollowsTheDirectionOfTravel() {
         settings->setUsePreloader(true);
         QVERIFY(settings->usePreloader());

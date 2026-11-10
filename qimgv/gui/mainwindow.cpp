@@ -116,7 +116,6 @@ void MW::setupUi() {
     connect(this, &MW::scrollLeft, viewerWidget, &ViewerWidget::scrollLeft);
     connect(this, &MW::scrollRight, viewerWidget, &ViewerWidget::scrollRight);
     connect(this, &MW::pauseVideo, viewerWidget, &ViewerWidget::pauseResumePlayback);
-    connect(this, &MW::stopPlayback, viewerWidget, &ViewerWidget::stopPlayback);
     connect(this, &MW::seekVideoForward, viewerWidget, &ViewerWidget::seekForward);
     connect(this, &MW::seekVideoBackward, viewerWidget, &ViewerWidget::seekBackward);
     connect(this, &MW::frameStep, viewerWidget, &ViewerWidget::frameStep);
@@ -165,18 +164,6 @@ void MW::setupRenameOverlay() {
     renameOverlay = new RenameOverlay(this);
     renameOverlay->setName(QString());
     connect(renameOverlay, &RenameOverlay::renameRequested, this, &MW::renameRequested);
-}
-
-void MW::toggleFolderView() {
-    hideCropPanel();
-    if(copyOverlay)
-        copyOverlay->hide();
-    if(renameOverlay)
-        renameOverlay->hide();
-    docWidget->hideFloatingPanel();
-    imageInfoOverlay->hide();
-    centralWidget->toggleViewMode();
-    refreshInfoViews();
 }
 
 void MW::enableFolderView() {
@@ -703,15 +690,6 @@ void MW::hideSaveOverlay() {
     saveOverlay->hide();
 }
 
-void MW::showChangelogWindow() {
-    changelogWindow->show();
-}
-
-void MW::showChangelogWindow(const QString &text) {
-    changelogWindow->setText(text);
-    changelogWindow->show();
-}
-
 void MW::triggerCropPanel() {
     if(activeSidePanel != SIDEPANEL_CROP) {
         showCropPanel();
@@ -723,6 +701,12 @@ void MW::triggerCropPanel() {
 void MW::showCropPanel() {
     if(centralWidget->currentViewMode() == MODE_FOLDERVIEW)
         return;
+
+    // the crop wiring is live from initActions, but the panel is built in
+    // setupFullUi — which Core schedules 50ms after showGui. An early trigger
+    // used to dereference the null pair (cropPanelSurvivesAnEarlyTrigger).
+    if(!cropPanel)
+        setupCropPanel();
 
     if(activeSidePanel != SIDEPANEL_CROP) {
         docWidget->hideFloatingPanel();
@@ -837,28 +821,6 @@ ThumbnailStripProxy *MW::getThumbnailPanel() {
 // todo: this is crap
 void MW::showMessageDirectory(const QString &dirName) {
     floatingMessage->showMessage(dirName, FloatingMessageIcon::ICON_DIRECTORY, 1700);
-}
-
-void MW::showMessageDirectoryEnd() {
-    // TODO replace with something nicer (integrate with click overlay?)
-    //floatingMessage->showMessage("", FloatingWidgetPosition::RIGHT, FloatingMessageIcon::ICON_RIGHT_EDGE, 400);
-}
-
-void MW::showMessageDirectoryStart() {
-    // TODO replace with something nicer (integrate with click overlay?)
-    //floatingMessage->showMessage("", FloatingWidgetPosition::LEFT, FloatingMessageIcon::ICON_LEFT_EDGE, 400);
-}
-
-void MW::showMessageFitWindow() {
-    floatingMessage->showMessage(tr("Fit Window"), FloatingMessageIcon::NO_ICON, 350);
-}
-
-void MW::showMessageFitWidth() {
-    floatingMessage->showMessage(tr("Fit Width"), FloatingMessageIcon::NO_ICON, 350);
-}
-
-void MW::showMessageFitOriginal() {
-    floatingMessage->showMessage(tr("Fit 1:1"), FloatingMessageIcon::NO_ICON, 350);
 }
 
 void MW::showMessage(const QString &text) {
