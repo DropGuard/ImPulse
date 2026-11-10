@@ -6,6 +6,18 @@
 # red gate in history is how f8e8b216's six regressions landed unseen.
 set -e
 cd "$(git rev-parse --show-toplevel)"
+# format gate on staged C++ files (working-tree contents, same scan surface as
+# the lint gate): the tree's style is .clang-format, and an unformatted file
+# dies at the commit that introduced it
+STAGED_CPP=$(git diff --cached --name-only --diff-filter=ACMR \
+    | grep -E '^qimgv/.*\.(cpp|h)$' | grep -v '/3rdparty/' || true)
+if [ -n "$STAGED_CPP" ]; then
+    if ! printf '%s\n' "$STAGED_CPP" | xargs clang-format --dry-run --Werror > /tmp/qimgv-hook-format.log 2>&1; then
+        head -5 /tmp/qimgv-hook-format.log >&2
+        echo "pre-commit: not formatted — run: clang-format -i <the files above>" >&2
+        exit 1
+    fi
+fi
 # a fresh clone has no configured build dir: the gate cannot run, and
 # blocking docs-only commits on a full configure would be worse than the
 # hole — skip loudly instead
