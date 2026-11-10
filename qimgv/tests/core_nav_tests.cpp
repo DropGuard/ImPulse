@@ -501,7 +501,8 @@ class TestCoreNav : public QObject {
         QApplication::sendEvent(copyOverlay, &esc);
         QVERIFY(!copyOverlay->isVisible());
 
-        // save-confirm prompt (shown automatically after edits)
+        // save-confirm prompt (surfaced by edits — flips H/V land here too):
+        // Esc means "discard edits", the same chain as the discard button
         settings->setShowSaveOverlay(true);
         core.mw->overlays()->showSaveOverlay();
         auto *saveOverlay = core.mw->findChild<SaveConfirmOverlay *>();

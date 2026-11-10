@@ -18,12 +18,13 @@ SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent)
     this->hide();
 }
 
-// the surface owns Esc: dismiss the prompt without acting — the save/discard
-// decision stays with the user's buttons
+// the surface owns Esc, and Esc means the same thing as the discard button:
+// drop the edits and dismiss. The chain runs through Core::discardEdits,
+// which also hides this overlay.
 void SaveConfirmOverlay::keyPressEvent(QKeyEvent *event) {
     if(event->key() == Qt::Key_Escape) {
         event->accept();
-        hide();
+        emit discardClicked();
         return;
     }
     event->ignore();
