@@ -519,6 +519,33 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000);
     }
 
+    // free zoom works mechanically on images that fit the viewport (small
+    // images included): + steps 1.0 -> 1.2 -> 1.44. Switching to a nominal
+    // fit mode collapses the free zoom back to that mode's scale — the
+    // FIT_FREE-is-ephemeral contract the mode-is-intent law rests on.
+    void zoomInWorksAndFitSwitchCollapsesFreeZoom() {
+        QImage img(400, 300, QImage::Format_RGB32);
+        img.fill(Qt::magenta);
+        QVERIFY(img.save(QDir(base).filePath("small.png"), "PNG"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("small.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("small.png"), 10000);
+        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        QVERIFY(viewer);
+        core.mw->fitOriginal();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
+        QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.0f));
+
+        viewer->zoomIn();
+        QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.2f));
+        viewer->zoomIn();
+        QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.44f));
+
+        core.mw->switchFitMode();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
+        QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.0f));
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
