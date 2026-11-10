@@ -48,7 +48,7 @@ void CropController::showCropPanel() {
         // overlay, and while cropping the zoom/scroll relays are physically
         // disconnected (setInteractionEnabled), so the pushed geometry cannot
         // go stale. The old fit window here was a reset disguised as a guard.
-        viewer->setCanvasInputEnabled(false);
+        viewer->setCanvasInputPolicy(CanvasInputPolicy::Framing);
         // feed the panel current image info
         updateCropPanelData();
     }
@@ -69,7 +69,7 @@ void CropController::hideCropPanel() {
     sidePanel->hide();
     if(activeSidePanel == SIDEPANEL_CROP) {
         cropOverlay->hide();
-        viewer->setCanvasInputEnabled(true);
+        viewer->setCanvasInputPolicy(CanvasInputPolicy::All);
     }
     activeSidePanel = SIDEPANEL_NONE;
 }

@@ -17,6 +17,11 @@ enum CurrentWidget {
     UNSET
 };
 
+enum class CanvasInputPolicy {
+    All,
+    Framing
+};
+
 class ViewerWidget : public FloatingWidgetContainer {
     Q_OBJECT
   public:
@@ -28,10 +33,14 @@ class ViewerWidget : public FloatingWidgetContainer {
     float currentScale();
     QSize sourceSize();
 
-    // the canvas-input policy: while false, the guarded canvas commands
-    // (zoom/scroll/fit) are no-ops, mouse input is shut off on the canvas,
-    // and the context menu hides — the state an overlay like crop runs under
-    void setCanvasInputEnabled(bool mode);
+    // the canvas-input policy. All: every canvas command. Framing: an
+    // overlay (crop) owns the canvas mouse and fit/scroll are blocked, but
+    // zoom stays available — it is how the user fine-frames the selection,
+    // and the overlay re-derives its mapping from the live queries.
+
+    void setCanvasInputPolicy(CanvasInputPolicy policy);
+    // true only under All: gates the fit keys' "temporarily disabled"
+    // message path and the context menu
     bool interactionEnabled();
 
     bool showImage(std::unique_ptr<QPixmap> pixmap);
@@ -59,7 +68,8 @@ class ViewerWidget : public FloatingWidgetContainer {
     void enableVideoPlayer();
 
     CurrentWidget currentWidget;
-    bool mInteractionEnabled, mWaylandCursorWorkaround;
+    CanvasInputPolicy canvasInputPolicy;
+    bool mWaylandCursorWorkaround;
     QTimer cursorTimer;
     const int CURSOR_HIDE_TIMEOUT_MS = 1000;
     bool mIsFullscreen;
@@ -134,6 +144,11 @@ class ViewerWidget : public FloatingWidgetContainer {
     void onFullscreenModeChanged(bool);
     void readSettings();
     void setLoopPlayback(bool mode);
+
+  signals:
+    // the viewer's scale changed (zoom, programmatic fit) — overlays that
+    // map image coordinates re-derive on this
+    void canvasScaleChanged();
 
   protected:
     void mouseMoveEvent(QMouseEvent *event) override;

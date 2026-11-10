@@ -28,6 +28,9 @@ CropOverlay::CropOverlay(ViewerWidget *viewerArg)
 
     if(viewer)
         setContainerSize(viewer->size());
+    // zoom while cropping re-derives the mapping instead of staling it —
+    // the selection is image-anchored, so it rides the zoom unchanged
+    connect(viewer, &ViewerWidget::canvasScaleChanged, this, &CropOverlay::refreshMapping);
 
     hide();
 }
@@ -575,10 +578,15 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
 }
 
 //------------------------------------------------------------------------------
-void CropOverlay::resizeEvent(QResizeEvent *event) {
+void CropOverlay::refreshMapping() {
     updateSelectionDrawRect();
     updateHandlePositions();
     update();
+}
+
+//------------------------------------------------------------------------------
+void CropOverlay::resizeEvent(QResizeEvent *event) {
+    refreshMapping();
     QWidget::resizeEvent(event);
 }
 
