@@ -26,7 +26,6 @@ class CropController : public QObject {
     void hideCropPanel();
     // viewer geometry changed (resize / fit / new image) while cropping
     void updateCropPanelData();
-    void onWindowResized();
     // setupFullUi materializes the panel; the controller can also do it
     // on demand (the crop action wiring is live before that)
     void setupCropPanel();

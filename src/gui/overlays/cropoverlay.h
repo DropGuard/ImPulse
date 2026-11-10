@@ -21,17 +21,20 @@ enum CursorAction {
     DRAG_BOTTOMRIGHT // 11
 };
 
+class ViewerWidget;
+
 class CropOverlay : public FloatingWidget {
     Q_OBJECT
   public:
-    explicit CropOverlay(FloatingWidgetContainer *parent = nullptr);
-    void setImageDrawRect(QRect);
-    void setImageRealSize(QSize);
-    void setImageScale(float scale);
-    // observability for tests: the scale the overlay draws with
-    float imageScale() const {
-        return scale;
-    }
+    // the overlay pulls its geometry live from the viewer (image rect,
+    // scale, source size) — it stores nothing that the viewer owns, so a
+    // zoom or image change mid-crop can never leave it stale
+    explicit CropOverlay(ViewerWidget *viewer = nullptr);
+
+    // observability: the scale the overlay draws with (live from the viewer)
+    float imageScale() const;
+    // a new image invalidates the selection in image coordinates
+    void onImageChanged();
     void clearSelection();
 
   signals:
@@ -50,11 +53,11 @@ class CropOverlay : public FloatingWidget {
     void resizeEvent(QResizeEvent *event) override;
 
   private:
+    // selection state is the overlay's own; image geometry is pulled live
+    ViewerWidget *viewer;
     QPoint startPos, endPos, moveStartPos, resizeAnchor;
-    QRect imageRect, imageDrawRect, imageDrawRectDpi, selectionRect, selectionDrawRect, selectionDrawRectDpi,
-        handles[8];
+    QRect selectionRect, selectionDrawRect, selectionDrawRectDpi, handles[8];
     bool lockAspectRatio;
-    float scale;
     QBrush brushInactiveTint, brushDarkGray, brushGray, brushLightGray;
     QRectF handlesDpi[8];
     int handleSize;
@@ -69,6 +72,9 @@ class CropOverlay : public FloatingWidget {
     void updateHandlePositions();
     void prepareDrawElements();
     CursorAction hoverTarget(QPoint pos);
+    QRect imageRectLive() const;
+    QRect imageDrawRectDevice() const;
+    QRect imageDrawRectLogical() const;
     void resizeSelection(QPoint d);
     void resizeSelectionAR(QPoint d);
     void resizeSelectionFree(QPoint d);
