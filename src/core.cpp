@@ -11,6 +11,7 @@
 #include "utils/folderend.h"
 
 #include "gui/windowshell.h"
+#include "gui/overlayhost.h"
 
 #include <QThread>
 #include <QDrag>
@@ -146,24 +147,24 @@ void Core::connectComponents() {
     connect(&folderViewPresenter, &DirectoryPresenter::droppedInto, this,
             qOverload<const QList<QString> &, const QString &>(&Core::movePathsTo));
 
-    connect(scriptManager, &ScriptManager::error, mw, &MW::showError);
+    connect(scriptManager, &ScriptManager::error, mw->overlays(), &OverlayHost::showError);
 
     connect(mw, &MW::opened, this, &Core::loadPath);
     connect(mw, &MW::droppedIn, this, &Core::onDropIn);
-    connect(mw, &MW::copyRequested, this, &Core::copyCurrentFile);
-    connect(mw, &MW::moveRequested, this, &Core::moveCurrentFile);
+    connect(mw->overlays(), &OverlayHost::copyRequested, this, &Core::copyCurrentFile);
+    connect(mw->overlays(), &OverlayHost::moveRequested, this, &Core::moveCurrentFile);
     connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
     connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
     connect(mw, &MW::cropRequested, this, &Core::crop);
     connect(mw, &MW::cropAndSaveRequested, this, &Core::cropAndSave);
-    connect(mw, &MW::saveAsClicked, this, &Core::requestSavePath);
-    connect(mw, &MW::saveRequested, this, &Core::saveCurrentFile);
+    connect(mw->overlays(), &OverlayHost::saveAsClicked, this, &Core::requestSavePath);
+    connect(mw->overlays(), &OverlayHost::saveRequested, this, &Core::saveCurrentFile);
     connect(mw, &MW::saveAsRequested, this, &Core::saveCurrentFileAs);
     connect(mw, &MW::resizeRequested, this, &Core::resize);
-    connect(mw, &MW::renameRequested, this, &Core::renameCurrentSelection);
+    connect(mw->overlays(), &OverlayHost::renameRequested, this, &Core::renameCurrentSelection);
     connect(mw, &MW::sortingSelected, this, &Core::sortBy);
     connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
-    connect(mw, &MW::discardEditsRequested, this, &Core::discardEdits);
+    connect(mw->overlays(), &OverlayHost::discardEditsRequested, this, &Core::discardEdits);
     connect(mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
 
     connect(mw, &MW::playbackFinished, this, &Core::onPlaybackFinished);
@@ -219,9 +220,9 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::closeFullScreenOrExit, mw->shell(), &WindowShell::closeFullScreenOrExit);
     connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
     connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
-    connect(actionManager, &ActionManager::copyFile, mw, &MW::triggerCopyOverlay);
+    connect(actionManager, &ActionManager::copyFile, mw->overlays(), &OverlayHost::triggerCopyOverlay);
     connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
-    connect(actionManager, &ActionManager::moveFile, mw, &MW::triggerMoveOverlay);
+    connect(actionManager, &ActionManager::moveFile, mw->overlays(), &OverlayHost::triggerMoveOverlay);
     connect(actionManager, &ActionManager::jumpToFirst, this, &Core::jumpToFirst);
     connect(actionManager, &ActionManager::jumpToLast, this, &Core::jumpToLast);
     connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
@@ -242,7 +243,7 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::sortByName, this, &Core::sortByName);
     connect(actionManager, &ActionManager::sortByTime, this, &Core::sortByTime);
     connect(actionManager, &ActionManager::sortBySize, this, &Core::sortBySize);
-    connect(actionManager, &ActionManager::toggleImageInfo, mw, &MW::toggleImageInfoOverlay);
+    connect(actionManager, &ActionManager::toggleImageInfo, mw->overlays(), &OverlayHost::toggleImageInfoOverlay);
     connect(actionManager, &ActionManager::toggleShuffle, this, &Core::toggleShuffle);
     connect(actionManager, &ActionManager::toggleScalingFilter, mw, &MW::toggleScalingFilter);
     connect(actionManager, &ActionManager::showInDirectory, this, &Core::showInDirectory);
@@ -296,23 +297,25 @@ void Core::onUpdate() {
     // TODO: finish changelogs
     //if(settings->showChangelogs())
     //    mw->showChangelogWindow();
-    mw->showMessage(tr("Updated: ") + settings->lastVersion().toString() + " > " + appVersion.toString(), 4000);
+    mw->overlays()->showMessage(tr("Updated: ") + settings->lastVersion().toString() + " > " + appVersion.toString(),
+                                4000);
     settings->setLastVersion(appVersion);
 }
 
 void Core::onFirstRun() {
     //mw->showSomeSortOfWelcomeScreen();
-    mw->showMessage(tr("Welcome to ") + qApp->applicationName() + tr(" version ") + appVersion.toString() + "!", 4000);
+    mw->overlays()->showMessage(
+        tr("Welcome to ") + qApp->applicationName() + tr(" version ") + appVersion.toString() + "!", 4000);
     settings->setFirstRun(false);
     settings->setLastVersion(appVersion);
 }
 
 void Core::toggleShuffle() {
     if(state.shuffle) {
-        mw->showMessage(tr("Shuffle mode: OFF"));
+        mw->overlays()->showMessage(tr("Shuffle mode: OFF"));
     } else {
         syncRandomizer();
-        mw->showMessage(tr("Shuffle mode: ON"));
+        mw->overlays()->showMessage(tr("Shuffle mode: ON"));
     }
     state.shuffle = !state.shuffle;
     updateInfoString();
@@ -321,11 +324,11 @@ void Core::toggleShuffle() {
 void Core::toggleSlideshow() {
     if(state.slideshow) {
         stopSlideshow();
-        mw->showMessage(tr("Slideshow: OFF"));
+        mw->overlays()->showMessage(tr("Slideshow: OFF"));
 
     } else {
         startSlideshow();
-        mw->showMessage(tr("Slideshow: ON"));
+        mw->overlays()->showMessage(tr("Slideshow: ON"));
     }
 }
 
@@ -415,11 +418,11 @@ void Core::removePermanent() {
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
-            mw->showMessageSuccess(tr("File removed"));
+            mw->overlays()->showMessageSuccess(tr("File removed"));
         else
             outputError(result);
     } else if(paths.count() > 1) {
-        mw->showMessageSuccess(tr("Removed: ") + QString::number(successCount) + tr(" files"));
+        mw->overlays()->showMessageSuccess(tr("Removed: ") + QString::number(successCount) + tr(" files"));
     }
 }
 
@@ -445,11 +448,11 @@ void Core::moveToTrash() {
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
-            mw->showMessageSuccess(tr("Moved to trash"));
+            mw->overlays()->showMessageSuccess(tr("Moved to trash"));
         else
             outputError(result);
     } else if(paths.count() > 1) {
-        mw->showMessageSuccess(tr("Moved to trash: ") + QString::number(successCount) + tr(" files"));
+        mw->overlays()->showMessageSuccess(tr("Moved to trash: ") + QString::number(successCount) + tr(" files"));
     }
 }
 
@@ -504,14 +507,14 @@ void Core::copyFileClipboard() {
     mimeData->setData("application/x-kde-cutselection", "0");
 
     QApplication::clipboard()->setMimeData(mimeData);
-    mw->showMessage(tr("File copied"));
+    mw->overlays()->showMessage(tr("File copied"));
 }
 
 void Core::copyPathClipboard() {
     if(model->isEmpty())
         return;
     QApplication::clipboard()->setText(selectedPath());
-    mw->showMessage(tr("Path copied"));
+    mw->overlays()->showMessage(tr("Path copied"));
 }
 
 // open from clipboard
@@ -667,13 +670,13 @@ void Core::renameCurrentSelection(const QString &newName) {
     FileOpResult result;
     model->renameEntry(oldPath, newName, false, result);
     if(result == FileOpResult::DESTINATION_DIR_EXISTS) {
-        mw->toggleRenameOverlay(newName);
+        mw->overlays()->toggleRenameOverlay(newName);
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
         if(ui_->showConfirmation(tr("File exists"), tr("Overwrite file?"))) {
             model->renameEntry(oldPath, newName, true, result);
         } else {
             // show rename dialog again
-            mw->toggleRenameOverlay(newName);
+            mw->overlays()->toggleRenameOverlay(newName);
         }
     }
     outputError(result);
@@ -746,7 +749,7 @@ void Core::onFileModified(const QString &filePath) {
 void Core::outputError(const FileOpResult &error) const {
     if(error == FileOpResult::SUCCESS || error == FileOpResult::NOTHING_TO_DO)
         return;
-    mw->showError(FileOperations::decodeResult(error));
+    mw->overlays()->showError(FileOperations::decodeResult(error));
     qDebug() << FileOperations::decodeResult(error);
 }
 
@@ -780,7 +783,7 @@ void Core::showInDirectory() {
         w->deleteLater();
         QDBusPendingReply<> reply = *w;
         if(reply.isError())
-            mw->showMessage(tr("No file manager is available to reveal the file"));
+            mw->overlays()->showMessage(tr("No file manager is available to reveal the file"));
     });
 #elif __WIN32
     QStringList args;
@@ -810,25 +813,25 @@ void Core::quickCopyToFixedDirectory() {
         return;
     QString destDir = settings->quickCopyDirectory();
     if(destDir.isEmpty()) {
-        mw->showMessage(tr("Set the quick copy folder in settings first"));
+        mw->overlays()->showMessage(tr("Set the quick copy folder in settings first"));
         return;
     }
     QFileInfo srcFi(selectedPath());
     if(!srcFi.isFile()) {
-        mw->showMessage(tr("Quick copy: not a regular file"));
+        mw->overlays()->showMessage(tr("Quick copy: not a regular file"));
         return;
     }
     QDir(destDir).mkpath(".");
     if(QFileInfo::exists(destDir + "/" + srcFi.fileName())) {
-        mw->showMessage(tr("Already in the quick copy folder"));
+        mw->overlays()->showMessage(tr("Already in the quick copy folder"));
         return;
     }
     FileOpResult result;
     FileOperations::copyFileTo(selectedPath(), destDir, false, result);
     if(result == FileOpResult::SUCCESS)
-        mw->showMessage(tr("Copied to ") + destDir);
+        mw->overlays()->showMessage(tr("Copied to ") + destDir);
     else
-        mw->showError(FileOperations::decodeResult(result));
+        mw->overlays()->showError(FileOperations::decodeResult(result));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
@@ -857,7 +860,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
             FileOperations::copyFileTo(path, destDirectory, true, result);
         }
         if(result != FileOpResult::SUCCESS && !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
-            mw->showError(FileOperations::decodeResult(result));
+            mw->overlays()->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
         }
         if(!overwriteFiles.all) // copy attempt done; reset temporary flag
@@ -894,7 +897,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         FileOpResult result;
         FileOperations::removeFile(dstFi.absoluteFilePath(), result);
         if(result != FileOpResult::SUCCESS) {
-            mw->showError(FileOperations::decodeResult(result));
+            mw->overlays()->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
             return;
         }
@@ -905,7 +908,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     // deleted the file and then copied nothing into a directory that never
     // existed
     if(!dstDir.mkpath(".")) {
-        mw->showError(tr("Could not create directory ") + dstDir.absolutePath());
+        mw->overlays()->showError(tr("Could not create directory ") + dstDir.absolutePath());
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
@@ -947,7 +950,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
             model->moveFileTo(path, destDirectory, true, result);
         }
         if(result != FileOpResult::SUCCESS && !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
-            mw->showError(FileOperations::decodeResult(result));
+            mw->overlays()->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
         }
         if(!overwriteFiles.all) // move attempt done; reset temporary flag
@@ -978,7 +981,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
         FileOpResult result;
         FileOperations::removeFile(dstFi.absoluteFilePath(), result);
         if(result != FileOpResult::SUCCESS) {
-            mw->showError(FileOperations::decodeResult(result));
+            mw->overlays()->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
             return;
         }
@@ -989,7 +992,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     // deleted the file and then copied nothing into a directory that never
     // existed
     if(!dstDir.mkpath(".")) {
-        mw->showError(tr("Could not create directory ") + dstDir.absolutePath());
+        mw->overlays()->showError(tr("Could not create directory ") + dstDir.absolutePath());
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
@@ -1026,7 +1029,7 @@ void Core::moveCurrentFile(const QString &destDirectory) {
     FileOpResult result;
     model->moveFileTo(selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
-        mw->showMessageSuccess(tr("File moved."));
+        mw->overlays()->showMessageSuccess(tr("File moved."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
         if(ui_->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
             model->moveFileTo(selectedPath(), destDirectory, true, result);
@@ -1047,7 +1050,7 @@ void Core::copyCurrentFile(const QString &destDirectory) {
     FileOpResult result;
     model->copyFileTo(selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
-        mw->showMessageSuccess(tr("File copied."));
+        mw->overlays()->showMessageSuccess(tr("File copied."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
         if(ui_->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
             model->copyFileTo(selectedPath(), destDirectory, true, result);
@@ -1155,7 +1158,7 @@ bool Core::saveFile(const QString &filePath) {
 bool Core::saveFile(const QString &filePath, const QString &newPath) {
     if(!model->saveFile(filePath, newPath))
         return false;
-    mw->hideSaveOverlay();
+    mw->overlays()->hideSaveOverlay();
     // switch to the new file
     if(model->containsFile(newPath) && state.currentFilePath != newPath) {
         discardEdits();
@@ -1173,10 +1176,10 @@ void Core::saveCurrentFileAs(const QString &destPath) {
     if(model->isEmpty())
         return;
     if(saveFile(selectedPath(), destPath)) {
-        mw->showMessageSuccess(tr("File saved"));
+        mw->overlays()->showMessageSuccess(tr("File saved"));
         updateInfoString();
     } else {
-        mw->showError(tr("Could not save file"));
+        mw->overlays()->showError(tr("Could not save file"));
     }
 }
 
@@ -1190,7 +1193,7 @@ void Core::discardEdits() {
         imgStatic->discardEditedImage();
         model->updateImage(selectedPath(), img);
     }
-    mw->hideSaveOverlay();
+    mw->overlays()->hideSaveOverlay();
 }
 
 // todo: remove?
@@ -1239,7 +1242,7 @@ void Core::showRenameDialog() {
     if(model->isEmpty())
         return;
     QFileInfo fi(selectedPath());
-    mw->toggleRenameOverlay(fi.fileName());
+    mw->overlays()->toggleRenameOverlay(fi.fileName());
 }
 
 void Core::runScript(const QString &scriptName) {
@@ -1266,7 +1269,7 @@ void Core::setWallpaper() {
         return;
     auto img = model->getImage(selectedPath());
     if(img->type() != DocumentType::STATIC) {
-        mw->showMessage("Set wallpaper: file not supported");
+        mw->overlays()->showMessage("Set wallpaper: file not supported");
         return;
     }
 #ifdef __WIN32
@@ -1289,7 +1292,7 @@ void Core::setWallpaper() {
     const QString session = qgetenv("DESKTOP_SESSION").toLower();
     auto [program, args] = wallpaperCommand(session, selectedPath());
     if(program.isEmpty()) {
-        mw->showMessage("Action is not supported in your desktop session (\"" + session + "\")", 3000);
+        mw->overlays()->showMessage("Action is not supported in your desktop session (\"" + session + "\")", 3000);
         return;
     }
     QProcess::startDetached(program, args);
@@ -1302,11 +1305,11 @@ void Core::print() {
     PrintDialog p(mw);
     auto img = model->getImage(selectedPath());
     if(!img) {
-        mw->showError(tr("Could not open image"));
+        mw->overlays()->showError(tr("Could not open image"));
         return;
     }
     if(img->type() != DocumentType::STATIC) {
-        mw->showError(tr("Can only print static images"));
+        mw->overlays()->showError(tr("Can only print static images"));
         return;
     }
     QString pdfPath = model->directoryPath() + "/" + img->baseName() + ".pdf";
@@ -1369,7 +1372,7 @@ bool Core::loadPath(QString path) {
         // — the open path below arms to the landing instead of racing it
         state.delayModel = (model->directoryPath() != dir);
     } else {
-        mw->showError(tr("Could not open path: ") + path);
+        mw->overlays()->showError(tr("Could not open path: ") + path);
         qDebug() << "Could not open path: " << path;
         return false;
     }
@@ -1399,7 +1402,7 @@ bool Core::loadPath(QString path) {
             if(idx != -1)
                 loadFileIndex(idx, false, settings->usePreloader());
             else
-                mw->showError(tr("Not in this folder's listing: ") + filePath);
+                mw->overlays()->showError(tr("Not in this folder's listing: ") + filePath);
         });
         return true;
     } else {
@@ -1412,7 +1415,7 @@ bool Core::setDirectory(const QString &path) {
     if(model->directoryPath() != path) {
         this->reset();
         if(!model->setDirectory(path)) {
-            mw->showError(tr("Could not load folder: ") + path);
+            mw->overlays()->showError(tr("Could not load folder: ") + path);
             return false;
         }
         // the state write is the commit point: the folder view re-derives
@@ -1488,7 +1491,7 @@ void Core::nextDirectory() {
     }
     if(!setDirectory(next))
         return;
-    mw->showMessageDirectory(QFileInfo(next).baseName());
+    mw->overlays()->showMessageDirectory(QFileInfo(next).baseName());
     // the new folder's listing is in flight; loading index 0 here would show a
     // file of the folder we just left — defer until it lands
     state.pendingListedToken = model->whenListed(next, [this] {
@@ -1506,7 +1509,7 @@ void Core::prevDirectory(bool selectLast) {
     }
     if(!setDirectory(prev))
         return;
-    mw->showMessageDirectory(QFileInfo(prev).baseName());
+    mw->overlays()->showMessageDirectory(QFileInfo(prev).baseName());
     state.pendingListedToken = model->whenListed(prev, [this, selectLast] {
         if(model->fileCount())
             loadFileIndex(selectLast ? static_cast<int>(model->fileCount()) - 1 : 0, false, true);
@@ -1568,7 +1571,7 @@ void Core::nextImageSlideshow() {
                 newIndex = 0;
             } else {
                 stopSlideshow();
-                mw->showMessage(tr("End of directory."));
+                mw->overlays()->showMessage(tr("End of directory."));
                 return;
             }
         }
@@ -1652,7 +1655,7 @@ void Core::onModelSortingChanged(SortingMode mode) {
 void Core::guiSetImage(std::shared_ptr<Image> img) {
     state.hasActiveImage = true;
     if(!img) {
-        mw->showMessage(tr("Error: could not load image."));
+        mw->overlays()->showMessage(tr("Error: could not load image."));
         return;
     }
     DocumentType type = img->type();
@@ -1668,8 +1671,8 @@ void Core::guiSetImage(std::shared_ptr<Image> img) {
         showGui();
         mw->showVideo(video->filePath());
     }
-    img->isEdited() ? mw->showSaveOverlay() : mw->hideSaveOverlay();
-    mw->setExifInfo(img->getExifTags());
+    img->isEdited() ? mw->overlays()->showSaveOverlay() : mw->overlays()->hideSaveOverlay();
+    mw->overlays()->setExifInfo(img->getExifTags());
 }
 
 void Core::updateInfoString() {

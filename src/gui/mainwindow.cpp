@@ -1,13 +1,13 @@
 #include "core.h"
 #include "mainwindow.h"
 #include "gui/windowshell.h"
+#include "gui/overlayhost.h"
 
 // TODO: nuke this and rewrite
 
 MW::MW(State *state, QWidget *parent)
-    : FloatingWidgetContainer(parent), appState(state), activeSidePanel(SIDEPANEL_NONE), copyOverlay(nullptr),
-      saveOverlay(nullptr), renameOverlay(nullptr), infoBarFullscreen(nullptr), imageInfoOverlay(nullptr),
-      floatingMessage(nullptr), cropPanel(nullptr), cropOverlay(nullptr) {
+    : FloatingWidgetContainer(parent), appState(state), activeSidePanel(SIDEPANEL_NONE), infoBarFullscreen(nullptr),
+      cropPanel(nullptr), cropOverlay(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     layout.setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
@@ -28,6 +28,7 @@ MW::MW(State *state, QWidget *parent)
     this->setAccessibleName("mainwindow");
     windowShell = new WindowShell(this);
     setupUi();
+    overlayHost = new OverlayHost(this, viewerWidget, docWidget);
 
     connect(settings, &Settings::settingsChanged, this, &MW::readSettings);
     connect(windowShell, &WindowShell::fullscreenStateChanged, this, &MW::adaptToWindowState);
@@ -71,13 +72,12 @@ MW::MW(State *state, QWidget *parent)
  *  ViewerWidget exists for input handling reasons (correct overlay hover handling)
  */
 MW::~MW() {
-    // the three non-QObject proxies are ordinary C++ members: nothing else
-    // deletes them, and their deleteLater dtors only matter while an event
-    // loop is alive — the inner overlays themselves are Qt-parented and go
-    // with the tree sweep right after this
+    // infoBarFullscreen is a non-QObject proxy and ordinary C++ member of MW:
+    // nothing else deletes it, and its deleteLater dtor only matters while an
+    // event loop is alive — the inner overlays themselves are Qt-parented and
+    // go with the tree sweep right after this. The message/info proxies live
+    // in OverlayHost now.
     delete infoBarFullscreen;
-    delete imageInfoOverlay;
-    delete floatingMessage;
 }
 
 void MW::setupUi() {
@@ -93,12 +93,9 @@ void MW::setupUi() {
 
     centralWidget = new CentralWidget(docWidget, folderView, this);
     layout.addWidget(centralWidget);
-    controlsOverlay = new ControlsOverlay(docWidget);
     infoBarFullscreen = new FullscreenInfoOverlayProxy(viewerWidget);
     sidePanel = new SidePanel(this);
     layout.addWidget(sidePanel);
-    imageInfoOverlay = new ImageInfoOverlayProxy(viewerWidget);
-    floatingMessage = new FloatingMessageProxy(viewerWidget); // todo: use additional one for folderview?
     connect(viewerWidget, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
     connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
@@ -143,33 +140,10 @@ void MW::setupCropPanel() {
     connect(cropPanel, &CropPanel::cropAndSave, this, &MW::cropAndSaveRequested);
 }
 
-void MW::setupCopyOverlay() {
-    copyOverlay = new CopyOverlay(viewerWidget);
-    connect(copyOverlay, &CopyOverlay::copyRequested, this, &MW::copyRequested);
-    connect(copyOverlay, &CopyOverlay::moveRequested, this, &MW::moveRequested);
-}
-
-void MW::setupSaveOverlay() {
-    saveOverlay = new SaveConfirmOverlay(viewerWidget);
-    connect(saveOverlay, &SaveConfirmOverlay::saveClicked, this, &MW::saveRequested);
-    connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &MW::saveAsClicked);
-    connect(saveOverlay, &SaveConfirmOverlay::discardClicked, this, &MW::discardEditsRequested);
-}
-
-void MW::setupRenameOverlay() {
-    renameOverlay = new RenameOverlay(this);
-    renameOverlay->setName(QString());
-    connect(renameOverlay, &RenameOverlay::renameRequested, this, &MW::renameRequested);
-}
-
 void MW::enableFolderView() {
     hideCropPanel();
-    if(copyOverlay)
-        copyOverlay->hide();
-    if(renameOverlay)
-        renameOverlay->hide();
+    overlayHost->hideTransientOverlays();
     docWidget->hideFloatingPanel();
-    imageInfoOverlay->hide();
     centralWidget->showFolderView();
     refreshInfoViews();
 }
@@ -187,7 +161,7 @@ void MW::fitWindow() {
     if(viewerWidget->interactionEnabled()) {
         emit viewerWidget->fitWindow();
     } else {
-        showMessage("Zoom temporary disabled");
+        overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
@@ -195,7 +169,7 @@ void MW::fitWidth() {
     if(viewerWidget->interactionEnabled()) {
         emit viewerWidget->fitWidth();
     } else {
-        showMessage("Zoom temporary disabled");
+        overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
@@ -203,7 +177,7 @@ void MW::fitOriginal() {
     if(viewerWidget->interactionEnabled()) {
         emit viewerWidget->fitOriginal();
     } else {
-        showMessage("Zoom temporary disabled");
+        overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
@@ -211,7 +185,7 @@ void MW::fitWindowStretch() {
     if(viewerWidget->interactionEnabled()) {
         emit viewerWidget->fitWindowStretch();
     } else {
-        showMessage("Zoom temporary disabled");
+        overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
@@ -275,12 +249,12 @@ void MW::onSortingChanged(SortingMode mode) {
     folderView->onSortingChanged(mode);
     if(centralWidget->currentViewMode() == ViewMode::MODE_DOCUMENT) {
         switch(mode) {
-        case SortingMode::SORT_NAME: showMessage("Sorting: By Name"); break;
-        case SortingMode::SORT_NAME_DESC: showMessage("Sorting: By Name (desc.)"); break;
-        case SortingMode::SORT_TIME: showMessage("Sorting: By Time"); break;
-        case SortingMode::SORT_TIME_DESC: showMessage("Sorting: By Time (desc.)"); break;
-        case SortingMode::SORT_SIZE: showMessage("Sorting: By File Size"); break;
-        case SortingMode::SORT_SIZE_DESC: showMessage("Sorting: By File Size (desc.)"); break;
+        case SortingMode::SORT_NAME: overlayHost->showMessage("Sorting: By Name"); break;
+        case SortingMode::SORT_NAME_DESC: overlayHost->showMessage("Sorting: By Name (desc.)"); break;
+        case SortingMode::SORT_TIME: overlayHost->showMessage("Sorting: By Time"); break;
+        case SortingMode::SORT_TIME_DESC: overlayHost->showMessage("Sorting: By Time (desc.)"); break;
+        case SortingMode::SORT_SIZE: overlayHost->showMessage("Sorting: By File Size"); break;
+        case SortingMode::SORT_SIZE_DESC: overlayHost->showMessage("Sorting: By File Size (desc.)"); break;
         }
     }
 }
@@ -288,18 +262,18 @@ void MW::onSortingChanged(SortingMode mode) {
 void MW::toggleLockZoom() {
     emit viewerWidget->toggleLockZoom();
     if(viewerWidget->lockZoomEnabled())
-        showMessage("Zoom lock: ON");
+        overlayHost->showMessage("Zoom lock: ON");
     else
-        showMessage("Zoom lock: OFF");
+        overlayHost->showMessage("Zoom lock: OFF");
     refreshInfoViews();
 }
 
 void MW::toggleLockView() {
     emit viewerWidget->toggleLockView();
     if(viewerWidget->lockViewEnabled())
-        showMessage("View lock: ON");
+        overlayHost->showMessage("View lock: ON");
     else
-        showMessage("View lock: OFF");
+        overlayHost->showMessage("View lock: OFF");
     refreshInfoViews();
 }
 
@@ -313,27 +287,6 @@ void MW::toggleFullscreenInfoBar() {
         infoBarFullscreen->hide();
 }
 
-void MW::toggleImageInfoOverlay() {
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW)
-        return;
-    if(imageInfoOverlay->isHidden())
-        imageInfoOverlay->show();
-    else
-        imageInfoOverlay->hide();
-}
-
-void MW::toggleRenameOverlay(const QString &currentName) {
-    if(!renameOverlay)
-        setupRenameOverlay();
-    if(renameOverlay->isHidden()) {
-        renameOverlay->setBackdropEnabled((centralWidget->currentViewMode() == MODE_FOLDERVIEW));
-        renameOverlay->setName(currentName);
-        renameOverlay->show();
-    } else {
-        renameOverlay->hide();
-    }
-}
-
 void MW::toggleScalingFilter() {
     ScalingFilter configuredFilter = settings->scalingFilter();
     if(viewerWidget->scalingFilter() == configuredFilter) {
@@ -344,12 +297,12 @@ void MW::toggleScalingFilter() {
 }
 
 void MW::setFilterNearest() {
-    showMessage("Filter: nearest", 600);
+    overlayHost->showMessage("Filter: nearest", 600);
     emit viewerWidget->setFilterNearest();
 }
 
 void MW::setFilterBilinear() {
-    showMessage("Filter: bilinear", 600);
+    overlayHost->showMessage("Filter: bilinear", 600);
     emit viewerWidget->setFilterBilinear();
 }
 
@@ -363,7 +316,7 @@ void MW::setFilter(ScalingFilter filter) {
     case QI_FILTER_CV_CUBIC_SHARPEN: filterName = "bicubic + sharpen"; break;
     default: filterName = "configured " + QString::number(static_cast<int>(filter)); break;
     }
-    showMessage("Filter " + filterName, 600);
+    overlayHost->showMessage("Filter " + filterName, 600);
     emit viewerWidget->setScalingFilter(filter);
 }
 
@@ -415,8 +368,7 @@ void MW::mouseDoubleClickEvent(QMouseEvent *event) {
 void MW::close() {
     windowShell->saveWindowGeometry();
     windowShell->saveCurrentDisplay();
-    if(copyOverlay)
-        copyOverlay->saveSettings();
+    overlayHost->saveCopySettings();
     QWidget::close();
 }
 
@@ -564,20 +516,6 @@ void MW::updateCropPanelData() {
     }
 }
 
-void MW::showSaveOverlay() {
-    if(!settings->showSaveOverlay())
-        return;
-    if(!saveOverlay)
-        setupSaveOverlay();
-    saveOverlay->show();
-}
-
-void MW::hideSaveOverlay() {
-    if(!saveOverlay)
-        return;
-    saveOverlay->hide();
-}
-
 void MW::triggerCropPanel() {
     if(activeSidePanel != SIDEPANEL_CROP) {
         showCropPanel();
@@ -624,38 +562,6 @@ void MW::hideCropPanel() {
     activeSidePanel = SIDEPANEL_NONE;
 }
 
-void MW::triggerCopyOverlay() {
-    if(!viewerWidget->isDisplaying())
-        return;
-    if(!copyOverlay)
-        setupCopyOverlay();
-
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW)
-        return;
-    if(copyOverlay->operationMode() == OVERLAY_COPY) {
-        copyOverlay->isHidden() ? copyOverlay->show() : copyOverlay->hide();
-    } else {
-        copyOverlay->setDialogMode(OVERLAY_COPY);
-        copyOverlay->show();
-    }
-}
-
-void MW::triggerMoveOverlay() {
-    if(!viewerWidget->isDisplaying())
-        return;
-    if(!copyOverlay)
-        setupCopyOverlay();
-
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW)
-        return;
-    if(copyOverlay->operationMode() == OVERLAY_MOVE) {
-        copyOverlay->isHidden() ? copyOverlay->show() : copyOverlay->hide();
-    } else {
-        copyOverlay->setDialogMode(OVERLAY_MOVE);
-        copyOverlay->show();
-    }
-}
-
 // the view is a projection: everything shown is re-derived here from the
 // state Core owns and this window's own modes — nothing is stored
 void MW::refreshInfoViews() {
@@ -663,8 +569,7 @@ void MW::refreshInfoViews() {
     QString states = titleStateSuffix(info.slideshow, info.shuffle, viewerWidget->lockZoomEnabled(),
                                       viewerWidget->lockViewEnabled());
 
-    if(renameOverlay)
-        renameOverlay->setName(info.fileName);
+    overlayHost->setRenameOverlayName(info.fileName);
 
     QString windowTitle =
         assembleWindowTitle(centralWidget->currentViewMode() == MODE_FOLDERVIEW, info, viewerWidget->lockZoomEnabled(),
@@ -684,9 +589,8 @@ void MW::refreshInfoViews() {
 }
 
 // TODO!!! buffer this in mw
-void MW::setExifInfo(const QMap<QString, QString> &exifInfo) {
-    if(imageInfoOverlay)
-        imageInfoOverlay->setExifInfo(exifInfo);
+OverlayHost *MW::overlays() {
+    return overlayHost;
 }
 
 WindowShell *MW::shell() {
@@ -702,28 +606,8 @@ ThumbnailStripProxy *MW::getThumbnailPanel() {
 }
 
 // todo: this is crap
-void MW::showMessageDirectory(const QString &dirName) {
-    floatingMessage->showMessage(dirName, FloatingMessageIcon::ICON_DIRECTORY, 1700);
-}
-
 void MW::showMessage(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::NO_ICON, 1500);
-}
-
-void MW::showMessage(const QString &text, int duration) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::NO_ICON, duration);
-}
-
-void MW::showMessageSuccess(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_SUCCESS, 1500);
-}
-
-void MW::showWarning(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_WARNING, 1500);
-}
-
-void MW::showError(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_ERROR, 2800);
+    overlayHost->showMessage(text);
 }
 
 bool MW::showConfirmation(const QString &title, const QString &msg) {
@@ -759,11 +643,7 @@ void MW::adaptToWindowState() {
         else
             infoBarFullscreen->hide();
 
-        auto pos = settings->panelPosition();
-        if(!settings->panelEnabled() || pos == PANEL_BOTTOM || pos == PANEL_LEFT)
-            controlsOverlay->show();
-        else
-            controlsOverlay->hide();
+        overlayHost->updateControlsOverlay();
     } else { //------------------------------------------------------ window ---
         windowShell->applyWindowedBackground();
         infoBarFullscreen->hide();
@@ -773,7 +653,7 @@ void MW::adaptToWindowState() {
         else
             infoBarWindowed->hide();
 
-        controlsOverlay->hide();
+        overlayHost->hideControlsOverlay();
     }
     folderView->onFullscreenModeChanged(isFullScreen());
     docWidget->onFullscreenModeChanged(isFullScreen());

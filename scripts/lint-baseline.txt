@@ -57,7 +57,7 @@
 # moved: compile_commands.json regenerates as CMake flag/entry state evolves, and a
 # fresh-configure scan of the SAME content reads 13-14. The four sites were an
 # artifact of the older flag set, recorded here twice-verified gone.
-instrument 7c8aa37b0f8635f4
+instrument 3ebaff6072870605
 
 # The fingerprint is the scanned (file, command) set from compile_commands.json
 # PLUS the --version output of every tool that judged it (the compilers named in
