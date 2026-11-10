@@ -601,6 +601,39 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
     }
 
+    // X on a framed view — mode 3, free-zoomed to 1.44x, panned, in a
+    // visible 1600x900 window — must preserve everything the user framed:
+    // scale, mode and the viewport rect, exactly. The old entry forced a
+    // fit window ("so CropOverlay won't go crazy"), resetting the very
+    // framing the user had composed.
+    void cropEntryPreservesFramedView() {
+        QImage big(2000, 1200, QImage::Format_RGB32);
+        big.fill(Qt::darkMagenta);
+        QVERIFY(big.save(QDir(base).filePath("framed.png"), "PNG"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("framed.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("framed.png"), 10000);
+        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        QVERIFY(viewer);
+        core.mw->resize(1600, 900);
+        core.mw->show();
+        QTest::qWait(300);
+        core.mw->fitOriginal();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
+        viewer->zoomIn();
+        viewer->zoomIn();
+        viewer->scrollLeft();
+        QTest::qWait(600);
+        float scaleBefore = viewer->currentScale();
+        QRect rectBefore = viewer->imageRect();
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QTest::qWait(300);
+        QVERIFY(qFuzzyCompare(viewer->currentScale(), scaleBefore));
+        QCOMPARE(static_cast<int>(viewer->fitMode()), static_cast<int>(FIT_FREE));
+        QCOMPARE(viewer->imageRect(), rectBefore);
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
