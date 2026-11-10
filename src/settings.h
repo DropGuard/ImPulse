@@ -228,10 +228,6 @@ class Settings : public QObject {
     bool placesPanel();
     void setPlacesPanel(bool mode);
 
-    QStringList bookmarks();
-    void setBookmarks(const QStringList &paths);
-    bool placesPanelBookmarksExpanded();
-    void setPlacesPanelBookmarksExpanded(bool mode);
     bool placesPanelTreeExpanded();
     void setPlacesPanelTreeExpanded(bool mode);
 
