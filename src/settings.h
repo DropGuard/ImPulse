@@ -211,9 +211,6 @@ class Settings : public QObject {
     bool maximizedWindow();
     void setMaximizedWindow(bool mode);
 
-    bool keepFitMode();
-    void setKeepFitMode(bool mode);
-
     int expandLimit();
     void setExpandLimit(int value);
 

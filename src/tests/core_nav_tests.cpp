@@ -40,7 +40,6 @@
 #include "components/directorymanager/enginebridge.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/actions.h"
-#include "utils/inputmap.h"
 #include "gui/dialogs/settingsdialog.h"
 #include "gui/contextmenu.h"
 #include "themestore.h"
@@ -425,6 +424,38 @@ class TestCoreNav : public QObject {
     // built in setupFullUi — which Core schedules 50ms after showGui. showCropPanel
     // used to dereference the not-yet-created cropPanel/sidePanel pair in that
     // window (a guaranteed SIGSEGV on an early trigger).
+    // mode = intent. Fit original declares "I am inspecting this image": the
+    // mode persists across image switches, and while it holds, the arrow keys
+    // pan (the keymap's inspect layer overrides the base bindings) — the
+    // software does not get to decide the inspection is over. Leaving the
+    // mode (1/2/4, Space) restores the browse arrows: left/right change
+    // images again.
+    void fitOriginalPersistsAndArrowsStayInInspectMode() {
+        writeImage(QDir(base).filePath("insA.png"));
+        writeImage(QDir(base).filePath("insB.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("insA.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
+        core.mw->fitOriginal();
+        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        QVERIFY(viewer);
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
+
+        core.nextImage();
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insB.png"), 10000);
+        QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
+
+        // armed: left pans, it never flips images
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(core.currentFilePath(), QDir(base).filePath("insB.png"));
+
+        // back in a browse mode the same key navigates again
+        core.mw->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;

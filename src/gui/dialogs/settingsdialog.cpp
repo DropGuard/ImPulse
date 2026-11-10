@@ -60,7 +60,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
         {ui->showInfoBarWindowed, &Settings::infoBarWindowed, &Settings::setInfoBarWindowed},
         {ui->showExtendedInfoTitle, &Settings::windowTitleExtendedInfo, &Settings::setWindowTitleExtendedInfo},
         {ui->cursorAutohideCheckBox, &Settings::cursorAutohide, &Settings::setCursorAutohide},
-        {ui->keepFitModeCheckBox, &Settings::keepFitMode, &Settings::setKeepFitMode},
         {ui->saveOverlayCheckBox, &Settings::showSaveOverlay, &Settings::setShowSaveOverlay},
         {ui->unloadThumbsCheckBox, &Settings::unloadThumbs, &Settings::setUnloadThumbs},
         {ui->animatedJxlCheckBox, &Settings::jxlAnimation, &Settings::setJxlAnimation},
@@ -293,7 +292,6 @@ void SettingsDialog::readSettings() {
     ui->showInfoBarWindowed->setChecked(settings->infoBarWindowed());
     ui->showExtendedInfoTitle->setChecked(settings->windowTitleExtendedInfo());
     ui->cursorAutohideCheckBox->setChecked(settings->cursorAutohide());
-    ui->keepFitModeCheckBox->setChecked(settings->keepFitMode());
     if(settings->focusPointIn1to1Mode() == FOCUS_TOP)
         ui->focus1to1Top->setChecked(true);
     else if(settings->focusPointIn1to1Mode() == FOCUS_CENTER)
@@ -434,7 +432,6 @@ void SettingsDialog::saveSettings() {
     settings->setInfoBarWindowed(ui->showInfoBarWindowed->isChecked());
     settings->setWindowTitleExtendedInfo(ui->showExtendedInfoTitle->isChecked());
     settings->setCursorAutohide(ui->cursorAutohideCheckBox->isChecked());
-    settings->setKeepFitMode(ui->keepFitModeCheckBox->isChecked());
     if(ui->focus1to1Top->isChecked())
         settings->setFocusPointIn1to1Mode(FOCUS_TOP);
     else if(ui->focus1to1Center->isChecked())

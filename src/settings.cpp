@@ -613,13 +613,6 @@ void Settings::setUsePreloader(bool mode) {
     store(K_UsePreloader, mode);
 }
 //------------------------------------------------------------------------------
-bool Settings::keepFitMode() {
-    return load<bool>(K_KeepFitMode);
-}
-
-void Settings::setKeepFitMode(bool mode) {
-    store(K_KeepFitMode, mode);
-}
 //------------------------------------------------------------------------------
 bool Settings::fullscreenMode() {
     return load<bool>(K_FullscreenMode);
