@@ -820,10 +820,7 @@ void MW::refreshInfoViews() {
         settings->windowTitleExtendedInfo(), !settings->infoBarWindowed(),
         qApp->applicationName(), tr("Folder view"));
 
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW) {
-        infoBarFullscreen->setInfo("", tr("No file opened."), "");
-        infoBarWindowed->setInfo("", tr("No file opened."), "");
-    } else if(info.fileName.isEmpty()) {
+    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW || info.fileName.isEmpty()) {
         infoBarFullscreen->setInfo("", tr("No file opened."), "");
         infoBarWindowed->setInfo("", tr("No file opened."), "");
     } else {

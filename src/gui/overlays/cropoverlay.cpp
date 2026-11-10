@@ -218,13 +218,13 @@ CursorAction CropOverlay::hoverTarget(QPoint pos) {
 //------------------------------------------------------------------------------
 void CropOverlay::setCursorAction(CursorAction action) {
     switch(action) {
-        case DRAG_TOPLEFT: setCursor(QCursor(Qt::SizeFDiagCursor)); break;
-        case DRAG_TOPRIGHT: setCursor(QCursor(Qt::SizeBDiagCursor)); break;
-        case DRAG_BOTTOMLEFT: setCursor(QCursor(Qt::SizeBDiagCursor)); break;
+        case DRAG_TOPLEFT:
         case DRAG_BOTTOMRIGHT: setCursor(QCursor(Qt::SizeFDiagCursor)); break;
-        case DRAG_LEFT: setCursor(QCursor(Qt::SizeHorCursor)); break;
+        case DRAG_TOPRIGHT:
+        case DRAG_BOTTOMLEFT: setCursor(QCursor(Qt::SizeBDiagCursor)); break;
+        case DRAG_LEFT:
         case DRAG_RIGHT: setCursor(QCursor(Qt::SizeHorCursor)); break;
-        case DRAG_TOP: setCursor(QCursor(Qt::SizeVerCursor)); break;
+        case DRAG_TOP:
         case DRAG_BOTTOM: setCursor(QCursor(Qt::SizeVerCursor)); break;
         case DRAG_MOVE: setCursor(QCursor(Qt::OpenHandCursor)); break;
         default: setCursor(QCursor(Qt::ArrowCursor)); break;
@@ -239,7 +239,7 @@ void CropOverlay::setResizeAnchor(CursorAction action) {
         case DRAG_BOTTOMLEFT: resizeAnchor = selectionRect.topRight(); break;
         case DRAG_BOTTOMRIGHT: resizeAnchor = selectionRect.topLeft(); break;
         case DRAG_LEFT: resizeAnchor = selectionRect.topRight(); break;
-        case DRAG_RIGHT: resizeAnchor = selectionRect.bottomLeft(); break;
+        case DRAG_RIGHT:
         case DRAG_TOP: resizeAnchor = selectionRect.bottomLeft(); break;
         case DRAG_BOTTOM: resizeAnchor = selectionRect.topLeft(); break;
         default: break;

@@ -1068,11 +1068,8 @@ void Core::copyCurrentFile(const QString &destDirectory) {
 void Core::toggleCropPanel() {
     if(model->isEmpty())
         return;
-    if(mw->isCropPanelActive()) {
+    if(mw->isCropPanelActive() || state.hasActiveImage)
         mw->triggerCropPanel();
-    } else if(state.hasActiveImage) {
-        mw->triggerCropPanel();
-    }
 }
 
 void Core::toggleFullscreenInfoBar() {
