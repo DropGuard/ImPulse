@@ -99,6 +99,11 @@ void ActionManager::initDefaults() {
     defaults.insert("P", "openSettings");
 #endif
 
+    // the inspect scope's defaults are platform-neutral: the arrows are the
+    // canvas keys while fit original / free zoom declare an inspection
+    inspectDefaults.insert("Left", "scrollLeft");
+    inspectDefaults.insert("Right", "scrollRight");
+
     //defaults.insert("Backspace", "goUp"); // todo: shortcut scopes?
 }
 
@@ -109,6 +114,7 @@ void ActionManager::initShortcuts() {
     // still picks the new default up. The old all-or-nothing copy left any
     // config holding at least one entry permanently pinned to its own era.
     shortcuts = defaults;
+    inspectShortcuts = inspectDefaults;
     readShortcuts();
 }
 //------------------------------------------------------------------------------
@@ -157,6 +163,11 @@ QString ActionManager::keyForNativeScancode(quint32 scanCode) {
 //------------------------------------------------------------------------------
 void ActionManager::resetDefaults() {
     shortcuts = defaults;
+    inspectShortcuts = inspectDefaults;
+}
+
+void ActionManager::setInspectMode(bool inspect) {
+    inspectMode = inspect;
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -215,7 +226,15 @@ bool ActionManager::invokeAction(const QString &actionName) {
 }
 //------------------------------------------------------------------------------
 bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
-    if(!shortcut.isEmpty() && shortcuts.contains(shortcut)) {
+    if(shortcut.isEmpty())
+        return false;
+    // the inspect scope's bindings win while it is armed — fit original /
+    // free zoom means "I am inspecting this image", and the software does
+    // not get to decide the inspection is over
+    if(inspectMode && inspectShortcuts.contains(shortcut)) {
+        return invokeAction(inspectShortcuts[shortcut]);
+    }
+    if(shortcuts.contains(shortcut)) {
         return invokeAction(shortcuts[shortcut]);
     }
     return false;

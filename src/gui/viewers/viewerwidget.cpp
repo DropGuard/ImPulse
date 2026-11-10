@@ -27,6 +27,7 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     layout.addWidget(imageViewer.get());
     imageViewer->hide();
 
+    connect(imageViewer.get(), &ImageViewerV2::fitModeChanged, this, &ViewerWidget::fitModeChanged);
     connect(imageViewer.get(), &ImageViewerV2::scalingRequested, this, &ViewerWidget::scalingRequested);
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::onScaleChanged);
     connect(imageViewer.get(), &ImageViewerV2::playbackFinished, this, &ViewerWidget::onAnimationPlaybackFinished);

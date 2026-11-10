@@ -24,6 +24,15 @@ class ActionManager : public QObject {
     static ActionManager *getInstance();
     ~ActionManager() override;
     bool processEvent(QInputEvent *);
+    // the keymap's resolution primitive: shortcut string -> action dispatch,
+    // honoring the inspect scope while it is armed. Public so the input
+    // funnel's decision itself is testable (ShortcutBuilder's physical event
+    // mapping is covered separately in machinery_tests).
+    bool invokeActionForShortcut(const QString &shortcut);
+    // arms/disarms the inspect scope: while armed, the inspect layer's
+    // bindings override the base ones — in fit original / free zoom the
+    // arrow keys pan the canvas and never change images (mode = intent)
+    void setInspectMode(bool inspect);
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
     QString actionForShortcut(const QString &keys);
@@ -43,11 +52,14 @@ class ActionManager : public QObject {
   private:
     explicit ActionManager(QObject *parent = nullptr);
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
+    // the inspect scope's layer: only the deltas live here (fit original /
+    // free zoom pan with the arrows instead of changing images)
+    QMap<QString, QString> inspectDefaults, inspectShortcuts; // <shortcut, action>
+    bool inspectMode = false;
 
     void initDefaults();
     void initShortcuts();
     QString modifierKeys(QEvent *event);
-    bool invokeActionForShortcut(const QString &action);
     void validateShortcuts();
     void readShortcuts();
     ActionType validateAction(const QString &actionName);
