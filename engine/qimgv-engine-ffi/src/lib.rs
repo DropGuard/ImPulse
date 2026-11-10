@@ -20,7 +20,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use qimgv_engine::{Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode, ThumbReq};
+use qimgv_engine::{Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode, ThumbCommand, ThumbReq};
 
 // --- status codes (mirror include/qimgv_engine.h) ---------------------------
 pub const QIMGV_OK: c_int = 0;
@@ -602,10 +602,10 @@ pub unsafe extern "C" fn qimgv_engine_thumb_request(
     let attempt = || -> Result<c_int, c_int> {
         let path = read_path(path)?;
         with_engine(engine, |e| {
-            e.send(Command::ThumbRequest {
+            e.send(Command::Thumb(ThumbCommand::Request {
                 req: ThumbReq { path, size, crop: crop != 0 },
                 replace_batch: replace_batch != 0,
-            })
+            }))
             .map(|_| QIMGV_OK)
             .map_err(|er| map_engine_error(&er))
         })
@@ -633,9 +633,9 @@ pub unsafe extern "C" fn qimgv_engine_thumb_done(
     let attempt = || -> Result<c_int, c_int> {
         let path = read_path(path)?;
         with_engine(engine, |e| {
-            e.send(Command::ThumbDone {
+            e.send(Command::Thumb(ThumbCommand::Done {
                 req: ThumbReq { path, size, crop: crop != 0 },
-            })
+            }))
             .map(|_| QIMGV_OK)
             .map_err(|er| map_engine_error(&er))
         })
@@ -654,7 +654,7 @@ pub unsafe extern "C" fn qimgv_engine_thumb_done(
 pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         with_engine(engine, |e| {
-            e.send(Command::ThumbClear)
+            e.send(Command::Thumb(ThumbCommand::Clear))
                 .map(|_| QIMGV_OK)
                 .map_err(|er| map_engine_error(&er))
         })
@@ -673,7 +673,7 @@ pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c
 pub unsafe extern "C" fn qimgv_engine_thumb_config(engine: *mut QimgvEngine, max_in_flight: u32) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         with_engine(engine, |e| {
-            e.send(Command::ThumbConfig { max_in_flight })
+            e.send(Command::Thumb(ThumbCommand::Config { max_in_flight }))
                 .map(|_| QIMGV_OK)
                 .map_err(|er| map_engine_error(&er))
         })
