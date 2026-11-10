@@ -13,6 +13,7 @@
 #include <QtTest/qtestcase.h>
 #include <QQueue>
 #include "gui/overlays/imageinfooverlayproxy.h"
+#include "gui/cropcontroller.h"
 #include "gui/overlays/floatingmessageproxy.h"
 #include <utility>
 #include <QApplication>
@@ -428,10 +429,10 @@ class TestCoreNav : public QObject {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("crop.png")));
-        core.mw->triggerCropPanel();
-        QVERIFY(core.mw->isCropPanelActive());
-        core.mw->triggerCropPanel();
-        QVERIFY(!core.mw->isCropPanelActive());
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        core.mw->crop()->trigger();
+        QVERIFY(!core.mw->crop()->isCropPanelActive());
     }
 
     void preloaderFollowsTheDirectionOfTravel() {
