@@ -318,6 +318,7 @@ ALLOWED_KEY_DOORS = {
     'gui/overlays/cropoverlay.cpp',          # modal editing surface: crop workflow keys
     'gui/overlays/renameoverlay.cpp',        # modal input with a curated passthrough
     'gui/overlays/copyoverlay.cpp',          # modal surface with its own per-destination hotkeys
+    'gui/overlays/saveconfirmoverlay.cpp',   # modal prompt: Esc dismisses without acting
     'gui/dialogs/resizedialog.cpp',          # modal dialog: Enter applies, Esc rejects
     'gui/overlays/changelogwindow.cpp',      # Esc-only window
     'gui/customwidgets/styledcombobox.cpp',  # input routing (ignore-all)

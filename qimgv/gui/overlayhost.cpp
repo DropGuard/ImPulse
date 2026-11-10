@@ -78,6 +78,7 @@ void OverlayHost::showSaveOverlay() {
     if(!saveOverlay)
         setupSaveOverlay();
     saveOverlay->show();
+    saveOverlay->setFocus();
 }
 
 void OverlayHost::hideSaveOverlay() {
