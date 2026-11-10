@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Static analysis on demand. Three tools, one table, one rule: a count may only
+# Static analysis on demand. Four tools, one table, one rule: a count may only
 # shrink. The families that are already at zero do not live here — they are
 # -Werror'd in the build itself (see the root CMakeLists); this script reports
 # the debt that would be noise to compile in, so that it can be watched instead
@@ -9,6 +9,17 @@
 #
 #   scripts/lint.py [build-dir]          report only
 #   scripts/lint.py [build-dir] --gate   fail if any count moved
+#   scripts/lint.py [build-dir] --no-cache   bypass the cache entirely
+#
+# gcc, clazy and clang-tidy are per-TU and cached in <build>/.lint-cache: the key
+# hashes
+# the command line, the tool version, the TU and every transitively included
+# header (contents, never mtimes — cp/mv carry stale mtimes), plus the -I
+# directory listings (a new file on an include path can shadow an existing
+# include without any tracked file changing). The include graph comes from
+# the gcc pass's -MD depfile; a missing/unreadable depfile or any listed file
+# means a miss, never a guess. Cached records hold raw tool output so parser
+# changes never invalidate them. cppcheck is whole-program and always runs.
 #
 # The build dir must have a compile_commands.json, which the root CMakeLists now
 # generates by default. Every tool reads its command line from that database
@@ -20,6 +31,8 @@ import collections, concurrent.futures, hashlib, json, os, re, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = next((a for a in sys.argv[1:] if not a.startswith('-')), os.path.join(ROOT, 'build'))
 GATE = '--gate' in sys.argv
+NOCACHE = '--no-cache' in sys.argv
+CACHE = os.path.abspath(os.path.join(BUILD, '.lint-cache'))
 BASELINE = os.path.join(ROOT, 'scripts', 'lint-baseline.txt')
 
 # fatal in the build, so they must be zero here too. Keys match what gcc prints
@@ -38,8 +51,19 @@ REPORT = ['-Wshadow', '-Wold-style-cast', '-Wsuggest-override']
 #   cppcheck passedByValue / duplInheritedMember — Qt's implicit sharing and
 #   signal re-declaration idioms make these recommendations wrong here.
 FROZEN = {'duplInheritedMember'}  # passedByValue re-armed at zero (2026-11-05)
+# clang-tidy: the bugprone census (2026-11-10). Excluded at selection, not
+# post-filtered — the gate stops paying to re-derive judged noise (same
+# philosophy as REPORT driving the gcc pass). Rationale per family lives in
+# lint-baseline.txt.
+TIDY_EXCLUDE = ['bugprone-narrowing-conversions',
+                'bugprone-easily-swappable-parameters',
+                'bugprone-integer-division',
+                'bugprone-parent-virtual-call',
+                'bugprone-implicit-widening-of-multiplication-result']
+TIDY_CHECKS = '-*,bugprone-*' + ''.join(',-' + c for c in TIDY_EXCLUDE)
 DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+)\]$')
 CLAZY = re.compile(r'^(/[^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
+TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[(bugprone-[a-z0-9-]+)(?:,.*)?\]$')
 CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
 SKIP = ('/3rdparty/', '_autogen/', '/corrosion/')
 
@@ -57,7 +81,7 @@ def instrument_versions(srcs):
     # here. The whole output, not the first line: clazy-standalone prints LLVM's
     # version first and its own ("clazy version 1.17") on the third line, so a
     # first-line slice would miss exactly the tool whose counts proved unstable.
-    tools = sorted({e['command'].split()[0] for e in srcs}) + ['clazy-standalone', 'cppcheck']
+    tools = sorted({e['command'].split()[0] for e in srcs}) + ['clazy-standalone', 'clang-tidy', 'cppcheck']
     return [[t, run([t, '--version'], ROOT).strip()] for t in tools]
 
 def fingerprint(srcs):
@@ -77,34 +101,187 @@ def run(cmd, cwd):
     p = subprocess.run(cmd, shell=isinstance(cmd, str), cwd=cwd, capture_output=True, text=True)
     return p.stdout + p.stderr
 
-def syntax_pass(e):
+def sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+def depfile_path(e):
+    return os.path.join(CACHE, 'deps', sha(e['file']) + '.d')
+
+def read_deps(e):
+    try:
+        text = open(depfile_path(e)).read()
+    except OSError:
+        return None
+    return text.replace('\\\n', ' ').partition(':')[2].split()
+
+def content_hashes(files, memo):
+    # None on any unreadable file: the caller must treat the whole key as a
+    # miss. A deleted header that is still included is a real state change,
+    # not something to replay a cached verdict for.
+    out = []
+    for f in sorted(set(files)):
+        if f not in memo:
+            try:
+                memo[f] = hashlib.sha256(open(f, 'rb').read()).hexdigest()[:16]
+            except OSError:
+                memo[f] = None
+        if memo[f] is None:
+            return None
+        out.append([f, memo[f]])
+    return out
+
+def include_listings(e):
+    dirs = [a or b for a, b in re.findall(r'-I\s*(\S+)|-isystem\s*(\S+)', e['command'])]
+    out = []
+    for d in sorted(set(dirs)):
+        d = os.path.normpath(os.path.join(e['directory'], d))
+        try:
+            listing = sorted(os.listdir(d))
+        except OSError:
+            listing = None
+        out.append([d, listing])
+    return out
+
+def tu_key(e, tool, command, version, deps, memo):
+    if deps is None:
+        return None
+    hashes = content_hashes([e['file']] + deps, memo)
+    if hashes is None:
+        return None
+    return sha(json.dumps([tool, command, version, hashes, include_listings(e)], sort_keys=True))
+
+def cache_read(tool, key):
+    if key is None:
+        return None
+    try:
+        return open(os.path.join(CACHE, tool, key + '.out')).read()
+    except OSError:
+        return None
+
+def cache_write(tool, key, out):
+    if key is None:
+        return
+    d = os.path.join(CACHE, tool)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, key + '.out'), 'w') as f:
+        f.write(out)
+
+def cache_gc(sub, used, suffix):
+    d = os.path.join(CACHE, sub)
+    if not os.path.isdir(d):
+        return
+    for name in os.listdir(d):
+        if name.endswith(suffix) and name[:-len(suffix)] not in used:
+            os.unlink(os.path.join(d, name))
+
+def syntax_command(e):
     # the real command line, minus the object file and minus -Werror: this pass
     # is a report, and the build's own gate has already had its say
     cmd = re.sub(r'\s-o\s+\S+', ' -fsyntax-only', e['command'], count=1)
     cmd = re.sub(r'-Werror(=\S+)?', '', cmd)
-    return run(cmd + ' ' + ' '.join(REPORT), e['directory']).splitlines()
+    return cmd + ' ' + ' '.join(REPORT)
 
-def gcc_counts(srcs):
+def gcc_counts(srcs, versions, memo):
     found = collections.defaultdict(set)
+    if not NOCACHE:
+        os.makedirs(os.path.join(CACHE, 'deps'), exist_ok=True)
     def one(e):
-        for line in syntax_pass(e):
+        cmd = syntax_command(e)
+        version = versions[e['command'].split()[0]]
+        key = None if NOCACHE else tu_key(e, 'gcc', cmd, version, read_deps(e), memo)
+        out = cache_read('gcc', key)
+        hit = out is not None
+        if not hit:
+            if NOCACHE:
+                out = run(cmd, e['directory'])
+            else:
+                # -MD writes the include graph as a side effect of the pass we
+                # already pay for. Via a temp path: if gcc dies before writing
+                # it, nothing is promoted and nothing is cached — a crash
+                # output must never be replayed as a verdict.
+                tmp = depfile_path(e) + '.tmp'
+                out = run(cmd + f' -MD -MF {tmp}', e['directory'])
+                try:
+                    os.replace(tmp, depfile_path(e))
+                except OSError:
+                    parse_gcc(out, found)
+                    return (False, None)
+                # key from the fresh graph: a content change may have added or
+                # removed includes, so the pre-run key is not the one this
+                # output belongs to
+                key = tu_key(e, 'gcc', cmd, version, read_deps(e), memo)
+                cache_write('gcc', key, out)
+        parse_gcc(out, found)
+        return (hit, key)
+    def parse_gcc(out, found):
+        for line in out.splitlines():
             m = DIAG.match(line)
             if m:
                 found[m.group(3)].add((m.group(1), m.group(2)))
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as ex:
-        list(ex.map(one, srcs))
+        results = list(ex.map(one, srcs))
+    if not NOCACHE:
+        cache_gc('gcc', {k for _, k in results if k}, '.out')
+        cache_gc('deps', {sha(e['file']) for e in srcs}, '.d')
+        print(f'cache: gcc {sum(h for h, _ in results)} hits, '
+              f'{sum(not h for h, _ in results)} misses')
     return found
 
-def clazy_counts(srcs):
+def clazy_counts(srcs, version, memo):
     found = collections.defaultdict(set)
     def one(e):
-        for line in run(['clazy-standalone', '-p', BUILD, e['file']], ROOT).splitlines():
+        # the include graph is the gcc pass's depfile — same TU, same db
+        # command, so the graph is identical and needs no re-derivation
+        key = None if NOCACHE else tu_key(e, 'clazy', e['command'], version, read_deps(e), memo)
+        out = cache_read('clazy', key)
+        hit = out is not None
+        if not hit:
+            out = run(['clazy-standalone', '-p', BUILD, e['file']], ROOT)
+            cache_write('clazy', key, out)
+        for line in out.splitlines():
             m = CLAZY.match(line)
             if m:
                 found[m.group(3)].add((m.group(1), m.group(2)))
-    # 4, not nproc: clazy is clang-tidy and each TU pays for the AST twice
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        list(ex.map(one, srcs))
+        return (hit, key)
+    # 8, not nproc: clazy is clang-tidy and each TU pays for the AST twice
+    # (~411 MiB peak RSS). Measured on 133 TUs: 4 workers 114s, 8 workers 64s,
+    # 16 workers 54s — past 8 the returns flatten (memory-bandwidth/header-I/O
+    # contention), so 8 is the sweet spot.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(one, srcs))
+    if not NOCACHE:
+        cache_gc('clazy', {k for _, k in results if k}, '.out')
+        print(f'cache: clazy {sum(h for h, _ in results)} hits, '
+              f'{sum(not h for h, _ in results)} misses')
+    return found
+
+def clang_tidy_counts(srcs, version, memo):
+    found = collections.defaultdict(set)
+    def one(e):
+        # the checks selection is part of the verdict, so it rides in the key
+        key = None if NOCACHE else tu_key(e, 'clang-tidy', e['command'] + ' ' + TIDY_CHECKS,
+                                          version, read_deps(e), memo)
+        out = cache_read('clang-tidy', key)
+        hit = out is not None
+        if not hit:
+            out = run(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
+            cache_write('clang-tidy', key, out)
+        for line in out.splitlines():
+            m = TIDY.match(line)
+            if m:
+                # unchecked-optional's hits are all in tests/, where QVERIFY
+                # guards the access but the macro is invisible to tidy's
+                # dataflow. Production code stays armed.
+                if m.group(3) == 'bugprone-unchecked-optional-access' and '/tests/' in m.group(1):
+                    continue
+                found[m.group(3)].add((m.group(1), m.group(2)))
+        return (hit, key)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(one, srcs))
+    if not NOCACHE:
+        cache_gc('clang-tidy', {k for _, k in results if k}, '.out')
+        print(f'cache: clang-tidy {sum(h for h, _ in results)} hits, '
+              f'{sum(not h for h, _ in results)} misses')
     return found
 
 def cppcheck_counts():
@@ -122,7 +299,11 @@ def cppcheck_counts():
     # see, and no worker can be poisoned. The coverage assertion below checks
     # the same filtered set.
     raw_db = os.path.join(BUILD, 'compile_commands.json')
-    db = os.path.join(BUILD, 'compile_commands.cppcheck.json')
+    # inside the cache dir, not the build root: the build root can itself be
+    # an -I directory, and a file appearing there after the gcc pass computed
+    # its keys would flap every key on the next run (observed: warm run 0 hits)
+    os.makedirs(CACHE, exist_ok=True)
+    db = os.path.join(CACHE, 'compile_commands.cppcheck.json')
     db_entries = json.load(open(raw_db))
     kept = [e for e in db_entries if not any(s in e['file'] for s in SKIP)]
     with open(db, 'w') as f:
@@ -173,14 +354,17 @@ def show(name, found):
 
 def main():
     srcs = entries()
+    versions = dict(instrument_versions(srcs))
     fp = fingerprint(srcs)
     print(f'{len(srcs)} translation units, build dir {BUILD}, instrument {fp}')
-    gcc = gcc_counts(srcs)
+    memo = {}
+    gcc = gcc_counts(srcs, versions, memo)
     gated = {k: v for k, v in gcc.items() if k in GATED}
     report_only = {k: v for k, v in gcc.items() if k not in GATED}
     now = {}
     now.update({('gcc', k): v for k, v in show('gcc, report-only families', report_only).items()})
-    now.update({('clazy', k): v for k, v in show('clazy', clazy_counts(srcs)).items()})
+    now.update({('clazy', k): v for k, v in show('clazy', clazy_counts(srcs, versions['clazy-standalone'], memo)).items()})
+    now.update({('clang-tidy', k): v for k, v in show('clang-tidy', clang_tidy_counts(srcs, versions['clang-tidy'], memo)).items()})
     now.update({('cppcheck', k): v for k, v in show('cppcheck', cppcheck_counts()).items()})
     print('\ngcc, families the build fails on:')
     for check in sorted(GATED):

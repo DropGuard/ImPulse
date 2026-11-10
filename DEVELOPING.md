@@ -115,11 +115,11 @@ impulse /path/to/image-or-directory
 Verify a build:
 
 ```bash
-cd build && ctest                       # five suites, including the architecture rules
+cd build && ctest                       # six suites, including the architecture rules
 cd engine/qimgv-engine && cargo test    # the engine's own suites
 ```
 
-Maintainer pre-push gate — the clazy/cppcheck/gcc counts are baselined against
+Maintainer gate (runs in the pre-commit hook) — the clazy/clang-tidy/cppcheck/gcc counts are baselined against
 a pinned toolchain, and on a foreign toolchain the gate fails by design (the
 instrument fingerprint names the change):
 
