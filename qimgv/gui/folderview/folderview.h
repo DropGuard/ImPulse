@@ -10,7 +10,6 @@
 #include "gui/idirectoryview.h"
 #include "gui/folderview/foldergridview.h"
 #include "gui/folderview/filesystemmodelcustom.h"
-#include "gui/folderview/bookmarkswidget.h"
 #include "gui/customwidgets/actionbutton.h"
 #include "gui/customwidgets/styledcombobox.h"
 #include "gui/folderview/fvoptionspopup.h"
@@ -74,12 +73,9 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
 
     void onTreeViewClicked(QModelIndex index);
     void onDroppedInByIndex(QList<QString>, QModelIndex index);
-    void toggleBookmarks();
     void toggleFilesystemView();
     void setPlacesPanel(bool mode);
     void onPlacesPanelButtonChecked(bool mode);
-    void onBookmarkClicked(QString dirPath);
-    void newBookmark();
     void fsTreeScrollToCurrent();
 
     void onOptionsPopupButtonToggled(bool mode);

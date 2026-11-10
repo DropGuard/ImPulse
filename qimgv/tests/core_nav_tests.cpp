@@ -63,8 +63,6 @@
 #include "gui/viewers/imageviewerv2.h"
 #include "gui/folderview/folderview.h"
 #include "gui/folderview/fvoptionspopup.h"
-#include "gui/folderview/bookmarksitem.h"
-#include "gui/folderview/bookmarkswidget.h"
 #include "gui/folderview/foldergridview.h"
 #include "gui/folderview/filesystemmodelcustom.h"
 #include "gui/customwidgets/styledcombobox.h"
@@ -131,21 +129,6 @@ class TestableFolderGridView : public FolderGridView {
     using FolderGridView::dragLeaveEvent;
     using FolderGridView::dragMoveEvent;
     using FolderGridView::dropEvent;
-};
-
-// The drop handlers are protected Qt overrides; the tests reach them the way
-// the widget hierarchy does — through a using-exposed subclass.
-class TestableBookmarksWidget : public BookmarksWidget {
-  public:
-    using BookmarksWidget::dragEnterEvent;
-    using BookmarksWidget::dropEvent;
-};
-
-class TestableBookmarksItem : public BookmarksItem {
-  public:
-    using BookmarksItem::BookmarksItem;
-    using BookmarksItem::dragEnterEvent;
-    using BookmarksItem::dropEvent;
 };
 
 // The presenter's remaining two view connections (thumbnailsRequested and
@@ -1969,13 +1952,11 @@ class TestCoreNav : public QObject {
         const QMap<QString, int> before = widgetClasses();
         const int beforeTotal = QApplication::allWidgets().size();
         {
-            BookmarksItem bookmark("some dir", "/tmp");
             SettingsSidebarItem sidebarItem("icon", "label");
             SettingsSidebar sidebar;
             EntryInfoItem info;
             FolderView fv;
             fv.populate(1); // the populated-grid state that killed the folder grid
-            bookmark.show();
             sidebar.show();
             info.show();
             fv.show();
@@ -2302,35 +2283,6 @@ class TestCoreNav : public QObject {
     // view really emits reaches the handler and produces the effect. The tests
     // in this cluster pin delivery per endpoint — itemActivated both ways,
     // draggedOut and droppedInto below.
-    // A widget must not accept a drop it is going to throw away. BookmarksWidget
-    // turned on acceptDrops and accepted every url drag in dragEnterEvent, while
-    // its dropEvent was an empty override — so dropping onto the panel's empty
-    // area advertised "copy here" and did nothing. Each BookmarksItem already
-    // handles its own drops (acceptDrops + an emitting dropEvent), so the panel
-    // never needed to accept anything itself.
-    void bookmarksPanelDoesNotAcceptDropsItDiscards() {
-        QMimeData mime;
-        mime.setUrls({QUrl::fromLocalFile("/tmp/somefile.png")});
-
-        // the live path: a bookmark row takes the drop and emits droppedIn
-        TestableBookmarksItem item("some dir", "/tmp");
-        QSignalSpy droppedIn(&item, &BookmarksItem::droppedIn);
-        QVERIFY(droppedIn.isValid());
-        QDragEnterEvent itemEnter(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
-        item.dragEnterEvent(&itemEnter);
-        QVERIFY2(itemEnter.isAccepted(), "a bookmark row stopped accepting the drop it handles");
-        QDropEvent itemDrop(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
-        item.dropEvent(&itemDrop);
-        QCOMPARE(droppedIn.count(), 1);
-
-        // the dead path: the panel itself must not advertise acceptance
-        TestableBookmarksWidget panel;
-        QVERIFY2(!panel.acceptDrops(), "the panel still accepts drops that its own dropEvent discards");
-        QDragEnterEvent panelEnter(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
-        panel.dragEnterEvent(&panelEnter);
-        QVERIFY2(!panelEnter.isAccepted(), "the panel accepted a drop it cannot deliver anywhere");
-    }
-
     // The presenter's two remaining string-based view connections. Neither has
     // a signal at the far end — thumbnailsRequested drives the thumbnailer and
     // the result comes back as a view *method call*, draggedOver reaches the

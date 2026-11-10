@@ -865,14 +865,6 @@ void Settings::setSavedPaths(const QStringList &paths) {
     stateConf->setValue("savedPaths", paths);
 }
 //------------------------------------------------------------------------------
-QStringList Settings::bookmarks() {
-    return stateConf->value("bookmarks").toStringList();
-}
-
-void Settings::setBookmarks(const QStringList &paths) {
-    stateConf->setValue("bookmarks", paths);
-}
-//------------------------------------------------------------------------------
 bool Settings::placesPanel() {
     return stateConf->value("placesPanel", true).toBool();
 }
@@ -881,13 +873,6 @@ void Settings::setPlacesPanel(bool mode) {
     stateConf->setValue("placesPanel", mode);
 }
 //------------------------------------------------------------------------------
-bool Settings::placesPanelBookmarksExpanded() {
-    return stateConf->value("placesPanelBookmarksExpanded", true).toBool();
-}
-
-void Settings::setPlacesPanelBookmarksExpanded(bool mode) {
-    stateConf->setValue("placesPanelBookmarksExpanded", mode);
-}
 //------------------------------------------------------------------------------
 bool Settings::placesPanelTreeExpanded() {
     return stateConf->value("placesPanelTreeExpanded", true).toBool();

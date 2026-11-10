@@ -50,7 +50,6 @@ FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), ui(ne
 
     ui->sortingComboBox->setIconPath(":res/icons/common/other/sorting-mode16.png");
 
-    ui->newBookmarkButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
     ui->homeButton->setIconPath(":res/icons/common/buttons/panel-small/home12.png");
     ui->rootButton->setIconPath(":res/icons/common/buttons/panel-small/root12.png");
 
@@ -72,9 +71,6 @@ FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), ui(ne
     connect(ui->thumbnailGrid, &FolderGridView::draggedOver, this, &FolderView::draggedOver);
     connect(ui->thumbnailGrid, &FolderGridView::droppedInto, this, &FolderView::droppedInto);
 
-    connect(ui->bookmarksWidget, &BookmarksWidget::bookmarkClicked, this, &FolderView::onBookmarkClicked);
-
-    connect(ui->newBookmarkButton, &IconButton::clicked, this, &FolderView::newBookmark);
     connect(ui->homeButton, &IconButton::clicked, this, &FolderView::onHomeBtn);
     connect(ui->rootButton, &IconButton::clicked, this, &FolderView::onRootBtn);
 
@@ -88,8 +84,6 @@ FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), ui(ne
 
     connect(ui->dirTreeView, &TreeViewCustom::droppedIn, this, &FolderView::onDroppedInByIndex);
     connect(ui->dirTreeView, &TreeViewCustom::tabbedOut, this, &FolderView::onTreeViewTabOut);
-    connect(ui->bookmarksWidget, &BookmarksWidget::droppedIn, this,
-            &FolderView::moveUrlsRequested); // ask what to do via popup? copy or move
 
     ui->sortingComboBox->setItemDelegate(new QStyledItemDelegate(ui->sortingComboBox));
     ui->sortingComboBox->view()->setTextElideMode(Qt::ElideNone);
@@ -112,7 +106,6 @@ void FolderView::readSettings() {
     ui->togglePlacesPanelButton->setChecked(settings->placesPanel());
 
     setPlacesPanel(settings->placesPanel());
-    ui->bookmarksWidget->setVisible(settings->placesPanelBookmarksExpanded());
     ui->dirTreeView->setVisible(settings->placesPanelTreeExpanded());
 
     QList<int> sizes;
@@ -132,14 +125,6 @@ void FolderView::onPlacesPanelButtonChecked(bool mode) {
 void FolderView::setPlacesPanel(bool mode) {
     if(width() >= 600)
         ui->placesPanel->setVisible(mode);
-}
-
-void FolderView::toggleBookmarks() {
-    if(ui->bookmarksWidget->isVisible())
-        ui->bookmarksWidget->hide();
-    else
-        ui->bookmarksWidget->show();
-    settings->setPlacesPanelBookmarksExpanded(ui->bookmarksWidget->isVisible());
 }
 
 void FolderView::toggleFilesystemView() {
@@ -290,8 +275,6 @@ void FolderView::setDirectoryPath(QString path) {
     if(ui->dirTreeView->currentIndex().data() == path)
         return;
 
-    ui->bookmarksWidget->onPathChanged(path);
-
     QModelIndex targetIndex = dirModel->index(path);
     bool keepExpand = ui->dirTreeView->isExpanded(targetIndex);
     bool collapse = !ui->dirTreeView->isExpanded(ui->dirTreeView->currentIndex().parent());
@@ -315,22 +298,6 @@ void FolderView::fsTreeScrollToCurrent() {
 
 void FolderView::onTreeViewClicked(QModelIndex index) {
     emit directorySelected(dirModel->fileInfo(index).absoluteFilePath());
-}
-
-void FolderView::onBookmarkClicked(QString dirPath) {
-    emit directorySelected(std::move(dirPath));
-}
-
-void FolderView::newBookmark() {
-    QFileDialog dialog;
-    dialog.setDirectory(QDir::homePath());
-    dialog.setWindowTitle("Select directory");
-    dialog.setWindowModality(Qt::ApplicationModal);
-    dialog.setFileMode(QFileDialog::Directory);
-    dialog.setOption(QFileDialog::ShowDirsOnly);
-    dialog.setOption(QFileDialog::DontResolveSymlinks);
-    connect(&dialog, &QFileDialog::fileSelected, ui->bookmarksWidget, &BookmarksWidget::addBookmark);
-    dialog.exec();
 }
 
 void FolderView::addItem() {

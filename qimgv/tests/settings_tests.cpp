@@ -270,17 +270,12 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         settings->setFolderEndAction(FOLDER_END_NO_ACTION);
     }
 
-    // the state-side lists: bookmarks and saved paths round-trip through the
-    // state config (IsolatedHome keeps this off the developer's real state)
-    void bookmarksAndSavedPathsRoundTrip() {
+    // the state-side list: saved paths round-trip through the state config
+    // (IsolatedHome keeps this off the developer's real state)
+    void savedPathsRoundTrips() {
         FreshSettings fresh;
-        QStringList paths = {"/tmp/a", "/tmp/b with space"};
-        settings->setBookmarks(paths);
         settings->setSavedPaths({"/home/user/pictures"});
-        QCOMPARE(settings->bookmarks(), paths);
         QCOMPARE(settings->savedPaths(), QStringList{"/home/user/pictures"});
-        settings->setBookmarks({});
-        QVERIFY(settings->bookmarks().isEmpty());
     }
 
     // the open-dialog filter policy: Qt's decodable mime types plus the
