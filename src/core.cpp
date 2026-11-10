@@ -12,6 +12,7 @@
 
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
+#include "gui/dialoghost.h"
 
 #include <QThread>
 #include <QDrag>
@@ -149,7 +150,7 @@ void Core::connectComponents() {
 
     connect(scriptManager, &ScriptManager::error, mw->overlays(), &OverlayHost::showError);
 
-    connect(mw, &MW::opened, this, &Core::loadPath);
+    connect(mw->dialogs(), &DialogHost::opened, this, &Core::loadPath);
     connect(mw, &MW::droppedIn, this, &Core::onDropIn);
     connect(mw->overlays(), &OverlayHost::copyRequested, this, &Core::copyCurrentFile);
     connect(mw->overlays(), &OverlayHost::moveRequested, this, &Core::moveCurrentFile);
@@ -159,8 +160,8 @@ void Core::connectComponents() {
     connect(mw, &MW::cropAndSaveRequested, this, &Core::cropAndSave);
     connect(mw->overlays(), &OverlayHost::saveAsClicked, this, &Core::requestSavePath);
     connect(mw->overlays(), &OverlayHost::saveRequested, this, &Core::saveCurrentFile);
-    connect(mw, &MW::saveAsRequested, this, &Core::saveCurrentFileAs);
-    connect(mw, &MW::resizeRequested, this, &Core::resize);
+    connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
+    connect(mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
     connect(mw->overlays(), &OverlayHost::renameRequested, this, &Core::renameCurrentSelection);
     connect(mw, &MW::sortingSelected, this, &Core::sortBy);
     connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
@@ -210,7 +211,7 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::flipV, this, &Core::flipV);
     connect(actionManager, &ActionManager::rotateLeft, this, &Core::rotateLeft);
     connect(actionManager, &ActionManager::rotateRight, this, &Core::rotateRight);
-    connect(actionManager, &ActionManager::openSettings, mw, &MW::showSettings);
+    connect(actionManager, &ActionManager::openSettings, mw->dialogs(), &DialogHost::showSettings);
     connect(actionManager, &ActionManager::crop, this, &Core::toggleCropPanel);
     connect(actionManager, &ActionManager::setWallpaper, this, &Core::setWallpaper);
     connect(actionManager, &ActionManager::open, this, &Core::showOpenDialog);
@@ -544,7 +545,7 @@ void Core::openFromClipboard() {
             return;
         QString destPath = (!model->isEmpty() ? model->directoryPath() : QDir::homePath());
         destPath.append("/clipboard.png");
-        destPath = mw->getSaveFileName(destPath);
+        destPath = mw->dialogs()->getSaveFileName(destPath);
         if(destPath.isEmpty())
             return;
         // the same save-with-rollback the on-disk editors use; this used to be
@@ -754,7 +755,7 @@ void Core::outputError(const FileOpResult &error) const {
 }
 
 void Core::showOpenDialog() {
-    mw->showOpenDialog(model->directoryPath());
+    mw->dialogs()->showOpenDialog(model->directoryPath());
 }
 
 void Core::showInDirectory() {
@@ -1073,7 +1074,7 @@ void Core::toggleFullscreenInfoBar() {
 void Core::requestSavePath() {
     if(model->isEmpty())
         return;
-    mw->showSaveDialog(selectedPath());
+    mw->dialogs()->showSaveDialog(selectedPath());
 }
 
 void Core::showResizeDialog() {
@@ -1081,7 +1082,7 @@ void Core::showResizeDialog() {
         return;
     auto img = model->getImage(selectedPath());
     if(img)
-        mw->showResizeDialog(img->size());
+        mw->dialogs()->showResizeDialog(img->size());
 }
 
 // ---------------------------------------------------------------- image operations
