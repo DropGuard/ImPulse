@@ -58,6 +58,11 @@
 # fresh-configure scan of the SAME content reads 13-14. The four sites were an
 # artifact of the older flag set, recorded here twice-verified gone.
 instrument c6395492fe177ecd
+# The fingerprint protects COUNTS. With the table empty there is nothing to
+# protect — every finding fails as NEW/GONE on its own — so a moved instrument
+# (typically a new TU entering the scanned set) is not a gate event, and the
+# fingerprint is updated without ceremony. It still gets recorded, for the day
+# a row returns. lint.py enforces the mismatch only while the table has rows.
 
 # The fingerprint is the scanned (file, command) set from compile_commands.json
 # PLUS the --version output of every tool that judged it (the compilers named in
