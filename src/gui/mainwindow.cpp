@@ -5,8 +5,6 @@
 #include "gui/dialoghost.h"
 #include "gui/cropcontroller.h"
 
-// TODO: nuke this and rewrite
-
 MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appState(state), infoBarFullscreen(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     layout.setContentsMargins(0, 0, 0, 0);
