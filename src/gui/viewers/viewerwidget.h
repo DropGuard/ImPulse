@@ -2,6 +2,8 @@
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include <QVBoxLayout>
+#include <QProperty>
+#include <functional>
 #include "gui/viewers/imageviewerv2.h"
 #include "gui/viewers/videoplayerinitproxy.h"
 #include "gui/overlays/videocontrolsproxy.h"
@@ -18,6 +20,8 @@ enum CurrentWidget {
 class ViewerWidget : public FloatingWidgetContainer {
     Q_OBJECT
   public:
+    // forwards to ImageViewerV2's fit-mode notifications
+    QPropertyNotifier observeFitMode(std::function<void()> callback);
     explicit ViewerWidget(QWidget *parent = nullptr);
     ~ViewerWidget() override;
     QRect imageRect();
@@ -70,8 +74,6 @@ class ViewerWidget : public FloatingWidgetContainer {
     void onAnimationPlaybackFinished();
 
   signals:
-    // forwarded from ImageViewerV2 — the keymap's inspect scope follows this
-    void fitModeChanged(ImageFitMode mode);
     void scalingRequested(QSize, ScalingFilter);
     void zoomIn();
     void zoomOut();
