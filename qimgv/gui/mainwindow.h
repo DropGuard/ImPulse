@@ -59,6 +59,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode,
                                    bool multiple) override;
     DialogHost *dialogs();
+    ViewerWidget *viewer();
     CropController *crop();
 
   private:
@@ -93,8 +94,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void setupUi();
 
     void mouseDoubleClickEvent(QMouseEvent *event) override;
-
-    void setInteractionEnabled(bool mode);
 
   private slots:
     void readSettings();
@@ -136,23 +135,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     // These were 17 declared signals relay-connected to the same-named viewer
     // signals — plumbing with no body of its own; ActionManager connects to
     // the slots unchanged.
-    void zoomIn();
-    void zoomOut();
-    void zoomInCursor();
-    void zoomOutCursor();
-    void scrollUp();
-    void scrollDown();
-    void scrollLeft();
-    void scrollRight();
-    void pauseVideo();
-    void seekVideoForward();
-    void seekVideoBackward();
-    void frameStep();
-    void frameStepBack();
-    void toggleMute();
-    void volumeUp();
-    void volumeDown();
-    void toggleTransparencyGrid();
     void enableFolderView();
     void enableDocumentView();
     void showMessage(const QString &text) override;
@@ -165,9 +147,9 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void closeImage();
     void showContextMenu();
     void onSortingChanged(SortingMode);
+    void setFilter(ScalingFilter filter);
     void setFilterNearest();
     void setFilterBilinear();
-    void setFilter(ScalingFilter filter);
     void toggleScalingFilter();
     void toggleLockZoom();
     void toggleLockView();
