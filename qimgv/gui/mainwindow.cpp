@@ -357,7 +357,6 @@ void MW::dropEvent(QDropEvent *event) {
 }
 
 void MW::resizeEvent(QResizeEvent *event) {
-    cropController->onWindowResized();
     FloatingWidgetContainer::resizeEvent(event);
 }
 

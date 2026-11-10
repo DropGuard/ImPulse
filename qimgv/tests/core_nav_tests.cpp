@@ -806,14 +806,16 @@ class TestCoreNav : public QObject {
     // emit cancel — the crop buttons are therefore pinned on "exactly one of
     // {crop, cropAndSave, cancel} fired", not on a guessed branch.
     void cropPanelConnectionsDeliver() {
-        FloatingWidgetContainer container;
-        CropOverlay overlay(&container);
+        // the overlay pulls its geometry from the viewer, so the fixture is a
+        // real viewer with a 100x100 image at scale 1.0 — imageRect reads
+        // (0,0,100,100), exactly what the old push used to fake
+        ViewerWidget viewer;
+        QPixmap pm(100, 100);
+        pm.fill(Qt::red);
+        viewer.showImage(std::make_unique<QPixmap>(pm));
+        CropOverlay overlay(&viewer);
         CropPanel panel(&overlay);
         panel.setImageRealSize(QSize(100, 100));
-        // the overlay needs a drawn image for its selection to be non-empty:
-        // without it width/height read back 0 and every crop endpoint collapses
-        overlay.setImageRealSize(QSize(100, 100));
-        overlay.setImageDrawRect(QRect(0, 0, 100, 100));
 
         auto *cancelBtn = panel.findChild<QPushButton *>("cancelButton");
         auto *cropBtn = panel.findChild<QPushButton *>("cropButton");
@@ -1495,13 +1497,6 @@ class TestCoreNav : public QObject {
         QVERIFY(activated.isValid());
         QMetaObject::invokeMethod(&second, "itemActivated", Q_ARG(int, 0));
         QCOMPARE(activated.count(), 1);
-    }
-
-    void cropOverlayImageScaleFollowsTheArgument() {
-        FloatingWidgetContainer container;
-        CropOverlay overlay(&container);
-        overlay.setImageScale(2.5f);
-        QCOMPARE(overlay.imageScale(), 2.5f);
     }
 
     // What a widget destructor forgets cannot be seen by the app: the tree is

@@ -76,16 +76,9 @@ void CropController::hideCropPanel() {
 
 void CropController::updateCropPanelData() {
     if(cropPanel && activeSidePanel == SIDEPANEL_CROP) {
+        // the overlay pulls its geometry from the viewer itself; the panel's
+        // size readout is a label, so it still gets pushed
         cropPanel->setImageRealSize(viewer->sourceSize());
-        cropOverlay->setImageDrawRect(viewer->imageRect());
-        cropOverlay->setImageScale(viewer->currentScale());
-        cropOverlay->setImageRealSize(viewer->sourceSize());
-    }
-}
-
-void CropController::onWindowResized() {
-    if(activeSidePanel == SIDEPANEL_CROP) {
-        cropOverlay->setImageScale(viewer->currentScale());
-        cropOverlay->setImageDrawRect(viewer->imageRect());
+        cropOverlay->onImageChanged();
     }
 }
