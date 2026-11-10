@@ -46,6 +46,11 @@ python3 scripts/lint.py build --gate
 # clazy, separate configured tree (clazy 1.17 + level0/level1/detaching)
 CLAZY_CHECKS="level0,level1,detaching" cmake --build build-clazy -j$(nproc)
 
+# style: .clang-format is the tree's own (derived from it, 2026-11-10); the
+# hook checks staged files. Blame should skip the reformat commit:
+# git config blame.ignoreRevsFile .git-blame-ignore-revs (one line per clone)
+clang-format -i <files>
+
 # line coverage (logic/GUI layers reported separately; ranks test work only, not a gate)
 python3 scripts/coverage.py
 
@@ -71,7 +76,8 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 # same block.
 ```
 
-The pre-commit hook runs incremental build + 6 suites + `lint --gate`
+The pre-commit hook checks staged C++ against `.clang-format`, then runs
+incremental build + 6 suites + `lint --gate`
 (~10-30 s plus ~5 s lint warm), plus Miri
 (~2 min) whenever the engine's pure layer is staged — the trigger is a
 mechanical staged-path check, with watcher/fd.rs and engine.rs excluded
