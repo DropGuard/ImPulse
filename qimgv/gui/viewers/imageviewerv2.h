@@ -36,6 +36,13 @@ class ImageViewerV2 : public QGraphicsView {
     ImageViewerV2(QWidget *parent = nullptr);
     ~ImageViewerV2() override;
     virtual ImageFitMode fitMode() const;
+
+  private:
+    // every imageFitMode assignment funnels through here so the scope signal
+    // cannot be missed by a future direct write
+    void setFitModeValue(ImageFitMode mode);
+
+  public:
     virtual QRect scaledRectR() const;
     virtual float currentScale() const;
     virtual QSize sourceSize() const;
@@ -57,6 +64,10 @@ class ImageViewerV2 : public QGraphicsView {
     void disableDrags();
 
   signals:
+    // emitted whenever the fit mode changes, wherever that happens — the keymap
+    // layer consults it to arm/disarm the inspect scope (fit original + free
+    // zoom mean "I am inspecting this image")
+    void fitModeChanged(ImageFitMode mode);
     void scalingRequested(QSize, ScalingFilter);
     void scaleChanged(qreal);
     void draggedOut();
@@ -132,8 +143,8 @@ class ImageViewerV2 : public QGraphicsView {
     QTimer *animationTimer, *scaleTimer;
     QScrollBar *hs, *vs;
     QPoint mouseMoveStartPos, mousePressPos, drawPos;
-    bool transparencyGrid, expandImage, smoothAnimatedImages, smoothUpscaling, forceFastScale, keepFitMode,
-        loopPlayback, mIsFullscreen, scrollBarWorkaround, useFixedZoomLevels, trackpadDetection;
+    bool transparencyGrid, expandImage, smoothAnimatedImages, smoothUpscaling, forceFastScale, loopPlayback,
+        mIsFullscreen, scrollBarWorkaround, useFixedZoomLevels, trackpadDetection;
     QList<float> zoomLevels;
     MouseInteractionState mouseInteraction;
     const int SCROLL_UPDATE_RATE = 7;

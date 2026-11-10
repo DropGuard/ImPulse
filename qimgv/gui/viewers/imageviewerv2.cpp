@@ -2,12 +2,11 @@
 
 ImageViewerV2::ImageViewerV2(QWidget *parent)
     : QGraphicsView(parent), pixmap(nullptr), pixmapScaled(nullptr), movie(nullptr), transparencyGrid(false),
-      expandImage(false), smoothAnimatedImages(true), smoothUpscaling(true), forceFastScale(false), keepFitMode(false),
-      loopPlayback(true), mIsFullscreen(false), scrollBarWorkaround(true), useFixedZoomLevels(false),
-      trackpadDetection(true), mouseInteraction(MouseInteractionState::MOUSE_NONE), minScale(0.01f), maxScale(500.0f),
-      fitWindowScale(0.125f), fitWindowStretchScale(0.125f), mViewLock(LOCK_NONE), imageFitMode(FIT_WINDOW),
-      mScalingFilter(QI_FILTER_BILINEAR), imageFitModeDefault(FIT_WINDOW), scene(nullptr),
-      checkboard(":res/icons/common/other/checkerboard.png") {
+      expandImage(false), smoothAnimatedImages(true), smoothUpscaling(true), forceFastScale(false), loopPlayback(true),
+      mIsFullscreen(false), scrollBarWorkaround(true), useFixedZoomLevels(false), trackpadDetection(true),
+      mouseInteraction(MouseInteractionState::MOUSE_NONE), minScale(0.01f), maxScale(500.0f), fitWindowScale(0.125f),
+      fitWindowStretchScale(0.125f), mViewLock(LOCK_NONE), imageFitMode(FIT_WINDOW), mScalingFilter(QI_FILTER_BILINEAR),
+      imageFitModeDefault(FIT_WINDOW), scene(nullptr), checkboard(":res/icons/common/other/checkerboard.png") {
     setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
     this->viewport()->setAttribute(Qt::WA_OpaquePaintEvent, true);
     setFocusPolicy(Qt::NoFocus);
@@ -115,7 +114,6 @@ void ImageViewerV2::readSettings() {
     expandLimit = static_cast<float>(settings->expandLimit());
     if(expandLimit < 1.0f)
         expandLimit = maxScale;
-    keepFitMode = settings->keepFitMode();
     imageFitModeDefault = settings->imageFitMode();
     zoomStep = settings->zoomStep();
     focusIn1to1 = settings->focusPointIn1to1Mode();
@@ -275,13 +273,17 @@ void ImageViewerV2::showAnimation(std::shared_ptr<QMovie> _movie) {
         emit frameChanged(0);
 
         updateMinScale();
-        if(!keepFitMode || imageFitMode == FIT_FREE)
-            imageFitMode = imageFitModeDefault;
+        if(imageFitMode == FIT_FREE)
+            setFitModeValue(imageFitModeDefault);
 
         if(mViewLock == LOCK_NONE) {
             applyFitMode();
+            // fit original declares "I am inspecting": the viewport follows
+            // the user across switches instead of re-centering
+            if(imageFitMode == FIT_ORIGINAL)
+                applySavedViewportPos();
         } else {
-            imageFitMode = FIT_FREE;
+            setFitModeValue(FIT_FREE);
             fitFree(lockedScale);
             if(mViewLock == LOCK_ALL)
                 applySavedViewportPos();
@@ -305,13 +307,15 @@ void ImageViewerV2::showImage(std::unique_ptr<QPixmap> _pixmap) {
         pixmapItem.show();
         updateMinScale();
 
-        if(!keepFitMode || imageFitMode == FIT_FREE)
-            imageFitMode = imageFitModeDefault;
+        if(imageFitMode == FIT_FREE)
+            setFitModeValue(imageFitModeDefault);
 
         if(mViewLock == LOCK_NONE) {
             applyFitMode();
+            if(imageFitMode == FIT_ORIGINAL)
+                applySavedViewportPos();
         } else {
-            imageFitMode = FIT_FREE;
+            setFitModeValue(FIT_FREE);
             fitFree(lockedScale);
             if(mViewLock == LOCK_ALL)
                 applySavedViewportPos();
@@ -671,9 +675,12 @@ void ImageViewerV2::showEvent(QShowEvent *event) {
     QGraphicsView::showEvent(event);
     // ensure we are properly resized
     qApp->processEvents();
-    // reapply fitmode to fix viewport position
-    if(imageFitMode == FIT_ORIGINAL)
+    // reapply fitmode to fix viewport position; the saved viewport follows
+    // so a show in the middle of an inspection does not re-center
+    if(imageFitMode == FIT_ORIGINAL) {
         applyFitMode();
+        applySavedViewportPos();
+    }
 }
 
 void ImageViewerV2::drawBackground(QPainter *painter, const QRectF &rect) {
@@ -703,15 +710,15 @@ inline void ImageViewerV2::mouseMoveZoom(QMouseEvent *event) {
     int moveDistance = mouseMoveStartPos.y() - currentPos;
     float newScale = currentScale() * (1.0f + stepMultiplier * moveDistance * dpr);
     mouseMoveStartPos = event->pos();
-    imageFitMode = FIT_FREE;
+    setFitModeValue(FIT_FREE);
 
     zoomAnchored(newScale);
     centerIfNecessary();
     snapToEdges();
     if(pixmapItem.scale() == fitWindowScale)
-        imageFitMode = FIT_WINDOW;
+        setFitModeValue(FIT_WINDOW);
     else if(pixmapItem.scale() == fitWindowStretchScale)
-        imageFitMode = FIT_WINDOW_STRETCH;
+        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 // scale at which current image fills the window
@@ -868,9 +875,16 @@ void ImageViewerV2::setFitMode(ImageFitMode newMode) {
     if(scaleTimer->isActive())
         scaleTimer->stop();
     stopPosAnimation();
-    imageFitMode = newMode;
+    setFitModeValue(newMode);
     applyFitMode();
     requestScaling();
+}
+
+void ImageViewerV2::setFitModeValue(ImageFitMode mode) {
+    if(imageFitMode == mode)
+        return;
+    imageFitMode = mode;
+    emit fitModeChanged(mode);
 }
 
 // public, sends scale request
@@ -1073,11 +1087,11 @@ void ImageViewerV2::doZoomIn(bool atCursor) {
     zoomAnchored(newScale);
     centerIfNecessary();
     snapToEdges();
-    imageFitMode = FIT_FREE;
+    setFitModeValue(FIT_FREE);
     if(pixmapItem.scale() == fitWindowScale)
-        imageFitMode = FIT_WINDOW;
+        setFitModeValue(FIT_WINDOW);
     else if(pixmapItem.scale() == fitWindowStretchScale)
-        imageFitMode = FIT_WINDOW_STRETCH;
+        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 // zoom out around viewport center
@@ -1114,11 +1128,11 @@ void ImageViewerV2::doZoomOut(bool atCursor) {
     zoomAnchored(newScale);
     centerIfNecessary();
     snapToEdges();
-    imageFitMode = FIT_FREE;
+    setFitModeValue(FIT_FREE);
     if(pixmapItem.scale() == fitWindowScale)
-        imageFitMode = FIT_WINDOW;
+        setFitModeValue(FIT_WINDOW);
     else if(pixmapItem.scale() == fitWindowStretchScale)
-        imageFitMode = FIT_WINDOW_STRETCH;
+        setFitModeValue(FIT_WINDOW_STRETCH);
 }
 
 void ImageViewerV2::toggleLockZoom() {
@@ -1138,7 +1152,7 @@ bool ImageViewerV2::lockZoomEnabled() {
 
 void ImageViewerV2::lockZoom() {
     lockedScale = pixmapItem.scale();
-    imageFitMode = FIT_FREE;
+    setFitModeValue(FIT_FREE);
     saveViewportPos();
 }
 
@@ -1161,7 +1175,10 @@ bool ImageViewerV2::lockViewEnabled() {
 // savedViewportPos is [0...1][0...1]
 // values are where viewport center is on the image
 void ImageViewerV2::saveViewportPos() {
-    if(mViewLock != LOCK_ALL)
+    // the position persists for LOCK_ALL, and for fit original: the mode
+    // itself declares "I am inspecting", so the viewport follows the user
+    // across image switches until they leave the mode
+    if(mViewLock != LOCK_ALL && imageFitMode != FIT_ORIGINAL)
         return;
     QGraphicsPixmapItem *item = &pixmapItem;
     QPointF sceneCenter = mapToScene(viewport()->rect().center()) + QPointF(1, 1);

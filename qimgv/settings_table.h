@@ -133,7 +133,6 @@ inline constexpr SettingDesc K_ShowChangelogs = BOOL("showChangelogs", true);
 inline constexpr SettingDesc K_BlurBackground = BOOL("blurBackground", true);
 inline constexpr SettingDesc K_PlayVideoSounds = BOOL("playVideoSounds", false);
 inline constexpr SettingDesc K_UsePreloader = BOOL("usePreloader", true);
-inline constexpr SettingDesc K_KeepFitMode = BOOL("keepFitMode", false);
 inline constexpr SettingDesc K_FullscreenMode = BOOL("openInFullscreen", false);
 inline constexpr SettingDesc K_PanelEnabled = BOOL("panelEnabled", true);
 inline constexpr SettingDesc K_PanelFullscreenOnly = BOOL("panelFullscreenOnly", true);
@@ -202,7 +201,6 @@ inline constexpr const SettingDesc *kAllSettings[] = {
     &K_BlurBackground,
     &K_PlayVideoSounds,
     &K_UsePreloader,
-    &K_KeepFitMode,
     &K_FullscreenMode,
     &K_PanelEnabled,
     &K_PanelFullscreenOnly,

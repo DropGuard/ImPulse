@@ -70,6 +70,8 @@ class ViewerWidget : public FloatingWidgetContainer {
     void onAnimationPlaybackFinished();
 
   signals:
+    // forwarded from ImageViewerV2 — the keymap's inspect scope follows this
+    void fitModeChanged(ImageFitMode mode);
     void scalingRequested(QSize, ScalingFilter);
     void zoomIn();
     void zoomOut();

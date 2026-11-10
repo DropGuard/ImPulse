@@ -26,6 +26,12 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     this->setAccessibleName("mainwindow");
     windowShell = new WindowShell(this);
     setupUi();
+    // the keymap's inspect scope follows the viewer's fit mode: fit original
+    // / free zoom declare "I am inspecting this image" — the arrows pan and
+    // never change images until the user leaves the mode
+    connect(viewerWidget, &ViewerWidget::fitModeChanged, this, [this](ImageFitMode mode) {
+        actionManager->setInspectMode(mode == FIT_ORIGINAL || mode == FIT_FREE);
+    });
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
     cropController = new CropController(this, viewerWidget, sidePanel, docWidget);
     dialogHost = new DialogHost(this, docWidget);
