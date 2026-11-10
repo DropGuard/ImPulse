@@ -546,6 +546,40 @@ class TestCoreNav : public QObject {
         QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.0f));
     }
 
+    // zoom stays available while crop is active (Framing policy): it is how
+    // the user fine-frames the selection, and the selection is image-anchored
+    // so it rides the zoom unchanged. Fit stays blocked — a fit would reset
+    // the view the user is framing in.
+    void cropAllowsZoomFineTuning() {
+        QImage big(2000, 1200, QImage::Format_RGB32);
+        big.fill(Qt::darkYellow);
+        QVERIFY(big.save(QDir(base).filePath("fine.png"), "PNG"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("fine.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("fine.png"), 10000);
+        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        QVERIFY(viewer);
+        core.mw->fitOriginal();
+        QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        auto *overlay = core.mw->findChild<CropOverlay *>();
+        QVERIFY(overlay);
+        overlay->selectAll();
+
+        viewer->zoomIn();
+        QVERIFY(viewer->currentScale() > 1.0f);
+        // the selection is image-anchored: zooming re-derives the mapping,
+        // the selection itself does not move or scale
+        QCOMPARE(overlay->imageScale(), viewer->currentScale());
+
+        // fit remains blocked while framing
+        float scale = viewer->currentScale();
+        viewer->fitWindow();
+        QVERIFY(qAbs(viewer->currentScale() - scale) < 0.001f);
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;

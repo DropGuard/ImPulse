@@ -9,8 +9,8 @@
 
 ViewerWidget::ViewerWidget(QWidget *parent)
     : FloatingWidgetContainer(parent), imageViewer(nullptr), videoPlayer(nullptr), contextMenu(nullptr),
-      videoControls(nullptr), currentWidget(UNSET), mInteractionEnabled(false), mWaylandCursorWorkaround(false),
-      mIsFullscreen(false) {
+      videoControls(nullptr), currentWidget(UNSET), canvasInputPolicy(CanvasInputPolicy::All),
+      mWaylandCursorWorkaround(false), mIsFullscreen(false) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     setMouseTracking(true);
 #ifdef Q_OS_LINUX
@@ -30,6 +30,7 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     connect(imageViewer.get(), &ImageViewerV2::scalingRequested, this, &ViewerWidget::scalingRequested);
     connect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::onScaleChanged);
+    connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::canvasScaleChanged);
     connect(imageViewer.get(), &ImageViewerV2::playbackFinished, this, &ViewerWidget::onAnimationPlaybackFinished);
 
     videoPlayer.reset(new VideoPlayerInitProxy(this));
@@ -51,7 +52,7 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     connect(videoControls, &VideoControlsProxyWrapper::seek, this, &ViewerWidget::seek);
 
     enableImageViewer();
-    setCanvasInputEnabled(true);
+    setCanvasInputPolicy(CanvasInputPolicy::All);
 
     connect(&cursorTimer, &QTimer::timeout, this, &ViewerWidget::hideCursor);
 
@@ -177,12 +178,12 @@ void ViewerWidget::onAnimationPlaybackFinished() {
         emit playbackFinished();
 }
 
-void ViewerWidget::setCanvasInputEnabled(bool mode) {
-    if(mInteractionEnabled == mode)
+void ViewerWidget::setCanvasInputPolicy(CanvasInputPolicy policy) {
+    if(canvasInputPolicy == policy)
         return;
-    mInteractionEnabled = mode;
-    imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, !mode);
-    if(!mode)
+    canvasInputPolicy = policy;
+    imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, policy != CanvasInputPolicy::All);
+    if(policy != CanvasInputPolicy::All)
         hideContextMenu();
 }
 
@@ -191,67 +192,67 @@ void ViewerWidget::setCanvasInputEnabled(bool mode) {
 // grid / lock family is ungated on purpose (it worked mid crop under the old
 // wiring bank, and that behavior is preserved verbatim)
 void ViewerWidget::zoomIn() {
-    if(!mInteractionEnabled)
-        return;
+    // zoom survives Framing: it is the fine-adjustment affordance of the
+    // crop flow, and the overlay re-derives its mapping from live queries
     imageViewer->zoomIn();
 }
 
 void ViewerWidget::zoomOut() {
-    if(!mInteractionEnabled)
-        return;
+    // zoom survives Framing: it is the fine-adjustment affordance of the
+    // crop flow, and the overlay re-derives its mapping from live queries
     imageViewer->zoomOut();
 }
 
 void ViewerWidget::zoomInCursor() {
-    if(!mInteractionEnabled)
-        return;
+    // zoom survives Framing: it is the fine-adjustment affordance of the
+    // crop flow, and the overlay re-derives its mapping from live queries
     imageViewer->zoomInCursor();
 }
 
 void ViewerWidget::zoomOutCursor() {
-    if(!mInteractionEnabled)
-        return;
+    // zoom survives Framing: it is the fine-adjustment affordance of the
+    // crop flow, and the overlay re-derives its mapping from live queries
     imageViewer->zoomOutCursor();
 }
 
 void ViewerWidget::scrollUp() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->scrollUp();
 }
 
 void ViewerWidget::scrollDown() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->scrollDown();
 }
 
 void ViewerWidget::scrollLeft() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->scrollLeft();
 }
 
 void ViewerWidget::scrollRight() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->scrollRight();
 }
 
 void ViewerWidget::fitWindow() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->setFitWindow();
 }
 
 void ViewerWidget::fitWidth() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->setFitWidth();
 }
 
 void ViewerWidget::fitOriginal() {
-    if(!mInteractionEnabled)
+    if(canvasInputPolicy != CanvasInputPolicy::All)
         return;
     imageViewer->setFitOriginal();
 }
@@ -281,7 +282,7 @@ void ViewerWidget::toggleLockView() {
 }
 
 bool ViewerWidget::interactionEnabled() {
-    return mInteractionEnabled;
+    return canvasInputPolicy == CanvasInputPolicy::All;
 }
 
 bool ViewerWidget::showImage(std::unique_ptr<QPixmap> pixmap) {

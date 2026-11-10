@@ -91,6 +91,10 @@ class CropOverlay : public FloatingWidget {
     void setResizeAnchor(CursorAction action);
     bool hasSelection();
   public slots:
+    // re-derive the screen-side mapping (selection draw rect, handles) from
+    // the live geometry and repaint — the overlay's reaction to any viewer
+    // scale change while surfaced
+    void refreshMapping();
     void hide();
     void onSelectionOutsideChange(QRect selection);
     void selectAll();
