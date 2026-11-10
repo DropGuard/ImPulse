@@ -13,6 +13,7 @@
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
 #include "gui/dialoghost.h"
+#include "gui/cropcontroller.h"
 
 #include <QThread>
 #include <QDrag>
@@ -156,8 +157,8 @@ void Core::connectComponents() {
     connect(mw->overlays(), &OverlayHost::moveRequested, this, &Core::moveCurrentFile);
     connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
     connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
-    connect(mw, &MW::cropRequested, this, &Core::crop);
-    connect(mw, &MW::cropAndSaveRequested, this, &Core::cropAndSave);
+    connect(mw->crop(), &CropController::cropRequested, this, &Core::crop);
+    connect(mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
     connect(mw->overlays(), &OverlayHost::saveAsClicked, this, &Core::requestSavePath);
     connect(mw->overlays(), &OverlayHost::saveRequested, this, &Core::saveCurrentFile);
     connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
@@ -1063,8 +1064,8 @@ void Core::copyCurrentFile(const QString &destDirectory) {
 void Core::toggleCropPanel() {
     if(model->isEmpty())
         return;
-    if(mw->isCropPanelActive() || state.hasActiveImage)
-        mw->triggerCropPanel();
+    if(mw->crop()->isCropPanelActive() || state.hasActiveImage)
+        mw->crop()->trigger();
 }
 
 void Core::toggleFullscreenInfoBar() {

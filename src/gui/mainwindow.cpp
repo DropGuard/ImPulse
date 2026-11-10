@@ -3,12 +3,11 @@
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
 #include "gui/dialoghost.h"
+#include "gui/cropcontroller.h"
 
 // TODO: nuke this and rewrite
 
-MW::MW(State *state, QWidget *parent)
-    : FloatingWidgetContainer(parent), appState(state), activeSidePanel(SIDEPANEL_NONE), infoBarFullscreen(nullptr),
-      cropPanel(nullptr), cropOverlay(nullptr) {
+MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appState(state), infoBarFullscreen(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     layout.setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
@@ -30,6 +29,7 @@ MW::MW(State *state, QWidget *parent)
     windowShell = new WindowShell(this);
     setupUi();
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
+    cropController = new CropController(this, viewerWidget, sidePanel, docWidget);
     dialogHost = new DialogHost(this, docWidget);
     connect(viewerWidget, &ViewerWidget::showScriptSettings, dialogHost, &DialogHost::showScriptSettings);
 
@@ -123,27 +123,15 @@ void MW::setupUi() {
 }
 
 void MW::setupFullUi() {
-    setupCropPanel();
+    cropController->setupCropPanel();
     docWidget->allowPanelInit();
     docWidget->setupMainPanel();
     infoBarWindowed->init();
     infoBarFullscreen->init();
 }
 
-void MW::setupCropPanel() {
-    if(cropPanel)
-        return;
-    cropOverlay = new CropOverlay(viewerWidget);
-    cropPanel = new CropPanel(cropOverlay, this);
-    connect(cropPanel, &CropPanel::cancel, this, &MW::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop, this, &MW::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop, this, &MW::cropRequested);
-    connect(cropPanel, &CropPanel::cropAndSave, this, &MW::hideCropPanel);
-    connect(cropPanel, &CropPanel::cropAndSave, this, &MW::cropAndSaveRequested);
-}
-
 void MW::enableFolderView() {
-    hideCropPanel();
+    cropController->hideCropPanel();
     overlayHost->hideTransientOverlays();
     docWidget->hideFloatingPanel();
     centralWidget->showFolderView();
@@ -227,14 +215,14 @@ void MW::showImage(std::unique_ptr<QPixmap> pixmap) {
     if(settings->autoResizeWindow())
         windowShell->preShowResize(pixmap->size());
     viewerWidget->showImage(std::move(pixmap));
-    updateCropPanelData();
+    cropController->updateCropPanelData();
 }
 
 void MW::showAnimation(const std::shared_ptr<QMovie> &movie) {
     if(settings->autoResizeWindow())
         windowShell->preShowResize(movie->frameRect().size());
     viewerWidget->showAnimation(movie);
-    updateCropPanelData();
+    cropController->updateCropPanelData();
 }
 
 void MW::showVideo(const QString &file) {
@@ -322,10 +310,6 @@ void MW::setFilter(ScalingFilter filter) {
     emit viewerWidget->setScalingFilter(filter);
 }
 
-bool MW::isCropPanelActive() {
-    return (activeSidePanel == SIDEPANEL_CROP);
-}
-
 void MW::onScalingFinished(std::unique_ptr<QPixmap> scaled) {
     viewerWidget->onScalingFinished(std::move(scaled));
 }
@@ -391,10 +375,7 @@ void MW::dropEvent(QDropEvent *event) {
 }
 
 void MW::resizeEvent(QResizeEvent *event) {
-    if(activeSidePanel == SIDEPANEL_CROP) {
-        cropOverlay->setImageScale(viewerWidget->currentScale());
-        cropOverlay->setImageDrawRect(viewerWidget->imageRect());
-    }
+    cropController->onWindowResized();
     FloatingWidgetContainer::resizeEvent(event);
 }
 
@@ -402,59 +383,9 @@ DialogResult MW::fileReplaceDialog(const QString &src, const QString &dst, FileR
     return dialogHost->fileReplaceDialog(src, dst, mode, multiple);
 }
 
-void MW::updateCropPanelData() {
-    if(cropPanel && activeSidePanel == SIDEPANEL_CROP) {
-        cropPanel->setImageRealSize(viewerWidget->sourceSize());
-        cropOverlay->setImageDrawRect(viewerWidget->imageRect());
-        cropOverlay->setImageScale(viewerWidget->currentScale());
-        cropOverlay->setImageRealSize(viewerWidget->sourceSize());
-    }
-}
-
-void MW::triggerCropPanel() {
-    if(activeSidePanel != SIDEPANEL_CROP) {
-        showCropPanel();
-    } else {
-        hideCropPanel();
-    }
-}
-
-void MW::showCropPanel() {
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW)
-        return;
-
-    // the crop wiring is live from initActions, but the panel is built in
-    // setupFullUi — which Core schedules 50ms after showGui. An early trigger
-    // used to dereference the null pair (cropPanelSurvivesAnEarlyTrigger).
-    if(!cropPanel)
-        setupCropPanel();
-
-    if(activeSidePanel != SIDEPANEL_CROP) {
-        docWidget->hideFloatingPanel();
-        sidePanel->setWidget(cropPanel);
-        sidePanel->show();
-        cropOverlay->show();
-        activeSidePanel = SIDEPANEL_CROP;
-        // reset & lock zoom so CropOverlay won't go crazy
-        emit viewerWidget->fitWindow();
-        setInteractionEnabled(false);
-        // feed the panel current image info
-        updateCropPanelData();
-    }
-}
-
 void MW::setInteractionEnabled(bool mode) {
     docWidget->setInteractionEnabled(mode);
     viewerWidget->setInteractionEnabled(mode);
-}
-
-void MW::hideCropPanel() {
-    sidePanel->hide();
-    if(activeSidePanel == SIDEPANEL_CROP) {
-        cropOverlay->hide();
-        setInteractionEnabled(true);
-    }
-    activeSidePanel = SIDEPANEL_NONE;
 }
 
 // the view is a projection: everything shown is re-derived here from the
@@ -484,6 +415,10 @@ void MW::refreshInfoViews() {
 }
 
 // TODO!!! buffer this in mw
+CropController *MW::crop() {
+    return cropController;
+}
+
 DialogHost *MW::dialogs() {
     return dialogHost;
 }
