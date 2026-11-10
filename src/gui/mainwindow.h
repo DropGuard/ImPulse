@@ -14,6 +14,8 @@
 
 struct State;
 
+class WindowShell;
+
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/iuserinteractions.h"
 #include "gui/viewers/viewerwidget.h"
@@ -63,6 +65,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     ThumbnailStripProxy *getThumbnailPanel();
 
     ViewMode currentViewMode();
+    WindowShell *shell();
 
     bool showConfirmation(const QString &title, const QString &msg) override;
     DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode,
@@ -73,14 +76,12 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     // at mainpanel.cpp ("The pointer here only observes"), generalized here.
     ViewerWidget *viewerWidget = nullptr;
     QHBoxLayout layout;
-    QTimer windowGeometryChangeTimer;
     // const by construction: the views read state, they never write it. The
     // one non-const use — wiring the notifiers — happens in the constructor
     // through the State* parameter, and never again.
     const State *appState = nullptr;
-    int currentDisplay;
 
-    bool showInfoBarFullscreen, showInfoBarWindowed, maximized;
+    bool showInfoBarFullscreen, showInfoBarWindowed;
     DocumentWidget *docWidget = nullptr;
     FolderViewProxy *folderView = nullptr;
     CentralWidget *centralWidget = nullptr;
@@ -102,33 +103,25 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     QPropertyNotifier slideshowObserver;
     QPropertyNotifier shuffleObserver;
     QPropertyNotifier directoryObserver;
-    void saveWindowGeometry();
-    void restoreWindowGeometry();
-    void saveCurrentDisplay();
+    WindowShell *windowShell = nullptr;
     void setupUi();
 
-    void applyWindowedBackground();
-    void applyFullscreenBackground();
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
     void setupCropPanel();
     void setupCopyOverlay();
     void setupSaveOverlay();
     void setupRenameOverlay();
-    void preShowResize(QSize sz);
     void setInteractionEnabled(bool mode);
 
   private slots:
-    void updateCurrentDisplay();
     void readSettings();
     void adaptToWindowState();
-    void onWindowGeometryChanged();
     void refreshInfoViews();
     void showScriptSettings();
 
   protected:
     void mouseMoveEvent(QMouseEvent *event) override;
-    bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
@@ -186,7 +179,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
 
   public slots:
     void setupFullUi();
-    void showDefault();
     void showCropPanel();
     void hideCropPanel();
     void enableFolderView();
@@ -196,10 +188,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     QString getSaveFileName(const QString &fileName);
     void showResizeDialog(QSize initialSize);
     void showSettings();
-    void triggerFullScreen();
     void showMessageDirectory(const QString &dirName);
-    void showFullScreen();
-    void showWindowed();
     void triggerCopyOverlay();
     void showMessage(const QString &text) override;
     void showMessage(const QString &text, int duration);
@@ -207,7 +196,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void showWarning(const QString &text);
     void showError(const QString &text);
     void triggerMoveOverlay();
-    void closeFullScreenOrExit();
     void close();
     void triggerCropPanel();
     void updateCropPanelData();
