@@ -60,10 +60,16 @@ class CropOverlay : public FloatingWidget {
     bool lockAspectRatio;
     QBrush brushInactiveTint, brushDarkGray, brushGray, brushLightGray;
     QRectF handlesDpi[8];
-    int handleSize;
     CursorAction cursorAction;
     QPen selectionOutlinePen;
-    qreal dpr;
+    // both queried live: a window dragged across screens with different DPRs
+    // must not keep converting coordinates with the construction-time ratio
+    qreal dpr() const {
+        return devicePixelRatioF();
+    }
+    int handleSize() const {
+        return static_cast<int>(8 * dpr());
+    }
     QPointF ar;
 
     QRect placeInside(QRect what, QRect where);
