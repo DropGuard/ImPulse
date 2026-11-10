@@ -3,10 +3,7 @@
 
 #include <QStyle>
 
-ContextMenu::ContextMenu(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::ContextMenu)
-{
+ContextMenu::ContextMenu(QWidget *parent) : QWidget(parent), ui(new Ui::ContextMenu) {
     ui->setupUi(this);
     setWindowFlags(Qt::Popup);
     setAttribute(Qt::WA_TranslucentBackground, true);
@@ -122,10 +119,10 @@ ContextMenu::~ContextMenu() {
 // child-add order matches the visual order closely enough for keyboard
 // navigation; hidden and disabled entries are skipped so the selection
 // never lands on a dead row
-QList<ContextMenuItem*> ContextMenu::visibleItems() const {
-    QList<ContextMenuItem*> items;
-    const auto children = ui->stackedWidget->currentWidget()
-                              ->findChildren<ContextMenuItem*>(QString(), Qt::FindDirectChildrenOnly);
+QList<ContextMenuItem *> ContextMenu::visibleItems() const {
+    QList<ContextMenuItem *> items;
+    const auto children =
+        ui->stackedWidget->currentWidget()->findChildren<ContextMenuItem *>(QString(), Qt::FindDirectChildrenOnly);
     for(auto *item : children)
         if(item->isVisible() && item->isEnabled())
             items.append(item);
@@ -149,8 +146,8 @@ void ContextMenu::clearSelection() {
     selectedIndex = -1;
     // every child, visible or not: a stale property from a previous open
     // must not resurrect as a phantom highlight
-    const auto children = ui->stackedWidget->currentWidget()
-                              ->findChildren<ContextMenuItem*>(QString(), Qt::FindDirectChildrenOnly);
+    const auto children =
+        ui->stackedWidget->currentWidget()->findChildren<ContextMenuItem *>(QString(), Qt::FindDirectChildrenOnly);
     for(auto *item : children) {
         if(item->property("selected").isValid()) {
             item->setProperty("selected", false);
@@ -167,9 +164,8 @@ void ContextMenu::moveSelection(int delta) {
         selectedIndex = -1;
         return;
     }
-    selectedIndex = selectedIndex < 0
-        ? (delta > 0 ? 0 : items.size() - 1)
-        : (selectedIndex + delta + items.size()) % items.size();
+    selectedIndex =
+        selectedIndex < 0 ? (delta > 0 ? 0 : items.size() - 1) : (selectedIndex + delta + items.size()) % items.size();
     applySelection();
 }
 
@@ -184,10 +180,10 @@ void ContextMenu::activateSelected() {
 void ContextMenu::fillOpenWithMenu() {
     auto scripts = scriptManager->allScripts();
     QMap<QString, Script>::iterator i;
-    for (i = scripts.begin(); i != scripts.end(); ++i) {
+    for(i = scripts.begin(); i != scripts.end(); ++i) {
         if(!i.value().command.isEmpty()) {
             auto btn = new ContextMenuItem();
-            btn->setAction("s:"+i.key());
+            btn->setAction("s:" + i.key());
             btn->setIconPath(":/res/icons/common/menuitem/open16.png");
             btn->setText(i.key());
             ui->scriptsLayout->addWidget(btn);
@@ -260,20 +256,11 @@ void ContextMenu::keyPressEvent(QKeyEvent *event) {
     // not fire global actions behind itself (F used to toggle fullscreen
     // with the menu up, and Esc double-fired closeFullScreenOrExit)
     switch(event->key()) {
-    case Qt::Key_Escape:
-        hide();
-        return;
-    case Qt::Key_Up:
-        moveSelection(-1);
-        return;
-    case Qt::Key_Down:
-        moveSelection(1);
-        return;
+    case Qt::Key_Escape: hide(); return;
+    case Qt::Key_Up: moveSelection(-1); return;
+    case Qt::Key_Down: moveSelection(1); return;
     case Qt::Key_Return:
-    case Qt::Key_Enter:
-        activateSelected();
-        return;
-    default:
-        break;
+    case Qt::Key_Enter: activateSelected(); return;
+    default: break;
     }
 }

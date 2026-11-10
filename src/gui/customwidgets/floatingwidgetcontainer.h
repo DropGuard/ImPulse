@@ -5,13 +5,13 @@
 
 class FloatingWidgetContainer : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit FloatingWidgetContainer(QWidget *parent = nullptr);
 
-signals:
+  signals:
     void resized(QSize);
 
-protected:
+  protected:
     void resizeEvent(QResizeEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
 };

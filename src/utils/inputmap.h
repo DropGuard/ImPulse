@@ -4,7 +4,7 @@
 #include <QString>
 
 class InputMap {
-public:
+  public:
     InputMap();
     static InputMap *getInstance();
     const QMap<quint32, QString> &keys();
@@ -13,7 +13,7 @@ public:
     static QString keyNameAlt();
     static QString keyNameShift();
 
-private:
+  private:
     void initKeyMap();
     void initModMap();
     QMap<quint32, QString> keyMap;

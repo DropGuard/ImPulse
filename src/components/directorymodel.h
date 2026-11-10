@@ -9,7 +9,7 @@
 
 class DirectoryModel : public QObject {
     Q_OBJECT
-public:
+  public:
     explicit DirectoryModel(WorkerPool &pool, QObject *parent = nullptr);
     ~DirectoryModel() override;
 
@@ -72,12 +72,11 @@ public:
     QString dirNameAt(int index) const;
     QString dirPathAt(int index) const;
 
-
     bool saveFile(const QString &filePath);
     bool saveFile(const QString &filePath, const QString &destPath);
 
     bool containsDir(const QString &dirPath) const;
-signals:
+  signals:
     void fileRemoved(const QString &filePath, int index);
     void fileAdded(const QString &filePath);
     void fileModified(const QString &filePath);
@@ -88,16 +87,16 @@ signals:
     void loaded(const QString &filePath);
     void loadFailed(const QString &path);
     void sortingChanged(SortingMode);
-    void imageReady(std::shared_ptr<Image> img, const QString&, bool scaled);
+    void imageReady(std::shared_ptr<Image> img, const QString &, bool scaled);
     void imageUpdated(const QString &filePath);
 
-private:
+  private:
     DirectoryManager dirManager;
     Loader loader;
     QSet<QString> mScaledCache; // paths whose cached image is tier-1 (scaled)
     Cache cache;
 
-private slots:
+  private slots:
     void onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled);
     void onSortingChanged();
     void onFileAdded(const QString &filePath);

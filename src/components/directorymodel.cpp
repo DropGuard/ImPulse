@@ -2,20 +2,17 @@
 
 #include "components/directorymanager/enginebridge.h"
 
-DirectoryModel::DirectoryModel(WorkerPool &pool, QObject *parent) :
-    QObject(parent),
-    dirManager(EngineBridge::instance()),
-    loader(pool)
-{
+DirectoryModel::DirectoryModel(WorkerPool &pool, QObject *parent)
+    : QObject(parent), dirManager(EngineBridge::instance()), loader(pool) {
     scaler = new Scaler(&cache, pool);
 
-    connect(&dirManager, &DirectoryManager::fileRemoved,  this, &DirectoryModel::onFileRemoved);
-    connect(&dirManager, &DirectoryManager::fileAdded,    this, &DirectoryModel::onFileAdded);
+    connect(&dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
+    connect(&dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
     connect(&dirManager, &DirectoryManager::fileModified, this, &DirectoryModel::onFileModified);
-    connect(&dirManager, &DirectoryManager::fileRenamed,  this, &DirectoryModel::onFileRenamed);
-    connect(&dirManager, &DirectoryManager::dirRemoved,  this, &DirectoryModel::dirRemoved);
-    connect(&dirManager, &DirectoryManager::dirAdded,    this, &DirectoryModel::dirAdded);
-    connect(&dirManager, &DirectoryManager::dirRenamed,  this, &DirectoryModel::dirRenamed);
+    connect(&dirManager, &DirectoryManager::fileRenamed, this, &DirectoryModel::onFileRenamed);
+    connect(&dirManager, &DirectoryManager::dirRemoved, this, &DirectoryModel::dirRemoved);
+    connect(&dirManager, &DirectoryManager::dirAdded, this, &DirectoryModel::dirAdded);
+    connect(&dirManager, &DirectoryManager::dirRenamed, this, &DirectoryModel::dirRenamed);
 
     connect(&dirManager, &DirectoryManager::loaded, this, &DirectoryModel::loaded);
     connect(&dirManager, &DirectoryManager::sortingChanged, this, &DirectoryModel::onSortingChanged);
@@ -71,8 +68,6 @@ QString DirectoryModel::dirNameAt(int index) const {
 QString DirectoryModel::dirPathAt(int index) const {
     return dirManager.dirPathAt(index);
 }
-
-
 
 QString DirectoryModel::directoryPath() const {
     return dirManager.directoryPath();
@@ -177,7 +172,7 @@ void DirectoryModel::unload(const QString &filePath) {
 void DirectoryModel::unloadExcept(const QString &filePath, bool keepNearby) {
     QList<QString> list;
     list << filePath;
-    if(keepNearby)  {
+    if(keepNearby) {
         list << prevOf(filePath);
         list << nextOf(filePath);
     }

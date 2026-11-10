@@ -12,22 +12,22 @@ namespace Ui {
 class ScriptEditorDialog;
 }
 
-class ScriptEditorDialog : public QDialog
-{
+class ScriptEditorDialog : public QDialog {
     Q_OBJECT
 
-public:
+  public:
     explicit ScriptEditorDialog(QWidget *parent = nullptr);
-    explicit ScriptEditorDialog(const QString& name, const Script& script, QWidget *parent = nullptr);
+    explicit ScriptEditorDialog(const QString &name, const Script &script, QWidget *parent = nullptr);
     ~ScriptEditorDialog() override;
     QString scriptName();
     Script script();
 
-private slots:
-    void onNameChanged(const QString& name);
+  private slots:
+    void onNameChanged(const QString &name);
 
     void selectScriptPath();
-private:
+
+  private:
     Ui::ScriptEditorDialog *ui;
     bool editMode;
     QString editTarget;

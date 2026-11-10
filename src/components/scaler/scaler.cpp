@@ -9,12 +9,7 @@
  */
 
 Scaler::Scaler(Cache *_cache, WorkerPool &_pool, QObject *parent)
-    : QObject(parent),
-      pool(_pool),
-      buffered(false),
-      running(false),
-      cache(_cache)
-{
+    : QObject(parent), pool(_pool), buffered(false), running(false), cache(_cache) {
     // no explicit connection type: `finished` is emitted on a pool thread and
     // received here, so it is queued by construction and the state machine runs
     // on the UI thread. DirectConnection used to run these slots on the pool
@@ -36,30 +31,30 @@ Scaler::~Scaler() {
 void Scaler::requestScaled(const ScalerRequest &req) {
     Q_ASSERT(QThread::currentThread() == thread());
     if(!running) {
-//////////////////////////////////
+        //////////////////////////////////
         if(!buffered) {
             bufferedRequest = req;
             buffered = true;
-          //qDebug() << "1 requestScaled() - locking..  " <<  req.image->name();
+            //qDebug() << "1 requestScaled() - locking..  " <<  req.image->name();
             cache->reserve(req.image->filePath());
-          //qDebug() << "1 requestScaled() - LOCKED!  " <<  req.image->name();
+            //qDebug() << "1 requestScaled() - LOCKED!  " <<  req.image->name();
             startRequest(req);
         } else if(bufferedRequest.image != req.image) {
-          //qDebug() << "2 requestScaled() - locking...  " <<  req.image->name();
+            //qDebug() << "2 requestScaled() - locking...  " <<  req.image->name();
             cache->reserve(req.image->filePath());
-          //qDebug() << "2 requestScaled() - LOCKED!  " <<  req.image->name();
+            //qDebug() << "2 requestScaled() - LOCKED!  " <<  req.image->name();
             auto tmp = bufferedRequest;
             bufferedRequest = req;
             buffered = true;
             if(startedRequest.image != tmp.image) {
                 cache->release(tmp.image->filePath());
-              //qDebug() << "2 requestScaled() - RELEASED!  " <<  tmp.image->name();
+                //qDebug() << "2 requestScaled() - RELEASED!  " <<  tmp.image->name();
             }
         } else {
             bufferedRequest = req;
             buffered = true;
         }
-//////////////////////////////
+        //////////////////////////////
     } else {
         if(!buffered) {
             if(req.image != startedRequest.image)
@@ -89,12 +84,12 @@ void Scaler::onTaskFinish(std::shared_ptr<const QImage> scaled, const ScalerRequ
     running = false;
     if(buffered && bufferedRequest.image == req.image) {
     } else {
-      //qDebug() << "onTaskFinish() - 2 releasing..  " <<  req.image->name();
+        //qDebug() << "onTaskFinish() - 2 releasing..  " <<  req.image->name();
         cache->release(req.image->filePath());
-      //qDebug() << "onTaskFinish() - 2 RELEASED!  " <<  name;
+        //qDebug() << "onTaskFinish() - 2 RELEASED!  " <<  name;
     }
     if(buffered) {
-      //qDebug() << "onTaskFinish - startingBuffered: " << bufferedRequest.string;
+        //qDebug() << "onTaskFinish - startingBuffered: " << bufferedRequest.string;
         // the discarded result frees itself
         startRequest(bufferedRequest);
     } else {

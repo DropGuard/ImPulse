@@ -5,22 +5,20 @@
 #include "gui/viewers/documentwidget.h"
 #include "settings.h"
 
-
-class CentralWidget : public QStackedWidget
-{
+class CentralWidget : public QStackedWidget {
     Q_OBJECT
-public:
+  public:
     explicit CentralWidget(DocumentWidget *_docWidget, FolderViewProxy *_folderView, QWidget *parent = nullptr);
 
     ViewMode currentViewMode();
-signals:
+  signals:
 
-public slots:
+  public slots:
     void showDocumentView();
     void showFolderView();
     void toggleViewMode();
 
-private:
+  private:
     DocumentWidget *documentView = nullptr;
     FolderViewProxy *folderView = nullptr;
     // MODE_FOLDER, not MODE_DOCUMENT: the ctor calls showDocumentView(),

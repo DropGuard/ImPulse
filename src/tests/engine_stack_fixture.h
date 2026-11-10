@@ -43,14 +43,14 @@
 #include "qimgv_engine.h"
 
 class EngineStackFixture {
-public:
+  public:
     explicit EngineStackFixture(const QString &domain)
         // the pid is in the path because two instances of this binary can run at
         // once (a manual run beside a ctest run), and a shared tree means one
         // process deletes directories the other is still watching
-        : fixtureBase(QStandardPaths::writableLocation(QStandardPaths::TempLocation)
-                      + "/qimgv-engine-stack-test/pid" + QString::number(QCoreApplication::applicationPid())
-                      + "/" + domain) {}
+        : fixtureBase(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/qimgv-engine-stack-test/pid" +
+                      QString::number(QCoreApplication::applicationPid()) + "/" + domain) {
+    }
 
     void makeFile(const QString &name) {
         QFile f(fixtureDir + "/" + name);
@@ -74,7 +74,9 @@ public:
 
     // the load environment for factory calls: tests run on their own thread,
     // so capturing from settings here is the legal side of R4's line
-    LoadPolicy loadPolicy() const { return LoadPolicy::fromSettings(); }
+    LoadPolicy loadPolicy() const {
+        return LoadPolicy::fromSettings();
+    }
 
     QSize offscreenScreenPixels() {
         QScreen *screen = QApplication::primaryScreen();
@@ -132,9 +134,18 @@ public:
         auto append = [&arena](const void *data, int n) {
             arena.append(static_cast<const char *>(data), n);
         };
-        auto put32 = [&append](quint32 v) { v = qToLittleEndian(v); append(&v, 4); };
-        auto put64 = [&append](quint64 v) { v = qToLittleEndian(v); append(&v, 8); };
-        auto putI64 = [&append](qint64 v) { v = qToLittleEndian(v); append(&v, 8); };
+        auto put32 = [&append](quint32 v) {
+            v = qToLittleEndian(v);
+            append(&v, 4);
+        };
+        auto put64 = [&append](quint64 v) {
+            v = qToLittleEndian(v);
+            append(&v, 8);
+        };
+        auto putI64 = [&append](qint64 v) {
+            v = qToLittleEndian(v);
+            append(&v, 8);
+        };
 
         put32(quint32(files.size()));
         put32(quint32(dirs.size()));
@@ -185,8 +196,11 @@ public:
         };
         auto fail = [&](const QString &what) {
             diff = QStringLiteral("%1 — engine: %2 files [%3] / mirror: %4 files [%5]")
-                       .arg(what).arg(int(files.size()))
-                       .arg(joinNames(files)).arg(int(dm.fileCount())).arg(joinMirrorFileNames());
+                       .arg(what)
+                       .arg(int(files.size()))
+                       .arg(joinNames(files))
+                       .arg(int(dm.fileCount()))
+                       .arg(joinMirrorFileNames());
             return false;
         };
         if(files.size() != dm.fileCount())
@@ -243,7 +257,7 @@ public:
         QVERIFY(QDir().mkpath(fixtureBase));
     }
 
-protected:
+  protected:
     IsolatedHome home;
     QString fixtureBase;
     QString fixtureDir;

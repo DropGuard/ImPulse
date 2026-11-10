@@ -12,16 +12,16 @@
 
 class MenuItem : public QWidget {
     Q_OBJECT
-public:
+  public:
     MenuItem(QWidget *parent = nullptr);
-    void setText(const QString& mTextLabel);
+    void setText(const QString &mTextLabel);
     QString text();
-    void setShortcutText(const QString& mTextLabel);
+    void setShortcutText(const QString &mTextLabel);
     QString shortcut();
-    void setIconPath(const QString& path);
+    void setIconPath(const QString &path);
     void setPassthroughClicks(bool mode);
 
-protected:
+  protected:
     IconButton mIconWidget;
     QLabel mTextLabel, mShortcutLabel;
     QHBoxLayout mLayout;

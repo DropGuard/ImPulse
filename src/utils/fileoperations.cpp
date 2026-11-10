@@ -43,31 +43,22 @@ void FileOperations::removeDir(const QString &dirPath, bool recursive, FileOpRes
 
 QString FileOperations::decodeResult(const FileOpResult &result) {
     switch(result) {
-    case FileOpResult::SUCCESS:
-        return QObject::tr("Operation completed succesfully.");
-    case FileOpResult::DESTINATION_FILE_EXISTS:
-        return QObject::tr("Destination file exists.");
-    case FileOpResult::DESTINATION_DIR_EXISTS:
-        return QObject::tr("Destination directory exists.");
-    case FileOpResult::SOURCE_NOT_WRITABLE:
-        return QObject::tr("Source file is not writable.");
-    case FileOpResult::DESTINATION_NOT_WRITABLE:
-        return QObject::tr("Destination is not writable.");
-    case FileOpResult::SOURCE_DOES_NOT_EXIST:
-        return QObject::tr("Source file does not exist.");
-    case FileOpResult::DESTINATION_DOES_NOT_EXIST:
-        return QObject::tr("Destination does not exist.");
-    case FileOpResult::DIRECTORY_NOT_EMPTY:
-        return QObject::tr("Directory is not empty.");
-    case FileOpResult::NOTHING_TO_DO:
-        return QObject::tr("Nothing to do.");
-    case FileOpResult::OTHER_ERROR:
-        return QObject::tr("Other error.");
+    case FileOpResult::SUCCESS: return QObject::tr("Operation completed succesfully.");
+    case FileOpResult::DESTINATION_FILE_EXISTS: return QObject::tr("Destination file exists.");
+    case FileOpResult::DESTINATION_DIR_EXISTS: return QObject::tr("Destination directory exists.");
+    case FileOpResult::SOURCE_NOT_WRITABLE: return QObject::tr("Source file is not writable.");
+    case FileOpResult::DESTINATION_NOT_WRITABLE: return QObject::tr("Destination is not writable.");
+    case FileOpResult::SOURCE_DOES_NOT_EXIST: return QObject::tr("Source file does not exist.");
+    case FileOpResult::DESTINATION_DOES_NOT_EXIST: return QObject::tr("Destination does not exist.");
+    case FileOpResult::DIRECTORY_NOT_EMPTY: return QObject::tr("Directory is not empty.");
+    case FileOpResult::NOTHING_TO_DO: return QObject::tr("Nothing to do.");
+    case FileOpResult::OTHER_ERROR: return QObject::tr("Other error.");
     }
     return nullptr;
 }
 
-void FileOperations::copyFileTo(const QString &srcFilePath, const QString &destDirPath, bool force, FileOpResult &result) {
+void FileOperations::copyFileTo(const QString &srcFilePath, const QString &destDirPath, bool force,
+                                FileOpResult &result) {
     QFileInfo srcFile(srcFilePath);
     QString tmpPath;
     bool exists = false;
@@ -143,7 +134,8 @@ void FileOperations::copyFileTo(const QString &srcFilePath, const QString &destD
     return;
 }
 
-void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destDirPath, bool force, FileOpResult &result) {
+void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destDirPath, bool force,
+                                FileOpResult &result) {
     QFileInfo srcFile(srcFilePath);
     QString tmpPath;
     bool exists = false;
@@ -156,12 +148,12 @@ void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destD
         result = FileOpResult::SOURCE_DOES_NOT_EXIST;
         return;
     }
-    #ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN32
     if(!srcFile.isWritable()) {
         result = FileOpResult::SOURCE_NOT_WRITABLE;
         return;
     }
-    #endif
+#endif
     QFileInfo destDir(destDirPath);
     if(!destDir.exists()) {
         result = FileOpResult::DESTINATION_DOES_NOT_EXIST;
@@ -343,8 +335,7 @@ bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath
         const QByteArray to = destPath.toUtf8();
         if(::rename(from.constData(), to.constData()) != 0)
             qCritical() << "[FileOperations] save failed AND the backup could not be"
-                        << "restored; the previous contents of" << destPath
-                        << "are still in" << tmpPath;
+                        << "restored; the previous contents of" << destPath << "are still in" << tmpPath;
     }
     return success;
 }

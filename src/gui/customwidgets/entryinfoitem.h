@@ -8,17 +8,16 @@
 #include <QPainter>
 #include <QDebug>
 
-class EntryInfoItem : public QWidget
-{
+class EntryInfoItem : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit EntryInfoItem(QWidget *parent = nullptr);
     void setInfo(QString _name, QString _value);
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
 
-private:
+  private:
     QString name;
     QString value;
     QHBoxLayout layout;

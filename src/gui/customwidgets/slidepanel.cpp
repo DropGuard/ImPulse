@@ -1,13 +1,9 @@
 #include "slidepanel.h"
 
 SlidePanel::SlidePanel(FloatingWidgetContainer *parent)
-    : FloatingWidget(parent) ,
-      panelSize(50),
-      slideAmount(40),
-      mWidget(nullptr)
-{
+    : FloatingWidget(parent), panelSize(50), slideAmount(40), mWidget(nullptr) {
     mLayout.setSpacing(0);
-    mLayout.setContentsMargins(0,0,0,0);
+    mLayout.setContentsMargins(0, 0, 0, 0);
     this->setLayout(&mLayout);
 
     //fade effect
@@ -41,7 +37,6 @@ SlidePanel::SlidePanel(FloatingWidgetContainer *parent)
 }
 
 SlidePanel::~SlidePanel() {
-
 }
 
 void SlidePanel::hide() {
@@ -152,23 +147,22 @@ void SlidePanel::recalculateGeometry() {
     if(layoutManaged())
         return;
     if(mPosition == PANEL_TOP) {
-        setAnimationRange(QPoint(0,0), QPoint(0,0) - QPoint(0, slideAmount));
-        saveStaticGeometry(QRect(QPoint(0, 0),
-                                 QPoint(containerSize().width() - 1, height() - 1)));
+        setAnimationRange(QPoint(0, 0), QPoint(0, 0) - QPoint(0, slideAmount));
+        saveStaticGeometry(QRect(QPoint(0, 0), QPoint(containerSize().width() - 1, height() - 1)));
     } else if(mPosition == PANEL_BOTTOM) {
         setAnimationRange(QPoint(0, containerSize().height() - height()),
                           QPoint(0, containerSize().height() - height() + slideAmount));
         saveStaticGeometry(QRect(QPoint(0, containerSize().height() - height()),
                                  QPoint(containerSize().width() - 1, containerSize().height())));
     } else if(mPosition == PANEL_LEFT) {
-        setAnimationRange(QPoint(0,0), QPoint(0,0) - QPoint(slideAmount, 0));
+        setAnimationRange(QPoint(0, 0), QPoint(0, 0) - QPoint(slideAmount, 0));
         saveStaticGeometry(QRect(0, 0, width(), containerSize().height()));
 
     } else { // right
         setAnimationRange(QPoint(containerSize().width() - width(), 0),
                           QPoint(containerSize().width() - width(), 0) + QPoint(slideAmount, 0));
-        saveStaticGeometry(QRect(containerSize().width() - width(), 0,
-                                 containerSize().width(), containerSize().height()));
+        saveStaticGeometry(
+            QRect(containerSize().width() - width(), 0, containerSize().width(), containerSize().height()));
     }
     this->setGeometry(staticGeometry());
     updateTriggerRect();
@@ -179,5 +173,4 @@ void SlidePanel::updateTriggerRect() {
 }
 
 void SlidePanel::setOrientation() {
-
 }

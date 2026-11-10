@@ -15,19 +15,19 @@
 
 class BookmarksItem : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit BookmarksItem(QString _dirName, QString _dirPath, QWidget *parent = nullptr);
     const QString &path();
 
-public slots:
+  public slots:
     void setHighlighted(bool mode);
 
-signals:
+  signals:
     void clicked(QString dirPath);
     void removeClicked(QString dirPath);
     void droppedIn(QList<QString> paths, QString dirPath);
 
-protected:
+  protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
 
@@ -36,10 +36,10 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragLeaveEvent(QDragLeaveEvent *event) override;
 
-private slots:
+  private slots:
     void onRemoveClicked();
 
-private:
+  private:
     QString dirName, dirPath;
 
     IconWidget folderIconWidget;

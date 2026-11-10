@@ -8,20 +8,20 @@ namespace Ui {
 class SaveConfirmOverlay;
 }
 
-class SaveConfirmOverlay : public OverlayWidget
-{
+class SaveConfirmOverlay : public OverlayWidget {
     Q_OBJECT
-public:
+  public:
     explicit SaveConfirmOverlay(FloatingWidgetContainer *parent = nullptr);
     ~SaveConfirmOverlay() override;
 
-signals:
+  signals:
     void saveClicked();
     void saveAsClicked();
     void discardClicked();
 
-private slots:
+  private slots:
     void readSettings();
-private:
+
+  private:
     Ui::SaveConfirmOverlay *ui;
 };

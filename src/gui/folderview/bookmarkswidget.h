@@ -11,24 +11,24 @@
 class BookmarksWidget : public QWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit BookmarksWidget(QWidget *parent = nullptr);
     ~BookmarksWidget() override;
 
-public slots:
-    void addBookmark(const QString& directoryPath);
+  public slots:
+    void addBookmark(const QString &directoryPath);
 
-    void removeBookmark(const QString& dirPath);
-    void onPathChanged(const QString& path);
-private slots:
+    void removeBookmark(const QString &dirPath);
+    void onPathChanged(const QString &path);
+  private slots:
     void readSettings();
 
     void saveBookmarks();
-signals:
+  signals:
     void bookmarkClicked(QString dirPath);
     void droppedIn(QList<QString> paths, QString dirPath);
 
-private:
+  private:
     QVBoxLayout layout;
     QStringList paths;
     QString highlightedPath;

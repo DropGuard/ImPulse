@@ -12,18 +12,18 @@ struct InfoBarStateBuffer {
 
 class InfoBarProxy : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit InfoBarProxy(QWidget *parent = nullptr);
     ~InfoBarProxy() override;
 
     void init();
-public slots:
-    void setInfo(const QString& position, const QString& fileName, const QString& info);
+  public slots:
+    void setInfo(const QString &position, const QString &fileName, const QString &info);
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
 
-private:
+  private:
     InfoBarStateBuffer stateBuf;
     QPointer<InfoBar> infoBar;
     QVBoxLayout layout;

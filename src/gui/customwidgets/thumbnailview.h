@@ -35,7 +35,7 @@ enum ScrollDirection {
 class ThumbnailView : public QGraphicsView, public IDirectoryView {
     Q_OBJECT
     Q_INTERFACES(IDirectoryView)
-public:
+  public:
     ThumbnailView(Qt::Orientation orient, QWidget *parent = nullptr);
     void setDirectoryPath(QString path) override;
     void select(QList<int>) override;
@@ -48,7 +48,7 @@ public:
     void clearSelection();
     void deselect(int index);
 
-public slots:
+  public slots:
     void show();
     void showEvent(QShowEvent *event) override;
     void resetViewport();
@@ -67,14 +67,14 @@ public slots:
     void renameItem(int oldIndex, int newIndex, const QString &name) override;
     void setDragHover(int index) override;
 
-signals:
+  signals:
     void itemActivated(int) override;
     void thumbnailsRequested(QList<int>, int, bool, bool) override;
     void draggedOut() override;
     void draggedOver(int) override;
-    void droppedInto(const QMimeData*, QObject*, int) override;
+    void droppedInto(const QMimeData *, QObject *, int) override;
 
-protected:
+  protected:
     QTimer loadTimer;
     bool blockThumbnailLoading;
 
@@ -86,7 +86,7 @@ protected:
     int lastScrollFrameTime;
     QList<int> mSelection;
     QPoint dragStartPos;
-    ThumbnailWidget* dragTarget;
+    ThumbnailWidget *dragTarget;
 
     void createScrollTimeLine();
     QElapsedTimer scrollFrameTimer;
@@ -94,9 +94,9 @@ protected:
     QElapsedTimer lastTouchpadScroll;
     Qt::Orientation mOrientation = Qt::Horizontal;
 
-protected:
+  protected:
     QGraphicsScene scene;
-    QList<ThumbnailWidget*> thumbnails;
+    QList<ThumbnailWidget *> thumbnails;
     QScrollBar *scrollBar;
     QTimeLine *scrollTimeLine;
     QPointF viewportCenter;
@@ -124,7 +124,7 @@ protected:
     bool checkRange(int pos);
 
     virtual ThumbnailWidget *createThumbnailWidget() = 0;
-    virtual void addItemToLayout(ThumbnailWidget* widget, int pos) = 0;
+    virtual void addItemToLayout(ThumbnailWidget *widget, int pos) = 0;
     virtual void removeItemFromLayout(int pos) = 0;
     virtual void removeAll() = 0;
     virtual void updateLayout();

@@ -10,16 +10,16 @@
 
 class FolderGridView : public ThumbnailView {
     Q_OBJECT
-public:
+  public:
     explicit FolderGridView(QWidget *parent = nullptr);
     ~FolderGridView() override;
 
     const int THUMBNAIL_SIZE_MIN = 80;  // px
-    const int THUMBNAIL_SIZE_MAX = 400;  // these should be divisible by ZOOM_STEP
+    const int THUMBNAIL_SIZE_MAX = 400; // these should be divisible by ZOOM_STEP
     const int ZOOM_STEP = 20;
     void selectAll();
 
-public slots:
+  public slots:
     void show();
     void hide();
 
@@ -40,17 +40,17 @@ public slots:
     void focusOnSelection() override;
     void setDragHover(int index) override;
 
-private:
+  private:
     FlowLayout *flowLayout;
     QGraphicsWidget holderWidget;
     int shiftedCol;
     void scrollToCurrent();
     int lastDragTarget = -1;
 
-private slots:
+  private slots:
     void onitemSelected();
 
-protected:
+  protected:
     void resizeEvent(QResizeEvent *event) override;
     void updateScrollbarIndicator() override;
     void addItemToLayout(ThumbnailWidget *widget, int pos) override;
@@ -62,7 +62,7 @@ protected:
     void fitSceneToContents() override;
 
     void keyPressEvent(QKeyEvent *event) override;
-    void wheelEvent(QWheelEvent *event) override;    
+    void wheelEvent(QWheelEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -70,6 +70,6 @@ protected:
     void dragLeaveEvent(QDragLeaveEvent *event) override;
     bool focusNextPrevChild(bool) override;
 
-signals:
+  signals:
     void thumbnailSizeChanged(int);
 };

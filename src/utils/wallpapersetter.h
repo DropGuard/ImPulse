@@ -8,10 +8,9 @@
 #include <QDebug>
 #include "utils/stuff.h"
 
-class WallpaperSetter
-{
-public:
+class WallpaperSetter {
+  public:
     WallpaperSetter();
 
-    static void setWallpaper(const QString& path);
+    static void setWallpaper(const QString &path);
 };

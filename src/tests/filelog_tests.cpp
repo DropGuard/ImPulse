@@ -3,11 +3,14 @@
 // the file logging machinery in utils/filelog
 class TestFileLog : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestFileLog() : EngineStackFixture("filelog") {}
+  public:
+    TestFileLog() : EngineStackFixture("filelog") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // install() is thin glue verified by every session's first log lines; the
     // pieces it composes are drivable here with tiny limits.
@@ -35,18 +38,16 @@ private slots:
         for(int i = 0; i < 3; ++i)
             log.write(line);
         QCOMPARE(log.part(), 1);
-        log.write(line);                       // 124 >= 100 -> part 2
+        log.write(line); // 124 >= 100 -> part 2
         QCOMPARE(log.part(), 2);
         QCOMPARE(log.bytesInPart(), qint64(0));
         for(int i = 0; i < 4; ++i)
-            log.write(line);                   // the 4th write rotates -> part 3
+            log.write(line); // the 4th write rotates -> part 3
         QCOMPARE(log.part(), 3);
         for(int i = 0; i < 4; ++i)
-            log.write(line);                   // at the cap: this write lands, then stop
+            log.write(line); // at the cap: this write lands, then stop
         QVERIFY(!log.isWriting());
-        QCOMPARE(QDir(dir.path())
-                     .entryList(QStringList() << "qimgv-test.log*", QDir::Files)
-                     .size(), 3);
+        QCOMPARE(QDir(dir.path()).entryList(QStringList() << "qimgv-test.log*", QDir::Files).size(), 3);
     }
 
     void fileLogPruneKeepsTheNewestTenSessions() {
@@ -57,8 +58,7 @@ private slots:
             QVERIFY(f.open(QIODevice::WriteOnly));
         }
         FileLog::pruneOldSessions(dir.path(), 10);
-        QStringList left = QDir(dir.path())
-                               .entryList(QStringList() << "qimgv-*.log*", QDir::Files, QDir::Name);
+        QStringList left = QDir(dir.path()).entryList(QStringList() << "qimgv-*.log*", QDir::Files, QDir::Name);
         QCOMPARE(left.size(), 10);
         QCOMPARE(left.first(), QStringLiteral("qimgv-0101-03.log"));
         QCOMPARE(left.last(), QStringLiteral("qimgv-0101-12.log"));

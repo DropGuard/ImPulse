@@ -2,24 +2,18 @@
 
 #include <utility>
 
-ActionButton::ActionButton(QWidget *parent)
-    : IconButton(parent),
-      mTriggerMode(TriggerMode::ClickTrigger)
-{
+ActionButton::ActionButton(QWidget *parent) : IconButton(parent), mTriggerMode(TriggerMode::ClickTrigger) {
     this->setFocusPolicy(Qt::NoFocus);
     this->setProperty("checked", false);
 }
 
-ActionButton::ActionButton(QString _actionName, QString _iconPath, QWidget *parent)
-    :  ActionButton(parent)
-{
+ActionButton::ActionButton(QString _actionName, QString _iconPath, QWidget *parent) : ActionButton(parent) {
     setIconPath(std::move(_iconPath));
     setAction(std::move(_actionName));
 }
 
 ActionButton::ActionButton(QString _actionName, QString _iconPath, int _size, QWidget *parent)
-    :  ActionButton(std::move(_actionName), std::move(_iconPath), parent)
-{
+    : ActionButton(std::move(_actionName), std::move(_iconPath), parent) {
     if(_size > 0)
         setFixedSize(_size, _size);
 }
@@ -46,5 +40,4 @@ void ActionButton::mouseReleaseEvent(QMouseEvent *event) {
     IconButton::mouseReleaseEvent(event);
     if(mTriggerMode == TriggerMode::ClickTrigger && rect().contains(event->pos()) && event->button() == Qt::LeftButton)
         actionManager->invokeAction(actionName);
-
 }

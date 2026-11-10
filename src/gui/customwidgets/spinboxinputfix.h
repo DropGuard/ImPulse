@@ -7,15 +7,14 @@
 #include <QDebug>
 #include "components/actionmanager/actionmanager.h"
 
-class SpinBoxInputFix : public QSpinBox
-{
+class SpinBoxInputFix : public QSpinBox {
     Q_OBJECT
-public:
+  public:
     SpinBoxInputFix(QWidget *parent = nullptr);
 
-private:
+  private:
     QStringList allowedKeys;
 
-protected:
+  protected:
     void keyPressEvent(QKeyEvent *event) override;
 };

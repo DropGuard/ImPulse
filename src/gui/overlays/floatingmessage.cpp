@@ -3,11 +3,8 @@
 #include <utility>
 #include "ui_floatingmessage.h"
 
-FloatingMessage::FloatingMessage(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    preferredPosition(FloatingWidgetPosition::BOTTOM),
-    ui(new Ui::FloatingMessage)
-{
+FloatingMessage::FloatingMessage(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), preferredPosition(FloatingWidgetPosition::BOTTOM), ui(new Ui::FloatingMessage) {
     ui->setupUi(this);
     hideDelay = 700;
 
@@ -62,42 +59,42 @@ void FloatingMessage::doShowMessage(QString text, FloatingMessageIcon icon, int 
     show();
 }
 
-void FloatingMessage::setText(const QString& text) {
+void FloatingMessage::setText(const QString &text) {
     ui->textLabel->setText(text);
-    text.isEmpty()?ui->textLabel->hide():ui->textLabel->show();
+    text.isEmpty() ? ui->textLabel->hide() : ui->textLabel->show();
     recalculateGeometry();
     update();
 }
 
 void FloatingMessage::setIcon(FloatingMessageIcon icon) {
-    switch (icon) {
-        case FloatingMessageIcon::NO_ICON:
-        case FloatingMessageIcon::ICON_WARNING:
-        case FloatingMessageIcon::ICON_ERROR:
-            //ui->iconLabel->setIconPath(":/res/icons/common/notifications/error16.png");
-            ui->iconLabel->hide();
-            break;
-        case FloatingMessageIcon::ICON_DIRECTORY:
-            ui->iconLabel->show();
-            ui->iconLabel->setIconPath(":/res/icons/common/buttons/panel/folder16.png");
-            break;
-        case FloatingMessageIcon::ICON_LEFT_EDGE:
-            ui->iconLabel->show();
-            ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_start20.png");
-            break;
-        case FloatingMessageIcon::ICON_RIGHT_EDGE:
-            ui->iconLabel->show();
-            ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_end20.png");
-            break;
-        case FloatingMessageIcon::ICON_SUCCESS:
-            ui->iconLabel->show();
-            ui->iconLabel->setIconPath(":/res/icons/common/notifications/success16.png");
-            break;
+    switch(icon) {
+    case FloatingMessageIcon::NO_ICON:
+    case FloatingMessageIcon::ICON_WARNING:
+    case FloatingMessageIcon::ICON_ERROR:
+        //ui->iconLabel->setIconPath(":/res/icons/common/notifications/error16.png");
+        ui->iconLabel->hide();
+        break;
+    case FloatingMessageIcon::ICON_DIRECTORY:
+        ui->iconLabel->show();
+        ui->iconLabel->setIconPath(":/res/icons/common/buttons/panel/folder16.png");
+        break;
+    case FloatingMessageIcon::ICON_LEFT_EDGE:
+        ui->iconLabel->show();
+        ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_start20.png");
+        break;
+    case FloatingMessageIcon::ICON_RIGHT_EDGE:
+        ui->iconLabel->show();
+        ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_end20.png");
+        break;
+    case FloatingMessageIcon::ICON_SUCCESS:
+        ui->iconLabel->show();
+        ui->iconLabel->setIconPath(":/res/icons/common/notifications/success16.png");
+        break;
     }
 }
 
 void FloatingMessage::mousePressEvent(QMouseEvent *event) {
-    Q_UNUSED (event)
+    Q_UNUSED(event)
 }
 
 // "blink" the widget; show then fade out immediately

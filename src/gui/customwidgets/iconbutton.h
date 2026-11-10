@@ -5,19 +5,19 @@
 
 class IconButton : public IconWidget {
     Q_OBJECT
-public:
+  public:
     explicit IconButton(QWidget *parent = nullptr);
     void setCheckable(bool mode);
     bool isChecked();
 
-public slots:
+  public slots:
     void setChecked(bool mode);
 
-signals:
+  signals:
     void clicked();
     void toggled(bool);
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     bool mCheckable, mChecked, mPressed;

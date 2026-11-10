@@ -4,11 +4,14 @@
 // FileOperations through the engine, the save path, and ImageLib's transforms
 class TestImageOps : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestImageOps() : EngineStackFixture("image-ops") {}
+  public:
+    TestImageOps() : EngineStackFixture("image-ops") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // tier-1 decodes a large JPEG at screen size via libjpeg DCT scaling, and
     // the full-res upgrade rewrites the pixels later; the file's own
@@ -25,25 +28,44 @@ private slots:
         // fixture is raw bytes — the way machinery_tests writes its EXIF jpeg.
         QByteArray bmp;
         auto u32le = [&bmp](quint32 v) {
-            for(int i = 0; i < 4; ++i) bmp.append(char((v >> (8 * i)) & 0xFF));
+            for(int i = 0; i < 4; ++i)
+                bmp.append(char((v >> (8 * i)) & 0xFF));
         };
         auto u16le = [&bmp](quint16 v) {
-            bmp.append(char(v & 0xFF)); bmp.append(char((v >> 8) & 0xFF));
+            bmp.append(char(v & 0xFF));
+            bmp.append(char((v >> 8) & 0xFF));
         };
         bmp.append("BM");
-        u32le(14 + 40 + 8 + 32);            // file size: headers + palette + rows
-        u16le(0); u16le(0); u32le(62);      // reserved, pixel data offset
-        u32le(40); u32le(8); u32le(8);      // info header size, width, height
-        u16le(1); u16le(1);                 // planes, 1 bpp
-        u32le(0); u32le(32);                // BI_RGB, image size
-        u32le(0); u32le(0); u32le(2); u32le(0); // ppm, clrUsed=2, clrImportant
+        u32le(14 + 40 + 8 + 32); // file size: headers + palette + rows
+        u16le(0);
+        u16le(0);
+        u32le(62); // reserved, pixel data offset
+        u32le(40);
+        u32le(8);
+        u32le(8); // info header size, width, height
+        u16le(1);
+        u16le(1); // planes, 1 bpp
+        u32le(0);
+        u32le(32); // BI_RGB, image size
+        u32le(0);
+        u32le(0);
+        u32le(2);
+        u32le(0); // ppm, clrUsed=2, clrImportant
         // palette: entry0 blue, entry1 red (B,G,R,reserved)
-        bmp.append(char(220)); bmp.append(char(90));  bmp.append(char(30));  bmp.append(char(0));
-        bmp.append(char(40));  bmp.append(char(40));  bmp.append(char(220)); bmp.append(char(0));
+        bmp.append(char(220));
+        bmp.append(char(90));
+        bmp.append(char(30));
+        bmp.append(char(0));
+        bmp.append(char(40));
+        bmp.append(char(40));
+        bmp.append(char(220));
+        bmp.append(char(0));
         // bottom-up rows, alternating 0xAA / 0x55, each padded to 4 bytes
         for(int r = 0; r < 8; ++r) {
             bmp.append(r % 2 == 0 ? char(0xAA) : char(0x55));
-            bmp.append(char(0)); bmp.append(char(0)); bmp.append(char(0));
+            bmp.append(char(0));
+            bmp.append(char(0));
+            bmp.append(char(0));
         }
         const QString path = fixtureDir + "/palette-mono.bmp";
         QFile out(path);
@@ -92,7 +114,7 @@ private slots:
     // QByteArray compare equal to another empty one and pass
     static QByteArray readBytes(const QString &path) {
         QFile f(path);
-        if (!f.open(QIODevice::ReadOnly))
+        if(!f.open(QIODevice::ReadOnly))
             QTest::qFail(qPrintable(QStringLiteral("cannot open ") + path), __FILE__, __LINE__);
         return f.readAll();
     }
@@ -100,8 +122,8 @@ private slots:
     void saveWithBackupOverwritesAndRestores() {
         resetFixture();
         const QString dest = fixtureDir + "/saved.png";
-        const QString backupName = dest + "_" + QString(QCryptographicHash::hash(
-            dest.toUtf8(), QCryptographicHash::Md5).toHex());
+        const QString backupName =
+            dest + "_" + QString(QCryptographicHash::hash(dest.toUtf8(), QCryptographicHash::Md5).toHex());
 
         QImage first(8, 8, QImage::Format_RGB32);
         first.fill(Qt::blue);
@@ -122,16 +144,14 @@ private slots:
         third.fill(Qt::red);
         const QString odd = fixtureDir + "/saved.unknownsuffix";
         QVERIFY(QFile::copy(dest, odd));
-        const QString oddBackup = odd + "_" + QString(QCryptographicHash::hash(
-            odd.toUtf8(), QCryptographicHash::Md5).toHex());
+        const QString oddBackup =
+            odd + "_" + QString(QCryptographicHash::hash(odd.toUtf8(), QCryptographicHash::Md5).toHex());
         const QByteArray oddBytesBefore = readBytes(odd);
 
-        QVERIFY2(!FileOperations::saveWithBackup(third, odd, 95),
-                 "an unsupported format reported success");
+        QVERIFY2(!FileOperations::saveWithBackup(third, odd, 95), "an unsupported format reported success");
         QCOMPARE(readBytes(odd), oddBytesBefore);
         QVERIFY2(!QFile::exists(oddBackup),
-                 qPrintable(QStringLiteral("the backup was left behind after a restored rollback: ")
-                            + oddBackup));
+                 qPrintable(QStringLiteral("the backup was left behind after a restored rollback: ") + oddBackup));
     }
 
     static QStringList readPaths(const QSignalSpy &spy) {
@@ -152,7 +172,7 @@ private slots:
     void rolledBackSaveRestoresTheRowInsteadOfRebuildingIt() {
         // act runs its container as root, and root ignores permission bits — a save
         // into a read-only file SUCCEEDS there. The pin needs a user account.
-        if (geteuid() == 0)
+        if(geteuid() == 0)
             QSKIP("running as root: permission bits cannot make a destination unwritable");
         resetFixture();
         DirectoryManager dm{EngineBridge::instance()};
@@ -161,11 +181,10 @@ private slots:
 
         const QString dest = fixtureDir + "/img1.jpg";
         const int row = dm.indexOfFile(dest);
-        QVERIFY2(row >= 0, qPrintable(QStringLiteral("precondition broken: ") + dest
-                                      + " is not in the listing"));
+        QVERIFY2(row >= 0, qPrintable(QStringLiteral("precondition broken: ") + dest + " is not in the listing"));
         const QByteArray original = readBytes(dest);
-        const QString backup = dest + "_" + QString(QCryptographicHash::hash(
-            dest.toUtf8(), QCryptographicHash::Md5).toHex());
+        const QString backup =
+            dest + "_" + QString(QCryptographicHash::hash(dest.toUtf8(), QCryptographicHash::Md5).toHex());
         QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
         QSignalSpy added(&dm, &DirectoryManager::fileAdded);
         QVERIFY(removed.isValid() && added.isValid());
@@ -291,7 +310,7 @@ private slots:
         }
 
         auto image = *ImageFactory::createImage(fixtureDir + "/orig.png", false, loadPolicy());
-        QVERIFY(!image->save(fixtureDir + "/target.xyz", 95));  // "xyz" is not encodable
+        QVERIFY(!image->save(fixtureDir + "/target.xyz", 95)); // "xyz" is not encodable
 
         QFile after(fixtureDir + "/orig.png");
         QVERIFY(after.open(QIODevice::ReadOnly));
@@ -300,8 +319,8 @@ private slots:
         QFile target(fixtureDir + "/target.xyz");
         QVERIFY(target.open(QIODevice::ReadOnly));
         QCOMPARE(target.readAll(), targetBefore);
-        QCOMPARE(int(QDir(fixtureDir).entryList(QStringList() << QStringLiteral("target.xyz_*"),
-                                                QDir::Files).size()), 0);
+        QCOMPARE(int(QDir(fixtureDir).entryList(QStringList() << QStringLiteral("target.xyz_*"), QDir::Files).size()),
+                 0);
     }
 
     // (2) The edited image was swapped and discarded before `success` was
@@ -399,19 +418,18 @@ private slots:
     void imageLibScaledUsesTheCvPaths() {
         QVERIFY(writeBigImage(fixtureDir + "/cv-src.png", "png", QSize(64, 64)));
         auto src = std::make_shared<const QImage>(fixtureDir + "/cv-src.png");
-        for(auto filter : { QI_FILTER_CV_BILINEAR_SHARPEN, QI_FILTER_CV_CUBIC, QI_FILTER_CV_CUBIC_SHARPEN }) {
+        for(auto filter : {QI_FILTER_CV_BILINEAR_SHARPEN, QI_FILTER_CV_CUBIC, QI_FILTER_CV_CUBIC_SHARPEN}) {
             auto dst = ImageLib::scaled(src, QSize(32, 32), filter);
             QVERIFY(!dst->isNull());
             QCOMPARE(dst->size(), QSize(32, 32));
         }
 
         QImage indexed(16, 16, QImage::Format_Indexed8);
-        indexed.setColorTable({ qRgb(0, 0, 0), qRgb(255, 255, 255) });
+        indexed.setColorTable({qRgb(0, 0, 0), qRgb(255, 255, 255)});
         for(int y = 0; y < 16; ++y)
             for(int x = 0; x < 16; ++x)
                 indexed.setPixel(x, y, (x + y) % 2);
-        auto dst = ImageLib::scaled(std::make_shared<const QImage>(indexed),
-                                    QSize(8, 8), QI_FILTER_CV_CUBIC);
+        auto dst = ImageLib::scaled(std::make_shared<const QImage>(indexed), QSize(8, 8), QI_FILTER_CV_CUBIC);
         QVERIFY(!dst->isNull());
         QCOMPARE(dst->size(), QSize(8, 8));
         QVERIFY(dst->format() == QImage::Format_RGB32 || dst->format() == QImage::Format_ARGB32);
@@ -510,9 +528,9 @@ private slots:
     void imageStaticLoadsAnIcoFixture() {
         resetFixture();
         // 16x16 ICO (PIL-generated at authoring time)
-        const QByteArray ico = QByteArray::fromBase64(
-            "AAABAAEAEBAAAAAAIABWAAAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAQAAAAEAgGAAAAH/P/"
-            "YQAAAB1JREFUeJxjrNA48Z+BAsBEieZRA0YNGDVgMBkAAAD6Aof9mEGiAAAAAElFTkSuQmCC");
+        const QByteArray ico =
+            QByteArray::fromBase64("AAABAAEAEBAAAAAAIABWAAAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAQAAAAEAgGAAAAH/P/"
+                                   "YQAAAB1JREFUeJxjrNA48Z+BAsBEieZRA0YNGDVgMBkAAAD6Aof9mEGiAAAAAElFTkSuQmCC");
         QFile icoFile(fixtureDir + "/app.ico");
         QVERIFY(icoFile.open(QIODevice::WriteOnly));
         icoFile.write(ico);
@@ -528,7 +546,9 @@ private slots:
         for(int y = 0; y < 3; ++y)
             for(int x = 0; x < 2; ++x)
                 src.setPixel(x, y, qRgb(0, x, y + 1));
-        auto S = [&src]() { return std::make_shared<const QImage>(src); };
+        auto S = [&src]() {
+            return std::make_shared<const QImage>(src);
+        };
         auto px = [](const std::unique_ptr<const QImage> &im, int x, int y) {
             return im->pixel(x, y);
         };
@@ -579,11 +599,10 @@ private slots:
         // names say a mirror/flip precedes the rotation, and that is what the
         // switch does. QImage has no transform that produces this from the flags
         // alone, so the composition is spelled out here rather than trusted.
-        QImage mirrorThen90 = src.flipped(Qt::Horizontal).transformed(QTransform().rotate(90),
-                                                                     Qt::SmoothTransformation);
+        QImage mirrorThen90 =
+            src.flipped(Qt::Horizontal).transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         QCOMPARE(*E(T::TransformationMirrorAndRotate90), mirrorThen90);
-        QImage flipThen90 = src.flipped(Qt::Vertical).transformed(QTransform().rotate(90),
-                                                                  Qt::SmoothTransformation);
+        QImage flipThen90 = src.flipped(Qt::Vertical).transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         QCOMPARE(*E(T::TransformationFlipAndRotate90), flipThen90);
         QCOMPARE(*E(T::TransformationRotate270), *ImageLib::rotated(S(), -90));
     }

@@ -1,14 +1,11 @@
 #include "renameoverlay.h"
 #include "ui_renameoverlay.h"
 
-RenameOverlay::RenameOverlay(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::RenameOverlay)
-{
+RenameOverlay::RenameOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::RenameOverlay) {
     ui->setupUi(this);
     connect(ui->cancelButton, &QPushButton::clicked, this, &RenameOverlay::onCancel);
-    connect(ui->closeButton,  &IconButton::clicked,  this, &RenameOverlay::hide);
-    connect(ui->okButton,     &QPushButton::clicked, this, &RenameOverlay::rename);
+    connect(ui->closeButton, &IconButton::clicked, this, &RenameOverlay::hide);
+    connect(ui->okButton, &QPushButton::clicked, this, &RenameOverlay::rename);
     ui->okButton->setHighlighted(true);
     ui->closeButton->setIconPath(":res/icons/common/overlay/close-dim16.png");
     ui->headerIcon->setIconPath(":res/icons/common/overlay/edit16.png");
@@ -37,7 +34,7 @@ void RenameOverlay::hide() {
     OverlayWidget::hide();
 }
 
-void RenameOverlay::setName(const QString& name) {
+void RenameOverlay::setName(const QString &name) {
     ui->fileName->setText(name);
     origName = name;
     selectName();

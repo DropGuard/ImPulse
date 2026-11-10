@@ -25,7 +25,7 @@ void ThumbnailStrip::setupLayout() {
     this->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 }
 
-ThumbnailWidget* ThumbnailStrip::createThumbnailWidget() {
+ThumbnailWidget *ThumbnailStrip::createThumbnailWidget() {
     ThumbnailWidget *widget = new ThumbnailWidget();
     widget->setPadding(thumbPadding);
     widget->setMargins(thumbMarginX, thumbMarginY);
@@ -34,7 +34,7 @@ ThumbnailWidget* ThumbnailStrip::createThumbnailWidget() {
     return widget;
 }
 
-void ThumbnailStrip::addItemToLayout(ThumbnailWidget* widget, int pos) {
+void ThumbnailStrip::addItemToLayout(ThumbnailWidget *widget, int pos) {
     scene.addItem(widget);
     updateThumbnailPositions(pos, thumbnails.count() - 1);
 }
@@ -98,7 +98,7 @@ void ThumbnailStrip::focusOn(int index) {
         // partially show the next thumb if possible
         if(orientation() == Qt::Vertical) {
             if(height() > th->height() * 2)
-                ensureVisible(th, 0, th->height()/2);
+                ensureVisible(th, 0, th->height() / 2);
             else
                 ensureVisible(th, 0, 0);
         } else {

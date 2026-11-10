@@ -1,12 +1,12 @@
 #include "zoomindicatoroverlay.h"
 
-ZoomIndicatorOverlay::ZoomIndicatorOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent),
-                                                                              fm(QApplication::font()) {
+ZoomIndicatorOverlay::ZoomIndicatorOverlay(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), fm(QApplication::font()) {
     hideDelay = 2000;
     visibilityTimer.setSingleShot(true);
     visibilityTimer.setInterval(hideDelay);
 
-    layout.setContentsMargins(0,0,0,0);
+    layout.setContentsMargins(0, 0, 0, 0);
     layout.addWidget(&label);
     label.setAlignment(Qt::AlignCenter);
 
@@ -25,7 +25,7 @@ ZoomIndicatorOverlay::ZoomIndicatorOverlay(FloatingWidgetContainer *parent) : Ov
 }
 
 void ZoomIndicatorOverlay::setScale(qreal scale) {
-    label.setText(QString::number(qRound(scale * 100.0))+"%");
+    label.setText(QString::number(qRound(scale * 100.0)) + "%");
     label.setFixedSize(fm.horizontalAdvance(label.text()) + 14, fm.height() + 12);
     recalculateGeometry();
 }

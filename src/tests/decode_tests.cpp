@@ -10,11 +10,14 @@
 // is a race by construction and belongs to the real-machine logs.
 class TestDecode : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestDecode() : EngineStackFixture("decode") {}
+  public:
+    TestDecode() : EngineStackFixture("decode") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     void jpegTwoTierDecodesScaledThenUpgradesToFull() {
         resetFixture();

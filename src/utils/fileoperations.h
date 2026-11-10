@@ -29,7 +29,7 @@ enum FileOpResult {
 };
 
 class FileOperations {
-public:
+  public:
     static void copyFileTo(const QString &srcFilePath, const QString &destDirPath, bool force, FileOpResult &result);
     static void moveFileTo(const QString &srcFilePath, const QString &destDirPath, bool force, FileOpResult &result);
     static void rename(const QString &srcFilePath, const QString &newName, bool force, FileOpResult &result);
@@ -47,7 +47,7 @@ public:
     // itself failed, turning "save failed" into "your file is gone".
     static bool saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality);
 
-private:
+  private:
     static bool moveToTrashImpl(const QString &path);
     static QString generateHash(const QString &str);
 };

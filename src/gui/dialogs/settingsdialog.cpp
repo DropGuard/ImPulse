@@ -8,35 +8,31 @@
 // the about text's single home: the version line is dynamic, and a second
 // copy living in the .ui would be the next change-one-miss-the-rest drift
 static QString aboutHtml() {
-    return QStringLiteral(
-        "<p><b>ImPulse %1</b></p>"
-        "<p>A fast and easy to use image viewer. Video support via libmpv.</p>"
-        "<p>ImPulse is a fork of qimgv: the backend now runs on a Rust engine "
-        "that owns the directory listing and the decode schedule — it decides "
-        "which decode runs next, while the C++ side submits the requests and "
-        "executes the work.</p>"
-        "<p><b>GitHub page:</b> "
-        "<a href=\"https://github.com/DropGuard/ImPulse\">"
-        "https://github.com/DropGuard/ImPulse</a></p>"
-        "<p><b>Based on qimgv</b> by "
-        "<a href=\"https://github.com/easymodo/qimgv\">easymodo</a> and "
-        "<a href=\"https://github.com/easymodo/qimgv/graphs/contributors\">"
-        "contributors</a> — the interface and the artwork come from there.</p>"
-        "<p>OpenCV enabled builds use "
-        "<a href=\"https://github.com/dbzhang800/QtOpenCV\">QtOpenCV</a> "
-        "by dbzhang800</p>"
-        "<p>ImPulse is licensed under the "
-        "<a href=\"https://www.gnu.org/licenses/gpl-3.0.en.html\">"
-        "GNU GPL Version 3</a>.</p>"
-        "<p>Report any issues / request features "
-        "<a href=\"https://github.com/DropGuard/ImPulse/issues\">here</a>.</p>")
+    return QStringLiteral("<p><b>ImPulse %1</b></p>"
+                          "<p>A fast and easy to use image viewer. Video support via libmpv.</p>"
+                          "<p>ImPulse is a fork of qimgv: the backend now runs on a Rust engine "
+                          "that owns the directory listing and the decode schedule — it decides "
+                          "which decode runs next, while the C++ side submits the requests and "
+                          "executes the work.</p>"
+                          "<p><b>GitHub page:</b> "
+                          "<a href=\"https://github.com/DropGuard/ImPulse\">"
+                          "https://github.com/DropGuard/ImPulse</a></p>"
+                          "<p><b>Based on qimgv</b> by "
+                          "<a href=\"https://github.com/easymodo/qimgv\">easymodo</a> and "
+                          "<a href=\"https://github.com/easymodo/qimgv/graphs/contributors\">"
+                          "contributors</a> — the interface and the artwork come from there.</p>"
+                          "<p>OpenCV enabled builds use "
+                          "<a href=\"https://github.com/dbzhang800/QtOpenCV\">QtOpenCV</a> "
+                          "by dbzhang800</p>"
+                          "<p>ImPulse is licensed under the "
+                          "<a href=\"https://www.gnu.org/licenses/gpl-3.0.en.html\">"
+                          "GNU GPL Version 3</a>.</p>"
+                          "<p>Report any issues / request features "
+                          "<a href=\"https://github.com/DropGuard/ImPulse/issues\">here</a>.</p>")
         .arg(appVersion.toString());
 }
 
-SettingsDialog::SettingsDialog(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::SettingsDialog)
-{
+SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::SettingsDialog) {
     ui->setupUi(this);
     mChecks = {
         {ui->loopSlideshowCheckBox, &Settings::loopSlideshow, &Settings::setLoopSlideshow},
@@ -81,8 +77,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->aboutAppTextBrowser->setHtml(aboutHtml());
     ui->versionLabel->setText("" + QApplication::applicationVersion());
     ui->qtVersionLabel->setText(qVersion());
-    ui->appIconLabel->setPixmap(QIcon(":/res/icons/common/logo/app/22.png").pixmap(22,22));
-    ui->qtIconLabel->setPixmap(QIcon(":/res/icons/common/logo/3rdparty/qt22.png").pixmap(22,16));
+    ui->appIconLabel->setPixmap(QIcon(":/res/icons/common/logo/app/22.png").pixmap(22, 22));
+    ui->qtIconLabel->setPixmap(QIcon(":/res/icons/common/logo/3rdparty/qt22.png").pixmap(22, 16));
 
     // fake combobox that acts as a menu button
     // less code than using pushbutton with menu
@@ -92,11 +88,23 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         ui->themeSelectorComboBox->setCurrentIndex(index);
         ui->themeSelectorComboBox->blockSignals(false);
         switch(index) {
-            case 0: setColorScheme(ThemeStore::colorScheme(COLORS_BLACK));    settings->setColorTid(COLORS_BLACK);    break;
-            case 1: setColorScheme(ThemeStore::colorScheme(COLORS_DARK));     settings->setColorTid(COLORS_DARK);     break;
-            case 2: setColorScheme(ThemeStore::colorScheme(COLORS_DARKBLUE)); settings->setColorTid(COLORS_DARKBLUE); break;
-            case 3: setColorScheme(ThemeStore::colorScheme(COLORS_LIGHT));    settings->setColorTid(COLORS_LIGHT);    break;
-            default: break;
+        case 0:
+            setColorScheme(ThemeStore::colorScheme(COLORS_BLACK));
+            settings->setColorTid(COLORS_BLACK);
+            break;
+        case 1:
+            setColorScheme(ThemeStore::colorScheme(COLORS_DARK));
+            settings->setColorTid(COLORS_DARK);
+            break;
+        case 2:
+            setColorScheme(ThemeStore::colorScheme(COLORS_DARKBLUE));
+            settings->setColorTid(COLORS_DARKBLUE);
+            break;
+        case 3:
+            setColorScheme(ThemeStore::colorScheme(COLORS_LIGHT));
+            settings->setColorTid(COLORS_LIGHT);
+            break;
+        default: break;
         }
     });
 
@@ -105,8 +113,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
             ui->themeSelectorComboBox->setCurrentIndex(-1);
             setColorScheme(ThemeStore::colorScheme(COLORS_SYSTEM));
             settings->setColorTid(COLORS_SYSTEM);
-        }
-        else {
+        } else {
             readColorScheme();
             settings->setColorTid(COLORS_CUSTOMIZED);
         }
@@ -186,7 +193,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     // for index 0 is "system". Unknown stored values fall back to en_US.
     QStringList langValues = langs.keys(); // sorted, "system" included
     langValues.removeAll("system");
-    langValues.prepend("system");          // combo index 0 is the System entry
+    langValues.prepend("system"); // combo index 0 is the System entry
     mCombos = {{ui->langComboBox, &K_Language, langValues, QStringLiteral("en_US")}};
 
     connect(this, &SettingsDialog::settingsChanged, settings, &Settings::sendChangeNotification);
@@ -237,7 +244,6 @@ void SettingsDialog::resetToDesktopTheme() {
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::setupSidebar() {
-
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::readSettings() {
@@ -344,7 +350,6 @@ void SettingsDialog::readSettings() {
 
     ui->memoryLimitSpinBox->setValue(settings->memoryAllocationLimit());
 
-
     // ##### fit mode #####
     if(settings->imageFitMode() == FIT_WINDOW)
         ui->fitModeWindow->setChecked(true);
@@ -368,7 +373,7 @@ void SettingsDialog::readSettings() {
     ui->modifySystemSchemeLabel->setVisible(settings->useSystemColorScheme());
     ui->themeSelectorComboBox->setEnabled(!settings->useSystemColorScheme());
     ui->colorConfigSubgroup->setEnabled(!settings->useSystemColorScheme());
-    
+
     readColorScheme();
     readShortcuts();
     readScripts();
@@ -395,7 +400,6 @@ void SettingsDialog::saveSettings() {
         settings->setImageFitMode(FIT_WINDOW_STRETCH);
     else
         settings->setImageFitMode(FIT_ORIGINAL);
-
 
     settings->setVideoPlayback(ui->videoPlaybackCheckBox->isChecked());
     settings->setPlayVideoSounds(ui->playSoundsCheckBox->isChecked());
@@ -503,12 +507,12 @@ void SettingsDialog::readColorScheme() {
 }
 
 void SettingsDialog::setColorScheme(ColorScheme colors) {
-    switch (colors.tid) {
-        case COLORS_LIGHT: ui->themeSelectorComboBox->setCurrentIndex(3);   break;
-        case COLORS_BLACK: ui->themeSelectorComboBox->setCurrentIndex(0);   break;
-        case COLORS_DARK: ui->themeSelectorComboBox->setCurrentIndex(1);    break;
-        case COLORS_DARKBLUE: ui->themeSelectorComboBox->setCurrentIndex(2);break;
-        default: ui->themeSelectorComboBox->setCurrentIndex(-1);            break;
+    switch(colors.tid) {
+    case COLORS_LIGHT: ui->themeSelectorComboBox->setCurrentIndex(3); break;
+    case COLORS_BLACK: ui->themeSelectorComboBox->setCurrentIndex(0); break;
+    case COLORS_DARK: ui->themeSelectorComboBox->setCurrentIndex(1); break;
+    case COLORS_DARKBLUE: ui->themeSelectorComboBox->setCurrentIndex(2); break;
+    default: ui->themeSelectorComboBox->setCurrentIndex(-1); break;
     }
     ui->colorSelectorAccent->setColor(colors.accent);
     ui->colorSelectorBackground->setColor(colors.background);
@@ -594,13 +598,13 @@ void SettingsDialog::editScript() {
     }
 }
 //------------------------------------------------------------------------------
-void SettingsDialog::editScript(QListWidgetItem* item) {
+void SettingsDialog::editScript(QListWidgetItem *item) {
     if(item) {
         editScript(item->text());
     }
 }
 //------------------------------------------------------------------------------
-void SettingsDialog::editScript(const QString& name) {
+void SettingsDialog::editScript(const QString &name) {
     ScriptEditorDialog w(name, scriptManager->getScript(name));
     if(w.exec()) {
         if(w.scriptName().isEmpty())
@@ -616,7 +620,7 @@ void SettingsDialog::removeScript() {
         QString scriptName = ui->scriptsListWidget->currentItem()->text();
         delete ui->scriptsListWidget->takeItem(row);
         saveShortcuts();
-        actionManager->removeAllShortcuts("s:"+scriptName);
+        actionManager->removeAllShortcuts("s:" + scriptName);
         readShortcuts();
         scriptManager->removeScript(scriptName);
     }
@@ -737,7 +741,7 @@ void SettingsDialog::onZoomStepSliderChanged(int value) {
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onMouseScrollingSpeedSliderChanged(int value) {
-    ui->mouseScrollingSpeedLabel->setText(QString::number(0.5f + (value*0.25f), 'f', 2) + "x");
+    ui->mouseScrollingSpeedLabel->setText(QString::number(0.5f + (value * 0.25f), 'f', 2) + "x");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onThumbnailerThreadsSliderChanged(int value) {

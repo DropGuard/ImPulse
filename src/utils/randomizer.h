@@ -10,7 +10,7 @@
 #include <QString>
 
 class Randomizer {
-public:
+  public:
     Randomizer();
     Randomizer(int _count);
 
@@ -21,7 +21,8 @@ public:
     void shuffle();
     void print();
     void setCurrent(int _current);
-private:
+
+  private:
     int currentIndex;
     std::vector<int> vec;
     void fill();

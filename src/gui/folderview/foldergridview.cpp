@@ -4,10 +4,7 @@
 
 // TODO: create a base class for this and the one on panel
 
-FolderGridView::FolderGridView(QWidget *parent)
-    : ThumbnailView(Qt::Vertical, parent),
-      shiftedCol(-1)
-{
+FolderGridView::FolderGridView(QWidget *parent) : ThumbnailView(Qt::Vertical, parent), shiftedCol(-1) {
     offscreenPreloadArea = 2300;
 
     this->setAcceptDrops(true);
@@ -26,8 +23,7 @@ FolderGridView::FolderGridView(QWidget *parent)
     });
 
     setupLayout();
-    connect(this, &ThumbnailView::itemActivated,
-            this, &FolderGridView::onitemSelected);
+    connect(this, &ThumbnailView::itemActivated, this, &FolderGridView::onitemSelected);
 }
 
 FolderGridView::~FolderGridView() {
@@ -45,7 +41,7 @@ FolderGridView::~FolderGridView() {
 
 void FolderGridView::dropEvent(QDropEvent *event) {
     event->accept();
-    ThumbnailWidget *item = dynamic_cast<ThumbnailWidget*>(itemAt(event->position().toPoint()));
+    ThumbnailWidget *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->position().toPoint()));
     int index = -1;
     if(item) {
         index = thumbnails.indexOf(item);
@@ -60,7 +56,7 @@ void FolderGridView::dragEnterEvent(QDragEnterEvent *event) {
 
 void FolderGridView::dragMoveEvent(QDragMoveEvent *event) {
     event->accept();
-    ThumbnailWidget *item = dynamic_cast<ThumbnailWidget*>(itemAt(event->position().toPoint()));
+    ThumbnailWidget *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->position().toPoint()));
     int index = -1;
     if(item)
         index = thumbnails.indexOf(item);
@@ -288,14 +284,14 @@ void FolderGridView::setupLayout() {
     this->setAlignment(Qt::AlignHCenter);
 
     flowLayout = new FlowLayout();
-    flowLayout->setContentsMargins(9,6,9,0);
+    flowLayout->setContentsMargins(9, 6, 9, 0);
     setFrameShape(QFrame::NoFrame);
     scene.addItem(&holderWidget);
     holderWidget.setLayout(flowLayout);
-    holderWidget.setContentsMargins(0,0,0,0);
+    holderWidget.setContentsMargins(0, 0, 0, 0);
 }
 
-ThumbnailWidget* FolderGridView::createThumbnailWidget() {
+ThumbnailWidget *FolderGridView::createThumbnailWidget() {
     ThumbnailWidget *widget = new ThumbnailWidget();
     widget->setPadding(8);
     ThumbnailStyle style = (settings->folderViewMode() == FV_SIMPLE) ? THUMB_SIMPLE : THUMB_NORMAL;
@@ -304,7 +300,7 @@ ThumbnailWidget* FolderGridView::createThumbnailWidget() {
     return widget;
 }
 
-void FolderGridView::addItemToLayout(ThumbnailWidget* widget, int pos) {
+void FolderGridView::addItemToLayout(ThumbnailWidget *widget, int pos) {
     scene.addItem(widget);
     flowLayout->insertItem(pos, widget);
 }
@@ -354,33 +350,16 @@ void FolderGridView::keyPressEvent(QKeyEvent *event) {
     }
 
     // handle selection
-    switch (event->key()) {
-    case Qt::Key_Left:
-        selectPrev();
-        break;
-    case Qt::Key_Right:
-        selectNext();
-        break;
-    case Qt::Key_Up:
-        selectAbove();
-        break;
-    case Qt::Key_Down:
-        selectBelow();
-        break;
-    case Qt::Key_PageUp:
-        pageUp();
-        break;
-    case Qt::Key_PageDown:
-        pageDown();
-        break;
-    case Qt::Key_Home:
-        selectFirst();
-        break;
-    case Qt::Key_End:
-        selectLast();
-        break;
-    default:
-        actionManager->processEvent(event);
+    switch(event->key()) {
+    case Qt::Key_Left: selectPrev(); break;
+    case Qt::Key_Right: selectNext(); break;
+    case Qt::Key_Up: selectAbove(); break;
+    case Qt::Key_Down: selectBelow(); break;
+    case Qt::Key_PageUp: pageUp(); break;
+    case Qt::Key_PageDown: pageDown(); break;
+    case Qt::Key_Home: selectFirst(); break;
+    case Qt::Key_End: selectLast(); break;
+    default: actionManager->processEvent(event);
     }
 }
 
@@ -419,9 +398,9 @@ void FolderGridView::setThumbnailSize(int newSize) {
 
 void FolderGridView::fitSceneToContents() {
     if(scrollBar->isVisible())
-        holderWidget.setGeometry(0,0, width() - scrollBar->width(), height());
+        holderWidget.setGeometry(0, 0, width() - scrollBar->width(), height());
     else
-        holderWidget.setGeometry(0,0, width(), height());
+        holderWidget.setGeometry(0, 0, width(), height());
     ThumbnailView::fitSceneToContents();
 }
 

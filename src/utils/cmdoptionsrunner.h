@@ -5,6 +5,6 @@
 
 class CmdOptionsRunner : public QObject {
     Q_OBJECT
-public slots:
+  public slots:
     void showBuildOptions();
 };

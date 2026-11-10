@@ -14,31 +14,30 @@
 #include <QVBoxLayout>
 
 namespace Ui {
-    class ResizeDialog;
+class ResizeDialog;
 }
 
-class ResizeDialog : public QDialog
-{
+class ResizeDialog : public QDialog {
     Q_OBJECT
-public:
+  public:
     explicit ResizeDialog(QSize initialSize, QWidget *parent = nullptr);
     ~ResizeDialog() override;
     QSize newSize();
 
-public slots:
+  public slots:
     int exec() override;
 
-protected:
+  protected:
     void keyPressEvent(QKeyEvent *event) override;
 
-private:
+  private:
     Ui::ResizeDialog *ui;
     QSize originalSize, targetSize, desktopSize;
     void updateToTargetValues();
     int lastEdited; // 0 - width, 1 - height
     void resetResCheckBox();
 
-private slots:
+  private slots:
     void widthChanged(int);
     void heightChanged(int);
     void percentChanged(double);
@@ -51,6 +50,6 @@ private slots:
     void onAspectRatioCheckbox();
     void onPercentageRadioButton();
     void onAbsoluteSizeRadioButton();
-signals:
+  signals:
     void sizeSelected(QSize);
 };

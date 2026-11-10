@@ -4,7 +4,7 @@
 
 class VideoPlayer : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit VideoPlayer(QWidget *parent = nullptr);
     virtual bool showVideo(QString file) = 0;
     virtual void seek(int pos) = 0;
@@ -23,13 +23,13 @@ public:
     virtual void setVideoUnscaled(bool mode) = 0;
     virtual void setLoopPlayback(bool mode) = 0;
 
-signals:
+  signals:
     void durationChanged(int value);
     void positionChanged(int value);
     void videoPaused(bool);
     void playbackFinished();
 
-public slots:
+  public slots:
     virtual void show();
     virtual void hide();
 };

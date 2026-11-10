@@ -5,18 +5,19 @@
 
 class MacOSApplication : public QApplication {
     Q_OBJECT
-public:
+  public:
     MacOSApplication(int &argc, char *argv[]) : QApplication(argc, argv) {};
-protected:
+
+  protected:
     bool event(QEvent *event) override {
-        if (event->type() == QEvent::FileOpen) {
-            QString filePath = static_cast<QFileOpenEvent *> (event)->file();
+        if(event->type() == QEvent::FileOpen) {
+            QString filePath = static_cast<QFileOpenEvent *>(event)->file();
             emit fileOpened(filePath);
         } else {
-            return QApplication::event (event);
+            return QApplication::event(event);
         }
         return true;
     }
-signals:
+  signals:
     void fileOpened(QString filePath);
 };

@@ -15,15 +15,14 @@
 #include "gui/customwidgets/thumbnailwidget.h"
 #include "sourcecontainers/thumbnail.h"
 
-class ThumbnailStrip : public ThumbnailView
-{
+class ThumbnailStrip : public ThumbnailView {
     Q_OBJECT
-public:
+  public:
     explicit ThumbnailStrip(QWidget *parent = nullptr);
     QSize itemSize();
     void readSettings();
 
-private:
+  private:
     const int thumbPadding = 9;
     int thumbMarginX = 2, thumbMarginY = 4;
     void updateThumbnailPositions(int start, int end);
@@ -31,11 +30,11 @@ private:
     void setupLayout();
     ThumbnailStyle mCurrentStyle;
 
-public slots:
+  public slots:
     void focusOn(int index) override;
     void focusOnSelection() override;
 
-protected:
+  protected:
     void resizeEvent(QResizeEvent *event) override;
     void updateScrollbarIndicator() override;
     void addItemToLayout(ThumbnailWidget *widget, int pos) override;

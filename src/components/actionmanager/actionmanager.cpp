@@ -136,11 +136,11 @@ void ActionManager::removeAllShortcuts() {
 }
 //------------------------------------------------------------------------------
 // Removes all shortcuts for specified action. Slow (reverse map lookup).
-void ActionManager::removeAllShortcuts(const QString& actionName) {
+void ActionManager::removeAllShortcuts(const QString &actionName) {
     if(validateAction(actionName) == ActionType::ACTION_INVALID)
         return;
 
-    for (auto i = shortcuts.begin(); i != shortcuts.end();) {
+    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
         if(i.value() == actionName)
             i = shortcuts.erase(i);
         else
@@ -160,7 +160,7 @@ void ActionManager::resetDefaults() {
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void ActionManager::adjustFromVersion(const QVersionNumber& lastVer) {
+void ActionManager::adjustFromVersion(const QVersionNumber &lastVer) {
     // this member used to reach for the global actionManager pointer instead of
     // its own object; it has exactly one caller (Core::onUpdate) and operating
     // on `this` is what makes that call mean anything
@@ -173,7 +173,8 @@ void ActionManager::adjustFromVersion(const QVersionNumber& lastVer) {
                 shortcuts.insert(i.key(), i.value());
                 qDebug() << "[ActionManager] new action " << i.value() << " - assigning as [" << i.key() << "]";
             } else if(i.value() != actionForShortcut(i.key())) {
-                qDebug() << "[ActionManager] new action " << i.value() << " - shortcut [" << i.key() << "] already assigned to another action " << actionForShortcut(i.key());
+                qDebug() << "[ActionManager] new action " << i.value() << " - shortcut [" << i.key()
+                         << "] already assigned to another action " << actionForShortcut(i.key());
             }
         }
     }
@@ -190,11 +191,11 @@ QString ActionManager::actionForShortcut(const QString &keys) {
 }
 
 // returns first shortcut that is found
-const QString ActionManager::shortcutForAction(const QString& action) {
+const QString ActionManager::shortcutForAction(const QString &action) {
     return shortcuts.key(action, "");
 }
 
-const QList<QString> ActionManager::shortcutsForAction(const QString& action) {
+const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
     return shortcuts.keys(action);
 }
 
@@ -221,7 +222,7 @@ bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
 }
 //------------------------------------------------------------------------------
 void ActionManager::validateShortcuts() {
-    for (auto i = shortcuts.begin(); i != shortcuts.end();) {
+    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
         if(validateAction(i.value()) == ActionType::ACTION_INVALID)
             i = shortcuts.erase(i);
         else
@@ -229,8 +230,7 @@ void ActionManager::validateShortcuts() {
     }
 }
 //------------------------------------------------------------------------------
-inline
-ActionType ActionManager::validateAction(const QString &actionName) {
+inline ActionType ActionManager::validateAction(const QString &actionName) {
     if(appActions->getMap().contains(actionName))
         return ActionType::ACTION_NORMAL;
     if(actionName.startsWith("s:")) {

@@ -9,24 +9,24 @@
 
 class Scaler : public QObject {
     Q_OBJECT
-public:
+  public:
     explicit Scaler(Cache *_cache, WorkerPool &_pool, QObject *parent = nullptr);
     ~Scaler() override;
 
-signals:
+  signals:
     void scalingFinished(QPixmap result, const ScalerRequest &request);
     void acceptScalingResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
-public slots:
+  public slots:
     void requestScaled(const ScalerRequest &req);
 
-private slots:
+  private slots:
     // every slot here runs on this object's thread: the pool reports through a
     // queued connection, so the state machine below has exactly one owner
     void onTaskFinish(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
     void slotForwardScaledResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
-private:
+  private:
     WorkerPool &pool;
     bool buffered, running;
     ScalerRequest bufferedRequest, startedRequest;

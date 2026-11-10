@@ -1,21 +1,14 @@
 #include "documentwidget.h"
 
 DocumentWidget::DocumentWidget(ViewerWidget *viewWidget, InfoBarProxy *infoBar, QWidget *parent)
-    : FloatingWidgetContainer(parent),
-      mainPanel(nullptr),
-      mPanelPinned(false),
-      mPanelEnabled(false),
-      mPanelFullscreenOnly(false),
-      avoidPanelFlag(false),
-      mIsFullscreen(false),
-      mInteractionEnabled(false),
-      mAllowPanelInit(false)
-{
+    : FloatingWidgetContainer(parent), mainPanel(nullptr), mPanelPinned(false), mPanelEnabled(false),
+      mPanelFullscreenOnly(false), avoidPanelFlag(false), mIsFullscreen(false), mInteractionEnabled(false),
+      mAllowPanelInit(false) {
     layoutRoot = new QVBoxLayout();
-    layoutRoot->setContentsMargins(0,0,0,0);
+    layoutRoot->setContentsMargins(0, 0, 0, 0);
     layoutRoot->setSpacing(0);
     layout = new QBoxLayout(QBoxLayout::LeftToRight);
-    layout->setContentsMargins(0,0,0,0);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layoutRoot->addLayout(layout);
     setLayout(layoutRoot);
@@ -65,17 +58,13 @@ void DocumentWidget::setPanelPinned(bool mode) {
         if(mPanelPinned)
             layout->removeWidget(mainPanel);
         mainPanel->setLayoutManaged(false);
-    } else {    // pin
+    } else { // pin
         layout->insertWidget(1, mainPanel);
         switch(settings->panelPosition()) {
-            case PANEL_TOP:
-                layout->setDirection(QBoxLayout::BottomToTop); break;
-            case PANEL_BOTTOM:
-                layout->setDirection(QBoxLayout::TopToBottom); break;
-            case PANEL_LEFT:
-                layout->setDirection(QBoxLayout::RightToLeft); break;
-            case PANEL_RIGHT:
-                layout->setDirection(QBoxLayout::LeftToRight); break;
+        case PANEL_TOP: layout->setDirection(QBoxLayout::BottomToTop); break;
+        case PANEL_BOTTOM: layout->setDirection(QBoxLayout::TopToBottom); break;
+        case PANEL_LEFT: layout->setDirection(QBoxLayout::RightToLeft); break;
+        case PANEL_RIGHT: layout->setDirection(QBoxLayout::LeftToRight); break;
         }
         mainPanel->setLayoutManaged(true);
         mainPanel->show();
@@ -139,7 +128,7 @@ void DocumentWidget::mouseMoveEvent(QMouseEvent *event) {
         return;
     }
     // show on hover event
-    if(mPanelEnabled && (mIsFullscreen|| !mPanelFullscreenOnly)) {
+    if(mPanelEnabled && (mIsFullscreen || !mPanelFullscreenOnly)) {
         if(mainPanel->triggerRect().contains(event->pos()) && !avoidPanelFlag) {
             mainPanel->show();
         }
@@ -151,7 +140,7 @@ void DocumentWidget::mouseMoveEvent(QMouseEvent *event) {
         // it still fcks up Fitts law as the buttons are not receiving hover on screen border
 
         // alright this also only works when in root window. sad.
-        if(!mainPanel->triggerRect().adjusted(-8,-8,8,8).contains(event->pos())) {
+        if(!mainPanel->triggerRect().adjusted(-8, -8, 8, 8).contains(event->pos())) {
             mainPanel->hideAnimated();
         }
     }

@@ -1,6 +1,7 @@
 #include "loader.h"
 
-Loader::Loader(WorkerPool &_pool) : pool(_pool) {}
+Loader::Loader(WorkerPool &_pool) : pool(_pool) {
+}
 
 Loader::~Loader() {
     // submitted jobs are the pool's to destroy: the unstarted ones come back

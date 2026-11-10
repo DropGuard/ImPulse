@@ -12,11 +12,14 @@
 // the single deleter), priority order, and per-owner waiting.
 class TestWorkerPool : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestWorkerPool() : EngineStackFixture("workerpool") {}
+  public:
+    TestWorkerPool() : EngineStackFixture("workerpool") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     void persistentWorkersSurviveSubmitAndDrainWaves();
     void drainReturnsExactlyTheUnstartedJobs();
@@ -32,39 +35,51 @@ private slots:
 namespace {
 
 class CountingJob : public PoolJob {
-public:
-    CountingJob(std::atomic_int *_runs, std::atomic_int *_deaths)
-        : runs(_runs), deaths(_deaths) {}
-    ~CountingJob() override { deaths->fetch_add(1); }
-    void run() override { runs->fetch_add(1); }
-private:
+  public:
+    CountingJob(std::atomic_int *_runs, std::atomic_int *_deaths) : runs(_runs), deaths(_deaths) {
+    }
+    ~CountingJob() override {
+        deaths->fetch_add(1);
+    }
+    void run() override {
+        runs->fetch_add(1);
+    }
+
+  private:
     std::atomic_int *runs;
     std::atomic_int *deaths;
 };
 
 // occupies its worker until released, so the test controls what stays queued
 class GatedJob : public PoolJob {
-public:
+  public:
     GatedJob(std::atomic_bool *_gate, std::atomic_int *_starts, std::atomic_int *_deaths)
-        : gate(_gate), starts(_starts), deaths(_deaths) {}
-    ~GatedJob() override { deaths->fetch_add(1); }
+        : gate(_gate), starts(_starts), deaths(_deaths) {
+    }
+    ~GatedJob() override {
+        deaths->fetch_add(1);
+    }
     void run() override {
         starts->fetch_add(1);
         while(!gate->load())
             QThread::msleep(1);
     }
-private:
+
+  private:
     std::atomic_bool *gate;
     std::atomic_int *starts;
     std::atomic_int *deaths;
 };
 
 class OrderJob : public PoolJob {
-public:
-    OrderJob(int _marker, std::atomic_int *_next, int *_order)
-        : marker(_marker), next(_next), order(_order) {}
-    void run() override { order[next->fetch_add(1)] = marker; }
-private:
+  public:
+    OrderJob(int _marker, std::atomic_int *_next, int *_order) : marker(_marker), next(_next), order(_order) {
+    }
+    void run() override {
+        order[next->fetch_add(1)] = marker;
+    }
+
+  private:
     int marker;
     std::atomic_int *next;
     int *order;
@@ -74,15 +89,18 @@ private:
 // queued half of cancel()'s contract — the mark travels with the job, so the
 // entry checkpoint a consumer keeps sees it whenever the job eventually starts
 class MarkedJob : public PoolJob {
-public:
-    MarkedJob(std::atomic_int *_sawMark, std::atomic_int *_deaths)
-        : sawMark(_sawMark), deaths(_deaths) {}
-    ~MarkedJob() override { deaths->fetch_add(1); }
+  public:
+    MarkedJob(std::atomic_int *_sawMark, std::atomic_int *_deaths) : sawMark(_sawMark), deaths(_deaths) {
+    }
+    ~MarkedJob() override {
+        deaths->fetch_add(1);
+    }
     void run() override {
         if(cancelRequested())
             sawMark->fetch_add(1);
     }
-private:
+
+  private:
     std::atomic_int *sawMark;
     std::atomic_int *deaths;
 };
@@ -90,16 +108,19 @@ private:
 // spins inside run() until the cancel mark arrives — the deterministic
 // stand-in for "cancel() fired while this job was running"
 class CancelGatedJob : public PoolJob {
-public:
-    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_deaths)
-        : sawMark(_sawMark), deaths(_deaths) {}
-    ~CancelGatedJob() override { deaths->fetch_add(1); }
+  public:
+    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_deaths) : sawMark(_sawMark), deaths(_deaths) {
+    }
+    ~CancelGatedJob() override {
+        deaths->fetch_add(1);
+    }
     void run() override {
         while(!cancelRequested())
             QThread::msleep(1);
         sawMark->store(true);
     }
-private:
+
+  private:
     std::atomic_bool *sawMark;
     std::atomic_int *deaths;
 };
@@ -139,14 +160,14 @@ void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
 
         auto taken = pool.drain(PoolOwner::Loader);
         QVERIFY2(taken.size() == 3, "only the queued jobs come back, not the running one");
-        QCOMPARE(runs.load(), 0);          // so none of them ever ran
-        taken.clear();                     // caller deletes what it took back
+        QCOMPARE(runs.load(), 0); // so none of them ever ran
+        taken.clear();            // caller deletes what it took back
         QCOMPARE(deaths.load(), 3);
 
-        gate = true;                       // the running job finishes normally
+        gate = true; // the running job finishes normally
         pool.waitForOwner(PoolOwner::Loader);
-        QCOMPARE(runs.load(), 0);          // drained jobs never ran
-        QCOMPARE(deaths.load(), 4);        // the gated job was pool-deleted
+        QCOMPARE(runs.load(), 0);   // drained jobs never ran
+        QCOMPARE(deaths.load(), 4); // the gated job was pool-deleted
     }
     QCOMPARE(deaths.load(), 4);
 }
@@ -186,38 +207,38 @@ void TestWorkerPool::waitForOwnerWaitsOnlyForItsOwner() {
     pool.waitForAll();
 }
 
-    // The settings bus drains the whole pool: Core::readSettings() opens with
-    // waitForAll(), so the price of pressing Save is bounded by every owner's
-    // queue, not by the pipeline the changed setting actually feeds. The
-    // narrow form already has a test above; this pins the width of the wide
-    // one, because that width is the part that runs on the UI thread.
+// The settings bus drains the whole pool: Core::readSettings() opens with
+// waitForAll(), so the price of pressing Save is bounded by every owner's
+// queue, not by the pipeline the changed setting actually feeds. The
+// narrow form already has a test above; this pins the width of the wide
+// one, because that width is the part that runs on the UI thread.
 void TestWorkerPool::waitForAllWaitsForEveryOwner() {
-        std::atomic_bool gate{false};
-        std::atomic_int loaderStarts{0}, thumbRuns{0}, deaths{0};
-        WorkerPool pool(2);
-        pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &loaderStarts, &deaths));
-        QTRY_COMPARE_WITH_TIMEOUT(loaderStarts.load(), 1, 10000);
-        pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<CountingJob>(&thumbRuns, &deaths));
-        pool.waitForOwner(PoolOwner::Thumbnailer);
-        QCOMPARE(thumbRuns.load(), 1);   // one owner is provably finished with...
-        QVERIFY(loaderStarts.load() == 1); // ...while another is still inside a job
+    std::atomic_bool gate{false};
+    std::atomic_int loaderStarts{0}, thumbRuns{0}, deaths{0};
+    WorkerPool pool(2);
+    pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &loaderStarts, &deaths));
+    QTRY_COMPARE_WITH_TIMEOUT(loaderStarts.load(), 1, 10000);
+    pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<CountingJob>(&thumbRuns, &deaths));
+    pool.waitForOwner(PoolOwner::Thumbnailer);
+    QCOMPARE(thumbRuns.load(), 1);     // one owner is provably finished with...
+    QVERIFY(loaderStarts.load() == 1); // ...while another is still inside a job
 
-        std::atomic_bool returned{false};
-        std::thread waiter([&pool, &returned]() {
-            pool.waitForAll();
-            returned.store(true);
-        });
-        QThread::msleep(100);
-        QVERIFY2(!returned.load(), "waitForAll() returned while a Loader job was still running");
-        gate = true;
-        waiter.join();                 // it was waiting: opening the gate releases it
-        QVERIFY(returned.load());
-        // the pool destroys completed jobs on its worker thread, so the death
-        // count catches up asynchronously — asserting it as an instant value is
-        // a race this test authored, and it was the one red that arrived
-        // unnamed in the ASan sweep
-        QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
-    }
+    std::atomic_bool returned{false};
+    std::thread waiter([&pool, &returned]() {
+        pool.waitForAll();
+        returned.store(true);
+    });
+    QThread::msleep(100);
+    QVERIFY2(!returned.load(), "waitForAll() returned while a Loader job was still running");
+    gate = true;
+    waiter.join(); // it was waiting: opening the gate releases it
+    QVERIFY(returned.load());
+    // the pool destroys completed jobs on its worker thread, so the death
+    // count catches up asynchronously — asserting it as an instant value is
+    // a race this test authored, and it was the one red that arrived
+    // unnamed in the ASan sweep
+    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
+}
 
 // cancel() marks; it never stops anything by itself. What the pool owes its
 // callers is exactly three facts: the mark reaches queued jobs and jobs

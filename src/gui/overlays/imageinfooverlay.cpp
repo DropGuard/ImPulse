@@ -1,16 +1,14 @@
 #include "imageinfooverlay.h"
 #include "ui_imageinfooverlay.h"
 
-ImageInfoOverlay::ImageInfoOverlay(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::ImageInfoOverlay)
-{
+ImageInfoOverlay::ImageInfoOverlay(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), ui(new Ui::ImageInfoOverlay) {
     ui->setupUi(this);
     ui->closeButton->setIconPath(":res/icons/common/overlay/close-dim16.png");
     ui->headerIcon->setIconPath(":res/icons/common/overlay/info16.png");
     entryStub.setFixedSize(280, 48);
     entryStub.setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-    connect(ui->closeButton,  &IconButton::clicked, this, &ImageInfoOverlay::hide);
+    connect(ui->closeButton, &IconButton::clicked, this, &ImageInfoOverlay::hide);
     this->setPosition(FloatingWidgetPosition::RIGHT);
 
     if(parent)
