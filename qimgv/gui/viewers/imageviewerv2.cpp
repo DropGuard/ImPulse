@@ -139,7 +139,8 @@ void ImageViewerV2::readSettings() {
     zoomStep = settings->zoomStep();
     focusIn1to1 = settings->focusPointIn1to1Mode();
     trackpadDetection = settings->trackpadDetection();
-    if( (useFixedZoomLevels = settings->useFixedZoomLevels()) ) {
+    useFixedZoomLevels = settings->useFixedZoomLevels();
+    if(useFixedZoomLevels) {
         // zoomlevels are stored as a string, parse into list
         zoomLevels.clear();
         const auto levelsStr = settings->zoomLevels().split(',');

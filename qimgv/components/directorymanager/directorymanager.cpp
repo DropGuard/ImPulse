@@ -584,6 +584,8 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
             removeDirEntry(path);
             removeFileEntry(path);
             break;
+        default:
+            break;
     }
     if (tracing) {
         // the counts, not just the kind: the failure this trace exists to name is
