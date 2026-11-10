@@ -15,21 +15,16 @@
 struct State;
 
 class WindowShell;
+class OverlayHost;
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/iuserinteractions.h"
 #include "gui/viewers/viewerwidget.h"
-#include "gui/overlays/controlsoverlay.h"
 #include "gui/overlays/fullscreeninfooverlayproxy.h"
-#include "gui/overlays/floatingmessageproxy.h"
-#include "gui/overlays/saveconfirmoverlay.h"
 #include "gui/panels/mainpanel/thumbnailstrip.h"
 #include "gui/panels/sidepanel/sidepanel.h"
 #include "gui/panels/croppanel/croppanel.h"
 #include "gui/overlays/cropoverlay.h"
-#include "gui/overlays/copyoverlay.h"
-#include "gui/overlays/imageinfooverlayproxy.h"
-#include "gui/overlays/renameoverlay.h"
 #include "gui/dialogs/resizedialog.h"
 #include "gui/centralwidget.h"
 #include "gui/dialogs/filereplacedialog.h"
@@ -60,12 +55,12 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void showAnimation(const std::shared_ptr<QMovie> &movie);
     void showVideo(const QString &file);
 
-    void setExifInfo(const QMap<QString, QString> &exifInfo);
     FolderViewProxy *getFolderView();
     ThumbnailStripProxy *getThumbnailPanel();
 
     ViewMode currentViewMode();
     WindowShell *shell();
+    OverlayHost *overlays();
 
     bool showConfirmation(const QString &title, const QString &msg) override;
     DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode,
@@ -87,17 +82,11 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     CentralWidget *centralWidget = nullptr;
     ActiveSidePanel activeSidePanel;
     SidePanel *sidePanel;
-    CopyOverlay *copyOverlay;
-    SaveConfirmOverlay *saveOverlay;
-    RenameOverlay *renameOverlay;
     FullscreenInfoOverlayProxy *infoBarFullscreen;
-    ImageInfoOverlayProxy *imageInfoOverlay;
-    FloatingMessageProxy *floatingMessage;
+    InfoBarProxy *infoBarWindowed = nullptr;
+    OverlayHost *overlayHost = nullptr;
     CropPanel *cropPanel;
     CropOverlay *cropOverlay;
-
-    ControlsOverlay *controlsOverlay;
-    InfoBarProxy *infoBarWindowed = nullptr;
 
     QPropertyNotifier infoObserver;
     QPropertyNotifier slideshowObserver;
@@ -109,9 +98,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
     void setupCropPanel();
-    void setupCopyOverlay();
-    void setupSaveOverlay();
-    void setupRenameOverlay();
     void setInteractionEnabled(bool mode);
 
   private slots:
@@ -188,19 +174,10 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     QString getSaveFileName(const QString &fileName);
     void showResizeDialog(QSize initialSize);
     void showSettings();
-    void showMessageDirectory(const QString &dirName);
-    void triggerCopyOverlay();
     void showMessage(const QString &text) override;
-    void showMessage(const QString &text, int duration);
-    void showMessageSuccess(const QString &text);
-    void showWarning(const QString &text);
-    void showError(const QString &text);
-    void triggerMoveOverlay();
     void close();
     void triggerCropPanel();
     void updateCropPanelData();
-    void showSaveOverlay();
-    void hideSaveOverlay();
     void fitWindow();
     void fitWidth();
     void fitOriginal();
@@ -210,8 +187,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void closeImage();
     void showContextMenu();
     void onSortingChanged(SortingMode);
-    void toggleImageInfoOverlay();
-    void toggleRenameOverlay(const QString &currentName);
     void setFilterNearest();
     void setFilterBilinear();
     void setFilter(ScalingFilter filter);

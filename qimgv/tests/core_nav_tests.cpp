@@ -12,6 +12,8 @@
 #include <QtTest/QSignalSpy>
 #include <QtTest/qtestcase.h>
 #include <QQueue>
+#include "gui/overlays/imageinfooverlayproxy.h"
+#include "gui/overlays/floatingmessageproxy.h"
 #include <utility>
 #include <QApplication>
 
