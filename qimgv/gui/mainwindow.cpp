@@ -102,23 +102,6 @@ void MW::setupUi() {
     connect(viewerWidget, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
     connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
-    connect(this, &MW::zoomIn, viewerWidget, &ViewerWidget::zoomIn);
-    connect(this, &MW::zoomOut, viewerWidget, &ViewerWidget::zoomOut);
-    connect(this, &MW::zoomInCursor, viewerWidget, &ViewerWidget::zoomInCursor);
-    connect(this, &MW::zoomOutCursor, viewerWidget, &ViewerWidget::zoomOutCursor);
-    connect(this, &MW::scrollUp, viewerWidget, &ViewerWidget::scrollUp);
-    connect(this, &MW::scrollDown, viewerWidget, &ViewerWidget::scrollDown);
-    connect(this, &MW::scrollLeft, viewerWidget, &ViewerWidget::scrollLeft);
-    connect(this, &MW::scrollRight, viewerWidget, &ViewerWidget::scrollRight);
-    connect(this, &MW::pauseVideo, viewerWidget, &ViewerWidget::pauseResumePlayback);
-    connect(this, &MW::seekVideoForward, viewerWidget, &ViewerWidget::seekForward);
-    connect(this, &MW::seekVideoBackward, viewerWidget, &ViewerWidget::seekBackward);
-    connect(this, &MW::frameStep, viewerWidget, &ViewerWidget::frameStep);
-    connect(this, &MW::frameStepBack, viewerWidget, &ViewerWidget::frameStepBack);
-    connect(this, &MW::toggleMute, viewerWidget, &ViewerWidget::toggleMute);
-    connect(this, &MW::volumeUp, viewerWidget, &ViewerWidget::volumeUp);
-    connect(this, &MW::volumeDown, viewerWidget, &ViewerWidget::volumeDown);
-    connect(this, &MW::toggleTransparencyGrid, viewerWidget, &ViewerWidget::toggleTransparencyGrid);
     connect(this, &MW::setLoopPlayback, viewerWidget, &ViewerWidget::setLoopPlayback);
 }
 
@@ -229,6 +212,76 @@ void MW::showVideo(const QString &file) {
     if(settings->autoResizeWindow())
         windowShell->preShowResize(QSize()); // tmp. find a way to get this though mpv BEFORE playback
     viewerWidget->showVideo(file);
+}
+
+// viewer command one-liners: ActionManager's connects land here and each
+// re-fires the same-named (or renamed) ViewerWidget signal directly.
+void MW::zoomIn() {
+    emit viewerWidget->zoomIn();
+}
+
+void MW::zoomOut() {
+    emit viewerWidget->zoomOut();
+}
+
+void MW::zoomInCursor() {
+    emit viewerWidget->zoomInCursor();
+}
+
+void MW::zoomOutCursor() {
+    emit viewerWidget->zoomOutCursor();
+}
+
+void MW::scrollUp() {
+    emit viewerWidget->scrollUp();
+}
+
+void MW::scrollDown() {
+    emit viewerWidget->scrollDown();
+}
+
+void MW::scrollLeft() {
+    emit viewerWidget->scrollLeft();
+}
+
+void MW::scrollRight() {
+    emit viewerWidget->scrollRight();
+}
+
+void MW::pauseVideo() {
+    viewerWidget->pauseResumePlayback();
+}
+
+void MW::seekVideoForward() {
+    viewerWidget->seekForward();
+}
+
+void MW::seekVideoBackward() {
+    viewerWidget->seekBackward();
+}
+
+void MW::frameStep() {
+    viewerWidget->frameStep();
+}
+
+void MW::frameStepBack() {
+    viewerWidget->frameStepBack();
+}
+
+void MW::toggleMute() {
+    viewerWidget->toggleMute();
+}
+
+void MW::volumeUp() {
+    viewerWidget->volumeUp();
+}
+
+void MW::volumeDown() {
+    viewerWidget->volumeDown();
+}
+
+void MW::toggleTransparencyGrid() {
+    emit viewerWidget->toggleTransparencyGrid();
 }
 
 void MW::showContextMenu() {

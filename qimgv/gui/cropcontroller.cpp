@@ -47,6 +47,17 @@ void CropController::showCropPanel() {
     }
 }
 
+bool CropController::isCropPanelActive() const {
+    return activeSidePanel == SIDEPANEL_CROP;
+}
+
+void CropController::trigger() {
+    if(activeSidePanel != SIDEPANEL_CROP)
+        showCropPanel();
+    else
+        hideCropPanel();
+}
+
 void CropController::hideCropPanel() {
     sidePanel->hide();
     if(activeSidePanel == SIDEPANEL_CROP) {
