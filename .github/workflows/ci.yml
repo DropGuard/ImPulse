@@ -3,10 +3,10 @@ name: ci
 # C++ fallback watcher was deleted, so the old msys2 packaging workflow could
 # never build this tree again. What CI can and should carry is the pipeline
 # the repo already trusts locally — the build with its zero-warning contract,
-# the five ctest suites, and the Rust suite. The deep checks (the lint gate,
+# the six ctest suites, and the Rust suite. The deep checks (the lint gate,
 # the sanitizer tree, Miri) stay out of the per-push path: the gate's clazy
 # counts are baseline-sensitive to the toolchain version and belong to the
-# pre-push ritual on the machine that owns the baseline, and the sanitizer and
+# pre-commit gate on the machine that owns the baseline, and the sanitizer and
 # interpreter runs pay minutes the push path does not need to pay. They run on
 # the nightly schedule instead, and on demand.
 on:
@@ -36,7 +36,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
-      - name: the five suites
+      - name: the six suites
         run: cd build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
       - name: rust suite
         run: cargo test --manifest-path engine/qimgv-engine/Cargo.toml

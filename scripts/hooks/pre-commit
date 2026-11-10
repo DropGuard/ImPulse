@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The fast gate on every commit: incremental build + the five suites.
-# lint --gate (2m20s, measured) is the pre-push hook's job — too slow to sit
+# The gate on every commit: incremental build + the six suites + lint --gate.
+# lint used to sit at push time because a full scan cost ~2m20s; the per-TU
+# cache (scripts/lint.py) brought the warm run to ~5s, cheap enough to sit
 # between a human and a commit. Escape hatch: git commit --no-verify, but a
 # red gate in history is how f8e8b216's six regressions landed unseen.
 set -e
@@ -22,6 +23,12 @@ if ! (cd build && ctest -Q); then
     echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
     exit 1
 fi
+python3 scripts/lint.py build --gate > /tmp/qimgv-hook-lint.log 2>&1 || {
+    echo "pre-commit: lint gate red:" >&2
+    tail -20 /tmp/qimgv-hook-lint.log >&2
+    echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
+    exit 1
+}
 # engine pure layer touched → Miri rides the commit. The semantics layer's only
 # deep instrument (watcher/apply, model, meta, property — scripts/miri.sh) is
 # too slow for every commit (~2 min hot, ~8 min cold) and too easy to forget

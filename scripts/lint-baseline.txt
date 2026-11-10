@@ -27,6 +27,26 @@
 #   re-armed, a new by-value param in scanned code fails the gate.
 #   duplInheritedMember — Qt-style signal/slot re-declaration patterns
 #   (non-virtual shadowing is intentional in this framework).
+#   bugprone-narrowing-conversions — the retired float-conversion family
+#   above as seen by clang (137 sites at the 2026-11-10 census): GUI
+#   coordinate math, the truncation is the intent.
+#   bugprone-easily-swappable-parameters — Qt APIs take adjacent QString
+#   pairs by idiom (26 sites); strong-typing them is a non-improvement.
+#   bugprone-integer-division — all 10 census sites are icon/arrow
+#   centering: integer pixel math by intent, same verdict as the
+#   conversion families.
+#   bugprone-parent-virtual-call — all 7 census sites are deliberate
+#   base-skip: a multiply-installed eventFilter must call QObject::
+#   (QAbstractScrollArea:: would double-process the viewport), the
+#   wheelEvent sites are ignore+passthrough, and MainPanel's
+#   QWidget::paintEvent draws PE_Widget exactly like FloatingWidget's.
+#   bugprone-implicit-widening-of-multiplication-result — the 3 census
+#   sites are reserve() hints (count * 2); overflow needs 2^31 entries
+#   in one directory.
+#   bugprone-unchecked-optional-access is ARMED, but its findings under
+#   tests/ are filtered: QVERIFY guards engagement and the macro is
+#   invisible to tidy's dataflow (27/27 census hits were guarded test
+#   sites; production was zero).
 # qcolor-from-literal — retired at zero on 2026-11-10 (row removed per the
 # no-zero-rows rule): the theme table's 48 hex literals and the two test
 # literals now construct through QColor::fromString (the sanctioned path; the
@@ -37,11 +57,11 @@
 # moved: compile_commands.json regenerates as CMake flag/entry state evolves, and a
 # fresh-configure scan of the SAME content reads 13-14. The four sites were an
 # artifact of the older flag set, recorded here twice-verified gone.
-instrument 75c782e6e3a156fc
+instrument 192e961b051d4120
 
 # The fingerprint is the scanned (file, command) set from compile_commands.json
 # PLUS the --version output of every tool that judged it (the compilers named in
-# the commands, clazy-standalone, cppcheck): the baseline counts are only
+# the commands, clazy-standalone, clang-tidy, cppcheck): the baseline counts are only
 # meaningful for the instrument that measured them. A local act run re-configures
 # the build dir in its container and moves the set; a tool upgrade moves the
 # verdicts under an unchanged set, which the gate would otherwise misread as the
@@ -61,6 +81,13 @@ instrument 75c782e6e3a156fc
 # fixture member), one at an upstream-age site (MW::showMessage missing
 # override) — all three fixed to zero in the same commit as this re-record,
 # which is also why returnByReference reads 9.
+# Re-recorded 2026-11-10 from 75c782e6e3a156fc: clang-tidy joined the
+# instrument (bugprone-* census, selection exclusions above). The census's
+# actionable families were fixed to zero in the same commit (branch-clone,
+# assignment-in-if-condition, switch-missing-default-case; empty-catch
+# dissolved when the fossil FSEntry(QString) re-stat constructor was deleted),
+# so the new tool enters with an empty table — every armed family at zero,
+# verified by a full cold scan.
 #   connect-3arg-lambda — retired at zero on 2026-11-06: every lambda
 #   connect now names a context object, so the connection dies with the
 #   receiver instead of outliving it whenever the sender lives longer
