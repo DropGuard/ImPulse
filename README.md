@@ -17,9 +17,13 @@ of [qimgv](https://github.com/easymodo/qimgv). GPL-3.0 · v0.1.0
 - **Your configuration migrates itself.** First run carries qimgv's settings,
   shortcuts and theme into ImPulse's own namespace; upstream qimgv stays
   installed and untouched.
-- **The interface is upstream's, unchanged.** Same browsing, folder view,
-  thumbnail panel, editing, scripts and shortcuts — the feature tour lives in
-  [upstream's README](https://github.com/easymodo/qimgv#readme).
+- **The interface is upstream's, one removal.** Same browsing, thumbnail
+  panel, editing, scripts and shortcuts — the feature tour lives in
+  [upstream's README](https://github.com/easymodo/qimgv#readme). The one
+  exception: the folder view's bookmarks strip is gone. The directory tree
+  already follows the image you are viewing, the strip's own click targets
+  sat next to the tree's, and a misclick there navigated you away from a
+  deep path with no way back — cost without payoff.
 
 ## Install
 
