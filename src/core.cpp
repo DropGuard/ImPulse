@@ -1482,7 +1482,6 @@ void Core::nextDirectory() {
     stopSlideshow();
     QString next = DirectoryManager::adjacentDirectory(model->directoryPath(), true, model->sortingMode());
     if(next.isEmpty()) {
-        mw->showMessageDirectoryEnd();
         return;
     }
     if(!setDirectory(next))
@@ -1501,7 +1500,6 @@ void Core::prevDirectory(bool selectLast) {
         return;
     QString prev = DirectoryManager::adjacentDirectory(model->directoryPath(), false, model->sortingMode());
     if(prev.isEmpty()) {
-        mw->showMessageDirectoryStart();
         return;
     }
     if(!setDirectory(prev))
@@ -1532,8 +1530,7 @@ void Core::nextImage() {
     case FolderEnd::Outcome::EnterAdjacentFolder: nextDirectory(); return;
     case FolderEnd::Outcome::ReportBoundary:
         if(!model->loaderBusy())
-            mw->showMessageDirectoryEnd();
-        return;
+            return;
     }
 }
 
@@ -1553,8 +1550,7 @@ void Core::prevImage() {
     case FolderEnd::Outcome::EnterAdjacentFolder: prevDirectory(true); return;
     case FolderEnd::Outcome::ReportBoundary:
         if(!model->loaderBusy())
-            mw->showMessageDirectoryStart();
-        return;
+            return;
     }
 }
 
@@ -1597,7 +1593,6 @@ void Core::jumpToFirst() {
         return;
     stopSlideshow();
     loadFileIndex(0, true, settings->usePreloader());
-    mw->showMessageDirectoryStart();
 }
 
 void Core::jumpToLast() {
@@ -1605,7 +1600,6 @@ void Core::jumpToLast() {
         return;
     stopSlideshow();
     loadFileIndex(model->fileCount() - 1, true, settings->usePreloader());
-    mw->showMessageDirectoryEnd();
 }
 
 void Core::onLoadFailed(const QString &path) {
