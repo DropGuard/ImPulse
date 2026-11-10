@@ -53,9 +53,7 @@ class EngineStackFixture {
     }
 
     void makeFile(const QString &name) {
-        QFile f(fixtureDir + "/" + name);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write("x");
+        QVERIFY(!writeTestFile(fixtureDir + "/" + name, "x").isEmpty());
     }
 
     // each slot gets its own directory: the engine holds inotify watches on these
@@ -85,14 +83,7 @@ class EngineStackFixture {
     }
 
     bool writeBigImage(const QString &path, const QString &format, const QSize &size) {
-        QImage img(size, QImage::Format_RGB32);
-        QPainter p(&img);
-        QLinearGradient g(0, 0, size.width(), size.height());
-        g.setColorAt(0.0, Qt::red);
-        g.setColorAt(1.0, Qt::blue);
-        p.fillRect(img.rect(), g);
-        p.end();
-        return img.save(path, format.toStdString().c_str());
+        return makeImageFile(path, size, format.toStdString().c_str());
     }
 
     std::shared_ptr<Image> spyImage(const QSignalSpy &spy, int row) {

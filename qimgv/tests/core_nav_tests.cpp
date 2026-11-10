@@ -258,10 +258,9 @@ class TestCoreNav : public QObject {
         return false;
     }
 
+    // 8x8 red PNG via the shared factory
     void writeImage(const QString &path) {
-        QImage img(8, 8, QImage::Format_RGB32);
-        img.fill(Qt::red);
-        QVERIFY(img.save(path, "PNG"));
+        QVERIFY(makeImageFile(path, QSize(8, 8)));
     }
 
   private slots:
@@ -2968,16 +2967,6 @@ class TestCoreNav : public QObject {
     int lastSelection(FolderGridView &grid) {
         const QList<int> sel = grid.selection();
         return sel.last();
-    }
-    QString makeTxt(const QString &dir, const QString &name, const char *content) {
-        const QString path = QDir(dir).filePath(name);
-        QFile f(path);
-        if(!f.open(QIODevice::WriteOnly)) {
-            QTest::qFail(qPrintable(QStringLiteral("cannot create %1").arg(path)), __FILE__, __LINE__);
-            return {};
-        }
-        f.write(content);
-        return path;
     }
     QByteArray contentOf(const QString &path) {
         QFile f(path);
