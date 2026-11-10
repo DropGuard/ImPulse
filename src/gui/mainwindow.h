@@ -116,19 +116,24 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     // bool focusNextPrevChild(bool);
   signals:
     void fullscreenStateChanged(bool);
-    void copyRequested(QString);
-    void moveRequested(QString);
     void copyUrlsRequested(QList<QString>, QString);
     void moveUrlsRequested(QList<QString>, QString);
     void showFoldersChanged(bool);
-    void renameRequested(QString);
-    void discardEditsRequested();
-    void saveAsClicked();
-    void saveRequested();
     void sortingSelected(SortingMode);
 
-    // viewerWidget
+    // viewerWidget -> Core channel
     void scalingRequested(QSize, ScalingFilter);
+    void droppedIn(const QMimeData *, QObject *);
+    void draggedOut();
+    void setLoopPlayback(bool);
+    void playbackFinished();
+
+  public slots:
+    void setupFullUi();
+    // viewer commands: one-liners emitting the ViewerWidget signals directly.
+    // These were 17 declared signals relay-connected to the same-named viewer
+    // signals — plumbing with no body of its own; ActionManager connects to
+    // the slots unchanged.
     void zoomIn();
     void zoomOut();
     void zoomInCursor();
@@ -146,13 +151,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void volumeUp();
     void volumeDown();
     void toggleTransparencyGrid();
-    void droppedIn(const QMimeData *, QObject *);
-    void draggedOut();
-    void setLoopPlayback(bool);
-    void playbackFinished();
-
-  public slots:
-    void setupFullUi();
     void enableFolderView();
     void enableDocumentView();
     void showMessage(const QString &text) override;
