@@ -495,69 +495,6 @@
            <number>0</number>
           </property>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_3">
-            <property name="spacing">
-             <number>16</number>
-            </property>
-            <property name="leftMargin">
-             <number>8</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
-            <property name="rightMargin">
-             <number>5</number>
-            </property>
-            <property name="bottomMargin">
-             <number>0</number>
-            </property>
-            <item>
-             <widget class="ClickableLabel" name="bookmarksLabel">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="cursor">
-               <cursorShape>PointingHandCursor</cursorShape>
-              </property>
-              <property name="mouseTracking">
-               <bool>true</bool>
-              </property>
-              <property name="accessibleName">
-               <string notr="true">PanelSectionHeader</string>
-              </property>
-              <property name="text">
-               <string>BOOKMARKS</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="IconButton" name="newBookmarkButton" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>26</width>
-                <height>26</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>26</width>
-                <height>26</height>
-               </size>
-              </property>
-              <property name="accessibleName">
-               <string>PlacesPanelButton</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="BookmarksWidget" name="bookmarksWidget" native="true"/>
-          </item>
-          <item>
            <spacer name="placesPanelSpacer">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
@@ -790,12 +727,6 @@
    <header>gui/folderview/treeviewcustom.h</header>
   </customwidget>
   <customwidget>
-   <class>BookmarksWidget</class>
-   <extends>QWidget</extends>
-   <header>gui/folderview/bookmarkswidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
    <class>IconButton</class>
    <extends>QWidget</extends>
    <header>gui/customwidgets/iconbutton.h</header>
@@ -804,22 +735,6 @@
  </customwidgets>
  <resources/>
  <connections>
-  <connection>
-   <sender>bookmarksLabel</sender>
-   <signal>clicked()</signal>
-   <receiver>FolderView</receiver>
-   <slot>toggleBookmarks()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>54</x>
-     <y>58</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>-5</x>
-     <y>63</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>directoriesLabel</sender>
    <signal>clicked()</signal>
@@ -855,7 +770,6 @@
  </connections>
  <slots>
   <slot>onTreeViewClicked(QModelIndex)</slot>
-  <slot>toggleBookmarks()</slot>
   <slot>toggleFilesystemView()</slot>
  </slots>
 </ui>
