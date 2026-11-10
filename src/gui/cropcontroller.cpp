@@ -38,6 +38,10 @@ void CropController::showCropPanel() {
         sidePanel->setWidget(cropPanel);
         sidePanel->show();
         cropOverlay->show();
+        // keyboard focus defines the input context: with the overlay focused,
+        // its own Esc/Enter keys work instead of falling through to the
+        // ActionManager (where Esc would exit fullscreen / quit)
+        cropOverlay->setFocus();
         activeSidePanel = SIDEPANEL_CROP;
         // the user's zoom is the frame they picked — it stays. updateCropPanelData
         // pushes the viewer's geometry (scale, draw rect, real size) into the

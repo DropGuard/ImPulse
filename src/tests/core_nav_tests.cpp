@@ -14,6 +14,10 @@
 #include <QQueue>
 #include "gui/overlays/imageinfooverlayproxy.h"
 #include "gui/cropcontroller.h"
+#include "gui/overlayhost.h"
+#include "gui/overlays/copyoverlay.h"
+#include "gui/overlays/saveconfirmoverlay.h"
+#include "gui/overlays/cropoverlay.h"
 #include "gui/overlays/floatingmessageproxy.h"
 #include <utility>
 #include <QApplication>
@@ -478,6 +482,40 @@ class TestCoreNav : public QObject {
         QVERIFY(core.mw->crop()->isCropPanelActive());
         QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
         QVERIFY2(qAbs(viewer->currentScale() - scaleBefore) < 0.001f, "the zoom must survive crop entry");
+    }
+
+    // surfaced floating panels own Esc: it dismisses the surface and never
+    // reaches the action system, where "Esc" maps to closeFullScreenOrExit
+    // (app exit in windowed mode). Each surface's own key door handles it.
+    void overlayEscDismissesTheSurface() {
+        writeImage(QDir(base).filePath("esc.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("esc.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("esc.png"), 10000);
+        QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, 0, 1);
+
+        // copy overlay (serves copy and move alike)
+        core.mw->overlays()->triggerCopyOverlay();
+        auto *copyOverlay = core.mw->findChild<CopyOverlay *>();
+        QVERIFY(copyOverlay && copyOverlay->isVisible());
+        QApplication::sendEvent(copyOverlay, &esc);
+        QVERIFY(!copyOverlay->isVisible());
+
+        // save-confirm prompt (shown automatically after edits)
+        settings->setShowSaveOverlay(true);
+        core.mw->overlays()->showSaveOverlay();
+        auto *saveOverlay = core.mw->findChild<SaveConfirmOverlay *>();
+        QVERIFY(saveOverlay && saveOverlay->isVisible());
+        QApplication::sendEvent(saveOverlay, &esc);
+        QVERIFY(!saveOverlay->isVisible());
+
+        // crop surface: Esc = cancel the selection and leave crop
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        auto *cropOverlay = core.mw->findChild<CropOverlay *>();
+        QVERIFY(cropOverlay);
+        QApplication::sendEvent(cropOverlay, &esc);
+        QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000);
     }
 
     void cropPanelSurvivesAnEarlyTrigger() {

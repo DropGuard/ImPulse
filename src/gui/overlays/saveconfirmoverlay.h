@@ -3,6 +3,7 @@
 #include "gui/customwidgets/overlaywidget.h"
 #include "settings.h"
 #include <QPushButton>
+#include <QKeyEvent>
 
 namespace Ui {
 class SaveConfirmOverlay;
@@ -13,6 +14,9 @@ class SaveConfirmOverlay : public OverlayWidget {
   public:
     explicit SaveConfirmOverlay(FloatingWidgetContainer *parent = nullptr);
     ~SaveConfirmOverlay() override;
+
+  protected:
+    void keyPressEvent(QKeyEvent *event) override;
 
   signals:
     void saveClicked();
