@@ -76,7 +76,6 @@ class ActionManager : public QObject {
     void fitWindow();
     void fitWidth();
     void fitNormal();
-    void fitWindowStretch();
     void flipH();
     void flipV();
     void nextFitMode();

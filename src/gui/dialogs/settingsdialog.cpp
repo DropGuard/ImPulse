@@ -165,7 +165,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
     fitModeGrp.addButton(ui->fitModeWindow);
     fitModeGrp.addButton(ui->fitModeWidth);
     fitModeGrp.addButton(ui->fitMode1to1);
-    fitModeGrp.addButton(ui->fitModeWindowStretch);
     folderEndGrp.addButton(ui->folderEndSwitchFolder);
     folderEndGrp.addButton(ui->folderEndNoAction);
     folderEndGrp.addButton(ui->folderEndLoop);
@@ -353,8 +352,6 @@ void SettingsDialog::readSettings() {
         ui->fitModeWindow->setChecked(true);
     else if(settings->imageFitMode() == FIT_WIDTH)
         ui->fitModeWidth->setChecked(true);
-    else if(settings->imageFitMode() == FIT_WINDOW_STRETCH)
-        ui->fitModeWindowStretch->setChecked(true);
     else
         ui->fitMode1to1->setChecked(true);
 
@@ -394,8 +391,6 @@ void SettingsDialog::saveSettings() {
         settings->setImageFitMode(FIT_WINDOW);
     else if(ui->fitModeWidth->isChecked())
         settings->setImageFitMode(FIT_WIDTH);
-    else if(ui->fitModeWindowStretch->isChecked())
-        settings->setImageFitMode(FIT_WINDOW_STRETCH);
     else
         settings->setImageFitMode(FIT_ORIGINAL);
 

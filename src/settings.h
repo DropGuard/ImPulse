@@ -30,11 +30,12 @@ enum SortingMode {
 };
 
 enum ImageFitMode {
-    FIT_WINDOW,
-    FIT_WIDTH,
-    FIT_ORIGINAL,
-    FIT_WINDOW_STRETCH,
-    FIT_FREE
+    FIT_WINDOW = 0,
+    FIT_WIDTH = 1,
+    FIT_ORIGINAL = 2,
+    // 3 was FIT_WINDOW_STRETCH, retired — the slot stays reserved so stale
+    // configs carrying it clamp in the loader instead of shifting FIT_FREE
+    FIT_FREE = 4
 };
 
 enum PanelPosition {

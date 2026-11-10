@@ -158,7 +158,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void fitWindow();
     void fitWidth();
     void fitOriginal();
-    void fitWindowStretch();
     void cycleFitMode();
     void switchFitMode();
     void closeImage();
