@@ -137,7 +137,7 @@ ViewMode MW::currentViewMode() {
 
 void MW::fitWindow() {
     if(viewerWidget->interactionEnabled()) {
-        emit viewerWidget->fitWindow();
+        viewer()->fitWindow();
     } else {
         overlayHost->showMessage("Zoom temporary disabled");
     }
@@ -145,7 +145,7 @@ void MW::fitWindow() {
 
 void MW::fitWidth() {
     if(viewerWidget->interactionEnabled()) {
-        emit viewerWidget->fitWidth();
+        viewer()->fitWidth();
     } else {
         overlayHost->showMessage("Zoom temporary disabled");
     }
@@ -153,7 +153,7 @@ void MW::fitWidth() {
 
 void MW::fitOriginal() {
     if(viewerWidget->interactionEnabled()) {
-        emit viewerWidget->fitOriginal();
+        viewer()->fitOriginal();
     } else {
         overlayHost->showMessage("Zoom temporary disabled");
     }
@@ -213,74 +213,6 @@ void MW::showVideo(const QString &file) {
 
 // viewer command one-liners: ActionManager's connects land here and each
 // re-fires the same-named (or renamed) ViewerWidget signal directly.
-void MW::zoomIn() {
-    emit viewerWidget->zoomIn();
-}
-
-void MW::zoomOut() {
-    emit viewerWidget->zoomOut();
-}
-
-void MW::zoomInCursor() {
-    emit viewerWidget->zoomInCursor();
-}
-
-void MW::zoomOutCursor() {
-    emit viewerWidget->zoomOutCursor();
-}
-
-void MW::scrollUp() {
-    emit viewerWidget->scrollUp();
-}
-
-void MW::scrollDown() {
-    emit viewerWidget->scrollDown();
-}
-
-void MW::scrollLeft() {
-    emit viewerWidget->scrollLeft();
-}
-
-void MW::scrollRight() {
-    emit viewerWidget->scrollRight();
-}
-
-void MW::pauseVideo() {
-    viewerWidget->pauseResumePlayback();
-}
-
-void MW::seekVideoForward() {
-    viewerWidget->seekForward();
-}
-
-void MW::seekVideoBackward() {
-    viewerWidget->seekBackward();
-}
-
-void MW::frameStep() {
-    viewerWidget->frameStep();
-}
-
-void MW::frameStepBack() {
-    viewerWidget->frameStepBack();
-}
-
-void MW::toggleMute() {
-    viewerWidget->toggleMute();
-}
-
-void MW::volumeUp() {
-    viewerWidget->volumeUp();
-}
-
-void MW::volumeDown() {
-    viewerWidget->volumeDown();
-}
-
-void MW::toggleTransparencyGrid() {
-    emit viewerWidget->toggleTransparencyGrid();
-}
-
 void MW::showContextMenu() {
     viewerWidget->showContextMenu();
 }
@@ -300,7 +232,7 @@ void MW::onSortingChanged(SortingMode mode) {
 }
 
 void MW::toggleLockZoom() {
-    emit viewerWidget->toggleLockZoom();
+    viewer()->toggleLockZoom();
     if(viewerWidget->lockZoomEnabled())
         overlayHost->showMessage("Zoom lock: ON");
     else
@@ -309,7 +241,7 @@ void MW::toggleLockZoom() {
 }
 
 void MW::toggleLockView() {
-    emit viewerWidget->toggleLockView();
+    viewer()->toggleLockView();
     if(viewerWidget->lockViewEnabled())
         overlayHost->showMessage("View lock: ON");
     else
@@ -338,12 +270,12 @@ void MW::toggleScalingFilter() {
 
 void MW::setFilterNearest() {
     overlayHost->showMessage("Filter: nearest", 600);
-    emit viewerWidget->setFilterNearest();
+    viewer()->setFilterNearest();
 }
 
 void MW::setFilterBilinear() {
     overlayHost->showMessage("Filter: bilinear", 600);
-    emit viewerWidget->setFilterBilinear();
+    viewer()->setFilterBilinear();
 }
 
 void MW::setFilter(ScalingFilter filter) {
@@ -357,7 +289,7 @@ void MW::setFilter(ScalingFilter filter) {
     default: filterName = "configured " + QString::number(static_cast<int>(filter)); break;
     }
     overlayHost->showMessage("Filter " + filterName, 600);
-    emit viewerWidget->setScalingFilter(filter);
+    viewer()->setScalingFilter(filter);
 }
 
 void MW::onScalingFinished(std::unique_ptr<QPixmap> scaled) {
@@ -433,11 +365,6 @@ DialogResult MW::fileReplaceDialog(const QString &src, const QString &dst, FileR
     return dialogHost->fileReplaceDialog(src, dst, mode, multiple);
 }
 
-void MW::setInteractionEnabled(bool mode) {
-    docWidget->setInteractionEnabled(mode);
-    viewerWidget->setInteractionEnabled(mode);
-}
-
 // the view is a projection: everything shown is re-derived here from the
 // state Core owns and this window's own modes — nothing is stored
 void MW::refreshInfoViews() {
@@ -465,6 +392,10 @@ void MW::refreshInfoViews() {
 }
 
 // TODO!!! buffer this in mw
+ViewerWidget *MW::viewer() {
+    return viewerWidget;
+}
+
 CropController *MW::crop() {
     return cropController;
 }
