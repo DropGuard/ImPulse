@@ -96,6 +96,7 @@ target_sources(qimgv_gui PRIVATE
     resources.qrc
     gui/windowshell.cpp
     gui/overlayhost.cpp
+    gui/dialoghost.cpp
 )
 target_link_libraries(qimgv_gui PUBLIC qimgv_nongui qimgv_sanitizers Qt6::OpenGLWidgets)
 if(EXIV2)

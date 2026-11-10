@@ -2,6 +2,7 @@
 #include "mainwindow.h"
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
+#include "gui/dialoghost.h"
 
 // TODO: nuke this and rewrite
 
@@ -29,6 +30,8 @@ MW::MW(State *state, QWidget *parent)
     windowShell = new WindowShell(this);
     setupUi();
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
+    dialogHost = new DialogHost(this, docWidget);
+    connect(viewerWidget, &ViewerWidget::showScriptSettings, dialogHost, &DialogHost::showScriptSettings);
 
     connect(settings, &Settings::settingsChanged, this, &MW::readSettings);
     connect(windowShell, &WindowShell::fullscreenStateChanged, this, &MW::adaptToWindowState);
@@ -86,7 +89,7 @@ void MW::setupUi() {
     docWidget = new DocumentWidget(viewerWidget, infoBarWindowed);
     folderView = new FolderViewProxy(this);
     connect(folderView, &FolderViewProxy::sortingSelected, this, &MW::sortingSelected);
-    connect(folderView, &FolderViewProxy::directorySelected, this, &MW::opened);
+    connect(folderView, &FolderViewProxy::directorySelected, dialogHost, &DialogHost::opened);
     connect(folderView, &FolderViewProxy::copyUrlsRequested, this, &MW::copyUrlsRequested);
     connect(folderView, &FolderViewProxy::moveUrlsRequested, this, &MW::moveUrlsRequested);
     connect(folderView, &FolderViewProxy::showFoldersChanged, this, &MW::showFoldersChanged);
@@ -99,7 +102,6 @@ void MW::setupUi() {
     connect(viewerWidget, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
     connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
-    connect(viewerWidget, &ViewerWidget::showScriptSettings, this, &MW::showScriptSettings);
     connect(this, &MW::zoomIn, viewerWidget, &ViewerWidget::zoomIn);
     connect(this, &MW::zoomOut, viewerWidget, &ViewerWidget::zoomOut);
     connect(this, &MW::zoomInCursor, viewerWidget, &ViewerWidget::zoomInCursor);
@@ -396,115 +398,8 @@ void MW::resizeEvent(QResizeEvent *event) {
     FloatingWidgetContainer::resizeEvent(event);
 }
 
-void MW::showSaveDialog(const QString &filePath) {
-    QString newFilePath = getSaveFileName(filePath);
-    if(!newFilePath.isEmpty())
-        emit saveAsRequested(newFilePath);
-}
-
-QString MW::getSaveFileName(const QString &filePath) {
-    docWidget->hideFloatingPanel();
-    QStringList filters;
-    // generate filter for writable images
-    // todo: some may need to be blacklisted
-    auto writerFormats = QImageWriter::supportedImageFormats();
-    if(writerFormats.contains("jpg"))
-        filters.append("JPEG (*.jpg *.jpeg *jpe *jfif)");
-    if(writerFormats.contains("png"))
-        filters.append("PNG (*.png)");
-    if(writerFormats.contains("webp"))
-        filters.append("WebP (*.webp)");
-    // may not work..
-    if(writerFormats.contains("jp2"))
-        filters.append("JPEG 2000 (*.jp2 *.j2k *.jpf *.jpx *.jpm *.jpgx)");
-    if(writerFormats.contains("jxl"))
-        filters.append("JPEG-XL (*.jxl)");
-    if(writerFormats.contains("avif"))
-        filters.append("AVIF (*.avif *.avifs)");
-    if(writerFormats.contains("tif"))
-        filters.append("TIFF (*.tif *.tiff)");
-    if(writerFormats.contains("bmp"))
-        filters.append("BMP (*.bmp)");
-#ifdef _WIN32
-    if(writerFormats.contains("ico"))
-        filters.append("Icon Files (*.ico)");
-#endif
-    if(writerFormats.contains("ppm"))
-        filters.append("PPM (*.ppm)");
-    if(writerFormats.contains("xbm"))
-        filters.append("XBM (*.xbm)");
-    if(writerFormats.contains("xpm"))
-        filters.append("XPM (*.xpm)");
-    if(writerFormats.contains("dds"))
-        filters.append("DDS (*.dds)");
-    if(writerFormats.contains("wbmp"))
-        filters.append("WBMP (*.wbmp)");
-    // add everything else from imagewriter
-    for(const auto &fmt : std::as_const(writerFormats)) {
-        if(filters.filter(fmt).isEmpty())
-            filters.append(fmt.toUpper() + " (*." + fmt + ")");
-    }
-    QString filterString = filters.join(";; ");
-
-    // find matching filter for the current image
-    QString selectedFilter = "JPEG (*.jpg *.jpeg *jpe *jfif)";
-    QFileInfo fi(filePath);
-    for(const QString &filter : std::as_const(filters)) {
-        if(filter.contains(fi.suffix().toLower())) {
-            selectedFilter = filter;
-            break;
-        }
-    }
-    QString newFilePath =
-        QFileDialog::getSaveFileName(this, tr("Save File as..."), filePath, filterString, &selectedFilter);
-    return newFilePath;
-}
-
-void MW::showOpenDialog(const QString &path) {
-    docWidget->hideFloatingPanel();
-
-    QFileDialog dialog(this);
-    QStringList imageFilter;
-    imageFilter.append(settings->supportedFormatsFilter());
-    imageFilter.append("All Files (*)");
-    dialog.setDirectory(path);
-    dialog.setNameFilters(imageFilter);
-    dialog.setWindowTitle("Open image");
-    dialog.setWindowModality(Qt::ApplicationModal);
-    connect(&dialog, &QFileDialog::fileSelected, this, &MW::opened);
-    dialog.exec();
-}
-
-void MW::showResizeDialog(QSize initialSize) {
-    ResizeDialog dialog(initialSize, this);
-    connect(&dialog, &ResizeDialog::sizeSelected, this, &MW::resizeRequested);
-    dialog.exec();
-}
-
 DialogResult MW::fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode mode, bool multiple) {
-    FileReplaceDialog dialog(this);
-    dialog.setModal(true);
-    dialog.setSource(src);
-    dialog.setDestination(dst);
-    dialog.setMode(mode);
-    dialog.setMulti(multiple);
-
-    dialog.exec();
-
-    return dialog.getResult();
-}
-
-void MW::showSettings() {
-    docWidget->hideFloatingPanel();
-    SettingsDialog settingsDialog(this);
-    settingsDialog.exec();
-}
-
-void MW::showScriptSettings() {
-    docWidget->hideFloatingPanel();
-    SettingsDialog settingsDialog(this);
-    settingsDialog.switchToPage(4);
-    settingsDialog.exec();
+    return dialogHost->fileReplaceDialog(src, dst, mode, multiple);
 }
 
 void MW::updateCropPanelData() {
@@ -589,6 +484,10 @@ void MW::refreshInfoViews() {
 }
 
 // TODO!!! buffer this in mw
+DialogHost *MW::dialogs() {
+    return dialogHost;
+}
+
 OverlayHost *MW::overlays() {
     return overlayHost;
 }
@@ -611,18 +510,7 @@ void MW::showMessage(const QString &text) {
 }
 
 bool MW::showConfirmation(const QString &title, const QString &msg) {
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle(title);
-    msgBox.setText(msg);
-    msgBox.setIcon(QMessageBox::Warning);
-    msgBox.setStandardButtons(QMessageBox::Yes);
-    msgBox.addButton(QMessageBox::No);
-    msgBox.setDefaultButton(QMessageBox::Yes);
-    msgBox.setModal(true);
-    if(msgBox.exec() == QMessageBox::Yes)
-        return true;
-    else
-        return false;
+    return dialogHost->showConfirmation(title, msg);
 }
 
 void MW::readSettings() {
