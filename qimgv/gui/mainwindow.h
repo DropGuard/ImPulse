@@ -14,6 +14,7 @@ struct State;
 class WindowShell;
 class OverlayHost;
 class DialogHost;
+class CropController;
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/iuserinteractions.h"
@@ -21,8 +22,6 @@ class DialogHost;
 #include "gui/overlays/fullscreeninfooverlayproxy.h"
 #include "gui/panels/mainpanel/thumbnailstrip.h"
 #include "gui/panels/sidepanel/sidepanel.h"
-#include "gui/panels/croppanel/croppanel.h"
-#include "gui/overlays/cropoverlay.h"
 #include "gui/centralwidget.h"
 #include "components/actionmanager/actionmanager.h"
 #include "settings.h"
@@ -44,7 +43,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
   public:
     explicit MW(State *state, QWidget *parent = nullptr);
     ~MW() override;
-    bool isCropPanelActive();
     void onScalingFinished(std::unique_ptr<QPixmap> scaled);
     void showImage(std::unique_ptr<QPixmap> pixmap);
     void showAnimation(const std::shared_ptr<QMovie> &movie);
@@ -61,6 +59,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode,
                                    bool multiple) override;
     DialogHost *dialogs();
+    CropController *crop();
 
   private:
     // the parent tree owns every widget; these observe. See the rule comment
@@ -82,8 +81,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     InfoBarProxy *infoBarWindowed = nullptr;
     OverlayHost *overlayHost = nullptr;
     DialogHost *dialogHost = nullptr;
-    CropPanel *cropPanel;
-    CropOverlay *cropOverlay;
+    CropController *cropController = nullptr;
 
     QPropertyNotifier infoObserver;
     QPropertyNotifier slideshowObserver;
@@ -94,7 +92,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
 
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
-    void setupCropPanel();
     void setInteractionEnabled(bool mode);
 
   private slots:
@@ -125,8 +122,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void moveUrlsRequested(QList<QString>, QString);
     void showFoldersChanged(bool);
     void renameRequested(QString);
-    void cropRequested(QRect);
-    void cropAndSaveRequested(QRect);
     void discardEditsRequested();
     void saveAsClicked();
     void saveRequested();
@@ -158,14 +153,10 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
 
   public slots:
     void setupFullUi();
-    void showCropPanel();
-    void hideCropPanel();
     void enableFolderView();
     void enableDocumentView();
     void showMessage(const QString &text) override;
     void close();
-    void triggerCropPanel();
-    void updateCropPanelData();
     void fitWindow();
     void fitWidth();
     void fitOriginal();
