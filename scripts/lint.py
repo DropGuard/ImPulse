@@ -411,7 +411,11 @@ def main():
         problems.append('the baseline records no instrument fingerprint — measure once and '
                         'add "instrument <sha>" deliberately, so count drift can never ride in '
                         'silently on an unnamed instrument change')
-    elif base_fp != fp:
+    elif base_fp != fp and base:
+        # the fingerprint protects COUNTS; with an empty table there is nothing
+        # to protect — every finding fails as NEW/GONE on its own, so a moved
+        # instrument (typically a new TU in the scanned set) is not a gate event.
+        # It is still recorded, deliberately, for the day a row returns.
         problems.append(f'INSTRUMENT changed since the baseline was recorded ({base_fp} -> {fp}) — '
                         're-verify the counts against the new instrument and update the '
                         'fingerprint deliberately')
