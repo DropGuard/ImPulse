@@ -8,6 +8,8 @@
 #include <QTest>
 #include <QTemporaryDir>
 #include <QCoreApplication>
+#include <QImage>
+#include <QColor>
 
 #include "settings.h"
 
@@ -35,6 +37,26 @@ inline QByteArray readTestFile(const QString &path) {
         return {};
     }
     return f.readAll();
+}
+
+// writes <dir>/<name> with the given content, reports through qFail and
+// returns the full path (the convention shared by both suites' fixtures)
+inline QString makeTxt(const QString &dir, const QString &name, const char *content) {
+    return writeTestFile(QDir(dir).filePath(name), content);
+}
+
+// writes an image file of the given size/format, solid fill. Reports through
+// qFail and still returns false so QVERIFY-style callers can fail their own
+// frame.
+inline bool makeImageFile(const QString &path, const QSize &size, const char *format = "PNG",
+                          QColor fill = QColor(Qt::red)) {
+    QImage img(size, QImage::Format_RGB32);
+    img.fill(fill);
+    if(!img.save(path, format)) {
+        QTest::qFail(qPrintable(QStringLiteral("cannot create %1").arg(path)), __FILE__, __LINE__);
+        return false;
+    }
+    return true;
 }
 
 class IsolatedHome {
