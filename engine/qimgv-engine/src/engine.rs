@@ -39,18 +39,28 @@ pub enum Command {
     /// that was interrupted mid-flight; addressable from a test for the same reason
     /// it is needed in production: both are "the answer I have is not stable".
     Rescan(PathBuf),
-    /// Thumbnail scheduling: submit one request. `replace_batch` clears all
-    /// pending (not yet dispatched) requests first — the caller sends it on
-    /// the FIRST request of a fresh viewport batch, so an older batch dies
-    /// structurally (requests that were never dispatched never decode).
-    ThumbRequest { req: ThumbReq, replace_batch: bool },
-    /// The C++ executor finished (or failed) one dispatched request.
-    ThumbDone { req: ThumbReq },
-    /// Drop all pending requests (directory switch).
-    ThumbClear,
-    /// How many decodes may run concurrently on the C++ side.
-    ThumbConfig { max_in_flight: u32 },
+    /// Thumbnail scheduling. The four live and die with the thumbnail
+    /// viewport and none of them touch the listing — they are one family
+    /// with one scheduler behind it, so they ride one variant.
+    Thumb(ThumbCommand),
     Shutdown,
+}
+
+/// The thumbnail-scheduling family of `Command`. The C++ side owns decode
+/// execution; these drive the engine's scheduler for it.
+#[derive(Debug, Clone)]
+pub enum ThumbCommand {
+    /// Submit one request. `replace_batch` clears all pending (not yet
+    /// dispatched) requests first — the caller sends it on the FIRST request
+    /// of a fresh viewport batch, so an older batch dies structurally
+    /// (requests that were never dispatched never decode).
+    Request { req: ThumbReq, replace_batch: bool },
+    /// The C++ executor finished (or failed) one dispatched request.
+    Done { req: ThumbReq },
+    /// Drop all pending requests (directory switch).
+    Clear,
+    /// How many decodes may run concurrently on the C++ side.
+    Config { max_in_flight: u32 },
 }
 
 /// A decode request; identity is the full tuple (path may repeat at
@@ -357,18 +367,18 @@ impl Engine {
                                         fire_notify(&notify);
                                     }
                                 }
-                                Ok(Command::ThumbRequest { req, replace_batch }) => {
+                                Ok(Command::Thumb(ThumbCommand::Request { req, replace_batch })) => {
                                     thumbs.request(req, replace_batch);
                                     thumbs.pump(&ev_tx, &notify);
                                 }
-                                Ok(Command::ThumbDone { req }) => {
+                                Ok(Command::Thumb(ThumbCommand::Done { req })) => {
                                     thumbs.done(&req);
                                     thumbs.pump(&ev_tx, &notify);
                                 }
-                                Ok(Command::ThumbClear) => {
+                                Ok(Command::Thumb(ThumbCommand::Clear)) => {
                                     thumbs.pending.clear();
                                 }
-                                Ok(Command::ThumbConfig { max_in_flight }) => {
+                                Ok(Command::Thumb(ThumbCommand::Config { max_in_flight })) => {
                                     thumbs.max_in_flight = max_in_flight.max(1);
                                     thumbs.pump(&ev_tx, &notify);
                                 }
