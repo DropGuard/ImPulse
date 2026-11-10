@@ -68,3 +68,10 @@ set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 add_test(NAME ARCH_RULES
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/architecture_rules.py)
 set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=")
+
+# lint cache contract: cold==warm, header fan-out, include shadowing. Skips
+# (77) where the lint tools are not installed — the gate itself needs them,
+# but a bare configure-and-test should not fail on their absence.
+add_test(NAME LINT_CACHE
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/lint_cache_test.py)
+set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77)

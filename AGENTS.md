@@ -35,10 +35,12 @@ pipeline thread).
 # build (warnings are contractual: -Wall -Wextra -Wpedantic, zero is normal)
 cmake --build build -j$(nproc)
 
-# all tests (5 suites; ARCH_RULES is the architecture contract — read its output first on failure)
+# all tests (6 suites; ARCH_RULES is the architecture contract — read its output first on failure)
 cd build && ctest
 
-# static-analysis gate (counts may only shrink; a new family fails; a reduction ships with its fix)
+# static-analysis gate (counts may only shrink; a new family fails; a reduction
+# ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
+# --no-cache forces the full scan.
 python3 scripts/lint.py build --gate
 
 # clazy, separate configured tree (clazy 1.17 + level0/level1/detaching)
@@ -69,15 +71,18 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 # same block.
 ```
 
-The pre-commit hook runs incremental build + 5 suites (~10-30 s), plus Miri
+The pre-commit hook runs incremental build + 6 suites + `lint --gate`
+(~10-30 s plus ~5 s lint warm), plus Miri
 (~2 min) whenever the engine's pure layer is staged — the trigger is a
 mechanical staged-path check, with watcher/fd.rs and engine.rs excluded
 because their tests are the ones Miri refuses. The hook is **CMake
 self-installing**: every configure points `core.hooksPath` at
 `scripts/hooks` — clone → configure → build is itself the install step.
-`lint --gate` (~2m20s) is the pre-push hook's job — it used to be a manual
-ritual, and the stretch it stayed a memory (2026-11-09/10) is what let #636's
-and #612's findings ride into history on green suites alone. The `--no-verify`
+The lint gate used to be a manual ritual, and the stretch it stayed a
+memory (2026-11-09/10) is what let #636's and #612's findings ride into
+history on green suites alone; it then sat at push time because a full
+scan cost ~2m20s, until the per-TU cache (2026-11-10) made it cheap enough
+to gate every commit. The `--no-verify`
 escape hatch exists, but a red gate entering history is how f8e8b216's six
 silent regressions went unseen.
 
