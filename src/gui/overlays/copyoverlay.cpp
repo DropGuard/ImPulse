@@ -158,6 +158,12 @@ bool CopyOverlay::focusNextPrevChild(bool next) {
 
 void CopyOverlay::keyPressEvent(QKeyEvent *event) {
     event->accept();
+    // the surface owns Esc: dismiss without copying — never forward it to the
+    // action system, where "Esc" maps to closeFullScreenOrExit (app exit)
+    if(event->key() == Qt::Key_Escape) {
+        hide();
+        return;
+    }
     QString key = actionManager->keyForNativeScancode(event->nativeScanCode());
     if(shortcuts.contains(key))
         requestFileOperation(pathWidgets.at(shortcuts[key])->directory());
