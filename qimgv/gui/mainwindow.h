@@ -87,6 +87,8 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     QPropertyNotifier slideshowObserver;
     QPropertyNotifier shuffleObserver;
     QPropertyNotifier directoryObserver;
+    // the keymap's inspect scope follows the viewer's fit mode
+    QPropertyNotifier fitModeObserver;
     WindowShell *windowShell = nullptr;
     void setupUi();
 

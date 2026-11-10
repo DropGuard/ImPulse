@@ -10,6 +10,8 @@
 #include <QMovie>
 #include <QColor>
 #include <QTimer>
+#include <QProperty>
+#include <functional>
 #include <QDebug>
 #include <memory>
 #include <cmath>
@@ -36,11 +38,12 @@ class ImageViewerV2 : public QGraphicsView {
     ImageViewerV2(QWidget *parent = nullptr);
     ~ImageViewerV2() override;
     virtual ImageFitMode fitMode() const;
-
-  private:
-    // every imageFitMode assignment funnels through here so the scope signal
-    // cannot be missed by a future direct write
-    void setFitModeValue(ImageFitMode mode);
+    // the fit mode's change notifications, for consumers that react to mode
+    // switches (the keymap's inspect scope). The property itself stays private:
+    // writes remain the viewer's alone.
+    QPropertyNotifier observeFitMode(std::function<void()> callback) {
+        return imageFitMode.addNotifier(std::move(callback));
+    }
 
   public:
     virtual QRect scaledRectR() const;
@@ -64,10 +67,6 @@ class ImageViewerV2 : public QGraphicsView {
     void disableDrags();
 
   signals:
-    // emitted whenever the fit mode changes, wherever that happens — the keymap
-    // layer consults it to arm/disarm the inspect scope (fit original + free
-    // zoom mean "I am inspecting this image")
-    void fitModeChanged(ImageFitMode mode);
     void scalingRequested(QSize, ScalingFilter);
     void scaleChanged(qreal);
     void draggedOut();
@@ -169,7 +168,10 @@ class ImageViewerV2 : public QGraphicsView {
 
     QElapsedTimer lastTouchpadScroll;
 
-    ImageFitMode imageFitMode;
+    // QProperty: the fit mode has more than one consumer (applyFitMode
+    // internally, the keymap's inspect scope, tests) — the property notifies
+    // on every write, so no funnel discipline is needed at the call sites
+    QProperty<ImageFitMode> imageFitMode;
     ScalingFilter mScalingFilter;
     ImageFitMode imageFitModeDefault;
     QGraphicsScene *scene;

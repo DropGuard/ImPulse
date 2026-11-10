@@ -29,7 +29,8 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     // the keymap's inspect scope follows the viewer's fit mode: fit original
     // / free zoom declare "I am inspecting this image" — the arrows pan and
     // never change images until the user leaves the mode
-    connect(viewerWidget, &ViewerWidget::fitModeChanged, this, [this](ImageFitMode mode) {
+    fitModeObserver = viewerWidget->observeFitMode([this] {
+        ImageFitMode mode = viewerWidget->fitMode();
         actionManager->setInspectMode(mode == FIT_ORIGINAL || mode == FIT_FREE);
     });
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
