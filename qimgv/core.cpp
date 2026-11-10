@@ -10,6 +10,8 @@
 
 #include "utils/folderend.h"
 
+#include "gui/windowshell.h"
+
 #include <QThread>
 #include <QDrag>
 #include <QTemporaryFile>
@@ -102,7 +104,7 @@ void Core::readSettings() {
 
 void Core::showGui() {
     if(mw && !mw->isVisible())
-        mw->showDefault();
+        mw->shell()->showDefault();
     // TODO: this is unreliable.
     // how to make it wait until a window is shown?
     qApp->processEvents();
@@ -191,7 +193,7 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::fitWindowStretch, mw, &MW::fitWindowStretch);
     connect(actionManager, &ActionManager::nextFitMode, mw, &MW::cycleFitMode);
     connect(actionManager, &ActionManager::toggleFitMode, mw, &MW::switchFitMode);
-    connect(actionManager, &ActionManager::toggleFullscreen, mw, &MW::triggerFullScreen);
+    connect(actionManager, &ActionManager::toggleFullscreen, mw->shell(), &WindowShell::triggerFullScreen);
     connect(actionManager, &ActionManager::lockZoom, mw, &MW::toggleLockZoom);
     connect(actionManager, &ActionManager::lockView, mw, &MW::toggleLockView);
     connect(actionManager, &ActionManager::zoomIn, mw, &MW::zoomIn);
@@ -214,7 +216,7 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::save, this, &Core::saveCurrentFile);
     connect(actionManager, &ActionManager::saveAs, this, &Core::requestSavePath);
     connect(actionManager, &ActionManager::exit, this, &Core::close);
-    connect(actionManager, &ActionManager::closeFullScreenOrExit, mw, &MW::closeFullScreenOrExit);
+    connect(actionManager, &ActionManager::closeFullScreenOrExit, mw->shell(), &WindowShell::closeFullScreenOrExit);
     connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
     connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
     connect(actionManager, &ActionManager::copyFile, mw, &MW::triggerCopyOverlay);

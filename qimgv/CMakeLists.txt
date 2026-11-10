@@ -94,6 +94,7 @@ target_sources(qimgv_gui PRIVATE
     core.cpp
     proxystyle.cpp
     resources.qrc
+    gui/windowshell.cpp
 )
 target_link_libraries(qimgv_gui PUBLIC qimgv_nongui qimgv_sanitizers Qt6::OpenGLWidgets)
 if(EXIV2)

@@ -1,13 +1,13 @@
 #include "core.h"
 #include "mainwindow.h"
+#include "gui/windowshell.h"
 
 // TODO: nuke this and rewrite
 
 MW::MW(State *state, QWidget *parent)
-    : FloatingWidgetContainer(parent), appState(state), currentDisplay(0), maximized(false),
-      activeSidePanel(SIDEPANEL_NONE), copyOverlay(nullptr), saveOverlay(nullptr), renameOverlay(nullptr),
-      infoBarFullscreen(nullptr), imageInfoOverlay(nullptr), floatingMessage(nullptr), cropPanel(nullptr),
-      cropOverlay(nullptr) {
+    : FloatingWidgetContainer(parent), appState(state), activeSidePanel(SIDEPANEL_NONE), copyOverlay(nullptr),
+      saveOverlay(nullptr), renameOverlay(nullptr), infoBarFullscreen(nullptr), imageInfoOverlay(nullptr),
+      floatingMessage(nullptr), cropPanel(nullptr), cropOverlay(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     layout.setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
@@ -26,18 +26,14 @@ MW::MW(State *state, QWidget *parent)
     this->setMouseTracking(true);
     this->setAcceptDrops(true);
     this->setAccessibleName("mainwindow");
-    windowGeometryChangeTimer.setSingleShot(true);
-    windowGeometryChangeTimer.setInterval(30);
+    windowShell = new WindowShell(this);
     setupUi();
 
     connect(settings, &Settings::settingsChanged, this, &MW::readSettings);
-    connect(&windowGeometryChangeTimer, &QTimer::timeout, this, &MW::onWindowGeometryChanged);
-    connect(this, &MW::fullscreenStateChanged, this, &MW::adaptToWindowState);
+    connect(windowShell, &WindowShell::fullscreenStateChanged, this, &MW::adaptToWindowState);
 
     readSettings();
-    currentDisplay = settings->lastDisplay();
-    maximized = settings->maximizedWindow();
-    restoreWindowGeometry();
+    windowShell->restoreWindowGeometry();
 
     // the projection drives the views: any rewrite of the snapshot
     // re-derives title/info bars/overlay names (issue #505 semantics live
@@ -251,49 +247,23 @@ void MW::closeImage() {
 
 // todo: fix flicker somehow
 // ideally it should change img & resize in one go
-void MW::preShowResize(QSize sz) {
-    auto screens = qApp->screens();
-    if(this->windowState() != Qt::WindowNoState || !screens.count() || screens.count() <= currentDisplay)
-        return;
-    int decorationSize = frameGeometry().height() - height();
-    float maxSzMulti = settings->autoResizeLimit() / 100.f;
-    QRect availableGeom = screens.at(currentDisplay)->availableGeometry();
-    QSize maxSz = availableGeom.size() * maxSzMulti;
-    maxSz.setHeight(maxSz.height() - decorationSize);
-    if(!sz.isEmpty()) {
-        if(sz.width() > maxSz.width() || sz.height() > maxSz.height())
-            sz.scale(maxSz, Qt::KeepAspectRatio);
-    } else {
-        sz = maxSz;
-    }
-    QRect newGeom(0, 0, sz.width(), sz.height());
-    newGeom.moveCenter(availableGeom.center());
-    newGeom.translate(0, decorationSize / 2);
-
-    if(this->isVisible())
-        setGeometry(newGeom);
-    else // setGeometry wont work on hidden windows, so we just save for it to be restored later
-        settings->setWindowGeometry(newGeom);
-    qApp->processEvents(); // not needed anymore with patched qt?
-}
-
 void MW::showImage(std::unique_ptr<QPixmap> pixmap) {
     if(settings->autoResizeWindow())
-        preShowResize(pixmap->size());
+        windowShell->preShowResize(pixmap->size());
     viewerWidget->showImage(std::move(pixmap));
     updateCropPanelData();
 }
 
 void MW::showAnimation(const std::shared_ptr<QMovie> &movie) {
     if(settings->autoResizeWindow())
-        preShowResize(movie->frameRect().size());
+        windowShell->preShowResize(movie->frameRect().size());
     viewerWidget->showAnimation(movie);
     updateCropPanelData();
 }
 
 void MW::showVideo(const QString &file) {
     if(settings->autoResizeWindow())
-        preShowResize(QSize()); // tmp. find a way to get this though mpv BEFORE playback
+        windowShell->preShowResize(QSize()); // tmp. find a way to get this though mpv BEFORE playback
     viewerWidget->showVideo(file);
 }
 
@@ -405,50 +375,12 @@ void MW::onScalingFinished(std::unique_ptr<QPixmap> scaled) {
     viewerWidget->onScalingFinished(std::move(scaled));
 }
 
-void MW::saveWindowGeometry() {
-    if(this->windowState() == Qt::WindowNoState)
-        settings->setWindowGeometry(geometry());
-    settings->setMaximizedWindow(maximized);
-}
-
-// does not apply fullscreen; window size / maximized state only
-void MW::restoreWindowGeometry() {
-    this->setGeometry(settings->windowGeometry());
-    if(settings->maximizedWindow())
-        this->setWindowState(Qt::WindowMaximized);
-    updateCurrentDisplay();
-}
-
-void MW::updateCurrentDisplay() {
-    auto screens = qApp->screens();
-    currentDisplay = screens.indexOf(this->window()->screen());
-}
-
-void MW::onWindowGeometryChanged() {
-    saveWindowGeometry();
-    updateCurrentDisplay();
-}
-
-void MW::saveCurrentDisplay() {
-    settings->setLastDisplay(qApp->screens().indexOf(this->window()->screen()));
-}
-
 //#############################################################
 //######################### EVENTS ############################
 //#############################################################
 
 void MW::mouseMoveEvent(QMouseEvent *event) {
     event->ignore();
-}
-
-bool MW::event(QEvent *event) {
-    // only save maximized state if we are already visible
-    // this filter out out events while the window is still being set up
-    if(event->type() == QEvent::WindowStateChange && this->isVisible() && !this->isFullScreen())
-        maximized = isMaximized();
-    if(event->type() == QEvent::Move || event->type() == QEvent::Resize)
-        windowGeometryChangeTimer.start();
-    return QWidget::event(event);
 }
 
 // hook up to actionManager
@@ -481,8 +413,8 @@ void MW::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 void MW::close() {
-    saveWindowGeometry();
-    saveCurrentDisplay();
+    windowShell->saveWindowGeometry();
+    windowShell->saveCurrentDisplay();
     if(copyOverlay)
         copyOverlay->saveSettings();
     QWidget::close();
@@ -510,15 +442,6 @@ void MW::resizeEvent(QResizeEvent *event) {
         cropOverlay->setImageDrawRect(viewerWidget->imageRect());
     }
     FloatingWidgetContainer::resizeEvent(event);
-}
-
-void MW::showDefault() {
-    if(!this->isVisible()) {
-        if(settings->fullscreenMode())
-            showFullScreen();
-        else
-            showWindowed();
-    }
 }
 
 void MW::showSaveDialog(const QString &filePath) {
@@ -632,41 +555,6 @@ void MW::showScriptSettings() {
     settingsDialog.exec();
 }
 
-void MW::triggerFullScreen() {
-    if(!isFullScreen()) {
-        showFullScreen();
-    } else {
-        showWindowed();
-    }
-}
-
-void MW::showFullScreen() {
-    //do not save immediately on application start
-    if(!isHidden())
-        saveWindowGeometry();
-    auto screens = qApp->screens();
-    // todo: why check the screen again?
-    int _currentDisplay = screens.indexOf(this->window()->screen());
-    //move to target screen
-    if(screens.count() > currentDisplay && currentDisplay != _currentDisplay) {
-        this->move(screens.at(currentDisplay)->geometry().x(), screens.at(currentDisplay)->geometry().y());
-    }
-    QWidget::showFullScreen();
-    // try to repaint sooner
-    qApp->processEvents();
-    emit fullscreenStateChanged(true);
-}
-
-void MW::showWindowed() {
-    if(isFullScreen())
-        QWidget::showNormal();
-    restoreWindowGeometry();
-    QWidget::show();
-    // try to repaint sooner
-    qApp->processEvents();
-    emit fullscreenStateChanged(false);
-}
-
 void MW::updateCropPanelData() {
     if(cropPanel && activeSidePanel == SIDEPANEL_CROP) {
         cropPanel->setImageRealSize(viewerWidget->sourceSize());
@@ -768,15 +656,6 @@ void MW::triggerMoveOverlay() {
     }
 }
 
-// quit fullscreen or exit the program
-void MW::closeFullScreenOrExit() {
-    if(this->isFullScreen()) {
-        this->showWindowed();
-    } else {
-        actionManager->invokeAction("exit");
-    }
-}
-
 // the view is a projection: everything shown is re-derived here from the
 // state Core owns and this window's own modes — nothing is stored
 void MW::refreshInfoViews() {
@@ -808,6 +687,10 @@ void MW::refreshInfoViews() {
 void MW::setExifInfo(const QMap<QString, QString> &exifInfo) {
     if(imageInfoOverlay)
         imageInfoOverlay->setExifInfo(exifInfo);
+}
+
+WindowShell *MW::shell() {
+    return windowShell;
 }
 
 FolderViewProxy *MW::getFolderView() {
@@ -864,32 +747,11 @@ void MW::readSettings() {
     adaptToWindowState();
 }
 
-// todo: remove/rename?
-void MW::applyWindowedBackground() {
-#ifdef USE_KDE_BLUR
-    QWindow *window = this->windowHandle();
-    if(window) {
-        if(settings->backgroundOpacity() == 1.0)
-            KWindowEffects::enableBlurBehind(window, false);
-        else
-            KWindowEffects::enableBlurBehind(window, settings->blurBackground());
-    }
-#endif
-}
-
-void MW::applyFullscreenBackground() {
-#ifdef USE_KDE_BLUR
-    QWindow *window = this->windowHandle();
-    if(window)
-        KWindowEffects::enableBlurBehind(window, false);
-#endif
-}
-
 // changes ui elements according to fullscreen state
 void MW::adaptToWindowState() {
     docWidget->hideFloatingPanel();
     if(isFullScreen()) { //-------------------------------------- fullscreen ---
-        applyFullscreenBackground();
+        windowShell->applyFullscreenBackground();
         infoBarWindowed->hide();
 
         if(showInfoBarFullscreen)
@@ -903,7 +765,7 @@ void MW::adaptToWindowState() {
         else
             controlsOverlay->hide();
     } else { //------------------------------------------------------ window ---
-        applyWindowedBackground();
+        windowShell->applyWindowedBackground();
         infoBarFullscreen->hide();
 
         if(showInfoBarWindowed)
