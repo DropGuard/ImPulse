@@ -158,14 +158,6 @@ void MW::fitOriginal() {
     }
 }
 
-void MW::fitWindowStretch() {
-    if(viewerWidget->interactionEnabled()) {
-        emit viewerWidget->fitWindowStretch();
-    } else {
-        overlayHost->showMessage("Zoom temporary disabled");
-    }
-}
-
 // switch between 1:1 and Fit All
 // TODO: move to viewerWidget?
 void MW::switchFitMode() {

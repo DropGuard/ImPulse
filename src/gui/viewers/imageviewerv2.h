@@ -81,7 +81,6 @@ class ImageViewerV2 : public QGraphicsView {
     virtual void setFitOriginal();
     virtual void setFitWidth();
     virtual void setFitWindow();
-    virtual void setFitWindowStretch();
     virtual void zoomIn();
     virtual void zoomOut();
     virtual void zoomInCursor();
@@ -162,7 +161,7 @@ class ImageViewerV2 : public QGraphicsView {
     bool wayland = false;
 
     float zoomStep = 0.1, dpr;
-    float minScale, maxScale, fitWindowScale, fitWindowStretchScale, expandLimit, lockedScale;
+    float minScale, maxScale, fitWindowScale, expandLimit, lockedScale;
     QPointF savedViewportPos;
     ViewLockMode mViewLock;
 
@@ -182,7 +181,6 @@ class ImageViewerV2 : public QGraphicsView {
     void fitNormal();
     void fitWidth();
     void fitWindow();
-    void fitWindowStretch();
 
     void scroll(int dx, int dy, bool animated);
 
