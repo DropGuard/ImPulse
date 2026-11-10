@@ -28,7 +28,10 @@ class ViewerWidget : public FloatingWidgetContainer {
     float currentScale();
     QSize sourceSize();
 
-    void setInteractionEnabled(bool mode);
+    // the canvas-input policy: while false, the guarded canvas commands
+    // (zoom/scroll/fit) are no-ops, mouse input is shut off on the canvas,
+    // and the context menu hides — the state an overlay like crop runs under
+    void setCanvasInputEnabled(bool mode);
     bool interactionEnabled();
 
     bool showImage(std::unique_ptr<QPixmap> pixmap);
@@ -74,26 +77,11 @@ class ViewerWidget : public FloatingWidgetContainer {
     void onAnimationPlaybackFinished();
 
   signals:
+    // feedback up-channel: these report what the viewer did, they are not
+    // commands. Commands are methods below, gated by the canvas-input policy.
     void scalingRequested(QSize, ScalingFilter);
-    void zoomIn();
-    void zoomOut();
-    void zoomInCursor();
-    void zoomOutCursor();
-    void scrollUp();
-    void scrollDown();
-    void scrollLeft();
-    void scrollRight();
-    void fitWindow();
-    void fitWidth();
-    void fitOriginal();
-    void toggleTransparencyGrid();
     void draggedOut();
-    void setFilterNearest();
-    void setFilterBilinear();
-    void setScalingFilter(ScalingFilter filter);
     void playbackFinished();
-    void toggleLockZoom();
-    void toggleLockView();
     void showScriptSettings();
 
   public slots:
@@ -117,6 +105,27 @@ class ViewerWidget : public FloatingWidgetContainer {
     void toggleMute();
     void volumeUp();
     void volumeDown();
+
+    // canvas commands: each carries the canvas-input policy guard. The
+    // filter/grid/lock family is deliberately UNGATED — it kept working mid
+    // crop under the old wiring bank, and that behavior is preserved.
+    void zoomIn();
+    void zoomOut();
+    void zoomInCursor();
+    void zoomOutCursor();
+    void scrollUp();
+    void scrollDown();
+    void scrollLeft();
+    void scrollRight();
+    void fitWindow();
+    void fitWidth();
+    void fitOriginal();
+    void toggleTransparencyGrid();
+    void setFilterNearest();
+    void setFilterBilinear();
+    void setScalingFilter(ScalingFilter filter);
+    void toggleLockZoom();
+    void toggleLockView();
 
     void startPlayback();
     void showContextMenu();

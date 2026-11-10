@@ -28,12 +28,9 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     imageViewer->hide();
 
     connect(imageViewer.get(), &ImageViewerV2::scalingRequested, this, &ViewerWidget::scalingRequested);
+    connect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::onScaleChanged);
     connect(imageViewer.get(), &ImageViewerV2::playbackFinished, this, &ViewerWidget::onAnimationPlaybackFinished);
-    connect(this, &ViewerWidget::toggleTransparencyGrid, imageViewer.get(), &ImageViewerV2::toggleTransparencyGrid);
-    connect(this, &ViewerWidget::setFilterNearest, imageViewer.get(), &ImageViewerV2::setFilterNearest);
-    connect(this, &ViewerWidget::setFilterBilinear, imageViewer.get(), &ImageViewerV2::setFilterBilinear);
-    connect(this, &ViewerWidget::setScalingFilter, imageViewer.get(), &ImageViewerV2::setScalingFilter);
 
     videoPlayer.reset(new VideoPlayerInitProxy(this));
     layout.addWidget(videoPlayer.get());
@@ -54,7 +51,7 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     connect(videoControls, &VideoControlsProxyWrapper::seek, this, &ViewerWidget::seek);
 
     enableImageViewer();
-    setInteractionEnabled(true);
+    setCanvasInputEnabled(true);
 
     connect(&cursorTimer, &QTimer::timeout, this, &ViewerWidget::hideCursor);
 
@@ -180,42 +177,107 @@ void ViewerWidget::onAnimationPlaybackFinished() {
         emit playbackFinished();
 }
 
-void ViewerWidget::setInteractionEnabled(bool mode) {
+void ViewerWidget::setCanvasInputEnabled(bool mode) {
     if(mInteractionEnabled == mode)
         return;
     mInteractionEnabled = mode;
-    if(mInteractionEnabled) {
-        connect(this, &ViewerWidget::toggleLockZoom, imageViewer.get(), &ImageViewerV2::toggleLockZoom);
-        connect(this, &ViewerWidget::toggleLockView, imageViewer.get(), &ImageViewerV2::toggleLockView);
-        connect(this, &ViewerWidget::zoomIn, imageViewer.get(), &ImageViewerV2::zoomIn);
-        connect(this, &ViewerWidget::zoomOut, imageViewer.get(), &ImageViewerV2::zoomOut);
-        connect(this, &ViewerWidget::zoomInCursor, imageViewer.get(), &ImageViewerV2::zoomInCursor);
-        connect(this, &ViewerWidget::zoomOutCursor, imageViewer.get(), &ImageViewerV2::zoomOutCursor);
-        connect(this, &ViewerWidget::scrollUp, imageViewer.get(), &ImageViewerV2::scrollUp);
-        connect(this, &ViewerWidget::scrollDown, imageViewer.get(), &ImageViewerV2::scrollDown);
-        connect(this, &ViewerWidget::scrollLeft, imageViewer.get(), &ImageViewerV2::scrollLeft);
-        connect(this, &ViewerWidget::scrollRight, imageViewer.get(), &ImageViewerV2::scrollRight);
-        connect(this, &ViewerWidget::fitWindow, imageViewer.get(), &ImageViewerV2::setFitWindow);
-        connect(this, &ViewerWidget::fitWidth, imageViewer.get(), &ImageViewerV2::setFitWidth);
-        connect(this, &ViewerWidget::fitOriginal, imageViewer.get(), &ImageViewerV2::setFitOriginal);
-        connect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
-        imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-    } else {
-        disconnect(this, &ViewerWidget::zoomIn, imageViewer.get(), &ImageViewerV2::zoomIn);
-        disconnect(this, &ViewerWidget::zoomOut, imageViewer.get(), &ImageViewerV2::zoomOut);
-        disconnect(this, &ViewerWidget::zoomInCursor, imageViewer.get(), &ImageViewerV2::zoomInCursor);
-        disconnect(this, &ViewerWidget::zoomOutCursor, imageViewer.get(), &ImageViewerV2::zoomOutCursor);
-        disconnect(this, &ViewerWidget::scrollUp, imageViewer.get(), &ImageViewerV2::scrollUp);
-        disconnect(this, &ViewerWidget::scrollDown, imageViewer.get(), &ImageViewerV2::scrollDown);
-        disconnect(this, &ViewerWidget::scrollLeft, imageViewer.get(), &ImageViewerV2::scrollLeft);
-        disconnect(this, &ViewerWidget::scrollRight, imageViewer.get(), &ImageViewerV2::scrollRight);
-        disconnect(this, &ViewerWidget::fitWindow, imageViewer.get(), &ImageViewerV2::setFitWindow);
-        disconnect(this, &ViewerWidget::fitWidth, imageViewer.get(), &ImageViewerV2::setFitWidth);
-        disconnect(this, &ViewerWidget::fitOriginal, imageViewer.get(), &ImageViewerV2::setFitOriginal);
-        disconnect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
-        imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, !mode);
+    if(!mode)
         hideContextMenu();
-    }
+}
+
+// ---- canvas commands ----
+// every user-facing canvas command carries the policy guard; the filter /
+// grid / lock family is ungated on purpose (it worked mid crop under the old
+// wiring bank, and that behavior is preserved verbatim)
+void ViewerWidget::zoomIn() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->zoomIn();
+}
+
+void ViewerWidget::zoomOut() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->zoomOut();
+}
+
+void ViewerWidget::zoomInCursor() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->zoomInCursor();
+}
+
+void ViewerWidget::zoomOutCursor() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->zoomOutCursor();
+}
+
+void ViewerWidget::scrollUp() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->scrollUp();
+}
+
+void ViewerWidget::scrollDown() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->scrollDown();
+}
+
+void ViewerWidget::scrollLeft() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->scrollLeft();
+}
+
+void ViewerWidget::scrollRight() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->scrollRight();
+}
+
+void ViewerWidget::fitWindow() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->setFitWindow();
+}
+
+void ViewerWidget::fitWidth() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->setFitWidth();
+}
+
+void ViewerWidget::fitOriginal() {
+    if(!mInteractionEnabled)
+        return;
+    imageViewer->setFitOriginal();
+}
+
+void ViewerWidget::toggleTransparencyGrid() {
+    imageViewer->toggleTransparencyGrid();
+}
+
+void ViewerWidget::setFilterNearest() {
+    imageViewer->setFilterNearest();
+}
+
+void ViewerWidget::setFilterBilinear() {
+    imageViewer->setFilterBilinear();
+}
+
+void ViewerWidget::setScalingFilter(ScalingFilter filter) {
+    imageViewer->setScalingFilter(filter);
+}
+
+void ViewerWidget::toggleLockZoom() {
+    imageViewer->toggleLockZoom();
+}
+
+void ViewerWidget::toggleLockView() {
+    imageViewer->toggleLockView();
 }
 
 bool ViewerWidget::interactionEnabled() {
@@ -271,13 +333,16 @@ void ViewerWidget::startPlayback() {
     }
 }
 
+// programmatic fit — NOT a user command, deliberately ungated: mode
+// persistence and scripted fits must apply while the canvas input policy
+// is off (e.g. crop mode)
 void ViewerWidget::setFitMode(ImageFitMode mode) {
     if(mode == FIT_WINDOW)
-        emit fitWindow();
+        imageViewer->setFitWindow();
     else if(mode == FIT_WIDTH)
-        emit fitWidth();
+        imageViewer->setFitWidth();
     else if(mode == FIT_ORIGINAL)
-        emit fitOriginal();
+        imageViewer->setFitOriginal();
 }
 
 ImageFitMode ViewerWidget::fitMode() {
