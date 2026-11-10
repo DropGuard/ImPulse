@@ -5,6 +5,8 @@
 
 #include "viewerwidget.h"
 
+#include <QScrollBar>
+
 #include <utility>
 
 ViewerWidget::ViewerWidget(QWidget *parent)
@@ -31,6 +33,8 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     connect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::onScaleChanged);
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::canvasScaleChanged);
+    connect(imageViewer->horizontalScrollBar(), &QScrollBar::valueChanged, this, &ViewerWidget::canvasViewportChanged);
+    connect(imageViewer->verticalScrollBar(), &QScrollBar::valueChanged, this, &ViewerWidget::canvasViewportChanged);
     connect(imageViewer.get(), &ImageViewerV2::playbackFinished, this, &ViewerWidget::onAnimationPlaybackFinished);
 
     videoPlayer.reset(new VideoPlayerInitProxy(this));
@@ -216,26 +220,18 @@ void ViewerWidget::zoomOutCursor() {
 }
 
 void ViewerWidget::scrollUp() {
-    if(canvasInputPolicy != CanvasInputPolicy::All)
-        return;
     imageViewer->scrollUp();
 }
 
 void ViewerWidget::scrollDown() {
-    if(canvasInputPolicy != CanvasInputPolicy::All)
-        return;
     imageViewer->scrollDown();
 }
 
 void ViewerWidget::scrollLeft() {
-    if(canvasInputPolicy != CanvasInputPolicy::All)
-        return;
     imageViewer->scrollLeft();
 }
 
 void ViewerWidget::scrollRight() {
-    if(canvasInputPolicy != CanvasInputPolicy::All)
-        return;
     imageViewer->scrollRight();
 }
 

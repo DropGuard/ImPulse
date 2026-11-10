@@ -146,9 +146,10 @@ class ViewerWidget : public FloatingWidgetContainer {
     void setLoopPlayback(bool mode);
 
   signals:
-    // the viewer's scale changed (zoom, programmatic fit) — overlays that
-    // map image coordinates re-derive on this
+    // the viewer's geometry moved (zoom, programmatic fit, pan) — overlays
+    // that map image coordinates re-derive on either
     void canvasScaleChanged();
+    void canvasViewportChanged();
 
   protected:
     void mouseMoveEvent(QMouseEvent *event) override;
