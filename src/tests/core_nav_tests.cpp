@@ -2184,17 +2184,15 @@ class TestCoreNav : public QObject {
         QVERIFY(out.isValid() && into.isValid());
 
         // view draggedOut() -> presenter onDraggedOut -> presenter draggedOut(paths)
-        QMetaObject::invokeMethod(&proxy, "draggedOut");
+        // Qt6 signals are public, so the forwarding chain is driven directly:
+        // a by-name invoke would put the signature in a string for no service
+        emit proxy.draggedOut();
         QCOMPARE(out.count(), 1);
 
         // view droppedInto(mime, source, index) -> presenter droppedInto(paths, dir)
         QMimeData data;
         data.setUrls({QUrl::fromLocalFile(QDir(alpha).filePath("a.png"))});
-        // clang-format off: Q_ARG stringifies its type argument, so the
-        // normalized (no space before *) spelling is load-bearing here
-        QMetaObject::invokeMethod(&proxy, "droppedInto", Q_ARG(const QMimeData*, &data), Q_ARG(QObject*, nullptr),
-                                  Q_ARG(int, 0));
-        // clang-format on
+        emit proxy.droppedInto(&data, nullptr, 0);
         QCOMPARE(into.count(), 1);
     }
 
