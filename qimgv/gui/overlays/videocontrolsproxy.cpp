@@ -1,9 +1,7 @@
 #include "videocontrolsproxy.h"
 
 VideoControlsProxyWrapper::VideoControlsProxyWrapper(FloatingWidgetContainer *parent)
-    : container(parent),
-      videoControls(nullptr)
-{
+    : container(parent), videoControls(nullptr) {
 }
 
 VideoControlsProxyWrapper::~VideoControlsProxyWrapper() {
@@ -15,9 +13,9 @@ void VideoControlsProxyWrapper::init() {
         return;
     videoControls = new VideoControls(container);
 
-    connect(videoControls, &VideoControls::seekBackward,  this, &VideoControlsProxyWrapper::seekBackward);
+    connect(videoControls, &VideoControls::seekBackward, this, &VideoControlsProxyWrapper::seekBackward);
     connect(videoControls, &VideoControls::seekForward, this, &VideoControlsProxyWrapper::seekForward);
-    connect(videoControls, &VideoControls::seek,      this, &VideoControlsProxyWrapper::seek);
+    connect(videoControls, &VideoControls::seek, this, &VideoControlsProxyWrapper::seek);
 
     videoControls->setMode(stateBuf.mode);
     videoControls->setPlaybackDuration(stateBuf.duration);

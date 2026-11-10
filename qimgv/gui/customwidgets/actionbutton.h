@@ -9,7 +9,7 @@ enum TriggerMode {
 };
 
 class ActionButton : public IconButton {
-public:
+  public:
     ActionButton(QWidget *parent = nullptr);
     ActionButton(QString _actionName, QString _iconPath, QWidget *parent = nullptr);
     ActionButton(QString _actionName, QString _iconPath, int _size, QWidget *parent = nullptr);
@@ -17,7 +17,7 @@ public:
     void setTriggerMode(TriggerMode mode);
     TriggerMode triggerMode();
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     QString actionName;

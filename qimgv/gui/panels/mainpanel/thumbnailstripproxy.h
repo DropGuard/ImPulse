@@ -11,14 +11,14 @@ struct ThumbnailStripStateBuffer {
 class ThumbnailStripProxy : public QWidget, public IDirectoryView {
     Q_OBJECT
     Q_INTERFACES(IDirectoryView)
-public:
+  public:
     ThumbnailStripProxy(QWidget *parent = nullptr);
     void init();
     bool isInitialized();
     QSize itemSize();
     void readSettings();
 
-public slots:
+  public slots:
     void populate(int) override;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override;
     void select(QList<int>) override;
@@ -34,17 +34,17 @@ public slots:
     void setDirectoryPath(QString path) override;
     void addItem();
 
-protected:
+  protected:
     void showEvent(QShowEvent *event) override;
 
-signals:
+  signals:
     void itemActivated(int) override;
     void thumbnailsRequested(QList<int>, int, bool, bool) override;
     void draggedOut() override;
-    void droppedInto(const QMimeData*, QObject*, int) override;
+    void droppedInto(const QMimeData *, QObject *, int) override;
     void draggedOver(int) override;
 
-private:
+  private:
     ThumbnailStrip *thumbnailStrip = nullptr;
     QVBoxLayout layout;
     ThumbnailStripStateBuffer stateBuf;

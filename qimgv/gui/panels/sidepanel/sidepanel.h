@@ -11,24 +11,24 @@ namespace Ui {
 class SidePanel;
 }
 
-class SidePanel : public QWidget
-{
+class SidePanel : public QWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit SidePanel(QWidget *parent = nullptr);
     ~SidePanel() override;
 
     void setWidget(SidePanelWidget *w);
-    SidePanelWidget* widget();
+    SidePanelWidget *widget();
 
-public slots:
+  public slots:
     void show();
     void hide();
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *) override;
-private:
+
+  private:
     Ui::SidePanel *ui;
     SidePanelWidget *mWidget;
 };

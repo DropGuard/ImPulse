@@ -8,16 +8,9 @@
 #include <utility>
 
 ViewerWidget::ViewerWidget(QWidget *parent)
-    : FloatingWidgetContainer(parent),
-      imageViewer(nullptr),
-      videoPlayer(nullptr),
-      contextMenu(nullptr),
-      videoControls(nullptr),
-      currentWidget(UNSET),
-      mInteractionEnabled(false),
-      mWaylandCursorWorkaround(false),
-      mIsFullscreen(false)
-{
+    : FloatingWidgetContainer(parent), imageViewer(nullptr), videoPlayer(nullptr), contextMenu(nullptr),
+      videoControls(nullptr), currentWidget(UNSET), mInteractionEnabled(false), mWaylandCursorWorkaround(false),
+      mIsFullscreen(false) {
     setAttribute(Qt::WA_TranslucentBackground, true);
     setMouseTracking(true);
 #ifdef Q_OS_LINUX
@@ -38,10 +31,9 @@ ViewerWidget::ViewerWidget(QWidget *parent)
     connect(imageViewer.get(), &ImageViewerV2::scaleChanged, this, &ViewerWidget::onScaleChanged);
     connect(imageViewer.get(), &ImageViewerV2::playbackFinished, this, &ViewerWidget::onAnimationPlaybackFinished);
     connect(this, &ViewerWidget::toggleTransparencyGrid, imageViewer.get(), &ImageViewerV2::toggleTransparencyGrid);
-    connect(this, &ViewerWidget::setFilterNearest,       imageViewer.get(), &ImageViewerV2::setFilterNearest);
-    connect(this, &ViewerWidget::setFilterBilinear,      imageViewer.get(), &ImageViewerV2::setFilterBilinear);
-    connect(this, &ViewerWidget::setScalingFilter,       imageViewer.get(), &ImageViewerV2::setScalingFilter);
-
+    connect(this, &ViewerWidget::setFilterNearest, imageViewer.get(), &ImageViewerV2::setFilterNearest);
+    connect(this, &ViewerWidget::setFilterBilinear, imageViewer.get(), &ImageViewerV2::setFilterBilinear);
+    connect(this, &ViewerWidget::setScalingFilter, imageViewer.get(), &ImageViewerV2::setScalingFilter);
 
     videoPlayer.reset(new VideoPlayerInitProxy(this));
     layout.addWidget(videoPlayer.get());
@@ -57,9 +49,9 @@ ViewerWidget::ViewerWidget(QWidget *parent)
 
     connect(videoPlayer.get(), &VideoPlayer::playbackFinished, this, &ViewerWidget::onVideoPlaybackFinished);
 
-    connect(videoControls, &VideoControlsProxyWrapper::seekBackward,  this, &ViewerWidget::seekBackward);
+    connect(videoControls, &VideoControlsProxyWrapper::seekBackward, this, &ViewerWidget::seekBackward);
     connect(videoControls, &VideoControlsProxyWrapper::seekForward, this, &ViewerWidget::seekForward);
-    connect(videoControls, &VideoControlsProxyWrapper::seek,      this, &ViewerWidget::seek);
+    connect(videoControls, &VideoControlsProxyWrapper::seek, this, &ViewerWidget::seek);
 
     enableImageViewer();
     setInteractionEnabled(true);
@@ -76,12 +68,11 @@ ViewerWidget::~ViewerWidget() {
     delete zoomIndicator;
 }
 
-
 QRect ViewerWidget::imageRect() {
     if(imageViewer && currentWidget == IMAGEVIEWER)
         return imageViewer->scaledRectR();
     else
-        return QRect(0,0,0,0);
+        return QRect(0, 0, 0, 0);
 }
 
 float ViewerWidget::currentScale() {
@@ -95,7 +86,7 @@ QSize ViewerWidget::sourceSize() {
     if(currentWidget == IMAGEVIEWER)
         return imageViewer->sourceSize();
     else
-        return QSize(0,0);
+        return QSize(0, 0);
 }
 
 // hide videoPlayer, show imageViewer
@@ -103,9 +94,12 @@ void ViewerWidget::enableImageViewer() {
     if(currentWidget != IMAGEVIEWER) {
         disableVideoPlayer();
         videoControls->setMode(PLAYBACK_ANIMATION);
-        connect(imageViewer.get(), &ImageViewerV2::durationChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackDuration);
-        connect(imageViewer.get(), &ImageViewerV2::frameChanged,    videoControls, &VideoControlsProxyWrapper::setPlaybackPosition);
-        connect(imageViewer.get(), &ImageViewerV2::animationPaused, videoControls, &VideoControlsProxyWrapper::onPlaybackPaused);
+        connect(imageViewer.get(), &ImageViewerV2::durationChanged, videoControls,
+                &VideoControlsProxyWrapper::setPlaybackDuration);
+        connect(imageViewer.get(), &ImageViewerV2::frameChanged, videoControls,
+                &VideoControlsProxyWrapper::setPlaybackPosition);
+        connect(imageViewer.get(), &ImageViewerV2::animationPaused, videoControls,
+                &VideoControlsProxyWrapper::onPlaybackPaused);
         imageViewer->show();
         currentWidget = IMAGEVIEWER;
     }
@@ -116,9 +110,12 @@ void ViewerWidget::enableVideoPlayer() {
     if(currentWidget != VIDEOPLAYER) {
         disableImageViewer();
         videoControls->setMode(PLAYBACK_VIDEO);
-        connect(videoPlayer.get(), &VideoPlayer::durationChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackDuration);
-        connect(videoPlayer.get(), &VideoPlayer::positionChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackPosition);
-        connect(videoPlayer.get(), &VideoPlayer::videoPaused,     videoControls, &VideoControlsProxyWrapper::onPlaybackPaused);
+        connect(videoPlayer.get(), &VideoPlayer::durationChanged, videoControls,
+                &VideoControlsProxyWrapper::setPlaybackDuration);
+        connect(videoPlayer.get(), &VideoPlayer::positionChanged, videoControls,
+                &VideoControlsProxyWrapper::setPlaybackPosition);
+        connect(videoPlayer.get(), &VideoPlayer::videoPaused, videoControls,
+                &VideoControlsProxyWrapper::onPlaybackPaused);
         videoPlayer->show();
         currentWidget = VIDEOPLAYER;
     }
@@ -130,9 +127,12 @@ void ViewerWidget::disableImageViewer() {
         imageViewer->closeImage();
         imageViewer->hide();
         zoomIndicator->hide();
-        disconnect(imageViewer.get(), &ImageViewerV2::durationChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackDuration);
-        disconnect(imageViewer.get(), &ImageViewerV2::frameChanged,    videoControls, &VideoControlsProxyWrapper::setPlaybackPosition);
-        disconnect(imageViewer.get(), &ImageViewerV2::animationPaused, videoControls, &VideoControlsProxyWrapper::onPlaybackPaused);
+        disconnect(imageViewer.get(), &ImageViewerV2::durationChanged, videoControls,
+                   &VideoControlsProxyWrapper::setPlaybackDuration);
+        disconnect(imageViewer.get(), &ImageViewerV2::frameChanged, videoControls,
+                   &VideoControlsProxyWrapper::setPlaybackPosition);
+        disconnect(imageViewer.get(), &ImageViewerV2::animationPaused, videoControls,
+                   &VideoControlsProxyWrapper::onPlaybackPaused);
     }
 }
 
@@ -140,9 +140,12 @@ void ViewerWidget::disableVideoPlayer() {
     if(currentWidget == VIDEOPLAYER) {
         currentWidget = UNSET;
         //videoControls->hide();
-        disconnect(videoPlayer.get(), &VideoPlayer::durationChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackDuration);
-        disconnect(videoPlayer.get(), &VideoPlayer::positionChanged, videoControls, &VideoControlsProxyWrapper::setPlaybackPosition);
-        disconnect(videoPlayer.get(), &VideoPlayer::videoPaused,     videoControls, &VideoControlsProxyWrapper::onPlaybackPaused);
+        disconnect(videoPlayer.get(), &VideoPlayer::durationChanged, videoControls,
+                   &VideoControlsProxyWrapper::setPlaybackDuration);
+        disconnect(videoPlayer.get(), &VideoPlayer::positionChanged, videoControls,
+                   &VideoControlsProxyWrapper::setPlaybackPosition);
+        disconnect(videoPlayer.get(), &VideoPlayer::videoPaused, videoControls,
+                   &VideoControlsProxyWrapper::onPlaybackPaused);
         videoPlayer->setPaused(true);
         // even after calling hide() the player sends a few video frames
         // which paints over the imageviewer, causing corruption
@@ -184,32 +187,32 @@ void ViewerWidget::setInteractionEnabled(bool mode) {
     if(mInteractionEnabled) {
         connect(this, &ViewerWidget::toggleLockZoom, imageViewer.get(), &ImageViewerV2::toggleLockZoom);
         connect(this, &ViewerWidget::toggleLockView, imageViewer.get(), &ImageViewerV2::toggleLockView);
-        connect(this, &ViewerWidget::zoomIn,         imageViewer.get(), &ImageViewerV2::zoomIn);
-        connect(this, &ViewerWidget::zoomOut,        imageViewer.get(), &ImageViewerV2::zoomOut);
-        connect(this, &ViewerWidget::zoomInCursor,   imageViewer.get(), &ImageViewerV2::zoomInCursor);
-        connect(this, &ViewerWidget::zoomOutCursor,  imageViewer.get(), &ImageViewerV2::zoomOutCursor);
-        connect(this, &ViewerWidget::scrollUp,       imageViewer.get(), &ImageViewerV2::scrollUp);
-        connect(this, &ViewerWidget::scrollDown,     imageViewer.get(), &ImageViewerV2::scrollDown);
-        connect(this, &ViewerWidget::scrollLeft,     imageViewer.get(), &ImageViewerV2::scrollLeft);
-        connect(this, &ViewerWidget::scrollRight,    imageViewer.get(), &ImageViewerV2::scrollRight);
-        connect(this, &ViewerWidget::fitWindow,      imageViewer.get(), &ImageViewerV2::setFitWindow);
-        connect(this, &ViewerWidget::fitWidth,       imageViewer.get(), &ImageViewerV2::setFitWidth);
-        connect(this, &ViewerWidget::fitOriginal,    imageViewer.get(), &ImageViewerV2::setFitOriginal);
+        connect(this, &ViewerWidget::zoomIn, imageViewer.get(), &ImageViewerV2::zoomIn);
+        connect(this, &ViewerWidget::zoomOut, imageViewer.get(), &ImageViewerV2::zoomOut);
+        connect(this, &ViewerWidget::zoomInCursor, imageViewer.get(), &ImageViewerV2::zoomInCursor);
+        connect(this, &ViewerWidget::zoomOutCursor, imageViewer.get(), &ImageViewerV2::zoomOutCursor);
+        connect(this, &ViewerWidget::scrollUp, imageViewer.get(), &ImageViewerV2::scrollUp);
+        connect(this, &ViewerWidget::scrollDown, imageViewer.get(), &ImageViewerV2::scrollDown);
+        connect(this, &ViewerWidget::scrollLeft, imageViewer.get(), &ImageViewerV2::scrollLeft);
+        connect(this, &ViewerWidget::scrollRight, imageViewer.get(), &ImageViewerV2::scrollRight);
+        connect(this, &ViewerWidget::fitWindow, imageViewer.get(), &ImageViewerV2::setFitWindow);
+        connect(this, &ViewerWidget::fitWidth, imageViewer.get(), &ImageViewerV2::setFitWidth);
+        connect(this, &ViewerWidget::fitOriginal, imageViewer.get(), &ImageViewerV2::setFitOriginal);
         connect(this, &ViewerWidget::fitWindowStretch, imageViewer.get(), &ImageViewerV2::setFitWindowStretch);
         connect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
         imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     } else {
-        disconnect(this, &ViewerWidget::zoomIn,        imageViewer.get(), &ImageViewerV2::zoomIn);
-        disconnect(this, &ViewerWidget::zoomOut,       imageViewer.get(), &ImageViewerV2::zoomOut);
-        disconnect(this, &ViewerWidget::zoomInCursor,  imageViewer.get(), &ImageViewerV2::zoomInCursor);
+        disconnect(this, &ViewerWidget::zoomIn, imageViewer.get(), &ImageViewerV2::zoomIn);
+        disconnect(this, &ViewerWidget::zoomOut, imageViewer.get(), &ImageViewerV2::zoomOut);
+        disconnect(this, &ViewerWidget::zoomInCursor, imageViewer.get(), &ImageViewerV2::zoomInCursor);
         disconnect(this, &ViewerWidget::zoomOutCursor, imageViewer.get(), &ImageViewerV2::zoomOutCursor);
-        disconnect(this, &ViewerWidget::scrollUp,      imageViewer.get(), &ImageViewerV2::scrollUp);
-        disconnect(this, &ViewerWidget::scrollDown,    imageViewer.get(), &ImageViewerV2::scrollDown);
-        disconnect(this, &ViewerWidget::scrollLeft,    imageViewer.get(), &ImageViewerV2::scrollLeft);
-        disconnect(this, &ViewerWidget::scrollRight,   imageViewer.get(), &ImageViewerV2::scrollRight);
-        disconnect(this, &ViewerWidget::fitWindow,     imageViewer.get(), &ImageViewerV2::setFitWindow);
-        disconnect(this, &ViewerWidget::fitWidth,      imageViewer.get(), &ImageViewerV2::setFitWidth);
-        disconnect(this, &ViewerWidget::fitOriginal,   imageViewer.get(), &ImageViewerV2::setFitOriginal);
+        disconnect(this, &ViewerWidget::scrollUp, imageViewer.get(), &ImageViewerV2::scrollUp);
+        disconnect(this, &ViewerWidget::scrollDown, imageViewer.get(), &ImageViewerV2::scrollDown);
+        disconnect(this, &ViewerWidget::scrollLeft, imageViewer.get(), &ImageViewerV2::scrollLeft);
+        disconnect(this, &ViewerWidget::scrollRight, imageViewer.get(), &ImageViewerV2::scrollRight);
+        disconnect(this, &ViewerWidget::fitWindow, imageViewer.get(), &ImageViewerV2::setFitWindow);
+        disconnect(this, &ViewerWidget::fitWidth, imageViewer.get(), &ImageViewerV2::setFitWidth);
+        disconnect(this, &ViewerWidget::fitOriginal, imageViewer.get(), &ImageViewerV2::setFitOriginal);
         disconnect(this, &ViewerWidget::fitWindowStretch, imageViewer.get(), &ImageViewerV2::setFitWindowStretch);
         disconnect(imageViewer.get(), &ImageViewerV2::draggedOut, this, &ViewerWidget::draggedOut);
         imageViewer->setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -232,7 +235,7 @@ bool ViewerWidget::showImage(std::unique_ptr<QPixmap> pixmap) {
     return true;
 }
 
-bool ViewerWidget::showAnimation(const std::shared_ptr<QMovie>& movie) {
+bool ViewerWidget::showAnimation(const std::shared_ptr<QMovie> &movie) {
     if(!movie)
         return false;
     stopPlayback();
@@ -429,9 +432,7 @@ void ViewerWidget::hideCursor() {
             QPoint posMapped = mapFromGlobal(QCursor::pos());
             //if(settings->enableClickZoneThing())
             // ignore when we are hovering the click zone
-            if(clickZoneOverlay->leftZone().contains(posMapped) ||
-                clickZoneOverlay->leftZone().contains(posMapped))
-            {
+            if(clickZoneOverlay->leftZone().contains(posMapped) || clickZoneOverlay->leftZone().contains(posMapped)) {
                 return;
             }
 
@@ -470,7 +471,7 @@ bool ViewerWidget::eventFilter(QObject *object, QEvent *event) {
         if(width() <= 250)
             return false;
 
-        auto mouseEvent = dynamic_cast<QMouseEvent*>(event);
+        auto mouseEvent = dynamic_cast<QMouseEvent *>(event);
         if(mouseEvent->button() != Qt::LeftButton || mouseEvent->modifiers()) {
             clickZoneOverlay->disableHighlight();
             return false;
@@ -505,12 +506,12 @@ bool ViewerWidget::eventFilter(QObject *object, QEvent *event) {
     if(event->type() == QEvent::MouseMove || event->type() == QEvent::Enter) {
         QPoint mousePos;
         if(event->type() == QEvent::MouseMove) {
-            auto mouseEvent = dynamic_cast<QMouseEvent*>(event);
+            auto mouseEvent = dynamic_cast<QMouseEvent *>(event);
             mousePos = mouseEvent->pos();
             if(mouseEvent->buttons())
                 return false;
         } else {
-            auto enterEvent = dynamic_cast<QEnterEvent*>(event);
+            auto enterEvent = dynamic_cast<QEnterEvent *>(event);
             mousePos = enterEvent->position().toPoint();
         }
         if(clickZoneOverlay->leftZone().contains(mousePos)) {

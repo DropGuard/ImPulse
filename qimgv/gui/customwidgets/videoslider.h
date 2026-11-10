@@ -8,13 +8,15 @@
 
 class VideoSlider : public QSlider {
     Q_OBJECT
-public:
+  public:
     VideoSlider(QWidget *parent = nullptr);
-protected:
+
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
-signals:
+  signals:
     void sliderMovedX(int);
-private:
+
+  private:
     void setValueAtCursor(QPoint pos);
 };

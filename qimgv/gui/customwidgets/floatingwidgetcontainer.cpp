@@ -17,8 +17,8 @@ void FloatingWidgetContainer::resizeEvent(QResizeEvent *event) {
 void FloatingWidgetContainer::focusInEvent(QFocusEvent *event) {
     QWidget::focusInEvent(event);
     auto children = this->children();
-    for (auto i : children) {
-        FloatingWidget *overlay = qobject_cast<FloatingWidget*>(i);
+    for(auto i : children) {
+        FloatingWidget *overlay = qobject_cast<FloatingWidget *>(i);
         if(overlay && overlay->acceptKeyboardFocus() && overlay->isVisible()) {
             overlay->setFocus();
             break;

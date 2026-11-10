@@ -7,17 +7,16 @@
 #include "settings.h"
 #include "utils/imagelib.h"
 
-class StyledComboBox : public QComboBox
-{
-public:
+class StyledComboBox : public QComboBox {
+  public:
     StyledComboBox(QWidget *parent = nullptr);
     void setIconPath(QString path);
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *e) override;
     void keyPressEvent(QKeyEvent *event) override;
 
-private:
+  private:
     bool hiResPixmap;
     QPixmap downArrow;
     qreal dpr, pixmapDrawScale;

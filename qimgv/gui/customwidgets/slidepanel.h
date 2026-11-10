@@ -15,7 +15,7 @@
 
 class SlidePanel : public FloatingWidget {
     Q_OBJECT
-public:
+  public:
     explicit SlidePanel(FloatingWidgetContainer *parent);
     ~SlidePanel() override;
     bool hasWidget();
@@ -32,15 +32,15 @@ public:
     PanelPosition position();
     void hideAnimated();
 
-public slots:
+  public slots:
     void show();
     void hide();
 
-private slots:
+  private slots:
     void onAnimationFinish();
     void animationUpdate(int frame);
 
-protected:
+  protected:
     QHBoxLayout mLayout;
     QGraphicsOpacityEffect *fadeEffect;
     int panelSize, slideAmount;
@@ -57,7 +57,7 @@ protected:
     void recalculateGeometry() override;
     virtual void updateTriggerRect();
 
-private:
+  private:
     void setOrientation();
     Qt::Orientation mOrientation;
     QRect mStaticGeometry;

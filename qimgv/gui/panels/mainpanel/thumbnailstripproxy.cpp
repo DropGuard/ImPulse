@@ -1,9 +1,7 @@
 #include "thumbnailstripproxy.h"
 
-ThumbnailStripProxy::ThumbnailStripProxy(QWidget *parent)
-    : QWidget(parent)
-{
-    layout.setContentsMargins(0,0,0,0);
+ThumbnailStripProxy::ThumbnailStripProxy(QWidget *parent) : QWidget(parent) {
+    layout.setContentsMargins(0, 0, 0, 0);
 }
 
 void ThumbnailStripProxy::init() {
@@ -104,7 +102,7 @@ void ThumbnailStripProxy::removeItem(int index) {
     } else {
         stateBuf.itemCount--;
         stateBuf.selection.removeAll(index);
-        for(int i=0; i < stateBuf.selection.count(); i++) {
+        for(int i = 0; i < stateBuf.selection.count(); i++) {
             if(stateBuf.selection[i] > index)
                 stateBuf.selection[i]--;
         }

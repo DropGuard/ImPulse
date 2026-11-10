@@ -14,21 +14,15 @@ Q_LOGGING_CATEGORY(lcWatchPerf, "qimgv.perf.watch", QtInfoMsg)
 
 namespace fs = std::filesystem;
 
-DirectoryManager::DirectoryManager(EngineBridge &bridge) :
-    mBridge(bridge),
-    mSortingMode(SORT_NAME)
-{
+DirectoryManager::DirectoryManager(EngineBridge &bridge) : mBridge(bridge), mSortingMode(SORT_NAME) {
     regex.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
     readSettings();
     setSortingMode(settings->sortingMode());
     connect(settings, &Settings::settingsChanged, this, &DirectoryManager::readSettings);
 
-    connect(&mBridge, &EngineBridge::dirListed,
-            this, &DirectoryManager::onEngineDirListed);
-    connect(&mBridge, &EngineBridge::openFailed,
-            this, &DirectoryManager::onEngineOpenFailed);
-    connect(&mBridge, &EngineBridge::dirMutated,
-            this, &DirectoryManager::onEngineMutated);
+    connect(&mBridge, &EngineBridge::dirListed, this, &DirectoryManager::onEngineDirListed);
+    connect(&mBridge, &EngineBridge::openFailed, this, &DirectoryManager::onEngineOpenFailed);
+    connect(&mBridge, &EngineBridge::dirMutated, this, &DirectoryManager::onEngineMutated);
     mAppliedSort = mSortingMode;
 }
 
@@ -55,10 +49,8 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     // vectors keep serving the previous directory until then. A *refused* request
     // is not asynchronous though: nothing will ever arrive, so it has to fail
     // here rather than leave the caller staring at a silently empty folder.
-    if(!mBridge.openDir(dirPath, engineSortMode(mSortingMode),
-                                         settings->showHiddenFiles())) {
-        qWarning() << "[DirectoryManager] engine refused" << dirPath
-                   << (qimgv_last_error() ? qimgv_last_error() : "");
+    if(!mBridge.openDir(dirPath, engineSortMode(mSortingMode), settings->showHiddenFiles())) {
+        qWarning() << "[DirectoryManager] engine refused" << dirPath << (qimgv_last_error() ? qimgv_last_error() : "");
         return false;
     }
     mDirectoryPath = dirPath;
@@ -134,7 +126,7 @@ const QString &DirectoryManager::directoryPath() const {
 }
 
 int DirectoryManager::indexOfFile(const QString &filePath) const {
-    auto item = find_if(fileEntryVec.begin(), fileEntryVec.end(), [filePath](const FSEntry& e) {
+    auto item = find_if(fileEntryVec.begin(), fileEntryVec.end(), [filePath](const FSEntry &e) {
         return e.path == filePath;
     });
     if(item != fileEntryVec.end())
@@ -143,7 +135,7 @@ int DirectoryManager::indexOfFile(const QString &filePath) const {
 }
 
 int DirectoryManager::indexOfDir(const QString &dirPath) const {
-    auto item = find_if(dirEntryVec.begin(), dirEntryVec.end(), [dirPath](const FSEntry& e) {
+    auto item = find_if(dirEntryVec.begin(), dirEntryVec.end(), [dirPath](const FSEntry &e) {
         return e.path == dirPath;
     });
     if(item != dirEntryVec.end())
@@ -232,9 +224,8 @@ QDateTime DirectoryManager::lastModified(const QString &filePath) const {
 }
 
 // TODO: what about symlinks?
-inline
-bool DirectoryManager::isSupportedFile(const QString &path) const {
-    return ( isFile(path) && regex.match(path).hasMatch() );
+inline bool DirectoryManager::isSupportedFile(const QString &path) const {
+    return (isFile(path) && regex.match(path).hasMatch());
 }
 
 bool DirectoryManager::isFile(const QString &path) const {
@@ -287,11 +278,8 @@ SortingMode DirectoryManager::sortingMode() const {
 }
 
 bool DirectoryManager::isSettled() const {
-    return mMirroredDir == mEngineDir
-        && mAppliedSort == mSortingMode
-        && !mResyncing
-        && !mWantRescan
-        && !(rescanTimer && rescanTimer->isActive());
+    return mMirroredDir == mEngineDir && mAppliedSort == mSortingMode && !mResyncing && !mWantRescan &&
+           !(rescanTimer && rescanTimer->isActive());
 }
 
 // Entry management
@@ -316,8 +304,6 @@ void DirectoryManager::removeDirEntry(const QString &dirPath) {
     emit dirRemoved(dirPath, index);
 }
 
-
-
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 // rust engine bridge
@@ -326,12 +312,12 @@ void DirectoryManager::removeDirEntry(const QString &dirPath) {
 // explicitly, never positionally.
 int DirectoryManager::engineSortMode(SortingMode mode) {
     switch(mode) {
-        case SORT_NAME:       return QIMGV_SORT_NAME;
-        case SORT_NAME_DESC:  return QIMGV_SORT_NAME_DESC;
-        case SORT_SIZE:       return QIMGV_SORT_SIZE;
-        case SORT_SIZE_DESC:  return QIMGV_SORT_SIZE_DESC;
-        case SORT_TIME:       return QIMGV_SORT_TIME;
-        case SORT_TIME_DESC:  return QIMGV_SORT_TIME_DESC;
+    case SORT_NAME: return QIMGV_SORT_NAME;
+    case SORT_NAME_DESC: return QIMGV_SORT_NAME_DESC;
+    case SORT_SIZE: return QIMGV_SORT_SIZE;
+    case SORT_SIZE_DESC: return QIMGV_SORT_SIZE_DESC;
+    case SORT_TIME: return QIMGV_SORT_TIME;
+    case SORT_TIME_DESC: return QIMGV_SORT_TIME_DESC;
     }
     return QIMGV_SORT_NAME;
 }
@@ -372,8 +358,7 @@ void DirectoryManager::scheduleRescan() {
         rescanTimer->setInterval(150);
         connect(rescanTimer, &QTimer::timeout, this, [this]() {
             if(!mResyncing && !mDirectoryPath.isEmpty())
-                mBridge.openDir(mDirectoryPath, engineSortMode(mSortingMode),
-                                                 settings->showHiddenFiles());
+                mBridge.openDir(mDirectoryPath, engineSortMode(mSortingMode), settings->showHiddenFiles());
         });
     }
     rescanTimer->start();
@@ -431,7 +416,8 @@ static void insertAtEngineIndex(std::vector<FSEntry> &vec, FSEntry &&entry, int 
 // MODIFIED is applied from the wire: the watcher stat'ed the file before
 // emitting, so a re-stat here would be a second decision about the same fact —
 // and it is exactly where the old FSEntry self-assignment bug lived.
-void DirectoryManager::applyEngineModification(const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index) {
+void DirectoryManager::applyEngineModification(const QString &path, bool isDir, quint64 size, qint64 mtimeMs,
+                                               int index) {
     std::vector<FSEntry> &vec = isDir ? dirEntryVec : fileEntryVec;
     FSEntry entry;
     entry.path = path;
@@ -468,8 +454,8 @@ void DirectoryManager::applyEngineModification(const QString &path, bool isDir, 
 // move: an overwrite-by-move, where the engine removed the destination entry
 // before relocating the source, and a source the mirror never saw — there the
 // only way back into agreement is to insert at the wire position.
-void DirectoryManager::applyEngineRename(const QString &from, const QString &to, bool isDir,
-                                         quint64 size, qint64 mtimeMs, int index) {
+void DirectoryManager::applyEngineRename(const QString &from, const QString &to, bool isDir, quint64 size,
+                                         qint64 mtimeMs, int index) {
     std::vector<FSEntry> &vec = isDir ? dirEntryVec : fileEntryVec;
     int source = isDir ? indexOfDir(from) : indexOfFile(from);
     int dest = isDir ? indexOfDir(to) : indexOfFile(to);
@@ -524,10 +510,10 @@ void DirectoryManager::applyEngineRename(const QString &from, const QString &to,
 }
 
 void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs,
-                                      int index, const QString &oldPath) {
+                                       int index, const QString &oldPath) {
     const bool tracing = EngineBridge::traceEnabled();
     if(mResyncing) {
-        if (tracing)
+        if(tracing)
             qDebug() << "[mirror trace] drop (resync in progress)" << path;
         return;
     }
@@ -543,55 +529,52 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
         return;
     }
     switch(kind) {
-        case QIMGV_MUT_ADDED: {
-            if(containsFile(path) || containsDir(path)) {
-                if (tracing)
-                    qDebug() << "[mirror trace] drop (already mirrored)" << path;
-                return; // already mirrored (racing duplicate)
-            }
-            FSEntry entry;
-            entry.path = path;
-            entry.name = QFileInfo(path).fileName();
-            entry.isDirectory = isDir;
-            entry.size = size;
-            entry.modifyTime = fileTimeFromMs(isDir ? 0 : mtimeMs);
-            insertAtEngineIndex(isDir ? dirEntryVec : fileEntryVec, std::move(entry), index);
-            if(isDir) {
-                emit dirAdded(path);
-            } else {
-                mPrevFileMeta.insert(path, qMakePair(size, mtimeMs));
-                emit fileAdded(path);
-            }
-            break;
+    case QIMGV_MUT_ADDED: {
+        if(containsFile(path) || containsDir(path)) {
+            if(tracing)
+                qDebug() << "[mirror trace] drop (already mirrored)" << path;
+            return; // already mirrored (racing duplicate)
         }
-        case QIMGV_MUT_MODIFIED:
-            applyEngineModification(path, isDir, size, mtimeMs, index);
-            break;
-        case QIMGV_MUT_RENAMED: {
-            // The guard above can only see the destination. A rename also edits
-            // the row its *source* names, so that path has to live here too —
-            // otherwise the mirror would erase an unrelated entry and grow a row
-            // from another folder at an index computed against that folder.
-            if(!mMirroredDir.isEmpty() && !oldPath.startsWith(mMirroredDir + QLatin1Char('/'))) {
-                qWarning() << "[DirectoryManager] rename source outside the mirrored directory:" << oldPath
-                           << "mirrored:" << mMirroredDir;
-                return;
-            }
-            applyEngineRename(oldPath, path, isDir, size, mtimeMs, index);
-            break;
+        FSEntry entry;
+        entry.path = path;
+        entry.name = QFileInfo(path).fileName();
+        entry.isDirectory = isDir;
+        entry.size = size;
+        entry.modifyTime = fileTimeFromMs(isDir ? 0 : mtimeMs);
+        insertAtEngineIndex(isDir ? dirEntryVec : fileEntryVec, std::move(entry), index);
+        if(isDir) {
+            emit dirAdded(path);
+        } else {
+            mPrevFileMeta.insert(path, qMakePair(size, mtimeMs));
+            emit fileAdded(path);
         }
-        case QIMGV_MUT_REMOVED:
-            removeDirEntry(path);
-            removeFileEntry(path);
-            break;
-        default:
-            break;
+        break;
     }
-    if (tracing) {
+    case QIMGV_MUT_MODIFIED: applyEngineModification(path, isDir, size, mtimeMs, index); break;
+    case QIMGV_MUT_RENAMED: {
+        // The guard above can only see the destination. A rename also edits
+        // the row its *source* names, so that path has to live here too —
+        // otherwise the mirror would erase an unrelated entry and grow a row
+        // from another folder at an index computed against that folder.
+        if(!mMirroredDir.isEmpty() && !oldPath.startsWith(mMirroredDir + QLatin1Char('/'))) {
+            qWarning() << "[DirectoryManager] rename source outside the mirrored directory:" << oldPath
+                       << "mirrored:" << mMirroredDir;
+            return;
+        }
+        applyEngineRename(oldPath, path, isDir, size, mtimeMs, index);
+        break;
+    }
+    case QIMGV_MUT_REMOVED:
+        removeDirEntry(path);
+        removeFileEntry(path);
+        break;
+    default: break;
+    }
+    if(tracing) {
         // the counts, not just the kind: the failure this trace exists to name is
         // a mutation that lands and still leaves the mirror one entry short
-        qDebug() << "[mirror trace] applied kind" << kind << path << "index" << index
-                 << "files" << fileEntryVec.size() << "dirs" << dirEntryVec.size();
+        qDebug() << "[mirror trace] applied kind" << kind << path << "index" << index << "files" << fileEntryVec.size()
+                 << "dirs" << dirEntryVec.size();
     }
 }
 
@@ -617,7 +600,9 @@ void DirectoryManager::onEngineOpenFailed(const QString &dirPath, int code) {
     qWarning() << "[DirectoryManager] engine open failed:" << dirPath << "code" << code;
     // an open that failed will never produce the listing its actions wait for
     pendingOnListed.erase(std::remove_if(pendingOnListed.begin(), pendingOnListed.end(),
-                             [&](const PendingListed &p) { return p.dir == dirPath; }),
+                                         [&](const PendingListed &p) {
+                                             return p.dir == dirPath;
+                                         }),
                           pendingOnListed.end());
     emit loadingFailed(dirPath);
 }
@@ -631,8 +616,8 @@ bool DirectoryManager::mirrorEngineListing(const QString &dirPath) {
     return applyArena(dirPath, listing, newFileCount, newDirCount);
 }
 
-bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &listing,
-                                  quint32 newFileCount, quint32 newDirCount) {
+bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &listing, quint32 newFileCount,
+                                  quint32 newDirCount) {
     QElapsedTimer rebuildTimer;
     rebuildTimer.start();
 
@@ -646,13 +631,13 @@ bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &list
         // not exist anywhere: entries silently missing from the view, from the
         // counts and from end-of-folder navigation. Keep the old mirror and ask
         // for another listing.
-        qWarning() << "[DirectoryManager] listing arena rejected:" << listing.size()
-                   << "bytes, header claimed" << newFileCount << "files +" << newDirCount << "dirs";
+        qWarning() << "[DirectoryManager] listing arena rejected:" << listing.size() << "bytes, header claimed"
+                   << newFileCount << "files +" << newDirCount << "dirs";
         mWantRescan = true;
         return false;
     }
-    qDebug() << "[DirectoryManager] arena pull+parse" << parseTimer.elapsed() << "ms; parsed"
-             << files.size() << "files" << dirs.size() << "dirs; arena" << listing.size() << "bytes";
+    qDebug() << "[DirectoryManager] arena pull+parse" << parseTimer.elapsed() << "ms; parsed" << files.size() << "files"
+             << dirs.size() << "dirs; arena" << listing.size() << "bytes";
 
     QElapsedTimer hashTimer;
     hashTimer.start();
@@ -708,8 +693,8 @@ bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &list
         // measured ~400ms in the gui/ layer) — on the same UI thread but
         // belonging to the view, not to this mirror
         emit loaded(mDirectoryPath);
-        qDebug() << "[DirectoryManager] listing rebuild (incl. view repopulation)"
-                 << newFileCount << "files took" << rebuildTimer.elapsed() << "ms";
+        qDebug() << "[DirectoryManager] listing rebuild (incl. view repopulation)" << newFileCount << "files took"
+                 << rebuildTimer.elapsed() << "ms";
         // a fresh listing is the definition of agreement
         markListingInSync();
         return true;

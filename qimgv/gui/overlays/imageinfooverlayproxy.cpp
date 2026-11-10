@@ -1,9 +1,6 @@
 #include "imageinfooverlayproxy.h"
 
-ImageInfoOverlayProxy::ImageInfoOverlayProxy(FloatingWidgetContainer *parent)
-    : container(parent),
-      overlay(nullptr)
-{
+ImageInfoOverlayProxy::ImageInfoOverlayProxy(FloatingWidgetContainer *parent) : container(parent), overlay(nullptr) {
 }
 
 ImageInfoOverlayProxy::~ImageInfoOverlayProxy() {
@@ -31,7 +28,7 @@ bool ImageInfoOverlayProxy::isHidden() {
     return overlay ? overlay->isHidden() : true;
 }
 
-void ImageInfoOverlayProxy::setExifInfo(const QMap<QString, QString>& _info) {
+void ImageInfoOverlayProxy::setExifInfo(const QMap<QString, QString> &_info) {
     if(overlay)
         overlay->setExifInfo(_info);
     else

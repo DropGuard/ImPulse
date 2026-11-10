@@ -9,8 +9,7 @@
 #include <sys/stat.h>
 #include <time.h>
 
-ThumbnailCache::ThumbnailCache(const QString &_cacheDirPath)
-    : cacheDirPath(_cacheDirPath) {
+ThumbnailCache::ThumbnailCache(const QString &_cacheDirPath) : cacheDirPath(_cacheDirPath) {
 }
 
 QString ThumbnailCache::thumbnailPath(const QString &id) {
@@ -43,7 +42,7 @@ QImage *ThumbnailCache::readThumbnail(const QString &id) {
             // thumbnail that is still being displayed. utimensat because the
             // Qt setFileTime API needs the file open for write, and opening
             // a QFile for write truncates it
-            const struct timespec times[2] = { { 0, UTIME_OMIT }, { 0, UTIME_NOW } };
+            const struct timespec times[2] = {{0, UTIME_OMIT}, {0, UTIME_NOW}};
             ::utimensat(AT_FDCWD, filePath.toLocal8Bit().constData(), times, 0);
             return thumb;
         } else {
@@ -64,7 +63,11 @@ ThumbnailCache::PurgeReport ThumbnailCache::purgeOlderThan(int days, qint64 byte
     const QDateTime cutoff = QDateTime::currentDateTime().addDays(-days);
     PurgeReport report;
 
-    struct Entry { QString path; qint64 size; QDateTime mtime; };
+    struct Entry {
+        QString path;
+        qint64 size;
+        QDateTime mtime;
+    };
     QVector<Entry> kept;
     const QStringList entries = dir.entryList(QStringList() << "*.png", QDir::Files);
     kept.reserve(entries.size());
@@ -105,9 +108,8 @@ ThumbnailCache::PurgeReport ThumbnailCache::purgeOlderThan(int days, qint64 byte
                 report.sizeEvicted++;
             }
         }
-        qDebug() << "[ThumbnailCache] byte cap" << byteCap << "fired:"
-                 << report.sizeEvicted << "entries evicted least-recently-used first,"
-                 << report.bytesAfter << "bytes remain";
+        qDebug() << "[ThumbnailCache] byte cap" << byteCap << "fired:" << report.sizeEvicted
+                 << "entries evicted least-recently-used first," << report.bytesAfter << "bytes remain";
     }
     if(report.idleDropped)
         qDebug() << "[ThumbnailCache] purged" << report.idleDropped << "of" << entries.size()

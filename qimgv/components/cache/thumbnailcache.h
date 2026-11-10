@@ -7,10 +7,9 @@
 #include "settings.h"
 #include "sourcecontainers/thumbnail.h"
 
-class ThumbnailCache : public QObject
-{
+class ThumbnailCache : public QObject {
     Q_OBJECT
-public:
+  public:
     // the directory is a parameter, not a settings lookup in the constructor:
     // a purge deletes files, so a test that measures it must own the directory
     // it points at rather than share the app's with every other suite
@@ -34,16 +33,16 @@ public:
     };
 
     void saveThumbnail(QImage *image, const QString &id);
-    QImage* readThumbnail(const QString &id);
+    QImage *readThumbnail(const QString &id);
     QString thumbnailPath(const QString &id);
     bool exists(const QString &id);
     PurgeReport purgeOlderThan(int days, qint64 byteCap);
 
-signals:
+  signals:
 
-public slots:
+  public slots:
 
-private:
+  private:
     // we are still bottlenecked by disk access anyway
     QMutex mutex;
     QString cacheDirPath;

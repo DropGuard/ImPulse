@@ -2,10 +2,7 @@
 
 #include <utility>
 
-ContextMenuItem::ContextMenuItem(QWidget *parent)
-    : MenuItem(parent),
-      mAction("")
-{
+ContextMenuItem::ContextMenuItem(QWidget *parent) : MenuItem(parent), mAction("") {
 }
 
 ContextMenuItem::~ContextMenuItem() {

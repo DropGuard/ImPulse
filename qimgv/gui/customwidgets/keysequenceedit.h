@@ -6,22 +6,23 @@
 
 class KeySequenceEdit : public QPushButton {
     Q_OBJECT
-public:
+  public:
     KeySequenceEdit(QWidget *parent);
     const QString &sequence();
     void setText(const QString &text);
 
-protected:
+  protected:
     void keyPressEvent(QKeyEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
 
     void mouseReleaseEvent(QMouseEvent *e) override;
     bool focusNextPrevChild(bool) override;
-private:
+
+  private:
     void processEvent(QEvent *e);
     QString mSequence;
 
-signals:
+  signals:
     void edited();
 };

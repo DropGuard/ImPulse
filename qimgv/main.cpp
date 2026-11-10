@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
     // if this is set by other app, platform plugin may fail to load
     // https://github.com/easymodo/qimgv/issues/410
-    qputenv("QT_PLUGIN_PATH","");
+    qputenv("QT_PLUGIN_PATH", "");
 #endif
 
     // for hidpi testing
@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     //qputenv("QT_SCREEN_SCALE_FACTORS", "1;1.7");
 
     // do we still need this?
-    qputenv("QT_AUTO_SCREEN_SCALE_FACTOR","0");
+    qputenv("QT_AUTO_SCREEN_SCALE_FACTOR", "0");
 
     // hidpi rendering on windows still has artifacts
     // This disables it for scale factors < 1.75
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
     atexit(saveSettings);
     qDebug() << "[probe] message right after install";
 
-// parse args ------------------------------------------------------------------
+    // parse args ------------------------------------------------------------------
     QCommandLineParser parser;
     QString appDescription = qApp->applicationName() + " - Fast and configurable image viewer.";
     appDescription.append("\nVersion: " + qApp->applicationVersion());
@@ -122,8 +122,7 @@ int main(int argc, char *argv[]) {
     parser.addVersionOption();
     parser.addPositionalArgument("path", QCoreApplication::translate("main", "File or directory path."));
     parser.addOptions({
-        {"build-options",
-            QCoreApplication::translate("main", "Show build options.")},
+        {"build-options", QCoreApplication::translate("main", "Show build options.")},
     });
     parser.process(a);
 
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
         return a.exec();
     }
 
-// -----------------------------------------------------------------------------
+    // -----------------------------------------------------------------------------
 
     Core core;
 

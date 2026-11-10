@@ -7,10 +7,10 @@
 #include "utils/inputmap.h"
 
 class ShortcutBuilder {
-public:
+  public:
     static QString fromEvent(QInputEvent *event);
 
-private:
+  private:
     static QString processWheelEvent(QWheelEvent *event);
     static QString processMouseEvent(QMouseEvent *event);
     static QString processKeyEvent(QKeyEvent *event);

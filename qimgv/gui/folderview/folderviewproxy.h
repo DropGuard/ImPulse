@@ -14,7 +14,7 @@ struct FolderViewStateBuffer {
 class FolderViewProxy : public QWidget, public IDirectoryView {
     Q_OBJECT
     Q_INTERFACES(IDirectoryView)
-public:
+  public:
     FolderViewProxy(QWidget *parent = nullptr);
     void init();
     // the directory this view is a projection of — the buffered value until
@@ -22,7 +22,7 @@ public:
     // without entering folder view mode
     const QString &directoryPath() const;
 
-public slots:
+  public slots:
     void populate(int) override;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override;
     void select(QList<int>) override;
@@ -40,10 +40,10 @@ public slots:
     void onFullscreenModeChanged(bool mode);
     void onSortingChanged(SortingMode mode);
 
-protected:
+  protected:
     void showEvent(QShowEvent *event) override;
 
-signals:
+  signals:
     void itemActivated(int) override;
     void thumbnailsRequested(QList<int>, int, bool, bool) override;
     void draggedOut() override;
@@ -52,10 +52,10 @@ signals:
     void directorySelected(QString);
     void copyUrlsRequested(QList<QString>, QString path);
     void moveUrlsRequested(QList<QString>, QString path);
-    void droppedInto(const QMimeData*, QObject*, int) override;
+    void droppedInto(const QMimeData *, QObject *, int) override;
     void draggedOver(int) override;
 
-private:
+  private:
     FolderView *folderView = nullptr;
     QVBoxLayout layout;
     FolderViewStateBuffer stateBuf;

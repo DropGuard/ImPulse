@@ -3,7 +3,7 @@
 #include "settings.h"
 
 class MapOverlay::MapOverlayPrivate : public QObject {
-public:
+  public:
     MapOverlayPrivate(MapOverlay *qq);
     ~MapOverlayPrivate() override;
     void moveInnerWidget(float x, float y);
@@ -58,9 +58,7 @@ void MapOverlay::MapOverlayPrivate::moveMainImage(float xPos, float yPos) {
     moveInnerWidget(x, y);
 }
 
-MapOverlay::MapOverlay(QWidget *parent) : QWidget(parent),
-    visibilityEnabled(true),
-    d(new MapOverlayPrivate(this)) {
+MapOverlay::MapOverlay(QWidget *parent) : QWidget(parent), visibilityEnabled(true), d(new MapOverlayPrivate(this)) {
     this->setMouseTracking(true);
     d->opacityAnimation = new QPropertyAnimation(this, "opacity");
     d->opacityAnimation->setEasingCurve(QEasingCurve::OutSine);
@@ -100,34 +98,35 @@ void MapOverlay::setOpacity(float opacity) {
 }
 
 void MapOverlay::animateVisible(bool isVisible) {
-    if(isVisible) this->setOpacity(1.0f);
+    if(isVisible)
+        this->setOpacity(1.0f);
     else {
         d->opacityAnimation->setEndValue(1.0f * isVisible);
 
         switch(location()) {
-            case MapOverlay::LeftTop:
-            case MapOverlay::RightTop:
-                if(isVisible) {
-                    d->transitionAnimation->setStartValue(0);
-                    d->transitionAnimation->setEndValue(margin());
-                } else {
-                    d->transitionAnimation->setStartValue(margin());
-                    d->transitionAnimation->setEndValue(0);
-                }
-                break;
-            case MapOverlay::RightBottom:
-            case MapOverlay::LeftBottom:
-                int h = parentWidget()->height();
-                int offset = d->outerRect.height() + margin();
+        case MapOverlay::LeftTop:
+        case MapOverlay::RightTop:
+            if(isVisible) {
+                d->transitionAnimation->setStartValue(0);
+                d->transitionAnimation->setEndValue(margin());
+            } else {
+                d->transitionAnimation->setStartValue(margin());
+                d->transitionAnimation->setEndValue(0);
+            }
+            break;
+        case MapOverlay::RightBottom:
+        case MapOverlay::LeftBottom:
+            int h = parentWidget()->height();
+            int offset = d->outerRect.height() + margin();
 
-                if(isVisible) {
-                    d->transitionAnimation->setStartValue(h);
-                    d->transitionAnimation->setEndValue(h - offset);
-                } else {
-                    d->transitionAnimation->setStartValue(h - offset);
-                    d->transitionAnimation->setEndValue(h);
-                }
-                break;
+            if(isVisible) {
+                d->transitionAnimation->setStartValue(h);
+                d->transitionAnimation->setEndValue(h - offset);
+            } else {
+                d->transitionAnimation->setStartValue(h - offset);
+                d->transitionAnimation->setEndValue(h);
+            }
+            break;
         }
 
         d->opacityAnimation->start();
@@ -172,22 +171,22 @@ void MapOverlay::updatePosition() {
 
     int x = 0, y = 0;
     switch(location()) {
-        case MapOverlay::LeftTop:
-            x = parentRect.left() + margin();
-            y = parentRect.top() + margin();
-            break;
-        case MapOverlay::RightTop:
-            x = parentRect.right() - (margin() + d->outerRect.width());
-            y = parentRect.top() + margin();
-            break;
-        case MapOverlay::RightBottom:
-            x = parentRect.right() - (margin() + d->outerRect.width());
-            y = parentRect.bottom() - (margin() + d->outerRect.height());
-            break;
-        case MapOverlay::LeftBottom:
-            x = parentRect.left() + margin();
-            y = parentRect.bottom() - (margin() + d->outerRect.height());
-            break;
+    case MapOverlay::LeftTop:
+        x = parentRect.left() + margin();
+        y = parentRect.top() + margin();
+        break;
+    case MapOverlay::RightTop:
+        x = parentRect.right() - (margin() + d->outerRect.width());
+        y = parentRect.top() + margin();
+        break;
+    case MapOverlay::RightBottom:
+        x = parentRect.right() - (margin() + d->outerRect.width());
+        y = parentRect.bottom() - (margin() + d->outerRect.height());
+        break;
+    case MapOverlay::LeftBottom:
+        x = parentRect.left() + margin();
+        y = parentRect.bottom() - (margin() + d->outerRect.height());
+        break;
     }
 
     /**
@@ -222,11 +221,10 @@ void MapOverlay::updateMap(const QRectF &drawingRect) {
 
     float aspect = outerSz.width() / drawingRect.width();
 
-    float innerWidth = std::min(static_cast<float>(windowRect.width()) * aspect,
-                                static_cast<float>(outerSz.width()));
+    float innerWidth = std::min(static_cast<float>(windowRect.width()) * aspect, static_cast<float>(outerSz.width()));
 
-    float innerHeight = std::min(static_cast<float>(windowRect.height()) * aspect,
-                                 static_cast<float>(outerSz.height()));
+    float innerHeight =
+        std::min(static_cast<float>(windowRect.height()) * aspect, static_cast<float>(outerSz.height()));
 
     QSizeF innerSz(innerWidth, innerHeight);
     d->innerRect.setSize(innerSz);

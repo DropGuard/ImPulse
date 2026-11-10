@@ -31,7 +31,6 @@ class EngineBridge;
 #include "windows.h"
 #endif
 
-
 class DirectoryManager;
 
 typedef bool (DirectoryManager::*CompareFunction)(const FSEntry &e1, const FSEntry &e2) const;
@@ -40,7 +39,7 @@ typedef bool (DirectoryManager::*CompareFunction)(const FSEntry &e1, const FSEnt
 
 class DirectoryManager : public QObject {
     Q_OBJECT
-public:
+  public:
     // Which engine this instance mirrors. Required, not defaulted: a manager
     // that quietly picks the process-wide bridge cannot be pointed at another
     // one, and the ambiguity is not hypothetical — a test that spies on one
@@ -86,8 +85,7 @@ public:
     // calls it directly: mirrorEngineListing pulls the arena and forwards. This
     // lets a test describe divergence directly instead of hoping the
     // filesystem produces it on demand.
-    bool applyArena(const QString &dirPath, const QByteArray &listing,
-                    quint32 newFileCount, quint32 newDirCount);
+    bool applyArena(const QString &dirPath, const QByteArray &listing, quint32 newFileCount, quint32 newDirCount);
 
     bool containsFile(const QString &filePath) const;
     QString fileNameAt(int index) const;
@@ -108,15 +106,12 @@ public:
     QString dirPathAt(int index) const;
     QString dirNameAt(int index) const;
 
-
-
-
     // The one place qimgv's SortingMode becomes a QIMGV_SORT_* code. Public so a
     // test can pin it against the header constants: the two enums are ordered
     // differently, so a positional mistake sorts by the wrong column silently.
     static int engineSortMode(SortingMode mode);
 
-private:
+  private:
     EngineBridge &mBridge;
     QRegularExpression regex;
     std::vector<FSEntry> fileEntryVec, dirEntryVec;
@@ -124,8 +119,8 @@ private:
     QString mDirectoryPath;
 
     // rust engine mirror (SOURCE_DIRECTORY only)
-    QString mEngineDir;      // dir we asked the engine to open
-    QString mMirroredDir;    // dir the vectors currently reflect
+    QString mEngineDir;   // dir we asked the engine to open
+    QString mMirroredDir; // dir the vectors currently reflect
     SortingMode mAppliedSort;
     QTimer *rescanTimer = nullptr;
     bool mResyncing = false;
@@ -178,13 +173,13 @@ private:
     bool checkFileRange(int index) const;
     bool checkDirRange(int index) const;
 
-private slots:
+  private slots:
     void onEngineDirListed(const QString &dirPath);
     void onEngineOpenFailed(const QString &dirPath, int code);
     void onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
                          const QString &oldPath);
 
-signals:
+  signals:
     // The mutation vocabulary of the engine is Added | Modified | Removed |
     // Renamed (watcher/apply.rs::Applied) and these signals mirror exactly that.
     // Renamed is the one the watcher has to earn: the kernel reports a move as

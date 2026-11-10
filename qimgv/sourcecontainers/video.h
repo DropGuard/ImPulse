@@ -7,7 +7,7 @@
 #include "image.h"
 
 class Video : public Image {
-public:
+  public:
     Video(std::unique_ptr<DocumentInfo> _info);
 
     std::unique_ptr<QPixmap> getPixmap() override;
@@ -16,11 +16,10 @@ public:
     int width() override;
     QSize size() override;
 
-public slots:
+  public slots:
     bool save(QString destPath, int jpegQuality) override;
 
-
-private:
+  private:
     void load() override;
 
     uint srcWidth = 0;

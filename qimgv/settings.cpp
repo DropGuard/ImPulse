@@ -35,15 +35,27 @@ Script scriptFromStoredValue(const QVariant &value) {
     s.blocking = obj.value(QStringLiteral("blocking")).toBool();
     return s;
 }
-template<class T> constexpr SettingDesc::Kind kindOf();
-template<> constexpr SettingDesc::Kind kindOf<bool>()      { return SettingDesc::Kind::Bool; }
-template<> constexpr SettingDesc::Kind kindOf<int>()        { return SettingDesc::Kind::Int; }
-template<> constexpr SettingDesc::Kind kindOf<qlonglong>()  { return SettingDesc::Kind::Int; }
-template<> constexpr SettingDesc::Kind kindOf<float>()      { return SettingDesc::Kind::Real; }
-template<> constexpr SettingDesc::Kind kindOf<double>()     { return SettingDesc::Kind::Real; }
-template<> constexpr SettingDesc::Kind kindOf<QString>()    { return SettingDesc::Kind::Str; }
+template <class T> constexpr SettingDesc::Kind kindOf();
+template <> constexpr SettingDesc::Kind kindOf<bool>() {
+    return SettingDesc::Kind::Bool;
+}
+template <> constexpr SettingDesc::Kind kindOf<int>() {
+    return SettingDesc::Kind::Int;
+}
+template <> constexpr SettingDesc::Kind kindOf<qlonglong>() {
+    return SettingDesc::Kind::Int;
+}
+template <> constexpr SettingDesc::Kind kindOf<float>() {
+    return SettingDesc::Kind::Real;
+}
+template <> constexpr SettingDesc::Kind kindOf<double>() {
+    return SettingDesc::Kind::Real;
+}
+template <> constexpr SettingDesc::Kind kindOf<QString>() {
+    return SettingDesc::Kind::Str;
+}
 
-template<class T> T settingDefault(const SettingDesc &d) {
+template <class T> T settingDefault(const SettingDesc &d) {
     Q_ASSERT(d.kind == kindOf<T>());
     if constexpr(std::is_same_v<T, bool>)
         return d.defB;
@@ -56,8 +68,7 @@ template<class T> T settingDefault(const SettingDesc &d) {
 }
 }
 
-template<class T>
-T Settings::load(const SettingDesc &d) const {
+template <class T> T Settings::load(const SettingDesc &d) const {
     Q_ASSERT(d.kind == kindOf<T>());
     const QVariant raw = settingsConf->value(d.key);
     if(!raw.isValid())
@@ -72,12 +83,14 @@ T Settings::load(const SettingDesc &d) const {
         qlonglong v = raw.toLongLong(&ok);
         if(!ok)
             return settingDefault<T>(d);
-        const bool outside = (d.hasLo && v < static_cast<qlonglong>(d.lo))
-                          || (d.hasHi && v > static_cast<qlonglong>(d.hi));
+        const bool outside =
+            (d.hasLo && v < static_cast<qlonglong>(d.lo)) || (d.hasHi && v > static_cast<qlonglong>(d.hi));
         if(outside && d.resetOnRange)
             return settingDefault<T>(d);
-        if(d.hasLo) v = std::max<qlonglong>(v, static_cast<qlonglong>(d.lo));
-        if(d.hasHi) v = std::min<qlonglong>(v, static_cast<qlonglong>(d.hi));
+        if(d.hasLo)
+            v = std::max<qlonglong>(v, static_cast<qlonglong>(d.lo));
+        if(d.hasHi)
+            v = std::min<qlonglong>(v, static_cast<qlonglong>(d.hi));
         return static_cast<T>(v);
     } else if constexpr(std::is_same_v<T, float> || std::is_same_v<T, double>) {
         bool ok = false;
@@ -87,16 +100,17 @@ T Settings::load(const SettingDesc &d) const {
         const bool outside = (d.hasLo && v < d.lo) || (d.hasHi && v > d.hi);
         if(outside && d.resetOnRange)
             return settingDefault<T>(d);
-        if(d.hasLo) v = std::max(v, d.lo);
-        if(d.hasHi) v = std::min(v, d.hi);
+        if(d.hasLo)
+            v = std::max(v, d.lo);
+        if(d.hasHi)
+            v = std::min(v, d.hi);
         return static_cast<T>(v);
     } else {
         return raw.toString();
     }
 }
 
-template<class T>
-void Settings::store(const SettingDesc &d, const T &v) {
+template <class T> void Settings::store(const SettingDesc &d, const T &v) {
     Q_ASSERT(d.kind == kindOf<T>());
     settingsConf->setValue(d.key, v);
 }
@@ -111,13 +125,13 @@ void Settings::carryIdentityFiles(const QString &legacyConfDir, const QString &n
                                   const QString &legacyCacheDir, const QString &newCacheDir) {
     const QDir legacyConf(legacyConfDir);
     const QDir currentConf(newConfDir);
-    if (legacyConf.exists() && !currentConf.exists()) {
+    if(legacyConf.exists() && !currentConf.exists()) {
         QDir().mkpath(currentConf.absolutePath());
         QFile::copy(legacyConf.filePath("qimgv.conf"), currentConf.filePath("impulse.conf"));
         QFile::copy(legacyConf.filePath("savedState.conf"), currentConf.filePath("savedState.conf"));
         QFile::copy(legacyConf.filePath("theme.conf"), currentConf.filePath("theme.conf"));
     }
-    if (QDir(legacyCacheDir).exists() && !QDir(newCacheDir).exists())
+    if(QDir(legacyCacheDir).exists() && !QDir(newCacheDir).exists())
         QDir().rename(legacyCacheDir, newCacheDir);
 }
 
@@ -131,14 +145,17 @@ Settings::Settings(QObject *parent) : QObject(parent) {
 #else
     mConfDir = new QDir(QApplication::applicationDirPath() + "/conf");
     mConfDir->mkpath(QApplication::applicationDirPath() + "/conf");
-    settingsConf = new QSettings(mConfDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
+    settingsConf =
+        new QSettings(mConfDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
     stateConf = new QSettings(mConfDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
     themeConf = new QSettings(mConfDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
 #endif
     carryIdentityFiles(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/qimgv",
-                       QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + QCoreApplication::organizationName(),
+                       QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" +
+                           QCoreApplication::organizationName(),
                        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/qimgv",
-                       QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/" + QCoreApplication::applicationName());
+                       QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/" +
+                           QCoreApplication::applicationName());
     fillVideoFormats();
     // cache paths live in the constructor, not in an external protocol: a
     // directly-constructed instance (tests) used to carry uninitialized
@@ -219,20 +236,21 @@ void Settings::loadStylesheet() {
         QPalette p;
         QColor sys_text = p.text().color();
         QColor sys_window = p.window().color();
-        QColor sys_window_tinted, sys_window_tinted_lc, sys_window_tinted_lc2, sys_window_tinted_hc, sys_window_tinted_hc2;
+        QColor sys_window_tinted, sys_window_tinted_lc, sys_window_tinted_lc2, sys_window_tinted_hc,
+            sys_window_tinted_hc2;
         if(sys_window.valueF() <= 0.45f) {
             // dark system theme
             sys_window_tinted_lc2.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() + 6);
-            sys_window_tinted_lc.setHsv(sys_window.hue(),  sys_window.saturation(), sys_window.value() + 14);
-            sys_window_tinted.setHsv(sys_window.hue(),     sys_window.saturation(), sys_window.value() + 20);
-            sys_window_tinted_hc.setHsv(sys_window.hue(),  sys_window.saturation(), sys_window.value() + 35);
+            sys_window_tinted_lc.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() + 14);
+            sys_window_tinted.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() + 20);
+            sys_window_tinted_hc.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() + 35);
             sys_window_tinted_hc2.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() + 50);
         } else {
             // light system theme
             sys_window_tinted_lc2.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() - 6);
-            sys_window_tinted_lc.setHsv(sys_window.hue(),  sys_window.saturation(), sys_window.value() - 14);
-            sys_window_tinted.setHsv(sys_window.hue(),     sys_window.saturation(), sys_window.value() - 20);
-            sys_window_tinted_hc.setHsv(sys_window.hue(),  sys_window.saturation(), sys_window.value() - 35);
+            sys_window_tinted_lc.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() - 14);
+            sys_window_tinted.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() - 20);
+            sys_window_tinted_hc.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() - 35);
             sys_window_tinted_hc2.setHsv(sys_window.hue(), sys_window.saturation(), sys_window.value() - 50);
         }
 
@@ -262,7 +280,7 @@ void Settings::loadStylesheet() {
 
         // pseudo-dpi to scale some widget widths
         int text_height_base = 22;
-        qreal pDpr = qMax( (static_cast<qreal>(text_height) / text_height_base), 1.0);
+        qreal pDpr = qMax((static_cast<qreal>(text_height) / text_height_base), 1.0);
         int context_menu_width = 212 * pDpr;
         int context_menu_button_height = 32 * pDpr;
         int rename_overlay_width = 380 * pDpr;
@@ -270,70 +288,70 @@ void Settings::loadStylesheet() {
         //qDebug()<< "dpr=" << qApp->devicePixelRatio() << "pDpr=" << pDpr;
 
         // --- write variables into stylesheet --------------------------
-        styleSheet.replace("%font_small%", QString::number(font_small)+"pt");
-        styleSheet.replace("%font_large%", QString::number(font_large)+"pt");
-        styleSheet.replace("%button_height%", QString::number(button_height)+"px");
-        styleSheet.replace("%top_panel_height%", QString::number(top_panel_height)+"px");
-        styleSheet.replace("%overlay_header_size%", QString::number(overlay_header_size)+"px");
-        styleSheet.replace("%context_menu_width%", QString::number(context_menu_width)+"px");
-        styleSheet.replace("%context_menu_button_height%", QString::number(context_menu_button_height)+"px");
-        styleSheet.replace("%rename_overlay_width%", QString::number(rename_overlay_width)+"px");
+        styleSheet.replace("%font_small%", QString::number(font_small) + "pt");
+        styleSheet.replace("%font_large%", QString::number(font_large) + "pt");
+        styleSheet.replace("%button_height%", QString::number(button_height) + "px");
+        styleSheet.replace("%top_panel_height%", QString::number(top_panel_height) + "px");
+        styleSheet.replace("%overlay_header_size%", QString::number(overlay_header_size) + "px");
+        styleSheet.replace("%context_menu_width%", QString::number(context_menu_width) + "px");
+        styleSheet.replace("%context_menu_button_height%", QString::number(context_menu_button_height) + "px");
+        styleSheet.replace("%rename_overlay_width%", QString::number(rename_overlay_width) + "px");
 
-        styleSheet.replace("%icontheme%",  "light");
+        styleSheet.replace("%icontheme%", "light");
         // Qt::Popup can't do transparency under windows, use square window
 #ifdef _WIN32
-        styleSheet.replace("%contextmenu_border_radius%",  "0px");
+        styleSheet.replace("%contextmenu_border_radius%", "0px");
 #else
-        styleSheet.replace("%contextmenu_border_radius%",  "3px");
+        styleSheet.replace("%contextmenu_border_radius%", "3px");
 #endif
-        styleSheet.replace("%sys_window%",    sys_window.name());
-        styleSheet.replace("%sys_window_tinted%",    sys_window_tinted.name());
+        styleSheet.replace("%sys_window%", sys_window.name());
+        styleSheet.replace("%sys_window_tinted%", sys_window_tinted.name());
         styleSheet.replace("%sys_window_tinted_lc%", sys_window_tinted_lc.name());
         styleSheet.replace("%sys_window_tinted_lc2%", sys_window_tinted_lc2.name());
         styleSheet.replace("%sys_window_tinted_hc%", sys_window_tinted_hc.name());
         styleSheet.replace("%sys_window_tinted_hc2%", sys_window_tinted_hc2.name());
-        styleSheet.replace("%sys_text_secondary_rgba%", "rgba(" + QString::number(sys_text.red())   + ","
-                                                      + QString::number(sys_text.green()) + ","
-                                                      + QString::number(sys_text.blue())  + ",50%)");
+        styleSheet.replace("%sys_text_secondary_rgba%", "rgba(" + QString::number(sys_text.red()) + "," +
+                                                            QString::number(sys_text.green()) + "," +
+                                                            QString::number(sys_text.blue()) + ",50%)");
 
-        styleSheet.replace("%button%",               colors.button.name());
-        styleSheet.replace("%button_hover%",         colors.button_hover.name());
-        styleSheet.replace("%button_pressed%",       colors.button_pressed.name());
-        styleSheet.replace("%panel_button%",         colors.panel_button.name());
-        styleSheet.replace("%panel_button_hover%",   colors.panel_button_hover.name());
+        styleSheet.replace("%button%", colors.button.name());
+        styleSheet.replace("%button_hover%", colors.button_hover.name());
+        styleSheet.replace("%button_pressed%", colors.button_pressed.name());
+        styleSheet.replace("%panel_button%", colors.panel_button.name());
+        styleSheet.replace("%panel_button_hover%", colors.panel_button_hover.name());
         styleSheet.replace("%panel_button_pressed%", colors.panel_button_pressed.name());
-        styleSheet.replace("%widget%",               colors.widget.name());
-        styleSheet.replace("%widget_border%",        colors.widget_border.name());
-        styleSheet.replace("%folderview%",           colors.folderview.name());
-        styleSheet.replace("%folderview_topbar%",    colors.folderview_topbar.name());
-        styleSheet.replace("%folderview_hc%",        colors.folderview_hc.name());
-        styleSheet.replace("%folderview_hc2%",       colors.folderview_hc2.name());
-        styleSheet.replace("%accent%",               colors.accent.name());
-        styleSheet.replace("%input_field_focus%",    colors.input_field_focus.name());
-        styleSheet.replace("%overlay%",              colors.overlay.name());
-        styleSheet.replace("%icons%",                colors.icons.name());
-        styleSheet.replace("%text_hc2%",             colors.text_hc2.name());
-        styleSheet.replace("%text_hc%",              colors.text_hc.name());
-        styleSheet.replace("%text%",                 colors.text.name());
-        styleSheet.replace("%overlay_text%",         colors.overlay_text.name());
-        styleSheet.replace("%text_lc%",              colors.text_lc.name());
-        styleSheet.replace("%text_lc2%",             colors.text_lc2.name());
-        styleSheet.replace("%scrollbar%",            colors.scrollbar.name());
-        styleSheet.replace("%scrollbar_hover%",      colors.scrollbar_hover.name());
-        styleSheet.replace("%folderview_button_hover%",   colors.folderview_button_hover.name());
+        styleSheet.replace("%widget%", colors.widget.name());
+        styleSheet.replace("%widget_border%", colors.widget_border.name());
+        styleSheet.replace("%folderview%", colors.folderview.name());
+        styleSheet.replace("%folderview_topbar%", colors.folderview_topbar.name());
+        styleSheet.replace("%folderview_hc%", colors.folderview_hc.name());
+        styleSheet.replace("%folderview_hc2%", colors.folderview_hc2.name());
+        styleSheet.replace("%accent%", colors.accent.name());
+        styleSheet.replace("%input_field_focus%", colors.input_field_focus.name());
+        styleSheet.replace("%overlay%", colors.overlay.name());
+        styleSheet.replace("%icons%", colors.icons.name());
+        styleSheet.replace("%text_hc2%", colors.text_hc2.name());
+        styleSheet.replace("%text_hc%", colors.text_hc.name());
+        styleSheet.replace("%text%", colors.text.name());
+        styleSheet.replace("%overlay_text%", colors.overlay_text.name());
+        styleSheet.replace("%text_lc%", colors.text_lc.name());
+        styleSheet.replace("%text_lc2%", colors.text_lc2.name());
+        styleSheet.replace("%scrollbar%", colors.scrollbar.name());
+        styleSheet.replace("%scrollbar_hover%", colors.scrollbar_hover.name());
+        styleSheet.replace("%folderview_button_hover%", colors.folderview_button_hover.name());
         styleSheet.replace("%folderview_button_pressed%", colors.folderview_button_pressed.name());
-        styleSheet.replace("%text_secondary_rgba%",  "rgba(" + QString::number(colors.text.red())   + ","
-                                                             + QString::number(colors.text.green()) + ","
-                                                             + QString::number(colors.text.blue())  + ",62%)");
-        styleSheet.replace("%accent_hover_rgba%",    "rgba(" + QString::number(colors.accent.red())   + ","
-                                                             + QString::number(colors.accent.green()) + ","
-                                                             + QString::number(colors.accent.blue())  + ",65%)");
-        styleSheet.replace("%overlay_rgba%",         "rgba(" + QString::number(colors.overlay.red())   + ","
-                                                             + QString::number(colors.overlay.green()) + ","
-                                                             + QString::number(colors.overlay.blue())  + ",90%)");
-        styleSheet.replace("%fv_backdrop_rgba%",     "rgba(" + QString::number(colors.folderview_hc2.red())   + ","
-                                                             + QString::number(colors.folderview_hc2.green()) + ","
-                                                             + QString::number(colors.folderview_hc2.blue())  + ",80%)");
+        styleSheet.replace("%text_secondary_rgba%", "rgba(" + QString::number(colors.text.red()) + "," +
+                                                        QString::number(colors.text.green()) + "," +
+                                                        QString::number(colors.text.blue()) + ",62%)");
+        styleSheet.replace("%accent_hover_rgba%", "rgba(" + QString::number(colors.accent.red()) + "," +
+                                                      QString::number(colors.accent.green()) + "," +
+                                                      QString::number(colors.accent.blue()) + ",65%)");
+        styleSheet.replace("%overlay_rgba%", "rgba(" + QString::number(colors.overlay.red()) + "," +
+                                                 QString::number(colors.overlay.green()) + "," +
+                                                 QString::number(colors.overlay.blue()) + ",90%)");
+        styleSheet.replace("%fv_backdrop_rgba%", "rgba(" + QString::number(colors.folderview_hc2.red()) + "," +
+                                                     QString::number(colors.folderview_hc2.green()) + "," +
+                                                     QString::number(colors.folderview_hc2.blue()) + ",80%)");
         // do not show separator line if topbar color matches folderview
         if(colors.folderview != colors.folderview_topbar)
             styleSheet.replace("%topbar_border_rgba%", "rgba(0,0,0,14%)");
@@ -351,13 +369,13 @@ void Settings::loadTheme() {
     } else {
         BaseColorScheme base;
         themeConf->beginGroup("Colors");
-    for(const ThemeColorDesc &row : kThemeColors) {
-        QColor c(themeConf->value(row.key, row.def).toString());
-        if(!c.isValid())
-            c = QColor(row.def); // junk from a hand-edited theme file
-        base.*row.base = c;
-    }
-    base.tid = themeConf->value("tid", "-1").toInt();
+        for(const ThemeColorDesc &row : kThemeColors) {
+            QColor c(themeConf->value(row.key, row.def).toString());
+            if(!c.isValid())
+                c = QColor(row.def); // junk from a hand-edited theme file
+            base.*row.base = c;
+        }
+        base.tid = themeConf->value("tid", "-1").toInt();
         themeConf->endGroup();
         setColorScheme(ColorScheme(base));
     }
@@ -372,7 +390,7 @@ void Settings::saveTheme() {
     themeConf->endGroup();
 }
 //------------------------------------------------------------------------------
-const ColorScheme& Settings::colorScheme() {
+const ColorScheme &Settings::colorScheme() {
     return mColorScheme;
 }
 //------------------------------------------------------------------------------
@@ -386,16 +404,16 @@ void Settings::setColorTid(int tid) {
 }
 //------------------------------------------------------------------------------
 void Settings::fillVideoFormats() {
-    mVideoFormatsMap.insert("video/webm",       "webm");
-    mVideoFormatsMap.insert("video/mp4",        "mp4");
-    mVideoFormatsMap.insert("video/mp4",        "m4v");
-    mVideoFormatsMap.insert("video/mpeg",       "mpg");
-    mVideoFormatsMap.insert("video/mpeg",       "mpeg");
+    mVideoFormatsMap.insert("video/webm", "webm");
+    mVideoFormatsMap.insert("video/mp4", "mp4");
+    mVideoFormatsMap.insert("video/mp4", "m4v");
+    mVideoFormatsMap.insert("video/mpeg", "mpg");
+    mVideoFormatsMap.insert("video/mpeg", "mpeg");
     mVideoFormatsMap.insert("video/x-matroska", "mkv");
-    mVideoFormatsMap.insert("video/x-ms-wmv",   "wmv");
-    mVideoFormatsMap.insert("video/x-msvideo",  "avi");
-    mVideoFormatsMap.insert("video/quicktime",  "mov");
-    mVideoFormatsMap.insert("video/x-flv",      "flv");
+    mVideoFormatsMap.insert("video/x-ms-wmv", "wmv");
+    mVideoFormatsMap.insert("video/x-msvideo", "avi");
+    mVideoFormatsMap.insert("video/quicktime", "mov");
+    mVideoFormatsMap.insert("video/x-flv", "flv");
 }
 //------------------------------------------------------------------------------
 QString Settings::quickCopyDirectory() {
@@ -409,20 +427,20 @@ void Settings::setQuickCopyDirectory(const QString &dir) {
 QString Settings::mpvBinary() {
     QString mpvPath = settingsConf->value("mpvBinary", "").toString();
     if(!QFile::exists(mpvPath)) {
-    #ifdef _WIN32
+#ifdef _WIN32
         mpvPath = QCoreApplication::applicationDirPath() + "/mpv.exe";
-    #elif defined __linux__
+#elif defined __linux__
         mpvPath = "/usr/bin/mpv";
-    #elif defined __FreeBSD__
+#elif defined __FreeBSD__
         mpvPath = "/usr/local/bin/mpv";
-    #endif
+#endif
         if(!QFile::exists(mpvPath))
             mpvPath = "";
     }
     return mpvPath;
 }
 
-void Settings::setMpvBinary(const QString& path) {
+void Settings::setMpvBinary(const QString &path) {
     if(QFile::exists(path)) {
         store(K_MpvBinary, path);
     }
@@ -493,9 +511,7 @@ void Settings::setUseSystemColorScheme(bool mode) {
 }
 //------------------------------------------------------------------------------
 QVersionNumber Settings::lastVersion() {
-    return QVersionNumber(load<int>(K_LastVerMajor),
-                          load<int>(K_LastVerMinor),
-                          load<int>(K_LastVerMicro));
+    return QVersionNumber(load<int>(K_LastVerMajor), load<int>(K_LastVerMinor), load<int>(K_LastVerMicro));
 }
 
 void Settings::setLastVersion(QVersionNumber &ver) {
@@ -661,18 +677,10 @@ PanelPosition Settings::panelPosition() {
 void Settings::setPanelPosition(PanelPosition pos) {
     QString posString;
     switch(pos) {
-        case PANEL_TOP:
-            posString = "top";
-            break;
-        case PANEL_BOTTOM:
-            posString = "bottom";
-            break;
-        case PANEL_LEFT:
-            posString = "left";
-            break;
-        case PANEL_RIGHT:
-            posString = "right";
-            break;
+    case PANEL_TOP: posString = "top"; break;
+    case PANEL_BOTTOM: posString = "bottom"; break;
+    case PANEL_LEFT: posString = "left"; break;
+    case PANEL_RIGHT: posString = "right"; break;
     }
     store(K_PanelPosition, posString);
 }
@@ -735,7 +743,7 @@ void Settings::readShortcuts(QMap<QString, QString> &shortcuts) {
         pair = in[i].split("=");
         if(!pair[0].isEmpty() && !pair[1].isEmpty()) {
             if(pair[1].endsWith("eq"))
-                pair[1]=pair[1].chopped(2) + "=";
+                pair[1] = pair[1].chopped(2) + "=";
             shortcuts.insert(pair[1], pair[0]);
         }
     }
@@ -781,7 +789,7 @@ void Settings::readScripts(QMap<QString, Script> &scripts) {
     }
 
     int size = settingsConf->beginReadArray("script");
-    for(int i=0; i < size; i++) {
+    for(int i = 0; i < size; i++) {
         settingsConf->setArrayIndex(i);
         QString name = settingsConf->value("name").toString();
         Script scr = scriptFromStoredValue(settingsConf->value("value"));
@@ -855,7 +863,7 @@ QStringList Settings::savedPaths() {
     return stateConf->value("savedPaths", QDir::homePath()).toStringList();
 }
 
-void Settings::setSavedPaths(const QStringList& paths) {
+void Settings::setSavedPaths(const QStringList &paths) {
     stateConf->setValue("savedPaths", paths);
 }
 //------------------------------------------------------------------------------
@@ -863,7 +871,7 @@ QStringList Settings::bookmarks() {
     return stateConf->value("bookmarks").toStringList();
 }
 
-void Settings::setBookmarks(const QStringList& paths) {
+void Settings::setBookmarks(const QStringList &paths) {
     stateConf->setValue("bookmarks", paths);
 }
 //------------------------------------------------------------------------------
@@ -1150,7 +1158,7 @@ QString Settings::lastPrinter() {
     return stateConf->value("lastPrinter", "").toString();
 }
 
-void Settings::setLastPrinter(const QString& name) {
+void Settings::setLastPrinter(const QString &name) {
     stateConf->setValue("lastPrinter", name);
 }
 //------------------------------------------------------------------------------
@@ -1198,7 +1206,7 @@ QString Settings::language() {
     return load<QString>(K_Language);
 }
 
-void Settings::setLanguage(const QString& lang) {
+void Settings::setLanguage(const QString &lang) {
     store(K_Language, lang);
 }
 //------------------------------------------------------------------------------
@@ -1217,7 +1225,7 @@ QString Settings::zoomLevels() {
     return settingsConf->value("fixedZoomLevels", defaultZoomLevels()).toString();
 }
 
-void Settings::setZoomLevels(const QString& levels) {
+void Settings::setZoomLevels(const QString &levels) {
     settingsConf->setValue("fixedZoomLevels", levels);
 }
 //------------------------------------------------------------------------------

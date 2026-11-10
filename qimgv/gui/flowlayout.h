@@ -64,9 +64,8 @@ struct GridInfo {
     qreal height;
 };
 
-class FlowLayout : public QGraphicsLayout
-{
-public:
+class FlowLayout : public QGraphicsLayout {
+  public:
     FlowLayout();
     void insertItem(int index, QGraphicsLayoutItem *item);
     void setSpacing(Qt::Orientations o, qreal spacing);
@@ -89,16 +88,16 @@ public:
     int columnOf(int index);
     bool sameRow(int one, int two);
 
-protected:
+  protected:
     QSizeF sizeHint(Qt::SizeHint which, const QSizeF &constraint = QSizeF()) const override;
 
-private:
+  private:
     GridInfo doLayout(const QRectF &geom, bool applyNewGeometry) const;
     QSizeF minSize(const QSizeF &constraint) const;
     QSizeF prefSize() const;
     QSizeF maxSize() const;
 
-    QList<QGraphicsLayoutItem*> m_items;
+    QList<QGraphicsLayoutItem *> m_items;
     qreal m_spacing[2];
     int m_rows, m_columns;
 };

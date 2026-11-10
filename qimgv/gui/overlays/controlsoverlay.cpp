@@ -1,8 +1,6 @@
 #include "controlsoverlay.h"
 
-ControlsOverlay::ControlsOverlay(FloatingWidgetContainer *parent) :
-    FloatingWidget(parent)
-{
+ControlsOverlay::ControlsOverlay(FloatingWidgetContainer *parent) : FloatingWidget(parent) {
     folderViewButton = new ActionButton("folderView", ":/res/icons/common/buttons/panel/folderview20.png", 30);
     folderViewButton->setAccessibleName("ButtonSmall");
     settingsButton = new ActionButton("openSettings", ":/res/icons/common/buttons/panel/settings20.png", 30);
@@ -14,8 +12,8 @@ ControlsOverlay::ControlsOverlay(FloatingWidgetContainer *parent) :
     horizontalLineWidget->setFixedSize(5, 22);
     horizontalLineWidget->setStyleSheet(QString("background-color: #707070; margin-left: 2px; margin-right: 2px"));
 
-    layout.setContentsMargins(0,0,0,0);
-    this->setContentsMargins(0,0,0,0);
+    layout.setContentsMargins(0, 0, 0, 0);
+    this->setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
     layout.addWidget(folderViewButton);
     layout.addWidget(horizontalLineWidget);
@@ -46,7 +44,7 @@ void ControlsOverlay::show() {
 
 QSize ControlsOverlay::contentsSize() {
     QSize newSize(0, 0);
-    for(int i=0; i<layout.count(); i++) {
+    for(int i = 0; i < layout.count(); i++) {
         newSize.setWidth(newSize.width() + layout.itemAt(i)->widget()->width());
         newSize.setHeight(layout.itemAt(i)->widget()->height());
     }

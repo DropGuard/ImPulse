@@ -35,13 +35,17 @@
 // one pool: an active scaling now outranks a background full-res upgrade,
 // where the per-pool isolation of the QThreadPool era never let them compete.
 
-enum class PoolOwner : quint8 { Loader, Scaler, Thumbnailer };
+enum class PoolOwner : quint8 {
+    Loader,
+    Scaler,
+    Thumbnailer
+};
 
 // One job's cancellation state, held by the job and readable by the static
 // helpers its run() delegates into. Passing the handle is not passing ownership:
 // whoever holds one can read it, and only WorkerPool::cancel() can set it.
 class CancelToken {
-public:
+  public:
     bool requested() const {
         return mValue.load(std::memory_order_relaxed);
     }
@@ -49,12 +53,12 @@ public:
         mValue.store(true, std::memory_order_relaxed);
     }
 
-private:
+  private:
     std::atomic_bool mValue{false};
 };
 
 class PoolJob {
-public:
+  public:
     virtual ~PoolJob() = default;
     // runs on a worker thread; never dereferences the settings global —
     // per-request state travels inside the job (LoadPolicy, ScalerRequest)
@@ -67,7 +71,7 @@ public:
         mCancel.request();
     }
 
-protected:
+  protected:
     // The cooperative half: a job decides for itself where it can still be
     // dropped, and the answer is only ever "not yet started" or "not yet at the
     // seam". Nothing here unwinds a call that is already inside a library.
@@ -80,12 +84,12 @@ protected:
         return mCancel;
     }
 
-private:
+  private:
     CancelToken mCancel;
 };
 
 class WorkerPool {
-public:
+  public:
     explicit WorkerPool(int threadCount);
     ~WorkerPool();
     WorkerPool(const WorkerPool &) = delete;
@@ -116,7 +120,7 @@ public:
     void waitForOwner(PoolOwner owner);
     void waitForAll();
 
-private:
+  private:
     struct Entry {
         PoolOwner owner;
         int priority;
@@ -142,7 +146,7 @@ private:
     std::condition_variable workAvailable; // workers wait for submissions
     std::condition_variable idle;          // waitForOwner/waitForAll wait here
     std::deque<Entry> queue;
-    std::deque<Running> running;           // one record per job inside run()
+    std::deque<Running> running; // one record per job inside run()
     unsigned long nextSeq = 0;
     bool stopping = false;
 };

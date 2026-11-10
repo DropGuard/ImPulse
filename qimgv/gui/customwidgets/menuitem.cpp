@@ -1,9 +1,7 @@
 #include "menuitem.h"
 
-MenuItem::MenuItem(QWidget *parent)
-    : QWidget(parent)
-{
-    mLayout.setContentsMargins(6,0,8,0);
+MenuItem::MenuItem(QWidget *parent) : QWidget(parent) {
+    mLayout.setContentsMargins(6, 0, 8, 0);
     mLayout.setSpacing(2);
 
     setAccessibleName("MenuItem");
@@ -25,12 +23,12 @@ MenuItem::MenuItem(QWidget *parent)
     mLayout.addWidget(&mTextLabel);
     mLayout.addSpacerItem(spacer);
     mLayout.addWidget(&mShortcutLabel);
-    mLayout.setStretch(1,1);
+    mLayout.setStretch(1, 1);
 
     setLayout(&mLayout);
 }
 
-void MenuItem::setText(const QString& text) {
+void MenuItem::setText(const QString &text) {
     this->mTextLabel.setText(text);
 }
 
@@ -38,7 +36,7 @@ QString MenuItem::text() {
     return mTextLabel.text();
 }
 
-void MenuItem::setShortcutText(const QString& text) {
+void MenuItem::setShortcutText(const QString &text) {
     this->mShortcutLabel.setText(text);
     this->adjustSize();
 }
@@ -47,7 +45,7 @@ QString MenuItem::shortcut() {
     return mShortcutLabel.text();
 }
 
-void MenuItem::setIconPath(const QString& path) {
+void MenuItem::setIconPath(const QString &path) {
     mIconWidget.setIconPath(path);
 }
 

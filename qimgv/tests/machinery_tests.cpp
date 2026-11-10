@@ -24,15 +24,16 @@ namespace {
 
 // occupies its worker until released, so a test decides what stays queued
 class HoldJob : public PoolJob {
-public:
-    HoldJob(std::atomic_bool *_gate, std::atomic_int *_starts)
-        : gate(_gate), starts(_starts) {}
+  public:
+    HoldJob(std::atomic_bool *_gate, std::atomic_int *_starts) : gate(_gate), starts(_starts) {
+    }
     void run() override {
         starts->fetch_add(1);
         while(!gate->load())
             QThread::msleep(1);
     }
-private:
+
+  private:
     std::atomic_bool *gate;
     std::atomic_int *starts;
 };
@@ -43,11 +44,14 @@ private:
 // DocumentInfo, thumbnailer accounting
 class TestMachinery : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestMachinery() : EngineStackFixture("machinery") {}
+  public:
+    TestMachinery() : EngineStackFixture("machinery") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // Randomizer, Cache and the settings getters fail silently by design: a
     // stuck loop hangs the UI thread, an out-of-bounds index reads garbage, a
@@ -92,8 +96,8 @@ private slots:
         Randomizer shrink;
         shrink.setCount(5);
         for(int i = 0; i < 4; ++i)
-            shrink.next();          // cursor deep inside the vector
-        shrink.setCount(3);         // folder shrank underneath it
+            shrink.next();  // cursor deep inside the vector
+        shrink.setCount(3); // folder shrank underneath it
         for(int i = 0; i < 6; ++i) {
             int v = shrink.next();
             QVERIFY2(v >= 0 && v < 3, "stale cursor survived setCount shrink");
@@ -210,9 +214,8 @@ private slots:
         avif.append(QByteArray(24, '\x00'));
         write("anim.avif", avif);
         QMimeDatabase mimeDb;
-        if(mimeDb.mimeTypeForFile(fixtureDir + "/anim.avif",
-                                  QMimeDatabase::MatchContent).name()
-           == QStringLiteral("image/avif")) {
+        if(mimeDb.mimeTypeForFile(fixtureDir + "/anim.avif", QMimeDatabase::MatchContent).name() ==
+           QStringLiteral("image/avif")) {
             DocumentInfo avifDoc(fixtureDir + "/anim.avif", LoadPolicy::fromSettings());
             QCOMPARE(avifDoc.type(), DocumentType::ANIMATED);
         } else {
@@ -305,8 +308,7 @@ private slots:
         dot.fill(Qt::black);
         const QDateTime now = QDateTime::currentDateTime();
         auto age = [&now](const QString &path, int days) {
-            const struct timespec times[2] = { { 0, UTIME_OMIT },
-                                               { now.addDays(-days).toSecsSinceEpoch(), 0 } };
+            const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-days).toSecsSinceEpoch(), 0}};
             return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
         };
 
@@ -346,13 +348,14 @@ private slots:
         dot.fill(Qt::green);
         const QDateTime now = QDateTime::currentDateTime();
         auto age = [&now](const QString &path, int days) {
-            const struct timespec times[2] = { { 0, UTIME_OMIT },
-                                               { now.addDays(-days).toSecsSinceEpoch(), 0 } };
+            const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-days).toSecsSinceEpoch(), 0}};
             return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
         };
-        auto size = [](const QString &path) { return QFileInfo(path).size(); };
+        auto size = [](const QString &path) {
+            return QFileInfo(path).size();
+        };
         const QString newest = cache.thumbnailPath(QStringLiteral("newest"));
-        const QString older  = cache.thumbnailPath(QStringLiteral("older"));
+        const QString older = cache.thumbnailPath(QStringLiteral("older"));
         const QString older2 = cache.thumbnailPath(QStringLiteral("older2"));
         const QString oldest = cache.thumbnailPath(QStringLiteral("oldest"));
 
@@ -380,7 +383,7 @@ private slots:
         // inside the cap — the two newest are the survivors because they are
         // the two most recently used
         auto overCap = cache.purgeOlderThan(15, twoNewest);
-        QCOMPARE(overCap.idleDropped, 0);      // none of these was idle-expired
+        QCOMPARE(overCap.idleDropped, 0); // none of these was idle-expired
         QCOMPARE(overCap.sizeEvicted, 2);
         QCOMPARE(overCap.bytesAfter, twoNewest);
         QVERIFY(cache.exists(QStringLiteral("newest")));
@@ -396,8 +399,8 @@ private slots:
         QVERIFY(age(cache.thumbnailPath(QStringLiteral("ancient")), 30));
         const qint64 twoPlusAncient = twoNewest + size(cache.thumbnailPath(QStringLiteral("ancient")));
         auto mixed = cache.purgeOlderThan(15, twoPlusAncient - 1);
-        QCOMPARE(mixed.idleDropped, 1);          // the ancient one, by expiry
-        QCOMPARE(mixed.sizeEvicted, 0);          // and the fuse never needed to fire
+        QCOMPARE(mixed.idleDropped, 1); // the ancient one, by expiry
+        QCOMPARE(mixed.sizeEvicted, 0); // and the fuse never needed to fire
         QVERIFY(cache.exists(QStringLiteral("newest")));
         QVERIFY(cache.exists(QStringLiteral("older")));
         QVERIFY(!cache.exists(QStringLiteral("ancient")));
@@ -407,7 +410,7 @@ private slots:
         resetFixture();
         QVERIFY(writeBigImage(fixtureDir + "/tagged.png", "png", QSize(8, 8)));
         auto img = *ImageFactory::createImage(fixtureDir + "/tagged.png", false, loadPolicy());
-        QStringList cmd = { "tool", "%file%" };
+        QStringList cmd = {"tool", "%file%"};
         ScriptManager::processArguments(cmd, img);
         QCOMPARE(cmd.at(1), fixtureDir + "/tagged.png");
     }
@@ -428,10 +431,12 @@ private slots:
         pool.submit(PoolOwner::Scaler, 0, std::make_unique<HoldJob>(&gate, &holds));
         QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 1, 10000);
         Loader loader(pool);
-        QObject::connect(&loader, &Loader::loadFinished, &loader,
-                         [&](std::shared_ptr<Image>, const QString &, bool) { finished.fetch_add(1); });
-        QObject::connect(&loader, &Loader::loadFailed, &loader,
-                         [&](const QString &) { failed.fetch_add(1); });
+        QObject::connect(&loader, &Loader::loadFinished, &loader, [&](std::shared_ptr<Image>, const QString &, bool) {
+            finished.fetch_add(1);
+        });
+        QObject::connect(&loader, &Loader::loadFailed, &loader, [&](const QString &) {
+            failed.fetch_add(1);
+        });
         const QString path = fixtureDir + "/never-decoded.png";
         loader.loadAsync(path, loadPolicy());
         QCOMPARE(loader.isBusy(), true);
@@ -457,8 +462,8 @@ private slots:
         LoadPolicy policy = loadPolicy();
         CancelToken token;
         token.request();
-        auto thumbnail = ThumbnailerRunnable::generate(
-            nullptr, fixtureDir + "/canceled.png", 64, /*crop=*/false, /*force=*/true, policy, &token);
+        auto thumbnail = ThumbnailerRunnable::generate(nullptr, fixtureDir + "/canceled.png", 64, /*crop=*/false,
+                                                       /*force=*/true, policy, &token);
         QVERIFY(thumbnail != nullptr);
         QCOMPARE(thumbnail->size(), 64);
         QVERIFY2(thumbnail->info() == QStringLiteral("error"),
@@ -527,28 +532,28 @@ private slots:
 
     void shortcutBuilderMapsWheelDirection() {
         inputMap = InputMap::getInstance();
-        QWheelEvent down(QPointF(8, 8), QPointF(8, 8), QPoint(), QPoint(0, -120),
-                         Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QWheelEvent down(QPointF(8, 8), QPointF(8, 8), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                         Qt::NoScrollPhase, false);
         QCOMPARE(ShortcutBuilder::fromEvent(&down), QStringLiteral("WheelDown"));
-        QWheelEvent up(QPointF(8, 8), QPointF(8, 8), QPoint(), QPoint(0, 120),
-                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QWheelEvent up(QPointF(8, 8), QPointF(8, 8), QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                       Qt::NoScrollPhase, false);
         QCOMPARE(ShortcutBuilder::fromEvent(&up), QStringLiteral("WheelUp"));
     }
 
     void shortcutBuilderMapsMouseButtonsWithTheirQuirks() {
         inputMap = InputMap::getInstance();
-        QMouseEvent lmb(QEvent::MouseButtonPress, QPointF(1, 1), QPointF(1, 1), Qt::LeftButton,
-                        Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent lmb(QEvent::MouseButtonPress, QPointF(1, 1), QPointF(1, 1), Qt::LeftButton, Qt::LeftButton,
+                        Qt::NoModifier);
         QCOMPARE(ShortcutBuilder::fromEvent(&lmb), QStringLiteral("LMB"));
         QMouseEvent rmbRelease(QEvent::MouseButtonRelease, QPointF(1, 1), QPointF(1, 1), Qt::RightButton,
                                Qt::RightButton, Qt::NoModifier);
         QCOMPARE(ShortcutBuilder::fromEvent(&rmbRelease), QStringLiteral("RMB"));
         // RMB is recognized on release only — a press is deliberately ignored
-        QMouseEvent rmbPress(QEvent::MouseButtonPress, QPointF(1, 1), QPointF(1, 1), Qt::RightButton,
-                             Qt::RightButton, Qt::NoModifier);
+        QMouseEvent rmbPress(QEvent::MouseButtonPress, QPointF(1, 1), QPointF(1, 1), Qt::RightButton, Qt::RightButton,
+                             Qt::NoModifier);
         QCOMPARE(ShortcutBuilder::fromEvent(&rmbPress), QString());
-        QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(1, 1), QPointF(1, 1), Qt::LeftButton,
-                        Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent dbl(QEvent::MouseButtonDblClick, QPointF(1, 1), QPointF(1, 1), Qt::LeftButton, Qt::LeftButton,
+                        Qt::NoModifier);
         QCOMPARE(ShortcutBuilder::fromEvent(&dbl), QStringLiteral("LMB_DoubleClick"));
     }
 
@@ -558,10 +563,10 @@ private slots:
     void imageAnimatedLoadsFramesFromAGif() {
         resetFixture();
         // minimal two-frame GIF89a (PIL-generated at authoring time)
-        const QByteArray gif = QByteArray::fromBase64(
-            "R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACw"
-            "AAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAIBgABCAQ"
-            "QEAA7");
+        const QByteArray gif =
+            QByteArray::fromBase64("R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACw"
+                                   "AAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAIBgABCAQ"
+                                   "QEAA7");
         QFile f(fixtureDir + "/anim.gif");
         QVERIFY(f.open(QIODevice::WriteOnly));
         f.write(gif);
@@ -618,7 +623,7 @@ private slots:
         // exifOrientation() returns QImageReader::transformation()'s flag
         // value, not the raw tag: orientation 6 lands as TransformationRotate90
         QCOMPARE(doc.exifOrientation(), 4); // QImageIOHandler::TransformationRotate90
-        doc.loadExifTags(); // the tag map is lazy
+        doc.loadExifTags();                 // the tag map is lazy
         QVERIFY(!doc.getExifTags().isEmpty());
         // the rational tags' exact strings are exiv2's formatting domain —
         // pinned here: the keys exist and the verbatim strings survive
@@ -652,8 +657,7 @@ private slots:
             result = pix;
             ++delivered;
         });
-        scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png",
-                                           QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
         QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 10000);
         QCOMPARE(result.size(), QSize(32, 32));
     }
@@ -673,12 +677,12 @@ private slots:
         ScalerRequest base(image, QSize(32, 32), p, QI_FILTER_BILINEAR, true);
         QVERIFY2(!(base == ScalerRequest(image, QSize(32, 32), p, QI_FILTER_BILINEAR, false)),
                  "requests that scale differently compare equal: the buffered one would be dropped");
-        QVERIFY(!(base == ScalerRequest(image, QSize(40, 32), p, QI_FILTER_BILINEAR, true)));  // size
-        QVERIFY(!(base == ScalerRequest(image, QSize(32, 32), p, QI_FILTER_NEAREST, true)));   // filter
+        QVERIFY(!(base == ScalerRequest(image, QSize(40, 32), p, QI_FILTER_BILINEAR, true))); // size
+        QVERIFY(!(base == ScalerRequest(image, QSize(32, 32), p, QI_FILTER_NEAREST, true)));  // filter
         auto other = *ImageFactory::createImage(fixtureDir + "/real.png", false, loadPolicy());
-        QVERIFY(!(base == ScalerRequest(other, QSize(32, 32), p, QI_FILTER_BILINEAR, true)));   // image
-        QVERIFY(base == ScalerRequest(image, QSize(32, 32), fixtureDir + "/other.png",
-                                      QI_FILTER_BILINEAR, true));                               // path only
+        QVERIFY(!(base == ScalerRequest(other, QSize(32, 32), p, QI_FILTER_BILINEAR, true))); // image
+        QVERIFY(base ==
+                ScalerRequest(image, QSize(32, 32), fixtureDir + "/other.png", QI_FILTER_BILINEAR, true)); // path only
     }
 
     void threeSynchronousRequestsHandOffExactlyTwice() {
@@ -705,22 +709,18 @@ private slots:
         int delivered = 0;
         QSize gotSize;
         QString gotPath;
-        QObject::connect(&scaler, &Scaler::scalingFinished,
-                         [&](QPixmap pix, ScalerRequest req) {
+        QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap pix, ScalerRequest req) {
             ++delivered;
             gotSize = pix.size();
             gotPath = req.path;
         });
 
-        scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png",
-                                           QI_FILTER_BILINEAR, true));
-        scaler.requestScaled(ScalerRequest(b, QSize(40, 20), fixtureDir + "/b.png",
-                                           QI_FILTER_BILINEAR, true));
-        scaler.requestScaled(ScalerRequest(b, QSize(48, 24), fixtureDir + "/b.png",
-                                           QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(b, QSize(40, 20), fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(b, QSize(48, 24), fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
 
         QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 10000);
-        QCOMPARE(gotSize, QSize(48, 24));   // the last request, not the first
+        QCOMPARE(gotSize, QSize(48, 24)); // the last request, not the first
         QCOMPARE(gotPath, fixtureDir + "/b.png");
         // the middle request (40x20) must never have been scaled and delivered:
         // every hand-off is synchronous above, so nothing can arrive later
@@ -753,8 +753,7 @@ private slots:
             ++delivered;
         });
 
-        scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png",
-                                           QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
 
         cache.trimTo(QStringList{});
         QVERIFY2(cache.contains(a->filePath()),
@@ -790,16 +789,15 @@ private slots:
             QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap, ScalerRequest) {
                 ++delivered;
             });
-            scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png",
-                                               QI_FILTER_BILINEAR, true));
+            scaler.requestScaled(
+                ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
             QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 10000);
         }
 
         // the result travels through a queued hop, which copies the request into
         // a posted event; give that a chance to settle before blaming a holder
         QTest::qWait(100);
-        QVERIFY2(image.use_count() == 1,
-                 "a destroyed Scaler still holds its last request, and the image inside it");
+        QVERIFY2(image.use_count() == 1, "a destroyed Scaler still holds its last request, and the image inside it");
     }
 
     void videoFrameTempFilesDoNotCollideAcrossDirectories() {

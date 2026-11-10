@@ -9,13 +9,15 @@
 #include "sourcecontainers/documentinfo.h"
 
 class Image {
-public:
+  public:
     Image(std::unique_ptr<DocumentInfo>);
     virtual ~Image() = 0;
     virtual std::unique_ptr<QPixmap> getPixmap() = 0;
     // two-tier decode: true when the decoded image is a scaled (screen-res)
     // tier-1 result that still needs a full-res upgrade
-    virtual bool isScaledResult() const { return false; }
+    virtual bool isScaledResult() const {
+        return false;
+    }
     virtual std::shared_ptr<const QImage> getImage() = 0;
     DocumentType type() const;
     const QString &filePath() const;
@@ -26,7 +28,9 @@ public:
     // decode. Differs from size() only when the decode is a scaled tier
     // (JPEG); the title/info surfaces report this so a tier-2 upgrade never
     // rewrites what they show
-    virtual QSize originalSize() { return size(); }
+    virtual QSize originalSize() {
+        return size();
+    }
     virtual bool save(QString destPath, int jpegQuality) = 0;
     QString fileName() const;
     QString baseName() const;
@@ -35,7 +39,7 @@ public:
     QDateTime lastModified() const;
     QMap<QString, QString> getExifTags();
 
-protected:
+  protected:
     virtual void load() = 0;
     std::unique_ptr<DocumentInfo> mDocInfo;
     // "load() has run", NOT "we got pixels": a file we try to open and fail to

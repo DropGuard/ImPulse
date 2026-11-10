@@ -3,14 +3,13 @@
 #include <QObject>
 #include <QWidget>
 
-class SidePanelWidget : public QWidget
-{
+class SidePanelWidget : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit SidePanelWidget(QWidget *parent = nullptr);
 
-signals:
+  signals:
 
-public slots:
+  public slots:
     virtual void show() = 0;
 };

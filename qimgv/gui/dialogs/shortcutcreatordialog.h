@@ -14,22 +14,21 @@ namespace Ui {
 class ShortcutCreatorDialog;
 }
 
-class ShortcutCreatorDialog : public QDialog
-{
+class ShortcutCreatorDialog : public QDialog {
     Q_OBJECT
 
-public:
+  public:
     explicit ShortcutCreatorDialog(QWidget *parent = nullptr);
     ~ShortcutCreatorDialog() override;
     QString selectedAction();
     QString selectedShortcut();
     void setAction(QString);
-    void setShortcut(const QString&);
+    void setShortcut(const QString &);
 
-private slots:
+  private slots:
     void onShortcutEdited();
 
-private:
+  private:
     Ui::ShortcutCreatorDialog *ui;
     QList<QString> actionList, scriptList;
 };

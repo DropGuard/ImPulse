@@ -4,11 +4,14 @@
 // written independently of each other, and the SortingMode -> QIMGV_SORT_* map
 class TestWireFormat : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestWireFormat() : EngineStackFixture("wire-format") {}
+  public:
+    TestWireFormat() : EngineStackFixture("wire-format") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // model.rs::write_listing is the only producer and EngineBridge::parseListing
     // the only consumer, written independently of each other. Drift between them
@@ -41,7 +44,7 @@ private slots:
 
         // field-by-field against the engine's own index-based reader: same
         // source of truth, two independent code paths
-        for (size_t i = 0; i < files.size(); ++i) {
+        for(size_t i = 0; i < files.size(); ++i) {
             EngineBridge::EngineEntry ref;
             QVERIFY(bridge.entryAt(int(i), false, ref));
             QCOMPARE(files[i].name, ref.name);
@@ -74,8 +77,8 @@ private slots:
         QVERIFY(EngineBridge::parseListing(arena, files, dirs));
 
         bool found = false;
-        for (const auto &f : files) {
-            if (f.name == wide) {
+        for(const auto &f : files) {
+            if(f.name == wide) {
                 found = true;
                 QCOMPARE(f.path, fixtureDir + QStringLiteral("/") + wide);
             }
@@ -111,8 +114,7 @@ private slots:
         // and a header that overstates the records is rejected the same way
         const quint32 overstated = fc + 1;
         QByteArray lyingHeader = arena;
-        lyingHeader.replace(0, 4, QByteArray::fromRawData(
-            reinterpret_cast<const char *>(&overstated), 4));
+        lyingHeader.replace(0, 4, QByteArray::fromRawData(reinterpret_cast<const char *>(&overstated), 4));
         QVERIFY(!EngineBridge::parseListing(lyingHeader, files, dirs));
         QVERIFY(files.empty());
         QVERIFY(dirs.empty());
@@ -125,7 +127,7 @@ private slots:
         QByteArray arena;
         arena.resize(8);
         auto *h = reinterpret_cast<unsigned char *>(arena.data());
-        for (int i = 0; i < 4; ++i)
+        for(int i = 0; i < 4; ++i)
             h[i] = 0xff; // file_count = 0xffffffff
         // dir_count stays 0
 

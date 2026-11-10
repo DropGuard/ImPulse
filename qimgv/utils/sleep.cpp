@@ -1,7 +1,7 @@
 #include <QThread>
 
 class Sleeper : public QThread {
-public:
+  public:
     static void usleep(unsigned long usecs) {
         QThread::usleep(usecs);
     }

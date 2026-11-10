@@ -2,15 +2,9 @@
 
 // TODO: this is pretty old. Clean up
 
-CropOverlay::CropOverlay(FloatingWidgetContainer *parent) : FloatingWidget(parent),
-    startPos(QPoint(0, 0)),
-    endPos(QPoint(0, 0)),
-    imageDrawRect(QRect(0, 0, 0, 0)),
-    selectionRect(QRect(0, 0, 0, 0)),
-    lockAspectRatio(false),
-    scale(1.0f),
-    cursorAction(NO_DRAG)
-{
+CropOverlay::CropOverlay(FloatingWidgetContainer *parent)
+    : FloatingWidget(parent), startPos(QPoint(0, 0)), endPos(QPoint(0, 0)), imageDrawRect(QRect(0, 0, 0, 0)),
+      selectionRect(QRect(0, 0, 0, 0)), lockAspectRatio(false), scale(1.0f), cursorAction(NO_DRAG) {
     setMouseTracking(true);
     dpr = devicePixelRatioF();
     handleSize = static_cast<int>(8 * dpr);
@@ -66,10 +60,10 @@ void CropOverlay::setImageScale(float ratio) {
 //------------------------------------------------------------------------------
 void CropOverlay::clearSelection() {
     if(hasSelection()) {
-        startPos = QPoint(0,0);
-        endPos = QPoint(0,0);
-        selectionRect = QRect(0,0,0,0);
-        selectionDrawRect = QRect(0,0,0,0);
+        startPos = QPoint(0, 0);
+        endPos = QPoint(0, 0);
+        selectionRect = QRect(0, 0, 0, 0);
+        selectionDrawRect = QRect(0, 0, 0, 0);
         update();
         emit selectionChanged(selectionRect);
     }
@@ -104,7 +98,7 @@ void CropOverlay::setAspectRatio(QPointF ratio) {
     setLockAspectRatio(true);
     // force resize selection area
     if(hasSelection()) {
-        resizeSelection(QPoint(0,0));
+        resizeSelection(QPoint(0, 0));
         update();
         emit selectionChanged(selectionRect);
     }
@@ -218,31 +212,31 @@ CursorAction CropOverlay::hoverTarget(QPoint pos) {
 //------------------------------------------------------------------------------
 void CropOverlay::setCursorAction(CursorAction action) {
     switch(action) {
-        case DRAG_TOPLEFT:
-        case DRAG_BOTTOMRIGHT: setCursor(QCursor(Qt::SizeFDiagCursor)); break;
-        case DRAG_TOPRIGHT:
-        case DRAG_BOTTOMLEFT: setCursor(QCursor(Qt::SizeBDiagCursor)); break;
-        case DRAG_LEFT:
-        case DRAG_RIGHT: setCursor(QCursor(Qt::SizeHorCursor)); break;
-        case DRAG_TOP:
-        case DRAG_BOTTOM: setCursor(QCursor(Qt::SizeVerCursor)); break;
-        case DRAG_MOVE: setCursor(QCursor(Qt::OpenHandCursor)); break;
-        default: setCursor(QCursor(Qt::ArrowCursor)); break;
+    case DRAG_TOPLEFT:
+    case DRAG_BOTTOMRIGHT: setCursor(QCursor(Qt::SizeFDiagCursor)); break;
+    case DRAG_TOPRIGHT:
+    case DRAG_BOTTOMLEFT: setCursor(QCursor(Qt::SizeBDiagCursor)); break;
+    case DRAG_LEFT:
+    case DRAG_RIGHT: setCursor(QCursor(Qt::SizeHorCursor)); break;
+    case DRAG_TOP:
+    case DRAG_BOTTOM: setCursor(QCursor(Qt::SizeVerCursor)); break;
+    case DRAG_MOVE: setCursor(QCursor(Qt::OpenHandCursor)); break;
+    default: setCursor(QCursor(Qt::ArrowCursor)); break;
     }
 }
 
 //------------------------------------------------------------------------------
 void CropOverlay::setResizeAnchor(CursorAction action) {
     switch(action) {
-        case DRAG_TOPLEFT: resizeAnchor = selectionRect.bottomRight(); break;
-        case DRAG_TOPRIGHT: resizeAnchor = selectionRect.bottomLeft(); break;
-        case DRAG_BOTTOMLEFT: resizeAnchor = selectionRect.topRight(); break;
-        case DRAG_BOTTOMRIGHT: resizeAnchor = selectionRect.topLeft(); break;
-        case DRAG_LEFT: resizeAnchor = selectionRect.topRight(); break;
-        case DRAG_RIGHT:
-        case DRAG_TOP: resizeAnchor = selectionRect.bottomLeft(); break;
-        case DRAG_BOTTOM: resizeAnchor = selectionRect.topLeft(); break;
-        default: break;
+    case DRAG_TOPLEFT: resizeAnchor = selectionRect.bottomRight(); break;
+    case DRAG_TOPRIGHT: resizeAnchor = selectionRect.bottomLeft(); break;
+    case DRAG_BOTTOMLEFT: resizeAnchor = selectionRect.topRight(); break;
+    case DRAG_BOTTOMRIGHT: resizeAnchor = selectionRect.topLeft(); break;
+    case DRAG_LEFT: resizeAnchor = selectionRect.topRight(); break;
+    case DRAG_RIGHT:
+    case DRAG_TOP: resizeAnchor = selectionRect.bottomLeft(); break;
+    case DRAG_BOTTOM: resizeAnchor = selectionRect.topLeft(); break;
+    default: break;
     }
 }
 
@@ -269,71 +263,59 @@ void CropOverlay::resizeSelectionAR(QPoint delta) {
      * same for QRect::right()
      */
     switch(cursorAction) {
-        case DRAG_TOPLEFT:
-            // get max selection size
-            maxSz.setWidth(selectionRect.right() + 1);
-            maxSz.setHeight(selectionRect.bottom() + 1);
-            // apply ar to current size
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            // scale to fit
-            newSz.scale(qMin(newSz.width() - delta.x(), maxSz.width()),
-                        maxSz.height(),
-                        Qt::KeepAspectRatio);
-            // apply
-            selectionRect.setSize(newSz.toSize());
-            // move the corner so it stays in original place
-            selectionRect.moveBottomRight(resizeAnchor);
-            break;
-        case DRAG_TOPRIGHT:
-            maxSz.setWidth(imageRect.width() - selectionRect.left());
-            maxSz.setHeight(selectionRect.bottom() + 1);
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            newSz.scale(qMin(newSz.width() + delta.x(), maxSz.width()),
-                        maxSz.height(),
-                        Qt::KeepAspectRatio);
-            selectionRect.setSize(newSz.toSize());
-            selectionRect.moveBottomLeft(resizeAnchor);
-            break;
-        case DRAG_LEFT:
-        case DRAG_BOTTOMLEFT:
-            maxSz.setWidth(selectionRect.right() + 1);
-            maxSz.setHeight(imageRect.height() - selectionRect.top());
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            newSz.scale(qMin(newSz.width() - delta.x(), maxSz.width()),
-                        maxSz.height(),
-                        Qt::KeepAspectRatio);
-            selectionRect.setSize(newSz.toSize());
-            selectionRect.moveTopRight(resizeAnchor);
-            break;
-        case DRAG_TOP:
-            maxSz.setWidth(imageRect.width() - selectionRect.left());
-            maxSz.setHeight(selectionRect.bottom() + 1);
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            newSz.scale(maxSz.width(),
-                        qMin(newSz.height() - delta.y(), maxSz.height()),
-                        Qt::KeepAspectRatio);
-            selectionRect.setSize(newSz.toSize());
-            selectionRect.moveBottomLeft(resizeAnchor);
-            break;
-        case DRAG_BOTTOM:
-            maxSz.setWidth(imageRect.width() - selectionRect.left());
-            maxSz.setHeight(imageRect.height() - selectionRect.top());
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            newSz.scale(maxSz.width(),
-                        qMin(newSz.height() + delta.y(), maxSz.height()),
-                        Qt::KeepAspectRatio);
-            selectionRect.setSize(newSz.toSize());
-            break;
-        case DRAG_RIGHT:
-        case DRAG_BOTTOMRIGHT:
-        default:
-            maxSz.setWidth(imageRect.width() - selectionRect.left());
-            maxSz.setHeight(imageRect.height() - selectionRect.top());
-            newSz.setHeight(newSz.width() / ar.x() * ar.y());
-            newSz.scale(qMin(newSz.width() + delta.x(), maxSz.width()),
-                        maxSz.height(),
-                        Qt::KeepAspectRatio);
-            selectionRect.setSize(newSz.toSize());
+    case DRAG_TOPLEFT:
+        // get max selection size
+        maxSz.setWidth(selectionRect.right() + 1);
+        maxSz.setHeight(selectionRect.bottom() + 1);
+        // apply ar to current size
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        // scale to fit
+        newSz.scale(qMin(newSz.width() - delta.x(), maxSz.width()), maxSz.height(), Qt::KeepAspectRatio);
+        // apply
+        selectionRect.setSize(newSz.toSize());
+        // move the corner so it stays in original place
+        selectionRect.moveBottomRight(resizeAnchor);
+        break;
+    case DRAG_TOPRIGHT:
+        maxSz.setWidth(imageRect.width() - selectionRect.left());
+        maxSz.setHeight(selectionRect.bottom() + 1);
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        newSz.scale(qMin(newSz.width() + delta.x(), maxSz.width()), maxSz.height(), Qt::KeepAspectRatio);
+        selectionRect.setSize(newSz.toSize());
+        selectionRect.moveBottomLeft(resizeAnchor);
+        break;
+    case DRAG_LEFT:
+    case DRAG_BOTTOMLEFT:
+        maxSz.setWidth(selectionRect.right() + 1);
+        maxSz.setHeight(imageRect.height() - selectionRect.top());
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        newSz.scale(qMin(newSz.width() - delta.x(), maxSz.width()), maxSz.height(), Qt::KeepAspectRatio);
+        selectionRect.setSize(newSz.toSize());
+        selectionRect.moveTopRight(resizeAnchor);
+        break;
+    case DRAG_TOP:
+        maxSz.setWidth(imageRect.width() - selectionRect.left());
+        maxSz.setHeight(selectionRect.bottom() + 1);
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        newSz.scale(maxSz.width(), qMin(newSz.height() - delta.y(), maxSz.height()), Qt::KeepAspectRatio);
+        selectionRect.setSize(newSz.toSize());
+        selectionRect.moveBottomLeft(resizeAnchor);
+        break;
+    case DRAG_BOTTOM:
+        maxSz.setWidth(imageRect.width() - selectionRect.left());
+        maxSz.setHeight(imageRect.height() - selectionRect.top());
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        newSz.scale(maxSz.width(), qMin(newSz.height() + delta.y(), maxSz.height()), Qt::KeepAspectRatio);
+        selectionRect.setSize(newSz.toSize());
+        break;
+    case DRAG_RIGHT:
+    case DRAG_BOTTOMRIGHT:
+    default:
+        maxSz.setWidth(imageRect.width() - selectionRect.left());
+        maxSz.setHeight(imageRect.height() - selectionRect.top());
+        newSz.setHeight(newSz.width() / ar.x() * ar.y());
+        newSz.scale(qMin(newSz.width() + delta.x(), maxSz.width()), maxSz.height(), Qt::KeepAspectRatio);
+        selectionRect.setSize(newSz.toSize());
         break;
     }
 }
@@ -342,32 +324,15 @@ void CropOverlay::resizeSelectionAR(QPoint delta) {
 void CropOverlay::resizeSelectionFree(QPoint delta) {
     // resize
     switch(cursorAction) {
-        case DRAG_TOPLEFT:
-            selectionRect.setTopLeft(selectionRect.topLeft() + delta);
-            break;
-        case DRAG_TOPRIGHT:
-            selectionRect.setTopRight(selectionRect.topRight() + delta);
-            break;
-        case DRAG_BOTTOMLEFT:
-            selectionRect.setBottomLeft(selectionRect.bottomLeft() + delta);
-            break;
-        case DRAG_BOTTOMRIGHT:
-            selectionRect.setBottomRight(selectionRect.bottomRight() + delta);
-            break;
-        case DRAG_LEFT:
-            selectionRect.setLeft(selectionRect.left() + delta.x());
-            break;
-        case DRAG_RIGHT:
-            selectionRect.setRight(selectionRect.right() + delta.x());
-            break;
-        case DRAG_TOP:
-            selectionRect.setTop(selectionRect.top() + delta.y());
-            break;
-        case DRAG_BOTTOM:
-            selectionRect.setBottom(selectionRect.bottom() + delta.y());
-            break;
-        default:
-            break;
+    case DRAG_TOPLEFT: selectionRect.setTopLeft(selectionRect.topLeft() + delta); break;
+    case DRAG_TOPRIGHT: selectionRect.setTopRight(selectionRect.topRight() + delta); break;
+    case DRAG_BOTTOMLEFT: selectionRect.setBottomLeft(selectionRect.bottomLeft() + delta); break;
+    case DRAG_BOTTOMRIGHT: selectionRect.setBottomRight(selectionRect.bottomRight() + delta); break;
+    case DRAG_LEFT: selectionRect.setLeft(selectionRect.left() + delta.x()); break;
+    case DRAG_RIGHT: selectionRect.setRight(selectionRect.right() + delta.x()); break;
+    case DRAG_TOP: selectionRect.setTop(selectionRect.top() + delta.y()); break;
+    case DRAG_BOTTOM: selectionRect.setBottom(selectionRect.bottom() + delta.y()); break;
+    default: break;
     }
     // flip if needed
     if(selectionRect.width() < 0) {
@@ -375,13 +340,13 @@ void CropOverlay::resizeSelectionFree(QPoint delta) {
         selectionRect.setLeft(selectionRect.right());
         selectionRect.setRight(left);
         switch(cursorAction) {
-            case DRAG_TOPLEFT:     cursorAction = DRAG_TOPRIGHT;    break;
-            case DRAG_TOPRIGHT:    cursorAction = DRAG_TOPLEFT;     break;
-            case DRAG_BOTTOMLEFT:  cursorAction = DRAG_BOTTOMRIGHT; break;
-            case DRAG_BOTTOMRIGHT: cursorAction = DRAG_BOTTOMLEFT;  break;
-            case DRAG_LEFT:        cursorAction = DRAG_RIGHT;       break;
-            case DRAG_RIGHT:       cursorAction = DRAG_LEFT;        break;
-            default: break;
+        case DRAG_TOPLEFT: cursorAction = DRAG_TOPRIGHT; break;
+        case DRAG_TOPRIGHT: cursorAction = DRAG_TOPLEFT; break;
+        case DRAG_BOTTOMLEFT: cursorAction = DRAG_BOTTOMRIGHT; break;
+        case DRAG_BOTTOMRIGHT: cursorAction = DRAG_BOTTOMLEFT; break;
+        case DRAG_LEFT: cursorAction = DRAG_RIGHT; break;
+        case DRAG_RIGHT: cursorAction = DRAG_LEFT; break;
+        default: break;
         }
         setCursorAction(cursorAction);
     }
@@ -390,14 +355,13 @@ void CropOverlay::resizeSelectionFree(QPoint delta) {
         selectionRect.setTop(selectionRect.bottom());
         selectionRect.setBottom(top);
         switch(cursorAction) {
-            case DRAG_TOPLEFT:     cursorAction = DRAG_BOTTOMLEFT;  break;
-            case DRAG_TOPRIGHT:    cursorAction = DRAG_BOTTOMRIGHT; break;
-            case DRAG_BOTTOMLEFT:  cursorAction = DRAG_TOPLEFT;     break;
-            case DRAG_BOTTOMRIGHT: cursorAction = DRAG_TOPRIGHT;    break;
-            case DRAG_TOP:         cursorAction = DRAG_BOTTOM;      break;
-            case DRAG_BOTTOM:      cursorAction = DRAG_TOP;         break;
-            default:
-                break;
+        case DRAG_TOPLEFT: cursorAction = DRAG_BOTTOMLEFT; break;
+        case DRAG_TOPRIGHT: cursorAction = DRAG_BOTTOMRIGHT; break;
+        case DRAG_BOTTOMLEFT: cursorAction = DRAG_TOPLEFT; break;
+        case DRAG_BOTTOMRIGHT: cursorAction = DRAG_TOPRIGHT; break;
+        case DRAG_TOP: cursorAction = DRAG_BOTTOM; break;
+        case DRAG_BOTTOM: cursorAction = DRAG_TOP; break;
+        default: break;
         }
         setCursorAction(cursorAction);
     }
@@ -411,17 +375,16 @@ void CropOverlay::updateSelectionDrawRect() {
     selectionDrawRect = selectionRect;
     selectionDrawRect.moveTopLeft(selectionRect.topLeft() * scale + imageDrawRect.topLeft());
     selectionDrawRect.setSize((selectionRect.size() - QSize(1, 1)) * scale);
-    selectionDrawRectDpi = QRect(QPoint(selectionDrawRect.topLeft() / dpr),
-                                 selectionDrawRect.size() / dpr);
+    selectionDrawRectDpi = QRect(QPoint(selectionDrawRect.topLeft() / dpr), selectionDrawRect.size() / dpr);
 }
 
 //------------------------------------------------------------------------------
 // map a point to image coordinate
 QPoint CropOverlay::mapPointToImage(QPoint p) {
     // shift relative to (0,0)
-    if(p.x()<imageDrawRect.x())
+    if(p.x() < imageDrawRect.x())
         p.setX(imageDrawRect.x());
-    if(p.y()<imageDrawRect.y())
+    if(p.y() < imageDrawRect.y())
         p.setY(imageDrawRect.y());
     p.setX(p.x() - imageDrawRect.x());
     p.setY(p.y() - imageDrawRect.y());
@@ -469,11 +432,10 @@ void CropOverlay::mouseMoveEvent(QMouseEvent *event) {
                     cursorAction = DRAG_BOTTOMRIGHT;
                 else
                     cursorAction = DRAG_TOPRIGHT;
+            else if(event->pos().y() > moveStartPos.y())
+                cursorAction = DRAG_BOTTOMLEFT;
             else
-                if(event->pos().y() > moveStartPos.y())
-                    cursorAction = DRAG_BOTTOMLEFT;
-                else
-                    cursorAction = DRAG_TOPLEFT;
+                cursorAction = DRAG_TOPLEFT;
         }
         if(cursorAction == NO_DRAG || cursorAction == SELECTION_START)
             return;
@@ -489,7 +451,7 @@ void CropOverlay::mouseMoveEvent(QMouseEvent *event) {
             updateSelectionDrawRect();
             updateHandlePositions();
             update();
-        /*} else if(cursorAction == NO_DRAG || cursorAction == SELECTION_START) {
+            /*} else if(cursorAction == NO_DRAG || cursorAction == SELECTION_START) {
             // unneeded?
             endPos = event->pos();
             //build selection rectangle
@@ -542,17 +504,13 @@ void CropOverlay::updateHandlePositions() {
     // bottom right
     handles[3].moveBottomRight(selectionDrawRect.bottomRight() + QPoint(1, 1));
     // left
-    handles[4].moveTopLeft(QPoint(selectionDrawRect.left(),
-                                   selectionDrawRect.center().y() - handleSize));
+    handles[4].moveTopLeft(QPoint(selectionDrawRect.left(), selectionDrawRect.center().y() - handleSize));
     // right
-    handles[5].moveTopRight(QPoint(selectionDrawRect.right() + 1,
-                                    selectionDrawRect.center().y() - handleSize));
+    handles[5].moveTopRight(QPoint(selectionDrawRect.right() + 1, selectionDrawRect.center().y() - handleSize));
     // top
-    handles[6].moveTopLeft(QPoint(selectionDrawRect.center().x() - handleSize,
-                                   selectionDrawRect.top()));
+    handles[6].moveTopLeft(QPoint(selectionDrawRect.center().x() - handleSize, selectionDrawRect.top()));
     // bottom
-    handles[7].moveBottomLeft(QPoint(selectionDrawRect.center().x() - handleSize,
-                                      selectionDrawRect.bottom() + 1));
+    handles[7].moveBottomLeft(QPoint(selectionDrawRect.center().x() - handleSize, selectionDrawRect.bottom() + 1));
     for(int i = 0; i < 8; i++) {
         handlesDpi[i] = QRectF(handles[i].topLeft() / dpr, handles[i].size() / dpr);
     }
@@ -617,5 +575,5 @@ void CropOverlay::resizeEvent(QResizeEvent *event) {
 
 //------------------------------------------------------------------------------
 void CropOverlay::recalculateGeometry() {
-    setGeometry(0,0, containerSize().width(), containerSize().height());
+    setGeometry(0, 0, containerSize().width(), containerSize().height());
 }

@@ -13,32 +13,31 @@ namespace Ui {
 class RenameOverlay;
 }
 
-class RenameOverlay : public OverlayWidget
-{
+class RenameOverlay : public OverlayWidget {
     Q_OBJECT
 
-public:
+  public:
     explicit RenameOverlay(FloatingWidgetContainer *parent);
     ~RenameOverlay() override;
 
-public slots:
-    void setName(const QString& name);
+  public slots:
+    void setName(const QString &name);
     void setBackdropEnabled(bool mode);
     void show();
     void hide();
-signals:
+  signals:
     void renameRequested(QString name);
 
-protected:
+  protected:
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void recalculateGeometry() override;
 
-private slots:
+  private slots:
     void rename();
     void onCancel();
 
-private:
+  private:
     Ui::RenameOverlay *ui;
     bool backdrop = false;
     QString origName;

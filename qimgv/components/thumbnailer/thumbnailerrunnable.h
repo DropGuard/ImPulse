@@ -15,13 +15,14 @@
 
 class ThumbnailerRunnable : public QObject, public PoolJob {
     Q_OBJECT
-public:
-    ThumbnailerRunnable(ThumbnailCache* _cache, QString _path, int _size, bool _crop, bool _force,
+  public:
+    ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
                         const LoadPolicy &_policy);
     ~ThumbnailerRunnable() override;
     void run() override;
-    static std::shared_ptr<Thumbnail> generate(ThumbnailCache *cache, const QString& path, int size, bool crop, bool force,
-                                               const LoadPolicy &policy, const CancelToken *cancel = nullptr);
+    static std::shared_ptr<Thumbnail> generate(ThumbnailCache *cache, const QString &path, int size, bool crop,
+                                               bool force, const LoadPolicy &policy,
+                                               const CancelToken *cancel = nullptr);
     // The frame a video decode writes out lands in a shared directory, so its
     // name must be unique per SOURCE PATH, SIZE and CROP — two presenters (or
     // two processes) extracting the same clip concurrently used to hand two
@@ -37,12 +38,14 @@ public:
     // what the synchronous Thumbnailer::getThumbnail does. Public static for the
     // same reason as above — a test pins it against a real process.
     static void waitForProcess(QProcess &process, const CancelToken *cancel, int timeoutMs);
-private:
-    static QString generateIdString(const QString& path, int size, bool crop);
-    static std::pair<std::unique_ptr<QImage>, QSize> createThumbnail(const QString& path, const char* format, int size, bool crop,
-                                                                     const CancelToken *cancel);
-    static std::pair<std::unique_ptr<QImage>, QSize> createVideoThumbnail(const QString& path, int size, bool crop,
-                                                                          const QString &tmpDir, const QString &mpvBinary,
+
+  private:
+    static QString generateIdString(const QString &path, int size, bool crop);
+    static std::pair<std::unique_ptr<QImage>, QSize> createThumbnail(const QString &path, const char *format, int size,
+                                                                     bool crop, const CancelToken *cancel);
+    static std::pair<std::unique_ptr<QImage>, QSize> createVideoThumbnail(const QString &path, int size, bool crop,
+                                                                          const QString &tmpDir,
+                                                                          const QString &mpvBinary,
                                                                           const CancelToken *cancel);
     QString path;
     int size;
@@ -50,9 +53,9 @@ private:
     // the environment, carried from the dispatch site: the pool thread never
     // reads the settings global
     LoadPolicy policy;
-    ThumbnailCache* cache = nullptr;
+    ThumbnailCache *cache = nullptr;
 
-signals:
+  signals:
     void taskStart(QString, int);
     void taskEnd(std::shared_ptr<Thumbnail>, QString, bool crop);
 };

@@ -14,7 +14,7 @@ class QSocketNotifier;
 // Engine calls never block the UI thread.
 class EngineBridge : public QObject {
     Q_OBJECT
-public:
+  public:
     struct EngineEntry {
         QString name, path;
         quint64 size = 0;
@@ -59,8 +59,7 @@ public:
     // this consumer can be round-tripped against each other in a test.
     // Returns false unless the record counts and the arena agree exactly —
     // a truncated tail or producer/consumer drift.
-    static bool parseListing(const QByteArray &arena, std::vector<EngineEntry> &files,
-                             std::vector<EngineEntry> &dirs);
+    static bool parseListing(const QByteArray &arena, std::vector<EngineEntry> &files, std::vector<EngineEntry> &dirs);
 
     // Joins the engine's extension whitelist wire format ('\n'-separated).
     // Pure: the formats come in, so tests can pin the seam where an empty
@@ -84,20 +83,20 @@ public:
     void thumbClear();
     void thumbConfig(int maxInFlight);
 
-signals:
+  signals:
     void dirListed(const QString &dirPath);
     void openFailed(const QString &dirPath, int statusCode);
     void dirMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
                     const QString &oldPath);
     void thumbNext(const QString &path, int size, bool crop);
 
-private:
+  private:
     static void notifyCb(void *user);
 
-private slots:
+  private slots:
     void drainEvents();
 
-private:
+  private:
     qimgv_engine *engine = nullptr;
     int eventFd = -1;
     QSocketNotifier *notifier = nullptr;

@@ -7,16 +7,15 @@
 #include "gui/customwidgets/floatingwidget.h"
 #include "gui/customwidgets/actionbutton.h"
 
-class ControlsOverlay : public FloatingWidget
-{
+class ControlsOverlay : public FloatingWidget {
     Q_OBJECT
-public:
+  public:
     explicit ControlsOverlay(FloatingWidgetContainer *parent);
 
-public slots:
+  public slots:
     void show();
 
-private:
+  private:
     QHBoxLayout layout;
     ActionButton *closeButton, *settingsButton, *folderViewButton;
     QGraphicsOpacityEffect *fadeEffect;
@@ -24,7 +23,7 @@ private:
     QSize contentsSize();
     void fitToContents();
 
-protected:
+  protected:
     void recalculateGeometry() override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;

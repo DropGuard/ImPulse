@@ -13,7 +13,7 @@
 #include <QDebug>
 
 class VideoPlayerInitProxy : public VideoPlayer {
-public:
+  public:
     VideoPlayerInitProxy(QWidget *parent = nullptr);
     ~VideoPlayerInitProxy() override;
     bool showVideo(QString file) override;
@@ -38,14 +38,14 @@ public:
     void installEventFilter(QObject *filterObj);
     void removeEventFilter(QObject *filterObj);
 
-public slots:
+  public slots:
     void show() override;
     void hide() override;
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
 
-private:
+  private:
     QLibrary playerLib;
     VideoPlayer *player = nullptr;
     bool initPlayer();
@@ -56,12 +56,11 @@ private:
     QString libFile;
     QStringList libDirs;
 
-private slots:
+  private slots:
     void onSettingsChanged();
 
-// playbackFinished() comes from VideoPlayer — re-declaring it here would
-// make this class' signal a different one, and consumers connect through
-// &VideoPlayer::playbackFinished (viewerwidget.cpp:53). A re-declaration is
-// silent: the base-pointer connection receives nothing. Rule R6.
-
+    // playbackFinished() comes from VideoPlayer — re-declaring it here would
+    // make this class' signal a different one, and consumers connect through
+    // &VideoPlayer::playbackFinished (viewerwidget.cpp:53). A re-declaration is
+    // silent: the base-pointer connection receives nothing. Rule R6.
 };

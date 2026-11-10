@@ -1,0 +1,24 @@
+# Derived from the tree's own style (2026-11-10): no preset fit (closest,
+# WebKit, rewrote 18.5k lines; this config's initial pass was 7.5k, all
+# whitespace). The knobs below keep the formatter in pure-whitespace
+# territory — anything that touches tokens is disabled:
+#   SortIncludes — include order is load-bearing (implicit-context rule)
+#   BreakStringLiterals — test fixtures carry long base64/command strings
+#   FixNamespaceComments / ReflowComments — the formatter writes no prose
+#   AllowShort* — the tree's multiline functions/enums/lambdas are the majority
+BasedOnStyle: LLVM
+IndentWidth: 4
+BreakBeforeBraces: Attach
+PointerAlignment: Right
+DerivePointerAlignment: false
+SpaceBeforeParens: Never
+IndentCaseLabels: false
+AllowShortCaseLabelsOnASingleLine: true
+ColumnLimit: 120
+SortIncludes: Never
+FixNamespaceComments: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortEnumsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+ReflowComments: false
+BreakStringLiterals: false

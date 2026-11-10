@@ -1,14 +1,11 @@
 #include "changelogwindow.h"
 #include "ui_changelogwindow.h"
 
-ChangelogWindow::ChangelogWindow(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::ChangelogWindow)
-{
+ChangelogWindow::ChangelogWindow(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::ChangelogWindow) {
     ui->setupUi(this);
     hide();
     setPosition(FloatingWidgetPosition::CENTER);
-    connect(ui->closeButton, &QPushButton::pressed,  this, &ChangelogWindow::hide);
+    connect(ui->closeButton, &QPushButton::pressed, this, &ChangelogWindow::hide);
     connect(ui->shutUpButton, &QPushButton::pressed, this, &ChangelogWindow::hideAndShutUp);
 
     if(parent)
@@ -24,7 +21,7 @@ ChangelogWindow::~ChangelogWindow() {
     delete ui;
 }
 
-void ChangelogWindow::setText(const QString& text) {
+void ChangelogWindow::setText(const QString &text) {
     ui->textBrowser->setText(text);
 }
 

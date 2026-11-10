@@ -16,17 +16,17 @@
 #include "gui/folderview/fvoptionspopup.h"
 
 namespace Ui {
-    class FolderView;
+class FolderView;
 }
 
 class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     Q_OBJECT
     Q_INTERFACES(IDirectoryView)
-public:
+  public:
     explicit FolderView(QWidget *parent = nullptr);
     ~FolderView() override;
 
-public slots:
+  public slots:
     void show();
     void hide();
     void populate(int) override;
@@ -46,18 +46,17 @@ public slots:
     void onFullscreenModeChanged(bool mode);
     void onSortingChanged(SortingMode mode);
 
-
-protected:
+  protected:
     void wheelEvent(QWheelEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void paintEvent(QPaintEvent *) override;
     void resizeEvent(QResizeEvent *event) override;
 
-protected slots:
+  protected slots:
     void onThumbnailSizeChanged(int newSize);
     void onZoomSliderValueChanged(int value);
 
-signals:
+  signals:
     void itemActivated(int) override;
     void thumbnailsRequested(QList<int>, int, bool, bool) override;
     void draggedOut() override;
@@ -66,10 +65,10 @@ signals:
     void showFoldersChanged(bool mode);
     void copyUrlsRequested(QList<QString>, QString path);
     void moveUrlsRequested(QList<QString>, QString path);
-    void droppedInto(const QMimeData*, QObject*, int) override;
+    void droppedInto(const QMimeData *, QObject *, int) override;
     void draggedOver(int) override;
 
-private slots:
+  private slots:
     void onSortingSelected(int);
     void readSettings();
 
@@ -92,7 +91,7 @@ private slots:
     void onRootBtn();
     void onTreeViewTabOut();
 
-private:
+  private:
     Ui::FolderView *ui;
     FileSystemModelCustom *dirModel;
     FVOptionsPopup *optionsPopup;

@@ -4,11 +4,14 @@
 // extension list the FFI is handed
 class TestInfra : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestInfra() : EngineStackFixture("test-infra") {}
+  public:
+    TestInfra() : EngineStackFixture("test-infra") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     void bridgeInstancesAreIsolated() {
         // the old singleton forced every test through one engine, one watch
@@ -44,8 +47,7 @@ private slots:
     void extensionListForJoinsFormatsAndEmptiesToAcceptAll() {
         // the seam where an empty whitelist once meant "accept nothing"
         // against the header's documented NULL contract
-        QCOMPARE(EngineBridge::extensionListFor({QByteArray("jpg"), QByteArray("png")}),
-                 QByteArray("jpg\npng"));
+        QCOMPARE(EngineBridge::extensionListFor({QByteArray("jpg"), QByteArray("png")}), QByteArray("jpg\npng"));
         QCOMPARE(EngineBridge::extensionListFor({}), QByteArray());
     }
 };

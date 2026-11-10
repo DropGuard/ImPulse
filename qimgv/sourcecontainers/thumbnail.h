@@ -5,14 +5,15 @@
 #include <memory>
 
 class Thumbnail {
-public:
+  public:
     Thumbnail(QString _name, QString _info, int _size, std::shared_ptr<QPixmap> _pixmap);
     const QString &name();
     const QString &info();
     int size();
     bool hasAlphaChannel();
     std::shared_ptr<QPixmap> pixmap();
-private:
+
+  private:
     QString mName, mInfo;
     std::shared_ptr<QPixmap> mPixmap;
     int mSize;

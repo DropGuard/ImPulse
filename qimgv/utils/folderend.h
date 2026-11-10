@@ -10,9 +10,9 @@
 namespace FolderEnd {
 
 enum class Outcome {
-    LoadIndex,            // an image in this folder, at `index`
-    EnterAdjacentFolder,  // leave for the next / previous sibling folder
-    ReportBoundary        // nothing configured: there is nothing beyond this edge
+    LoadIndex,           // an image in this folder, at `index`
+    EnterAdjacentFolder, // leave for the next / previous sibling folder
+    ReportBoundary       // nothing configured: there is nothing beyond this edge
 };
 
 struct Decision {

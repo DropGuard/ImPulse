@@ -4,7 +4,7 @@
 #include "sourcecontainers/image.h"
 
 class CacheItem {
-public:
+  public:
     CacheItem();
     explicit CacheItem(std::shared_ptr<Image> _contents);
 
@@ -14,8 +14,8 @@ public:
     void unlock();
 
     int lockStatus();
-private:
+
+  private:
     std::shared_ptr<Image> contents;
     QSemaphore sem;
 };
-

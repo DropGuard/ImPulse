@@ -1,11 +1,7 @@
 #include "overlaywidget.h"
 
 OverlayWidget::OverlayWidget(FloatingWidgetContainer *parent)
-    : FloatingWidget(parent),
-      mHorizontalMargin(20),
-      mVerticalMargin(35),
-      fadeEnabled(false)
-{
+    : FloatingWidget(parent), mHorizontalMargin(20), mVerticalMargin(35), fadeEnabled(false) {
     opacityEffect = new QGraphicsOpacityEffect(this);
     opacityEffect->setOpacity(1.0);
     this->setGraphicsEffect(opacityEffect);
@@ -86,44 +82,44 @@ void OverlayWidget::hide() {
 }
 
 void OverlayWidget::recalculateGeometry() {
-    QRect newRect = QRect(QPoint(0,0), sizeHint());
+    QRect newRect = QRect(QPoint(0, 0), sizeHint());
     QPoint pos(0, 0);
-    switch (position) {
-        case FloatingWidgetPosition::LEFT:
-            pos.setX(mHorizontalMargin);
-            pos.setY( (containerSize().height() - newRect.height()) / 2);
-            break;
-        case FloatingWidgetPosition::RIGHT:
-            pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
-            pos.setY( (containerSize().height() - newRect.height()) / 2);
-            break;
-        case FloatingWidgetPosition::BOTTOM:
-            pos.setX( (containerSize().width() - newRect.width()) / 2);
-            pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::TOP:
-            pos.setX( (containerSize().width() - newRect.width()) / 2);
-            pos.setY(mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::TOPLEFT:
-            pos.setX(mHorizontalMargin);
-            pos.setY(mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::TOPRIGHT:
-            pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
-            pos.setY(mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::BOTTOMLEFT:
-            pos.setX(mHorizontalMargin);
-            pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::BOTTOMRIGHT:
-            pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
-            pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
-            break;
-        case FloatingWidgetPosition::CENTER:
-            pos.setX( (containerSize().width() - newRect.width()) / 2);
-            pos.setY( (containerSize().height() - newRect.height()) / 2);
+    switch(position) {
+    case FloatingWidgetPosition::LEFT:
+        pos.setX(mHorizontalMargin);
+        pos.setY((containerSize().height() - newRect.height()) / 2);
+        break;
+    case FloatingWidgetPosition::RIGHT:
+        pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
+        pos.setY((containerSize().height() - newRect.height()) / 2);
+        break;
+    case FloatingWidgetPosition::BOTTOM:
+        pos.setX((containerSize().width() - newRect.width()) / 2);
+        pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::TOP:
+        pos.setX((containerSize().width() - newRect.width()) / 2);
+        pos.setY(mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::TOPLEFT:
+        pos.setX(mHorizontalMargin);
+        pos.setY(mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::TOPRIGHT:
+        pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
+        pos.setY(mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::BOTTOMLEFT:
+        pos.setX(mHorizontalMargin);
+        pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::BOTTOMRIGHT:
+        pos.setX(containerSize().width() - newRect.width() - mHorizontalMargin);
+        pos.setY(containerSize().height() - newRect.height() - mVerticalMargin);
+        break;
+    case FloatingWidgetPosition::CENTER:
+        pos.setX((containerSize().width() - newRect.width()) / 2);
+        pos.setY((containerSize().height() - newRect.height()) / 2);
     }
     // apply position
     newRect.moveTopLeft(pos);

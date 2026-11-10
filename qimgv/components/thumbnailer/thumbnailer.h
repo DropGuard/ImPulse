@@ -6,10 +6,9 @@
 #include "components/workerpool/workerpool.h"
 #include "settings.h"
 
-class Thumbnailer : public QObject
-{
+class Thumbnailer : public QObject {
     Q_OBJECT
-public:
+  public:
     // The pool and the bridge are required, not defaulted: production names
     // the shared pool and the process-wide bridge at the construction site,
     // tests name their isolated ones. A default lets every call site keep the
@@ -20,10 +19,10 @@ public:
     void clearTasks();
     void waitForDone();
 
-public slots:
-    void getThumbnailAsync(const QString& path, int size, bool crop, bool force);
+  public slots:
+    void getThumbnailAsync(const QString &path, int size, bool crop, bool force);
 
-private:
+  private:
     EngineBridge &mBridge;
     WorkerPool &pool;
     ThumbnailCache *cache;
@@ -35,11 +34,11 @@ private:
     QHash<QString, bool> mPendingForce;
     bool mBatchStart = true;
 
-private slots:
-    void onTaskStart(const QString& filePath, int size);
-    void onTaskEnd(const std::shared_ptr<Thumbnail>& thumbnail, const QString& filePath, bool crop);
-    void onThumbNext(const QString& filePath, int size, bool crop);
+  private slots:
+    void onTaskStart(const QString &filePath, int size);
+    void onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath, bool crop);
+    void onThumbNext(const QString &filePath, int size, bool crop);
 
-signals:
+  signals:
     void thumbnailReady(std::shared_ptr<Thumbnail> thumbnail, QString filePath);
 };

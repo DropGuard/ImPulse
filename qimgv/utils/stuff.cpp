@@ -17,7 +17,7 @@ int probeOS() {
 #endif
 }
 
-StdString toStdString(const QString& str) {
+StdString toStdString(const QString &str) {
 #ifdef _WIN32
     return str.toStdWString();
 #else

@@ -48,16 +48,15 @@ enum ActiveSidePanel {
     SIDEPANEL_NONE
 };
 
-class MW : public FloatingWidgetContainer, public IUserInteractions
-{
+class MW : public FloatingWidgetContainer, public IUserInteractions {
     Q_OBJECT
-public:
+  public:
     explicit MW(State *state, QWidget *parent = nullptr);
     ~MW() override;
     bool isCropPanelActive();
-    void onScalingFinished(std::unique_ptr<QPixmap>scaled);
+    void onScalingFinished(std::unique_ptr<QPixmap> scaled);
     void showImage(std::unique_ptr<QPixmap> pixmap);
-    void showAnimation(const std::shared_ptr<QMovie>& movie);
+    void showAnimation(const std::shared_ptr<QMovie> &movie);
     void showVideo(const QString &file);
 
     void setExifInfo(const QMap<QString, QString> &exifInfo);
@@ -66,10 +65,11 @@ public:
 
     ViewMode currentViewMode();
 
-    bool showConfirmation(const QString& title, const QString& msg) override;
-    DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode, bool multiple) override;
+    bool showConfirmation(const QString &title, const QString &msg) override;
+    DialogResult fileReplaceDialog(const QString &source, const QString &target, FileReplaceMode mode,
+                                   bool multiple) override;
 
-private:
+  private:
     // the parent tree owns every widget; these observe. See the rule comment
     // at mainpanel.cpp ("The pointer here only observes"), generalized here.
     ViewerWidget *viewerWidget = nullptr;
@@ -121,7 +121,7 @@ private:
     void preShowResize(QSize sz);
     void setInteractionEnabled(bool mode);
 
-private slots:
+  private slots:
     void updateCurrentDisplay();
     void readSettings();
     void adaptToWindowState();
@@ -129,7 +129,7 @@ private slots:
     void refreshInfoViews();
     void showScriptSettings();
 
-protected:
+  protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     bool event(QEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
@@ -144,8 +144,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
 
-   // bool focusNextPrevChild(bool);
-signals:
+    // bool focusNextPrevChild(bool);
+  signals:
     void opened(QString);
     void fullscreenStateChanged(bool);
     void copyRequested(QString);
@@ -183,12 +183,12 @@ signals:
     void volumeUp();
     void volumeDown();
     void toggleTransparencyGrid();
-    void droppedIn(const QMimeData*, QObject*);
+    void droppedIn(const QMimeData *, QObject *);
     void draggedOut();
     void setLoopPlayback(bool);
     void playbackFinished();
 
-public slots:
+  public slots:
     void setupFullUi();
     void showDefault();
     void showCropPanel();
@@ -196,9 +196,9 @@ public slots:
     void toggleFolderView();
     void enableFolderView();
     void enableDocumentView();
-    void showOpenDialog(const QString& path);
+    void showOpenDialog(const QString &path);
     void showSaveDialog(const QString &filePath);
-    QString getSaveFileName(const QString& fileName);
+    QString getSaveFileName(const QString &fileName);
     void showResizeDialog(QSize initialSize);
     void showSettings();
     void triggerFullScreen();

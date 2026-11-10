@@ -29,8 +29,7 @@ int main(int argc, char **argv) {
     // the leftovers of runs whose process is gone. Sweeping the whole base was
     // wrong: it deletes the directories a concurrently running instance is
     // watching, which shows up later as a listing that fails or goes stale.
-    const QString base = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
-                         + "/qimgv-engine-stack-test";
+    const QString base = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/qimgv-engine-stack-test";
     const QString mine = base + "/pid" + QString::number(QCoreApplication::applicationPid());
     QDir(mine).removeRecursively();
     QDir(base).mkpath(QFileInfo(mine).fileName());
@@ -40,17 +39,9 @@ int main(int argc, char **argv) {
             QDir(base + "/" + stale).removeRecursively();
     int failures = 0;
     int (*const runs[])(int, char **) = {
-        runListingTests,
-        runWireFormatTests,
-        runFolderBoundaryTests,
-        runDecodeTests,
-        runSettingsTableTests,
-        runFileLogTests,
-        runMachineryTests,
-        runWorkerPoolTests,
-        runFileOpsTests,
-        runImageOpsTests,
-        runInfraTests,
+        runListingTests,       runWireFormatTests, runFolderBoundaryTests, runDecodeTests,
+        runSettingsTableTests, runFileLogTests,    runMachineryTests,      runWorkerPoolTests,
+        runFileOpsTests,       runImageOpsTests,   runInfraTests,
     };
     // One process per class. Not for parallelism and not primarily for crash
     // isolation: QtTest starts a WatchDog QThread per class and joins it at

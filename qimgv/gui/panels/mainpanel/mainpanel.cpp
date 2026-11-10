@@ -3,13 +3,13 @@
 MainPanel::MainPanel(FloatingWidgetContainer *parent) : SlidePanel(parent) {
     // buttons stuff
     buttonsWidget.setAccessibleName("panelButtonsWidget");
-    openButton       = new ActionButton("open", ":res/icons/common/buttons/panel/open20.png", 30, this);
+    openButton = new ActionButton("open", ":res/icons/common/buttons/panel/open20.png", 30, this);
     openButton->setAccessibleName("ButtonSmall");
     openButton->setTriggerMode(TriggerMode::PressTrigger);
-    settingsButton   = new ActionButton("openSettings", ":res/icons/common/buttons/panel/settings20.png", 30, this);
+    settingsButton = new ActionButton("openSettings", ":res/icons/common/buttons/panel/settings20.png", 30, this);
     settingsButton->setAccessibleName("ButtonSmall");
     settingsButton->setTriggerMode(TriggerMode::PressTrigger);
-    exitButton       = new ActionButton("exit", ":res/icons/common/buttons/panel/close16.png", 30, this);
+    exitButton = new ActionButton("exit", ":res/icons/common/buttons/panel/close16.png", 30, this);
     exitButton->setAccessibleName("ButtonSmall");
     exitButton->setTriggerMode(TriggerMode::PressTrigger);
     folderViewButton = new ActionButton("folderView", ":res/icons/common/buttons/panel/folderview20.png", 30, this);
@@ -64,25 +64,25 @@ void MainPanel::onPinClicked() {
 void MainPanel::setPosition(PanelPosition p) {
     SlidePanel::setPosition(p);
     switch(p) {
-        case PANEL_TOP:
-            buttonsLayout->setDirection(QBoxLayout::BottomToTop);
-            layout()->setContentsMargins(0,0,0,1);
-            buttonsLayout->setContentsMargins(4,0,0,0);
+    case PANEL_TOP:
+        buttonsLayout->setDirection(QBoxLayout::BottomToTop);
+        layout()->setContentsMargins(0, 0, 0, 1);
+        buttonsLayout->setContentsMargins(4, 0, 0, 0);
         break;
-        case PANEL_BOTTOM:
-            buttonsLayout->setDirection(QBoxLayout::BottomToTop);
-            layout()->setContentsMargins(0,3,0,0);
-            buttonsLayout->setContentsMargins(4,0,0,0);
+    case PANEL_BOTTOM:
+        buttonsLayout->setDirection(QBoxLayout::BottomToTop);
+        layout()->setContentsMargins(0, 3, 0, 0);
+        buttonsLayout->setContentsMargins(4, 0, 0, 0);
         break;
-        case PANEL_LEFT:
-            buttonsLayout->setDirection(QBoxLayout::LeftToRight);
-            layout()->setContentsMargins(0,0,1,0);
-            buttonsLayout->setContentsMargins(0,0,0,4);
+    case PANEL_LEFT:
+        buttonsLayout->setDirection(QBoxLayout::LeftToRight);
+        layout()->setContentsMargins(0, 0, 1, 0);
+        buttonsLayout->setContentsMargins(0, 0, 0, 4);
         break;
-        case PANEL_RIGHT:
-            buttonsLayout->setDirection(QBoxLayout::LeftToRight);
-            layout()->setContentsMargins(1,0,0,0);
-            buttonsLayout->setContentsMargins(0,0,0,4);
+    case PANEL_RIGHT:
+        buttonsLayout->setDirection(QBoxLayout::LeftToRight);
+        layout()->setContentsMargins(1, 0, 0, 0);
+        buttonsLayout->setContentsMargins(0, 0, 0, 4);
         break;
     }
     recalculateGeometry();
@@ -107,15 +107,11 @@ QSize MainPanel::sizeHint() const {
         return QSize(0, 0);
     // item size + spacing + scrollbar + border
     switch(settings->panelPosition()) {
-        case PANEL_TOP:
-            return QSize(width(), thumbnailStrip->itemSize().height() + 16);
-        case PANEL_BOTTOM:
-            return QSize(width(), thumbnailStrip->itemSize().height() + 16 + 3);
-        case PANEL_LEFT:
-        case PANEL_RIGHT:
-            return QSize(thumbnailStrip->itemSize().width() + 16, height());
-        default:
-            return QSize(0, 0);
+    case PANEL_TOP: return QSize(width(), thumbnailStrip->itemSize().height() + 16);
+    case PANEL_BOTTOM: return QSize(width(), thumbnailStrip->itemSize().height() + 16 + 3);
+    case PANEL_LEFT:
+    case PANEL_RIGHT: return QSize(thumbnailStrip->itemSize().width() + 16, height());
+    default: return QSize(0, 0);
     }
 }
 
@@ -146,18 +142,12 @@ void MainPanel::paintEvent(QPaintEvent *event) {
     QPainter p(this);
     p.setPen(settings->colorScheme().folderview_hc);
     switch(mPosition) {
-        case PANEL_TOP:
-            p.drawLine(rect().bottomLeft(), rect().bottomRight());
+    case PANEL_TOP: p.drawLine(rect().bottomLeft(), rect().bottomRight()); break;
+    case PANEL_BOTTOM:
+        p.fillRect(rect().left(), rect().top(), width(), 3, settings->colorScheme().folderview);
+        p.drawLine(rect().topLeft(), rect().topRight());
         break;
-        case PANEL_BOTTOM:
-            p.fillRect(rect().left(), rect().top(), width(), 3, settings->colorScheme().folderview);
-            p.drawLine(rect().topLeft(), rect().topRight());
-        break;
-        case PANEL_LEFT:
-            p.drawLine(rect().topRight(), rect().bottomRight());
-        break;
-        case PANEL_RIGHT:
-            p.drawLine(rect().topLeft(), rect().bottomLeft());
-        break;
+    case PANEL_LEFT: p.drawLine(rect().topRight(), rect().bottomRight()); break;
+    case PANEL_RIGHT: p.drawLine(rect().topLeft(), rect().bottomLeft()); break;
     }
 }

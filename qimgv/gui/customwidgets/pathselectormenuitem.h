@@ -6,21 +6,21 @@
 
 class PathSelectorMenuItem : public MenuItem {
     Q_OBJECT
-public:
+  public:
     PathSelectorMenuItem(QWidget *parent);
     const QString &directory();
     const QString &path();
 
-public slots:
-    void setDirectory(const QString& path);
+  public slots:
+    void setDirectory(const QString &path);
 
-protected:
+  protected:
     void onPress() override;
 
-signals:
+  signals:
     void directorySelected(QString);
 
-private:
+  private:
     QString mDirectory;
     QString mPath;
 };

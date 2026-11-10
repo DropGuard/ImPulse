@@ -71,9 +71,12 @@
 // FloatingWidget::setContainerSize is protected; the pin reaches it the way
 // the widget hierarchy does — through a subclass.
 class ProbeWidget : public FloatingWidget {
-public:
-    explicit ProbeWidget(FloatingWidgetContainer *parent) : FloatingWidget(parent) {}
-    void pokeContainerSize(QSize size) { setContainerSize(size); }
+  public:
+    explicit ProbeWidget(FloatingWidgetContainer *parent) : FloatingWidget(parent) {
+    }
+    void pokeContainerSize(QSize size) {
+        setContainerSize(size);
+    }
 };
 
 // The scripted IUserInteractions: answers queued as DialogResults (consumed in
@@ -82,7 +85,7 @@ public:
 // a deliberate trap: an unexpected question surfaces as a failed expectation,
 // not as a silently-tolerated dialog.
 class FakeInteractions : public IUserInteractions {
-public:
+  public:
     QQueue<DialogResult> replaceAnswers;
     QList<QPair<QString, QString>> replaceArgs;
     int replaceCalls = 0;
@@ -93,8 +96,7 @@ public:
         ++confirmCalls;
         return confirmAnswer;
     }
-    DialogResult fileReplaceDialog(const QString &src, const QString &dst,
-                                   FileReplaceMode, bool) override {
+    DialogResult fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode, bool) override {
         ++replaceCalls;
         replaceArgs.append({src, dst});
         return replaceAnswers.isEmpty() ? DialogResult{} : replaceAnswers.dequeue();
@@ -108,7 +110,7 @@ public:
 };
 
 class TestableContextMenu : public ContextMenu {
-public:
+  public:
     using ContextMenu::keyPressEvent;
     using ContextMenu::showAt;
     void pressKey(Qt::Key k) {
@@ -118,23 +120,23 @@ public:
 };
 
 class TestableFolderGridView : public FolderGridView {
-public:
+  public:
     using FolderGridView::dragEnterEvent;
-    using FolderGridView::dragMoveEvent;
     using FolderGridView::dragLeaveEvent;
+    using FolderGridView::dragMoveEvent;
     using FolderGridView::dropEvent;
 };
 
 // The drop handlers are protected Qt overrides; the tests reach them the way
 // the widget hierarchy does — through a using-exposed subclass.
 class TestableBookmarksWidget : public BookmarksWidget {
-public:
+  public:
     using BookmarksWidget::dragEnterEvent;
     using BookmarksWidget::dropEvent;
 };
 
 class TestableBookmarksItem : public BookmarksItem {
-public:
+  public:
     using BookmarksItem::BookmarksItem;
     using BookmarksItem::dragEnterEvent;
     using BookmarksItem::dropEvent;
@@ -145,7 +147,7 @@ public:
 // observable is the call arriving at the view. This proxy counts them and still
 // forwards, so the real strip path runs underneath.
 class CountingStripProxy : public ThumbnailStripProxy {
-public:
+  public:
     using ThumbnailStripProxy::ThumbnailStripProxy;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override {
         ++thumbnailCalls;
@@ -206,17 +208,15 @@ QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
     return grid.mapFromScene(center);
 }
 
-
 // The overlay-proxy lifetime helper. A file-scope template rather than a class
 // member: moc refuses a template inside a slots section ("Template function as
 // signal or slot"), and this is a mechanism, not a test case.
-template<typename Proxy>
-void proxyOutlivesItsContainer() {
+template <typename Proxy> void proxyOutlivesItsContainer() {
     auto *container = new FloatingWidgetContainer();
     auto proxy = std::make_unique<Proxy>(container);
-    proxy->init();                    // materializes the overlay as the container's child
-    delete container;                 // the tree frees the overlay right here
-    proxy.reset();                    // the proxy destructor must not touch it now
+    proxy->init();    // materializes the overlay as the container's child
+    delete container; // the tree frees the overlay right here
+    proxy.reset();    // the proxy destructor must not touch it now
 }
 
 // The settings bus's pool wait, measured rather than asserted as a duration:
@@ -224,8 +224,9 @@ void proxyOutlivesItsContainer() {
 // returns long before it and the old global wait could only return after it.
 // A bound test, not a hang test.
 class DeadlineJob : public PoolJob {
-public:
-    DeadlineJob(std::atomic_bool *_gate, std::atomic_int *_holds) : gate(_gate), holds(_holds) {}
+  public:
+    DeadlineJob(std::atomic_bool *_gate, std::atomic_int *_holds) : gate(_gate), holds(_holds) {
+    }
     void run() override {
         holds->store(1);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(5000);
@@ -233,7 +234,8 @@ public:
             QThread::msleep(1);
         holds->store(0);
     }
-private:
+
+  private:
     std::atomic_bool *gate;
     std::atomic_int *holds;
 };
@@ -244,8 +246,8 @@ class TestCoreNav : public QObject {
     QString base, alpha, beta;
 
     static bool sawDir(const QSignalSpy &spy, const QString &dir, int from = 0) {
-        for (int i = from; i < spy.count(); ++i)
-            if (spy.at(i).at(0).toString() == dir)
+        for(int i = from; i < spy.count(); ++i)
+            if(spy.at(i).at(0).toString() == dir)
                 return true;
         return false;
     }
@@ -256,7 +258,7 @@ class TestCoreNav : public QObject {
         QVERIFY(img.save(path, "PNG"));
     }
 
-private slots:
+  private slots:
     void initTestCase() {
         // IsolatedHome redirected HOME and the config identity
         QVERIFY(home.path() != nullptr);
@@ -298,37 +300,48 @@ private slots:
     // reads them: one glance, not eight test functions
     void userVisibleTextAssemblySweepsTheStates() {
         CurrentInfo info{};
-        info.index = 1; info.fileCount = 3;
+        info.index = 1;
+        info.fileCount = 3;
         info.fileName = "shot.png";
         info.imageSize = QSize(1920, 1080);
         info.fileSize = 3200000;
         QString size = QLocale().formattedDataSize(3200000, 1);
 
         // full house: extended info on, nothing toggled
-        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("[ 2/3 ]  shot.png  -  1920 x 1080  -  ") + size);
         // missing dimensions and size: the segments drop out whole
-        info.imageSize = QSize(0, 0); info.fileSize = 0;
-        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        info.imageSize = QSize(0, 0);
+        info.fileSize = 0;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("[ 2/3 ]  shot.png"));
         // extended info off: bare name — the position prefix lives in the same gate
-        info.imageSize = QSize(1920, 1080); info.fileSize = 3200000;
-        QCOMPARE(assembleWindowTitle(false, info, false, false, false, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        info.imageSize = QSize(1920, 1080);
+        info.fileSize = 3200000;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, false, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("shot.png"));
         // toggle states ride only when the info bar is not already showing them
         info.slideshow = info.shuffle = true;
-        QCOMPARE(assembleWindowTitle(false, info, true, true, false, true, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        QCOMPARE(assembleWindowTitle(false, info, true, true, false, true, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("shot.png - [slideshow] [shuffle] [zoom lock] [view lock]"));
         // edited marks the front of the assembled line
         info.slideshow = info.shuffle = false;
         info.edited = true;
-        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("* [ 2/3 ]  shot.png  -  1920 x 1080  -  ") + size);
         // the two degenerate surfaces
-        QCOMPARE(assembleWindowTitle(true, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        QCOMPARE(assembleWindowTitle(true, info, false, false, true, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("Folder view"));
-        info.fileName.clear(); info.edited = false;
-        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"), QStringLiteral("Folder view")),
+        info.fileName.clear();
+        info.edited = false;
+        QCOMPARE(assembleWindowTitle(false, info, false, false, true, false, QStringLiteral("ImPulse"),
+                                     QStringLiteral("Folder view")),
                  QStringLiteral("ImPulse"));
     }
 
@@ -365,11 +378,11 @@ private slots:
         menu.showAt(QPoint(40, 40));
         QCOMPARE(menu.navigationIndex(), -1);
 
-        menu.pressKey(Qt::Key_Down);   // from nothing: the first item
+        menu.pressKey(Qt::Key_Down); // from nothing: the first item
         QCOMPARE(menu.navigationIndex(), 0);
-        menu.pressKey(Qt::Key_Up);     // wrap backwards: the last item
+        menu.pressKey(Qt::Key_Up); // wrap backwards: the last item
         QVERIFY(menu.navigationIndex() > 0);
-        menu.pressKey(Qt::Key_Down);   // wrap forwards: back to the first
+        menu.pressKey(Qt::Key_Down); // wrap forwards: back to the first
         QCOMPARE(menu.navigationIndex(), 0);
         menu.pressKey(Qt::Key_Down);
         QCOMPARE(menu.navigationIndex(), 1);
@@ -402,8 +415,7 @@ private slots:
         QDir().mkpath(QDir(base).filePath("projdir"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("projdir")));
-        QTRY_COMPARE_WITH_TIMEOUT(core.mw->getFolderView()->directoryPath(),
-                                  QDir(base).filePath("projdir"), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.mw->getFolderView()->directoryPath(), QDir(base).filePath("projdir"), 10000);
     }
 
     void preloaderFollowsTheDirectionOfTravel() {
@@ -525,8 +537,8 @@ private slots:
         FreshSettings fresh;
         QSettings theme(QCoreApplication::organizationName(), "theme");
         theme.beginGroup("Colors");
-        theme.setValue("background", "banana");  // junk -> default
-        theme.setValue("accent", "#ff0000");     // valid -> passes through
+        theme.setValue("background", "banana"); // junk -> default
+        theme.setValue("accent", "#ff0000");    // valid -> passes through
         theme.endGroup();
         theme.sync();
         settings->loadTheme();
@@ -665,13 +677,13 @@ private slots:
         overlay.setImageRealSize(QSize(100, 100));
         overlay.setImageDrawRect(QRect(0, 0, 100, 100));
 
-        auto *cancelBtn   = panel.findChild<QPushButton*>("cancelButton");
-        auto *cropBtn     = panel.findChild<QPushButton*>("cropButton");
-        auto *cropSaveBtn = panel.findChild<QPushButton*>("cropSaveButton");
-        auto *posX        = panel.findChild<QSpinBox*>("posX");
-        auto *width       = panel.findChild<QSpinBox*>("width");
-        auto *height      = panel.findChild<QSpinBox*>("height");
-        auto *ary         = panel.findChild<QDoubleSpinBox*>("ARY");
+        auto *cancelBtn = panel.findChild<QPushButton *>("cancelButton");
+        auto *cropBtn = panel.findChild<QPushButton *>("cropButton");
+        auto *cropSaveBtn = panel.findChild<QPushButton *>("cropSaveButton");
+        auto *posX = panel.findChild<QSpinBox *>("posX");
+        auto *width = panel.findChild<QSpinBox *>("width");
+        auto *height = panel.findChild<QSpinBox *>("height");
+        auto *ary = panel.findChild<QDoubleSpinBox *>("ARY");
         QVERIFY(cancelBtn && cropBtn && cropSaveBtn && posX && width && height && ary);
 
         QSignalSpy cancel(&panel, &CropPanel::cancel);
@@ -704,12 +716,13 @@ private slots:
         // doCrop builds its target from the live boxes, so that is what the
         // expectation is read from; the precondition is asserted separately
         // because the overlay writes its own selection back into the boxes.
-        const QRect target(posX->value(), panel.findChild<QSpinBox*>("posY")->value(),
-                           width->value(), height->value());
+        const QRect target(posX->value(), panel.findChild<QSpinBox *>("posY")->value(), width->value(),
+                           height->value());
         QVERIFY2(target.width() > 0 && target.height() > 0 && target.size() != QSize(100, 100),
-                 qPrintable(QStringLiteral("precondition broken: selection is ")
-                            + QStringLiteral("%1x%2, doCrop would emit cancel instead of crop")
-                            .arg(target.width()).arg(target.height())));
+                 qPrintable(QStringLiteral("precondition broken: selection is ") +
+                            QStringLiteral("%1x%2, doCrop would emit cancel instead of crop")
+                                .arg(target.width())
+                                .arg(target.height())));
         cropBtn->click();
         QCOMPARE(crop.count(), 1);
         QCOMPARE(crop[0][0].toRect(), target);
@@ -767,14 +780,14 @@ private slots:
         const QString dir = QDir(base).filePath(tag);
         // not QVERIFY: it expands to `return;` and this helper has a value to
         // hand back — the same reason dropPosOverThumbnail uses qFail
-        if (!QDir().mkpath(dir))
+        if(!QDir().mkpath(dir))
             QTest::qFail("cannot create the slideshow fixture directory", __FILE__, __LINE__);
         QStringList files;
-        for (int i = 1; i <= 4; ++i) {
+        for(int i = 1; i <= 4; ++i) {
             const QString f = dir + QStringLiteral("/s%1.png").arg(i);
             QImage img(8, 8, QImage::Format_RGB32);
             img.fill(Qt::red);
-            if (!img.save(f, "PNG"))
+            if(!img.save(f, "PNG"))
                 QTest::qFail(qPrintable(QStringLiteral("cannot write ") + f), __FILE__, __LINE__);
             files << f;
         }
@@ -822,8 +835,7 @@ private slots:
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), files.at(1));
-        QVERIFY2(core.slideshowTimer.isActive(),
-                 "a static image under slideshow must keep the timer armed");
+        QVERIFY2(core.slideshowTimer.isActive(), "a static image under slideshow must keep the timer armed");
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), files.at(2));
@@ -852,8 +864,7 @@ private slots:
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), atEnd);
-        QVERIFY2(!core.state.slideshow,
-                 "a non-looping slideshow must stop itself at the end of the directory");
+        QVERIFY2(!core.state.slideshow, "a non-looping slideshow must stop itself at the end of the directory");
         QVERIFY(!core.slideshowTimer.isActive());
     }
 
@@ -865,7 +876,7 @@ private slots:
         QVERIFY(!core.state.shuffle);
 
         core.toggleShuffle();
-        QVERIFY(core.state.shuffle);          // this is what syncRandomizer sized for
+        QVERIFY(core.state.shuffle); // this is what syncRandomizer sized for
 
         core.startSlideshow();
         core.jumpToLast();
@@ -901,7 +912,7 @@ private slots:
         writeImage(file);
 
         Core core;
-        FakeInteractions fake;                 // must be installed: see below
+        FakeInteractions fake; // must be installed: see below
         core.ui_ = &fake;
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -918,10 +929,9 @@ private slots:
         // blocks on a real modal dialog — the test does not fail, it hangs
         // until the QTest watchdog kills the process at 300 s.
         core.moveCurrentFile(moveDst);
-        QTRY_VERIFY2_WITH_TIMEOUT(!QFileInfo::exists(file),
-                                  "move left the original behind", 10000);
+        QTRY_VERIFY2_WITH_TIMEOUT(!QFileInfo::exists(file), "move left the original behind", 10000);
         QVERIFY(QFileInfo::exists(moveDst + QStringLiteral("/moving.png")));
-        QCOMPARE(fake.confirmCalls, 0);        // no collision on this path
+        QCOMPARE(fake.confirmCalls, 0); // no collision on this path
     }
 
     void declinedCollisionLeavesBothFilesWhereTheyWere() {
@@ -935,7 +945,7 @@ private slots:
 
         Core core;
         FakeInteractions fake;
-        fake.confirmAnswer = false;                   // the overwrite question is answered NO
+        fake.confirmAnswer = false; // the overwrite question is answered NO
         core.ui_ = &fake;
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -1090,11 +1100,10 @@ private slots:
         QCOMPARE(contentOf(img), diskBefore);
 
         auto edited = std::dynamic_pointer_cast<ImageStatic>(core.model->getImage(img));
-        QVERIFY2(edited && edited->isEdited(),
-                 "flipH left no edited image in memory");
+        QVERIFY2(edited && edited->isEdited(), "flipH left no edited image in memory");
         const QImage shown = edited->getPixmap()->toImage();
         QCOMPARE(shown.size(), QSize(16, 8));
-        QCOMPARE(shown.pixelColor(0, 0), QColor(Qt::blue));      // mirrored: blue moved left
+        QCOMPARE(shown.pixelColor(0, 0), QColor(Qt::blue)); // mirrored: blue moved left
         QCOMPARE(shown.pixelColor(15, 0), QColor(Qt::red));
 
         core.flipV();
@@ -1131,17 +1140,17 @@ private slots:
         settings->setFirstRun(false);
         QVersionNumber inherited(1, 0, 3);
         settings->setLastVersion(inherited);
-        QCOMPARE(settings->lastVersion(), inherited);   // the rows serve what was written
+        QCOMPARE(settings->lastVersion(), inherited); // the rows serve what was written
 
         {
-            Core core;   // the constructor is what decides to migrate
+            Core core; // the constructor is what decides to migrate
         }
 
         QCOMPARE(settings->lastVersion(), appVersion);
 
         // put the singleton back the way the rest of the suite expects it
         actionManager->removeAllShortcuts();
-        for (auto it = snapshot.constBegin(); it != snapshot.constEnd(); ++it)
+        for(auto it = snapshot.constBegin(); it != snapshot.constEnd(); ++it)
             actionManager->addShortcut(it.key(), it.value());
     }
 
@@ -1163,14 +1172,12 @@ private slots:
         QStringList missing;
         for(const QString &name : names) {
             const QByteArray signature = (name + QStringLiteral("()")).toLatin1();
-            if(actionManager->metaObject()->indexOfMethod(
-                   QMetaObject::normalizedSignature(signature.constData())) < 0)
+            if(actionManager->metaObject()->indexOfMethod(QMetaObject::normalizedSignature(signature.constData())) < 0)
                 missing << name;
         }
         QVERIFY2(missing.isEmpty(),
-                 qPrintable(QStringLiteral("registered with no method to invoke (")
-                            + QString::number(names.size()) + QStringLiteral(" actions checked):\n  ")
-                            + missing.join(QStringLiteral("\n  "))));
+                 qPrintable(QStringLiteral("registered with no method to invoke (") + QString::number(names.size()) +
+                            QStringLiteral(" actions checked):\n  ") + missing.join(QStringLiteral("\n  "))));
     }
 
     // invokeAction itself: it had never been entered despite eight production
@@ -1195,8 +1202,7 @@ private slots:
         QCOMPARE(runScript.count(), 0);
 
         // and one that does exist emits runScript with the prefix stripped
-        scriptManager->addScript(QStringLiteral("qtest-ping"),
-                                 Script(QStringLiteral("/bin/true"), false));
+        scriptManager->addScript(QStringLiteral("qtest-ping"), Script(QStringLiteral("/bin/true"), false));
         QVERIFY(scriptManager->scriptExists(QStringLiteral("qtest-ping")));
         QVERIFY(actionManager->invokeAction(QStringLiteral("s:qtest-ping")));
         QCOMPARE(runScript.count(), 1);
@@ -1229,8 +1235,8 @@ private slots:
         core.flipH();
 
         QCOMPARE(fake.confirmCalls, 1);
-        QTRY_VERIFY2_WITH_TIMEOUT(contentOf(img) != diskBefore,
-                                  "a consented folder-view edit never reached the disk", 10000);
+        QTRY_VERIFY2_WITH_TIMEOUT(contentOf(img) != diskBefore, "a consented folder-view edit never reached the disk",
+                                  10000);
     }
 
     // copyFileClipboard builds the GNOME/KDE companion formats out of
@@ -1260,8 +1266,8 @@ private slots:
                  << "gnome-copied-files =" << cb->data("x-special/gnome-copied-files");
         QVERIFY2(cb->data("x-special/gnome-copied-files").contains("file://"),
                  qPrintable(QStringLiteral("the gnome companion format carries no file url, so a "
-                                            "file manager cannot paste it; payload was \"")
-                            + QString::fromUtf8(cb->data("x-special/gnome-copied-files")) + '\"'));
+                                           "file manager cannot paste it; payload was \"") +
+                            QString::fromUtf8(cb->data("x-special/gnome-copied-files")) + '\"'));
         QCOMPARE(cb->data("application/x-kde-cutselection"), QByteArray("0"));
 
         // an edited image is written to a uniquely-named temp file and the url
@@ -1273,14 +1279,13 @@ private slots:
         const QUrl editedUrl = QApplication::clipboard()->mimeData()->urls().constFirst();
         const QString editedPath = editedUrl.toLocalFile();
         QVERIFY2(editedPath.startsWith(settings->tmpDir()),
-                 qPrintable(QStringLiteral("the edited copy advertised a file outside the tmp dir: ")
-                            + editedPath));
+                 qPrintable(QStringLiteral("the edited copy advertised a file outside the tmp dir: ") + editedPath));
         QVERIFY2(editedPath != settings->tmpDir() + QStringLiteral("image.png"),
-                 qPrintable(QStringLiteral("the edited copy was handed the old fixed name: ")
-                            + editedPath));
+                 qPrintable(QStringLiteral("the edited copy was handed the old fixed name: ") + editedPath));
         QVERIFY2(QFileInfo::exists(editedPath),
                  qPrintable(QStringLiteral("the edited copy advertised a temp file that was never "
-                                            "written: ") + editedPath));
+                                           "written: ") +
+                            editedPath));
         QVERIFY2(QFileInfo(editedPath).size() > 0, "the edited temp image was written empty");
 
         // copying again replaces the clipboard entry, and the entry the file is
@@ -1292,8 +1297,7 @@ private slots:
         const QString secondPath = QApplication::clipboard()->mimeData()->urls().constFirst().toLocalFile();
         QVERIFY2(secondPath != editedPath, "two clipboard entries shared one temp name");
         QVERIFY2(!QFileInfo::exists(editedPath),
-                 qPrintable(QStringLiteral("the replaced clipboard entry left its temp file behind: ")
-                            + editedPath));
+                 qPrintable(QStringLiteral("the replaced clipboard entry left its temp file behind: ") + editedPath));
         QVERIFY(QFileInfo::exists(secondPath));
     }
 
@@ -1317,7 +1321,7 @@ private slots:
         proxyOutlivesItsContainer<FullscreenInfoOverlayProxy>();
         proxyOutlivesItsContainer<FloatingMessageProxy>();
         proxyOutlivesItsContainer<VideoControlsProxyWrapper>();
-        QTest::qWait(100);                   // any deferred deletion must have landed
+        QTest::qWait(100); // any deferred deletion must have landed
         // nothing outlives the container it was made in: the tree reclaimed all
         // five overlays with their containers, and no proxy stashed a widget
         QCOMPARE(QApplication::allWidgets().size(), baseline);
@@ -1339,9 +1343,9 @@ private slots:
         {
             auto *proxy = new ThumbnailStripProxy();
             presenter.setView(proxy);
-            delete proxy;                       // the view dies while the presenter lives
+            delete proxy; // the view dies while the presenter lives
         }
-        presenter.disconnectView();             // must not reach the freed sender
+        presenter.disconnectView(); // must not reach the freed sender
         // and rebinding to a fresh view still works afterwards
         ThumbnailStripProxy second;
         presenter.setView(&second);
@@ -1385,9 +1389,9 @@ private slots:
         }
         const QMap<QString, int> after = widgetClasses();
         QStringList surplus;
-        for (auto it = after.constBegin(); it != after.constEnd(); ++it) {
+        for(auto it = after.constBegin(); it != after.constEnd(); ++it) {
             const int left = it.value() - before.value(it.key(), 0);
-            if (left > 0)
+            if(left > 0)
                 surplus << QStringLiteral("%1 x%2").arg(it.key()).arg(left);
         }
         QVERIFY2(surplus.isEmpty(),
@@ -1428,9 +1432,9 @@ private slots:
         }
         const QMap<QString, int> after = widgetClasses();
         QStringList surplus;
-        for (auto it = after.constBegin(); it != after.constEnd(); ++it) {
+        for(auto it = after.constBegin(); it != after.constEnd(); ++it) {
             const int left = it.value() - before.value(it.key(), 0);
-            if (left > 0)
+            if(left > 0)
                 surplus << QStringLiteral("%1 x%2").arg(it.key()).arg(left);
         }
         QVERIFY2(surplus.isEmpty(),
@@ -1565,7 +1569,7 @@ private slots:
         makeTxt(srcDir, "inner.txt", "inner");
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
-        makeTxt(destDir, "sdir", "old file"); // a FILE where the directory lands
+        makeTxt(destDir, "sdir", "old file");                    // a FILE where the directory lands
         fake.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
 
         core.interactiveCopy({srcDir}, destDir);
@@ -1657,9 +1661,10 @@ private slots:
         // dotted directory names survive the move whole
         QVERIFY(QDir(root + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
         QVERIFY(QDir(root + "/otherdir/thetop/1. What/5. Another one/Normal name works").exists());
-        QVERIFY(QFileInfo::exists(root + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension"));
+        QVERIFY(QFileInfo::exists(
+            root + "/otherdir/thetop/Another normal name/5. This is a file with a prefix but no extension"));
         QVERIFY(!QDir(root + "/otherdir/thetop/1").exists()); // the corruption signature
-        QVERIFY(!QFileInfo::exists(root + "/thetop"));         // moved, not copied
+        QVERIFY(!QFileInfo::exists(root + "/thetop"));        // moved, not copied
 
         // a directory dropped into its own subtree is refused flat
         core.interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
@@ -1701,8 +1706,7 @@ private slots:
         core.removePermanent();
 
         QTRY_COMPARE_WITH_TIMEOUT(core.model->fileCount(), before - 1, 10000);
-        QVERIFY2(!QFileInfo::exists(QDir(alpha).filePath("a.png")),
-                 "the confirmed removal never reached the disk");
+        QVERIFY2(!QFileInfo::exists(QDir(alpha).filePath("a.png")), "the confirmed removal never reached the disk");
         QCOMPARE(fake.confirmCalls, 1);
     }
 
@@ -1758,13 +1762,12 @@ private slots:
         }
         const QMap<QString, int> after = widgetClasses();
         QStringList surplus;
-        for (auto it = after.constBegin(); it != after.constEnd(); ++it) {
+        for(auto it = after.constBegin(); it != after.constEnd(); ++it) {
             const int left = it.value() - before.value(it.key(), 0);
-            if (left > 0)
+            if(left > 0)
                 surplus << QStringLiteral("%1 x%2").arg(it.key()).arg(left);
         }
-        QVERIFY2(surplus.isEmpty(),
-                 qPrintable(QStringLiteral("widgets outliving their owner: ") + surplus.join(", ")));
+        QVERIFY2(surplus.isEmpty(), qPrintable(QStringLiteral("widgets outliving their owner: ") + surplus.join(", ")));
     }
 
     // Dragging an entry whose full-size image was never DECODED: every listed
@@ -1787,8 +1790,7 @@ private slots:
 
         std::unique_ptr<QMimeData> mime(core.mimeDataForPaths({far}));
 
-        QVERIFY2(mime->hasUrls(),
-                 "dragging an undecoded entry produced a mime without urls");
+        QVERIFY2(mime->hasUrls(), "dragging an undecoded entry produced a mime without urls");
         QCOMPARE(mime->urls().constFirst(), QUrl::fromLocalFile(far));
     }
 
@@ -1830,12 +1832,12 @@ private slots:
         const QString file = QDir(alpha).filePath("a.png");
         const int before = core.children().size();
 
-        for (int i = 0; i < 8; ++i)
+        for(int i = 0; i < 8; ++i)
             core.onDraggedOut({file});
 
         int drags = 0;
-        for (QObject *child : core.children())
-            if (child->metaObject()->className() == QLatin1String("QDrag"))
+        for(QObject *child : core.children())
+            if(child->metaObject()->className() == QLatin1String("QDrag"))
                 ++drags;
         QVERIFY2(drags == 0, qPrintable(QStringLiteral("QDrag objects retained by Core after 8 drag-outs")));
         QCOMPARE(core.children().size(), before);
@@ -1910,10 +1912,10 @@ private slots:
         // the moment the rename returns. Wait on the facts themselves.
         QTRY_VERIFY_WITH_TIMEOUT(core.model->containsFile(to), 10000);
         QVERIFY(!core.model->containsFile(from));
-        QCOMPARE(core.model->fileCount(), 2);   // lossless: nothing dropped
+        QCOMPARE(core.model->fileCount(), 2); // lossless: nothing dropped
         QTRY_VERIFY_WITH_TIMEOUT(core.currentFilePath() == to, 10000);
-        QVERIFY(core.model->isLoaded(to));      // landed on it, not merely listed
-        QVERIFY(!core.model->isLoaded(from));   // and the old name is gone from memory
+        QVERIFY(core.model->isLoaded(to));    // landed on it, not merely listed
+        QVERIFY(!core.model->isLoaded(from)); // and the old name is gone from memory
     }
 
     // The other half of 跟手: a rename this process never issued, done by another
@@ -1935,13 +1937,12 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(core.model->containsFile(from), 10000);
         QCOMPARE(core.currentFilePath(), from);
 
-        QVERIFY(std::rename(from.toLocal8Bit().constData(),
-                            to.toLocal8Bit().constData()) == 0);
+        QVERIFY(std::rename(from.toLocal8Bit().constData(), to.toLocal8Bit().constData()) == 0);
 
         QTRY_VERIFY_WITH_TIMEOUT(core.currentFilePath() == to, 10000);
-        QVERIFY(core.model->isLoaded(to));      // on it, not merely pointing at it
+        QVERIFY(core.model->isLoaded(to)); // on it, not merely pointing at it
         QVERIFY(!core.model->isLoaded(from));
-        QCOMPARE(core.model->fileCount(), 2);   // lossless, as under an issued rename
+        QCOMPARE(core.model->fileCount(), 2); // lossless, as under an issued rename
     }
 
     // ---- DirectoryPresenter lifecycle: the view is an injected observer, the
@@ -2094,25 +2095,19 @@ private slots:
         TestableBookmarksItem item("some dir", "/tmp");
         QSignalSpy droppedIn(&item, &BookmarksItem::droppedIn);
         QVERIFY(droppedIn.isValid());
-        QDragEnterEvent itemEnter(QPoint(5, 5), Qt::CopyAction, &mime,
-                                  Qt::LeftButton, Qt::NoModifier);
+        QDragEnterEvent itemEnter(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
         item.dragEnterEvent(&itemEnter);
-        QVERIFY2(itemEnter.isAccepted(),
-                 "a bookmark row stopped accepting the drop it handles");
-        QDropEvent itemDrop(QPoint(5, 5), Qt::CopyAction, &mime,
-                            Qt::LeftButton, Qt::NoModifier);
+        QVERIFY2(itemEnter.isAccepted(), "a bookmark row stopped accepting the drop it handles");
+        QDropEvent itemDrop(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
         item.dropEvent(&itemDrop);
         QCOMPARE(droppedIn.count(), 1);
 
         // the dead path: the panel itself must not advertise acceptance
         TestableBookmarksWidget panel;
-        QVERIFY2(!panel.acceptDrops(),
-                 "the panel still accepts drops that its own dropEvent discards");
-        QDragEnterEvent panelEnter(QPoint(5, 5), Qt::CopyAction, &mime,
-                                   Qt::LeftButton, Qt::NoModifier);
+        QVERIFY2(!panel.acceptDrops(), "the panel still accepts drops that its own dropEvent discards");
+        QDragEnterEvent panelEnter(QPoint(5, 5), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
         panel.dragEnterEvent(&panelEnter);
-        QVERIFY2(!panelEnter.isAccepted(),
-                 "the panel accepted a drop it cannot deliver anywhere");
+        QVERIFY2(!panelEnter.isAccepted(), "the panel accepted a drop it cannot deliver anywhere");
     }
 
     // The presenter's two remaining string-based view connections. Neither has
@@ -2139,11 +2134,8 @@ private slots:
         view.thumbnailCalls = 0;
         view.lastThumbnailPos = -1;
 
-        QMetaObject::invokeMethod(&view, "thumbnailsRequested",
-                                  Q_ARG(QList<int>, {0}),
-                                  Q_ARG(int, 128),
-                                  Q_ARG(bool, true),
-                                  Q_ARG(bool, false));
+        QMetaObject::invokeMethod(&view, "thumbnailsRequested", Q_ARG(QList<int>, {0}), Q_ARG(int, 128),
+                                  Q_ARG(bool, true), Q_ARG(bool, false));
         QTRY_COMPARE_WITH_TIMEOUT(view.thumbnailCalls, 1, 10000);
         QCOMPARE(view.lastThumbnailPos, 0);
 
@@ -2161,18 +2153,18 @@ private slots:
         // of reporting a bare zero.
         QVERIFY2(presenter.showDirs(), "precondition broken: the presenter is in files-only mode");
         QVERIFY2(model->dirCount() > 1,
-                 qPrintable(QStringLiteral("precondition broken: only %1 directories listed")
-                            .arg(model->dirCount())));
+                 qPrintable(QStringLiteral("precondition broken: only %1 directories listed").arg(model->dirCount())));
         QVERIFY2(!view.selection().contains(1),
                  "precondition broken: index 1 is selected, onDraggedOver returns early");
 
         QMetaObject::invokeMethod(&view, "draggedOver", Q_ARG(int, 1));
         QVERIFY2(view.hoverCalls == 1,
                  qPrintable(QStringLiteral("setDragHover never reached the view (dirCount=%1, "
-                                            "showDirs=%2, selection=%3)")
-                            .arg(model->dirCount()).arg(presenter.showDirs())
-                            .arg(view.selection().isEmpty() ? QStringLiteral("empty")
-                                                            : QStringLiteral("%1").arg(view.selection().at(0)))));
+                                           "showDirs=%2, selection=%3)")
+                                .arg(model->dirCount())
+                                .arg(presenter.showDirs())
+                                .arg(view.selection().isEmpty() ? QStringLiteral("empty")
+                                                                : QStringLiteral("%1").arg(view.selection().at(0)))));
     }
 
     void presenterForwardsDragFromTheView() {
@@ -2198,10 +2190,11 @@ private slots:
         // view droppedInto(mime, source, index) -> presenter droppedInto(paths, dir)
         QMimeData data;
         data.setUrls({QUrl::fromLocalFile(QDir(alpha).filePath("a.png"))});
-        QMetaObject::invokeMethod(&proxy, "droppedInto",
-                                  Q_ARG(const QMimeData*, &data),
-                                  Q_ARG(QObject*, nullptr),
+        // clang-format off: Q_ARG stringifies its type argument, so the
+        // normalized (no space before *) spelling is load-bearing here
+        QMetaObject::invokeMethod(&proxy, "droppedInto", Q_ARG(const QMimeData*, &data), Q_ARG(QObject*, nullptr),
                                   Q_ARG(int, 0));
+        // clang-format on
         QCOMPARE(into.count(), 1);
     }
 
@@ -2246,23 +2239,24 @@ private slots:
         QCOMPARE(view.removed, QList<int>({0}));
         QMetaObject::invokeMethod(model.get(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
         QMetaObject::invokeMethod(model.get(), "dirAdded", Q_ARG(QString, d0));
-        QCOMPARE(view.removed.count(), 1);   // dirs are not in the grid: no splice
+        QCOMPARE(view.removed.count(), 1); // dirs are not in the grid: no splice
         QCOMPARE(view.inserted.count(), 1);
 
         // A rename is one call, not a remove plus an insert: the old row comes
         // from the event (the mirror has already spliced, so the listing cannot
         // answer "where was it") and the new row and the name come from the
         // listing. In files-only mode a directory rename is refused outright.
-        QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0),
-                                  Q_ARG(QString, f1), Q_ARG(int, 0));
+        QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
         QCOMPARE(view.renamed, QList<int>({0, 1}));
         QCOMPARE(view.renamedTo, QList<QString>({QFileInfo(f1).fileName()}));
-        QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0),
-                                  Q_ARG(QString, d1), Q_ARG(int, 0));
+        QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
         QCOMPARE(view.renamed.count(), 2);
 
-        view.removed.clear(); view.inserted.clear(); view.reloaded.clear();
-        view.renamed.clear(); view.renamedTo.clear();
+        view.removed.clear();
+        view.inserted.clear();
+        view.reloaded.clear();
+        view.renamed.clear();
+        view.renamedTo.clear();
 
         // dirs shown: every file index shifts by dirCount, dir indices do not
         presenter.setShowDirs(true);
@@ -2279,14 +2273,12 @@ private slots:
 
         // with dirs in front, both rename sides of a *file* shift by dirCount
         // while a dir row — already in the leading block — does not shift at all
-        view.renamed.clear(); view.renamedTo.clear();
-        QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0),
-                                  Q_ARG(QString, f1), Q_ARG(int, 0));
-        QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0),
-                                  Q_ARG(QString, d1), Q_ARG(int, 0));
+        view.renamed.clear();
+        view.renamedTo.clear();
+        QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
+        QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
         QCOMPARE(view.renamed, QList<int>({dirCount, dirCount + 1, 0, 1}));
-        QCOMPARE(view.renamedTo, QList<QString>({QFileInfo(f1).fileName(),
-                                                 QFileInfo(d1).fileName()}));
+        QCOMPARE(view.renamedTo, QList<QString>({QFileInfo(f1).fileName(), QFileInfo(d1).fileName()}));
     }
 
     // The row is the unit a rename moves. Driven straight at the view because
@@ -2302,8 +2294,7 @@ private slots:
         grid.populate(25);
         grid.show();
         const QList<ThumbnailWidget *> before = orderedThumbnails(grid);
-        QVERIFY2(before.count() == 25,
-                 qPrintable(QStringLiteral("populate(25) laid out %1 rows").arg(before.count())));
+        QVERIFY2(before.count() == 25, qPrintable(QStringLiteral("populate(25) laid out %1 rows").arg(before.count())));
         grid.select(1);
         ThumbnailWidget *const moving = before.at(1);
 
@@ -2311,8 +2302,7 @@ private slots:
 
         const QList<ThumbnailWidget *> after = orderedThumbnails(grid);
         QCOMPARE(after.count(), 25);
-        QVERIFY2(after.at(4) == moving,
-                 "the moved row is a different widget — renaming does not recreate the row");
+        QVERIFY2(after.at(4) == moving, "the moved row is a different widget — renaming does not recreate the row");
         QVERIFY2(after.at(1) == before.at(2) && after.at(3) == before.at(4),
                  "the rows the move jumped over did not slide into the space it left");
         QCOMPARE(grid.selection(), QList<int>({4}));
@@ -2368,11 +2358,11 @@ private slots:
         QVERIFY(model->setDirectory(dir));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 3, 10000);
 
-        CountingStripProxy view;               // never shown: the buffer is all there is
+        CountingStripProxy view; // never shown: the buffer is all there is
         Thumbnailer thumbnailer(pool, EngineBridge::instance());
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&view);
-        presenter.setModel(model);             // populate + select(0)
+        presenter.setModel(model); // populate + select(0)
         QCOMPARE(view.selection(), QList<int>({0}));
         QCOMPARE(model->fileNameAt(0), QStringLiteral("a.png"));
 
@@ -2400,14 +2390,13 @@ private slots:
 
         QElapsedTimer t;
         t.start();
-        settings->sendChangeNotification();   // what the settings dialog's Save does
+        settings->sendChangeNotification(); // what the settings dialog's Save does
         const qint64 elapsed = t.elapsed();
 
-        QCOMPARE(holds.load(), 1);            // the Loader job was still running when it returned
-        QVERIFY2(elapsed < 1000,
-                 qPrintable(QStringLiteral("the settings bus waited %1 ms — a pool drain that is not "
-                                            "owner-scoped waits for work none of its settings feed")
-                            .arg(elapsed)));
+        QCOMPARE(holds.load(), 1); // the Loader job was still running when it returned
+        QVERIFY2(elapsed < 1000, qPrintable(QStringLiteral("the settings bus waited %1 ms — a pool drain that is not "
+                                                           "owner-scoped waits for work none of its settings feed")
+                                                .arg(elapsed)));
         gate = true;
         QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 0, 10000);
     }
@@ -2422,8 +2411,8 @@ private slots:
     // run it twice per change.
     void settingsBusReachesTheThumbnailStripThroughThePanelChain() {
         Core core;
-        const int original = settings->panelPreviewsSize();   // singleton: snapshot and restore
-        auto *strip = core.mw->findChild<ThumbnailStripProxy*>();
+        const int original = settings->panelPreviewsSize(); // singleton: snapshot and restore
+        auto *strip = core.mw->findChild<ThumbnailStripProxy *>();
         QVERIFY2(strip, "no ThumbnailStripProxy under MW — the chain is not what this claims");
         // init(), not show(): the proxy is a child here, and a child's show()
         // fires no showEvent while its ancestors are hidden, which is what made
@@ -2444,9 +2433,11 @@ private slots:
 
         QVERIFY2(big.height() > small.height() || big.width() > small.width(),
                  qPrintable(QStringLiteral("the settings bus does not reach ThumbnailStrip::readSettings "
-                                            "(30 -> %1x%2, 200 -> %3x%4)")
-                            .arg(small.width()).arg(small.height())
-                            .arg(big.width()).arg(big.height())));
+                                           "(30 -> %1x%2, 200 -> %3x%4)")
+                                .arg(small.width())
+                                .arg(small.height())
+                                .arg(big.width())
+                                .arg(big.height())));
     }
 
     void editingInDocumentModeEditsInMemoryWithoutConfirmation() {
@@ -2463,7 +2454,7 @@ private slots:
         core.rotateLeft();
 
         QTRY_COMPARE_WITH_TIMEOUT(core.model->getImage(img)->size(), QSize(8, 16), 10000);
-        QCOMPARE(fake.confirmCalls, 0); // document mode: in memory, no save, no ask
+        QCOMPARE(fake.confirmCalls, 0);       // document mode: in memory, no save, no ask
         QCOMPARE(contentOf(img), diskBefore); // the disk file is untouched until save
     }
 
@@ -2511,7 +2502,7 @@ private slots:
 
         core.rotateLeft();
 
-        QCOMPARE(fake.confirmCalls, 1); // folder view saves immediately, so it asks first
+        QCOMPARE(fake.confirmCalls, 1);             // folder view saves immediately, so it asks first
         QCOMPARE(QImage(img).size(), QSize(8, 16)); // the disk file is the rotated one
     }
 
@@ -2559,7 +2550,7 @@ private slots:
         core.cropAndSave(QRect(0, 0, 8, 8));
 
         QCOMPARE(QImage(img).size(), QSize(8, 8)); // cropped AND saved to disk
-        QCOMPARE(fake.confirmCalls, 0); // cropAndSave bypasses the confirmation
+        QCOMPARE(fake.confirmCalls, 0);            // cropAndSave bypasses the confirmation
     }
 
     void discardEditsRestoresTheOnDiskImage() {
@@ -2596,18 +2587,15 @@ private slots:
 
         auto mime = std::make_unique<QMimeData>();
         mime->setUrls({QUrl::fromLocalFile("/tmp/whatever.png")});
-        QDragEnterEvent enter(QPoint(10, 10), Qt::CopyAction, mime.get(),
-                              Qt::LeftButton, Qt::NoModifier);
+        QDragEnterEvent enter(QPoint(10, 10), Qt::CopyAction, mime.get(), Qt::LeftButton, Qt::NoModifier);
         grid.dragEnterEvent(&enter);
         QVERIFY2(enter.isAccepted(), "dragEnter rejected a drop the grid is built to accept");
 
         QMimeData plain;
         plain.setText("just text");
-        QDragEnterEvent plainEnter(QPoint(10, 10), Qt::CopyAction, &plain,
-                                   Qt::LeftButton, Qt::NoModifier);
+        QDragEnterEvent plainEnter(QPoint(10, 10), Qt::CopyAction, &plain, Qt::LeftButton, Qt::NoModifier);
         grid.dragEnterEvent(&plainEnter);
-        QVERIFY2(plainEnter.isAccepted(),
-                 "the grid accepts without inspecting the mime — reporting is the drop's job");
+        QVERIFY2(plainEnter.isAccepted(), "the grid accepts without inspecting the mime — reporting is the drop's job");
     }
 
     void dragMoveReportsTheHoveredThumbnailIndex() {
@@ -2646,13 +2634,11 @@ private slots:
         QVERIFY(spy.isValid());
 
         auto mime = std::make_unique<QMimeData>();
-        const QList<QUrl> urls {QUrl::fromLocalFile("/tmp/dropped1.png"),
-                                QUrl::fromLocalFile("/tmp/dropped2.png")};
+        const QList<QUrl> urls{QUrl::fromLocalFile("/tmp/dropped1.png"), QUrl::fromLocalFile("/tmp/dropped2.png")};
         mime->setUrls(urls);
 
         const QPoint pos1 = dropPosOverThumbnail(grid, 1);
-        QDropEvent drop(QPointF(pos1), Qt::CopyAction, mime.get(),
-                        Qt::LeftButton | Qt::RightButton, Qt::NoModifier);
+        QDropEvent drop(QPointF(pos1), Qt::CopyAction, mime.get(), Qt::LeftButton | Qt::RightButton, Qt::NoModifier);
         grid.dropEvent(&drop);
         QVERIFY(drop.isAccepted());
         QCOMPARE(spy.count(), 1);
@@ -2673,8 +2659,7 @@ private slots:
 
         auto mime = std::make_unique<QMimeData>();
         mime->setUrls({QUrl::fromLocalFile("/tmp/x.png")});
-        QDropEvent drop(QPointF(1, 1), Qt::CopyAction, mime.get(),
-                        Qt::LeftButton, Qt::NoModifier);
+        QDropEvent drop(QPointF(1, 1), Qt::CopyAction, mime.get(), Qt::LeftButton, Qt::NoModifier);
         grid.dropEvent(&drop);
 
         QCOMPARE(spy.count(), 1);
@@ -2741,7 +2726,7 @@ private slots:
         grid.selectAbove(); // first row: already at the top
         QCOMPARE(lastSelection(grid), 0);
 
-        grid.select(24); // the last item
+        grid.select(24);    // the last item
         grid.selectBelow(); // last row: stays
         QCOMPARE(lastSelection(grid), 24);
         grid.selectNext(); // past the end: stays
@@ -2768,7 +2753,7 @@ private slots:
         grid.pageDown();
         QCOMPARE(lastSelection(grid), 4 * cols); // exactly four rows down
         grid.pageUp();
-        QCOMPARE(lastSelection(grid), 0);        // and exactly four rows back
+        QCOMPARE(lastSelection(grid), 0); // and exactly four rows back
     }
 
     void navigationRestoresTheColumnOnIrregularRows() {
@@ -2812,7 +2797,7 @@ private slots:
         QCOMPARE(spy.at(spy.count() - 1).at(0).toInt(), grid.THUMBNAIL_SIZE_MIN);
     }
 
-private:
+  private:
     // selection() returns QList by value: capturing it in a named local keeps
     // clazy's detaching-temporary quiet AND avoids a real detach per .last()
     int lastSelection(FolderGridView &grid) {
@@ -2840,11 +2825,10 @@ private:
     static QMap<QString, int> widgetClasses() {
         QMap<QString, int> counts;
         const QList<QWidget *> widgets = QApplication::allWidgets();
-        for (QWidget *w : widgets)
+        for(QWidget *w : widgets)
             counts[QString::fromUtf8(w->metaObject()->className())]++;
         return counts;
     }
-
 };
 
 int main(int argc, char **argv) {
@@ -2859,38 +2843,34 @@ int main(int argc, char **argv) {
     // threads then collide with the stale value. A private registry per test
     // function ends the reuse; explicit argv (a named test) skips the fork for
     // targeted debugging.
-    if (argc > 1)
+    if(argc > 1)
         return QTest::qExec(&t, argc, argv);
     const QMetaObject *mo = t.metaObject();
     QStringList testSlots;
-    for (int i = 0; i < mo->methodCount(); ++i) {
+    for(int i = 0; i < mo->methodCount(); ++i) {
         const QMetaMethod m = mo->method(i);
         const QByteArray name = m.name();
-        if (m.methodType() == QMetaMethod::Slot && m.access() == QMetaMethod::Private
-            && m.parameterCount() == 0
-            && name != "initTestCase" && name != "cleanupTestCase"
-            && name != "init" && name != "cleanup")
+        if(m.methodType() == QMetaMethod::Slot && m.access() == QMetaMethod::Private && m.parameterCount() == 0 &&
+           name != "initTestCase" && name != "cleanupTestCase" && name != "init" && name != "cleanup")
             testSlots << QString::fromUtf8(name);
     }
     int failures = 0;
-    for (const QString &slot : std::as_const(testSlots)) {
+    for(const QString &slot : std::as_const(testSlots)) {
         fflush(nullptr); // fork would duplicate whatever is buffered in stdout
         pid_t pid = fork();
-        if (pid == 0) {
+        if(pid == 0) {
             QByteArray nameBytes = slot.toUtf8();
             char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
             return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
         }
         int status = 0;
-        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
         }
         // a crashed child loses its buffered output entirely — without naming
         // the slot here, the evidence is a red ctest with nothing in the log
         if(!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
-            fprintf(stderr, "core_nav: slot '%s' exited abnormally (exit=%d, sig=%d)\n",
-                    slot.toUtf8().constData(),
-                    WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-                    WIFSIGNALED(status) ? WTERMSIG(status) : -1);
+            fprintf(stderr, "core_nav: slot '%s' exited abnormally (exit=%d, sig=%d)\n", slot.toUtf8().constData(),
+                    WIFEXITED(status) ? WEXITSTATUS(status) : -1, WIFSIGNALED(status) ? WTERMSIG(status) : -1);
         failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
     }
     return failures;

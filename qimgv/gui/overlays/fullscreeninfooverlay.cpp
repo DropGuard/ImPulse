@@ -1,10 +1,8 @@
 #include "fullscreeninfooverlay.h"
 #include "ui_fullscreeninfooverlay.h"
 
-FullscreenInfoOverlay::FullscreenInfoOverlay(FloatingWidgetContainer *parent) :
-    OverlayWidget(parent),
-    ui(new Ui::FullscreenInfoOverlay)
-{
+FullscreenInfoOverlay::FullscreenInfoOverlay(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), ui(new Ui::FullscreenInfoOverlay) {
     ui->setupUi(this);
     setPosition(FloatingWidgetPosition::TOPLEFT);
     this->setHorizontalMargin(0);
@@ -18,7 +16,7 @@ FullscreenInfoOverlay::~FullscreenInfoOverlay() {
     delete ui;
 }
 
-void FullscreenInfoOverlay::setInfo(const QString& pos, const QString& fileName, const QString& info) {
+void FullscreenInfoOverlay::setInfo(const QString &pos, const QString &fileName, const QString &info) {
     ui->posLabel->setText(pos);
     ui->nameLabel->setText(fileName);
     ui->infoLabel->setText(info);

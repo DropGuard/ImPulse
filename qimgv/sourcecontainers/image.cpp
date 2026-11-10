@@ -1,11 +1,7 @@
 #include "image.h"
 
 Image::Image(std::unique_ptr<DocumentInfo> _info)
-    : mDocInfo(std::move(_info)),
-      mLoadAttempted(false),
-      mEdited(false),
-      mPath(mDocInfo->filePath())
-{
+    : mDocInfo(std::move(_info)), mLoadAttempted(false), mEdited(false), mPath(mDocInfo->filePath()) {
 }
 
 Image::~Image() {
@@ -42,4 +38,3 @@ QDateTime Image::lastModified() const {
 QMap<QString, QString> Image::getExifTags() {
     return mDocInfo->getExifTags();
 }
-

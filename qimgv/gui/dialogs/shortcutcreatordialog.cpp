@@ -1,10 +1,7 @@
 #include "shortcutcreatordialog.h"
 #include "ui_shortcutcreatordialog.h"
 
-ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ShortcutCreatorDialog)
-{
+ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) : QDialog(parent), ui(new Ui::ShortcutCreatorDialog) {
     ui->setupUi(this);
     setWindowTitle("Add shortcut");
     actionList = appActions->getList();
@@ -25,7 +22,7 @@ QString ShortcutCreatorDialog::selectedAction() {
     if(ui->actionsRadioButton->isChecked())
         return ui->actionsComboBox->currentText();
     else
-        return "s:"+ui->scriptsComboBox->currentText();
+        return "s:" + ui->scriptsComboBox->currentText();
 }
 
 QString ShortcutCreatorDialog::selectedShortcut() {
@@ -43,15 +40,15 @@ void ShortcutCreatorDialog::onShortcutEdited() {
 void ShortcutCreatorDialog::setAction(QString action) {
     auto cbox = ui->actionsComboBox;
     if(action.startsWith("s:")) {
-        action = action.remove(0,2);
+        action = action.remove(0, 2);
         cbox = ui->scriptsComboBox;
         ui->scriptsRadioButton->setChecked(true);
     }
     int index = cbox->findText(action);
     if(index != -1)
-       cbox->setCurrentIndex(index);
+        cbox->setCurrentIndex(index);
 }
 
-void ShortcutCreatorDialog::setShortcut(const QString& shortcut) {
+void ShortcutCreatorDialog::setShortcut(const QString &shortcut) {
     ui->sequenceEdit->setText(shortcut);
 }

@@ -5,10 +5,8 @@ Q_LOGGING_CATEGORY(lcLoaderPerf, "qimgv.perf.loader", QtInfoMsg)
 
 #include <QElapsedTimer>
 
-LoaderRunnable::LoaderRunnable(QString _path, bool _scaled, const LoadPolicy &_policy) :
-    path(_path),
-    scaled(_scaled),
-    policy(_policy) {
+LoaderRunnable::LoaderRunnable(QString _path, bool _scaled, const LoadPolicy &_policy)
+    : path(_path), scaled(_scaled), policy(_policy) {
 }
 
 void LoaderRunnable::run() {

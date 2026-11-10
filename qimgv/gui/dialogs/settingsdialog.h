@@ -22,22 +22,21 @@ class QCheckBox;
 class SettingsDialog;
 }
 
-class SettingsDialog : public QDialog
-{
+class SettingsDialog : public QDialog {
     Q_OBJECT
 
-public:
+  public:
     explicit SettingsDialog(QWidget *parent = nullptr);
     ~SettingsDialog() override;
     void switchToPage(int number);
 
-public slots:
+  public slots:
     int exec() override;
     // both directions of the binding table; public so tests can drive them
     void readSettings();
     void saveSettings();
 
-private:
+  private:
     void readColorScheme();
     void setColorScheme(ColorScheme colors);
     void saveColorScheme();
@@ -54,7 +53,7 @@ private:
     void adjustSizeToContents();
     QButtonGroup fitModeGrp, folderEndGrp, zoomIndGrp;
 
-private:
+  private:
     struct CheckBinding {
         QCheckBox *box;
         bool (Settings::*get)();
@@ -65,18 +64,18 @@ private:
     struct ComboBinding {
         QComboBox *box;
         const SettingDesc *desc;
-        QStringList values;   // combo index -> stored value
-        QString fallback;     // used when the stored value is not in the list
+        QStringList values; // combo index -> stored value
+        QString fallback;   // used when the stored value is not in the list
     };
     QVector<ComboBinding> mCombos;
 
-private slots:
+  private slots:
     void saveSettingsAndClose();
 
     void addScript();
     void editScript();
     void editScript(QListWidgetItem *item);
-    void editScript(const QString& name);
+    void editScript(const QString &name);
     void removeScript();
 
     void addShortcut();
@@ -90,11 +89,11 @@ private slots:
     void onExpandLimitSliderChanged(int value);
     void onZoomStepSliderChanged(int value);
     void onJPEGQualitySliderChanged(int value);
-    void resetToDesktopTheme();    
+    void resetToDesktopTheme();
     void onAutoResizeLimitSliderChanged(int value);
     void onMouseScrollingSpeedSliderChanged(int value);
 
     void resetZoomLevels();
-signals:
+  signals:
     void settingsChanged();
 };

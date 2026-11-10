@@ -7,11 +7,14 @@
 // primitive and the single-writer rule
 class TestListing : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestListing() : EngineStackFixture("listing") {}
+  public:
+    TestListing() : EngineStackFixture("listing") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     void engineBridgePumpDeliversListed() {
         resetFixture();
@@ -229,7 +232,9 @@ private slots:
         DirectoryManager dm{EngineBridge::instance()};
         QVERIFY(dm.setDirectory(fixtureDir));
         bool fired = false;
-        dm.whenListed(fixtureDir, [&fired] { fired = true; });
+        dm.whenListed(fixtureDir, [&fired] {
+            fired = true;
+        });
         QVERIFY(!fired); // armed, the listing is still in flight
         QTRY_VERIFY_WITH_TIMEOUT(fired, 10000);
     }
@@ -243,12 +248,16 @@ private slots:
         DirectoryManager dm{EngineBridge::instance()};
         QVERIFY(dm.setDirectory(fixtureDir));
         bool staleFired = false;
-        dm.whenListed(fixtureDir, [&staleFired] { staleFired = true; });
+        dm.whenListed(fixtureDir, [&staleFired] {
+            staleFired = true;
+        });
         // a newer open supersedes the queue before the stale listing lands
         QVERIFY(dm.setDirectory(fixtureDir + "/second"));
         QVERIFY(!staleFired);
         bool freshFired = false;
-        dm.whenListed(fixtureDir + "/second", [&freshFired] { freshFired = true; });
+        dm.whenListed(fixtureDir + "/second", [&freshFired] {
+            freshFired = true;
+        });
         QTRY_VERIFY_WITH_TIMEOUT(freshFired, 10000);
         QVERIFY(!staleFired);
     }
@@ -258,7 +267,9 @@ private slots:
         DirectoryManager dm{EngineBridge::instance()};
         QVERIFY(dm.setDirectory(fixtureDir));
         bool fired = false;
-        qint64 token = dm.whenListed(fixtureDir, [&fired] { fired = true; });
+        qint64 token = dm.whenListed(fixtureDir, [&fired] {
+            fired = true;
+        });
         QVERIFY(dm.cancelListed(token));
         // the listing lands (the counts arrive), the cancelled action stays
         // silent, and a double cancel is a no-op rather than an error
@@ -347,8 +358,8 @@ private slots:
             QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Append));
             QVERIFY(f.write(QByteArray(4096, 'x')));
         }
-        QTRY_VERIFY_WITH_TIMEOUT(dm.indexOfFile(fixtureDir + "/10.jpg")
-                                     > dm.indexOfFile(fixtureDir + "/img2.jpg"), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(dm.indexOfFile(fixtureDir + "/10.jpg") > dm.indexOfFile(fixtureDir + "/img2.jpg"),
+                                 10000);
         QTRY_VERIFY_WITH_TIMEOUT(dm.isSettled(), 10000);
         assertMirrorMatchesEngineExport(dm);
     }
@@ -368,8 +379,7 @@ private slots:
         QVERIFY(before > 0);
 
         QSignalSpy added(&dm, &DirectoryManager::fileAdded);
-        emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/x.jpg"),
-                               false, 1, 0, 0, QString());
+        emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/x.jpg"), false, 1, 0, 0, QString());
         QCOMPARE(added.count(), 0);
         QCOMPARE(dm.fileCount(), before);
         QVERIFY(!dm.containsFile(QStringLiteral("/some/other/place/x.jpg")));
@@ -379,8 +389,7 @@ private slots:
         // collide — it would simply gain a row for a file that is not here, at
         // an index computed against the other folder's order.
         const QString twin = QFileInfo(dm.filePathAt(0)).fileName();
-        emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/") + twin,
-                               false, 1, 0, 1, QString());
+        emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/") + twin, false, 1, 0, 1, QString());
         QCOMPARE(added.count(), 0);
         QCOMPARE(dm.fileCount(), before);
 

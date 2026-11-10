@@ -20,26 +20,27 @@ enum ActionType {
 
 class ActionManager : public QObject {
     Q_OBJECT
-public:
-    static ActionManager* getInstance();
+  public:
+    static ActionManager *getInstance();
     ~ActionManager() override;
-    bool processEvent(QInputEvent*);
+    bool processEvent(QInputEvent *);
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
     QString actionForShortcut(const QString &keys);
-    const QString shortcutForAction(const QString& action);
-    const QList<QString> shortcutsForAction(const QString& action);
+    const QString shortcutForAction(const QString &action);
+    const QList<QString> shortcutsForAction(const QString &action);
     QStringList actionList();
-    const QMap<QString,QString>& allShortcuts();
+    const QMap<QString, QString> &allShortcuts();
     void removeShortcut(const QString &keys);
     void removeAllShortcuts();
-    void removeAllShortcuts(const QString& actionName);
+    void removeAllShortcuts(const QString &actionName);
     QString keyForNativeScancode(quint32 scanCode);
-    void adjustFromVersion(const QVersionNumber& lastVer);
+    void adjustFromVersion(const QVersionNumber &lastVer);
     void saveShortcuts();
-public slots:
+  public slots:
     bool invokeAction(const QString &actionName);
-private:
+
+  private:
     explicit ActionManager(QObject *parent = nullptr);
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
 
@@ -51,7 +52,7 @@ private:
     void readShortcuts();
     ActionType validateAction(const QString &actionName);
 
-signals:
+  signals:
     void open();
     void save();
     void saveAs();
@@ -89,7 +90,7 @@ signals:
     void jumpToLast();
     void folderView();
     void documentView();
-    void runScript(const QString&);
+    void runScript(const QString &);
     void pauseVideo();
     void seekVideoForward();
     void seekVideoBackward();

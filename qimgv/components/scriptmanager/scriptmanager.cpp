@@ -4,16 +4,13 @@
 
 ScriptManager *scriptManager = nullptr;
 
-ScriptManager::ScriptManager(QObject *parent)
-    : QObject(parent)
-{
+ScriptManager::ScriptManager(QObject *parent) : QObject(parent) {
 }
 
 ScriptManager::~ScriptManager() = default;
 // The body used to call saveScripts() and then delete the global it is
 // stored in. Saving is the settings dialog's job (see settingsdialog.cpp);
 // the self-delete was unreachable recursion waiting to be triggered.
-
 
 ScriptManager *ScriptManager::getInstance() {
     if(!scriptManager) {
@@ -39,8 +36,8 @@ void ScriptManager::runScript(const QString &scriptName, std::shared_ptr<Image> 
             if(!exec.waitForStarted()) {
                 // the failed start used to hide behind a misspelled qDebug
                 // while the caller waited on a process that would never run
-                QString errorString = "Error: unable to run application/script: " + program +
-                                      ". Make sure it is an executable.";
+                QString errorString =
+                    "Error: unable to run application/script: " + program + ". Make sure it is an executable.";
                 emit error(errorString);
                 qWarning() << errorString;
                 return;
@@ -51,10 +48,10 @@ void ScriptManager::runScript(const QString &scriptName, std::shared_ptr<Image> 
                 QFileInfo fi(program);
                 QString errorString;
                 if(fi.isFile() && !fi.isExecutable())
-                     errorString = "Error: " + program + " is not an executable.";
+                    errorString = "Error: " + program + " is not an executable.";
                 else
-                    errorString = "Error: unable to run application/script: " + program +
-                                  ". See README for working examples.";
+                    errorString =
+                        "Error: unable to run application/script: " + program + ". See README for working examples.";
                 emit error(errorString);
                 qWarning() << errorString;
             }
@@ -64,7 +61,7 @@ void ScriptManager::runScript(const QString &scriptName, std::shared_ptr<Image> 
     }
 }
 
-QString ScriptManager::runCommand(const QString& cmd) {
+QString ScriptManager::runCommand(const QString &cmd) {
     QProcess exec;
     QStringList cmdSplit = ScriptManager::splitCommandLine(cmd);
     exec.start(cmdSplit.takeAt(0), cmdSplit);
@@ -72,14 +69,14 @@ QString ScriptManager::runCommand(const QString& cmd) {
     return exec.readAllStandardOutput();
 }
 
-void ScriptManager::runCommandDetached(const QString& cmd) {
+void ScriptManager::runCommandDetached(const QString &cmd) {
     QStringList cmdSplit = ScriptManager::splitCommandLine(cmd);
     QProcess::startDetached(cmdSplit.takeAt(0), cmdSplit);
 }
 
 // TODO: what if filename contains one of the tags?
-void ScriptManager::processArguments(QStringList &cmd, const std::shared_ptr<Image>& img) {
-    for (auto& i : cmd) {
+void ScriptManager::processArguments(QStringList &cmd, const std::shared_ptr<Image> &img) {
+    for(auto &i : cmd) {
         if(i.contains("%file%"))
             i.replace("%file%", img.get()->filePath());
 #ifdef __WIN32
@@ -95,17 +92,21 @@ QStringList ScriptManager::splitCommandLine(const QString &cmdLine) {
     QStringList list;
     QString arg;
     bool escape = false;
-    enum { Idle, Arg, QuotedArg } state = Idle;
-    foreach (QChar const c, cmdLine) {
+    enum {
+        Idle,
+        Arg,
+        QuotedArg
+    } state = Idle;
+    foreach(QChar const c, cmdLine) {
         //if(!escape && c == '\\') {
         //    escape = true;
         //    continue;
         //}
-        switch (state) {
+        switch(state) {
         case Idle:
             if(!escape && c == '"')
                 state = QuotedArg;
-            else if (escape || !c.isSpace()) {
+            else if(escape || !c.isSpace()) {
                 arg += c;
                 state = Arg;
             }
@@ -135,8 +136,7 @@ QStringList ScriptManager::splitCommandLine(const QString &cmdLine) {
     return list;
 }
 
-
-bool ScriptManager::scriptExists(const QString& scriptName) {
+bool ScriptManager::scriptExists(const QString &scriptName) {
     return scripts.contains(scriptName);
 }
 
@@ -149,7 +149,7 @@ void ScriptManager::saveScripts() {
 }
 
 // replaces if it already exists
-void ScriptManager::addScript(const QString& scriptName, const Script& script) {
+void ScriptManager::addScript(const QString &scriptName, const Script &script) {
     if(scripts.contains(scriptName)) {
         qDebug() << "[ScriptManager] Replacing script" << scriptName;
         scripts.remove(scriptName);
@@ -157,7 +157,7 @@ void ScriptManager::addScript(const QString& scriptName, const Script& script) {
     scripts.insert(scriptName, script);
 }
 
-void ScriptManager::removeScript(const QString& scriptName) {
+void ScriptManager::removeScript(const QString &scriptName) {
     scripts.remove(scriptName);
 }
 
@@ -169,6 +169,6 @@ QList<QString> ScriptManager::scriptNames() {
     return scriptManager->scripts.keys();
 }
 
-Script ScriptManager::getScript(const QString& scriptName) {
+Script ScriptManager::getScript(const QString &scriptName) {
     return scripts.value(scriptName);
 }

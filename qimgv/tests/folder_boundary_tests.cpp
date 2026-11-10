@@ -4,11 +4,14 @@
 // order and the navigation's
 class TestFolderBoundary : public QObject, protected EngineStackFixture {
     Q_OBJECT
-public:
-    TestFolderBoundary() : EngineStackFixture("folder-boundary") {}
+  public:
+    TestFolderBoundary() : EngineStackFixture("folder-boundary") {
+    }
 
-private slots:
-    void initTestCase() { init(); }
+  private slots:
+    void initTestCase() {
+        init();
+    }
 
     // "After reaching the end of a folder" is a setting with three values, so what
     // gets pinned here is the behavior each value produces — not the absence of one
@@ -101,8 +104,7 @@ private slots:
         QVERIFY(dm.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
-        auto decision = FolderEnd::decide(FOLDER_END_GOTO_ADJACENT, static_cast<int>(dm.fileCount()),
-                                          dm.fileCount());
+        auto decision = FolderEnd::decide(FOLDER_END_GOTO_ADJACENT, static_cast<int>(dm.fileCount()), dm.fileCount());
         QVERIFY(decision.outcome == FolderEnd::Outcome::EnterAdjacentFolder);
         // the transition this keypress would take: nowhere — subdir is the only and
         // therefore the last folder here
@@ -127,18 +129,16 @@ private slots:
         QVERIFY(QDir(fixtureDir).mkdir("zulu"));
         QVERIFY(QDir(fixtureDir).mkdir("mike"));
         QVERIFY(QDir(fixtureDir).mkdir("bravo"));
-        QStringList names = {fixtureDir + "/bravo", fixtureDir + "/mike",
-                             fixtureDir + "/subdir", fixtureDir + "/zulu"};
+        QStringList names = {fixtureDir + "/bravo", fixtureDir + "/mike", fixtureDir + "/subdir", fixtureDir + "/zulu"};
         QStringList reversed;
-        for (int i = names.size() - 1; i >= 0; --i)
+        for(int i = names.size() - 1; i >= 0; --i)
             reversed << names.at(i);
 
         DirectoryManager dm{EngineBridge::instance()};
         QVERIFY(dm.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(dm.dirCount(), 4UL, 10000);
 
-        const SortingMode modes[] = {SORT_NAME, SORT_NAME_DESC, SORT_TIME, SORT_TIME_DESC,
-                                     SORT_SIZE, SORT_SIZE_DESC};
+        const SortingMode modes[] = {SORT_NAME, SORT_NAME_DESC, SORT_TIME, SORT_TIME_DESC, SORT_SIZE, SORT_SIZE_DESC};
         for(SortingMode mode : modes) {
             dm.setSortingMode(mode);
             QTRY_VERIFY_WITH_TIMEOUT(dm.isSettled(), 10000);
@@ -188,12 +188,11 @@ private slots:
         QStringList rows;
         for(unsigned long i = 0; i < dm.dirCount(); ++i)
             rows << dm.dirNameAt(int(i));
-        const QStringList want = {QStringLiteral("alpha"), QStringLiteral("mike"),
-                                  QStringLiteral("subdir"), QStringLiteral("zulu")};
+        const QStringList want = {QStringLiteral("alpha"), QStringLiteral("mike"), QStringLiteral("subdir"),
+                                  QStringLiteral("zulu")};
         QCOMPARE(rows, want);
         // navigation walks the same order
-        QCOMPARE(DirectoryManager::adjacentDirectory(fixtureDir + "/mike", true, SORT_TIME),
-                 fixtureDir + "/subdir");
+        QCOMPARE(DirectoryManager::adjacentDirectory(fixtureDir + "/mike", true, SORT_TIME), fixtureDir + "/subdir");
     }
 
     void settlePredicateTracksTheReplyInsteadOfTheRequest() {

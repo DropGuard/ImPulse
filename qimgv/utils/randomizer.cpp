@@ -36,7 +36,7 @@ int Randomizer::indexOf(int item) {
 void Randomizer::fill() {
     std::vector<int>::iterator it;
     int i = 0;
-    for (it = vec.begin(); it != vec.end(); ++it, ++i) {
+    for(it = vec.begin(); it != vec.end(); ++it, ++i) {
         *it = i;
     }
 }
@@ -44,7 +44,7 @@ void Randomizer::fill() {
 void Randomizer::print() {
     qDebug() << "---vector---";
     std::vector<int>::iterator it;
-    for (it = vec.begin(); it != vec.end(); ++it) {
+    for(it = vec.begin(); it != vec.end(); ++it) {
         std::cout << *it << std::endl;
     }
     qDebug() << "----end----";

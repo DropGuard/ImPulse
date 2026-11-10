@@ -12,21 +12,21 @@ class SettingsSidebarItem;
 
 class SettingsSidebar : public QWidget {
     Q_OBJECT
-public:
+  public:
     explicit SettingsSidebar(QWidget *parent = nullptr);
     void addEntry(QString icon, QString name);
     void selectEntry(int idx);
 
-private:
+  private:
     QBoxLayout *layout;
     QList<SettingsSidebarItem *> entries;
     Qt::Orientation orientation = Qt::Vertical;
     void selectEntryAt(QPoint pos);
 
-signals:
+  signals:
     void entrySelected(int);
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
 
@@ -35,18 +35,18 @@ protected:
 
 class SettingsSidebarItem : public QWidget {
     Q_OBJECT
-public:
-    explicit SettingsSidebarItem(const QString& icon, const QString& name, QWidget *parent = nullptr);
+  public:
+    explicit SettingsSidebarItem(const QString &icon, const QString &name, QWidget *parent = nullptr);
     void setHighlighted(bool mode);
     bool highlighted();
 
-private:
+  private:
     QBoxLayout *layout;
     IconWidget iconWidget;
     QLabel textLabel;
     bool mHighlighted = false;
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
 };
 

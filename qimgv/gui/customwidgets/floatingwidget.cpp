@@ -29,7 +29,6 @@ void FloatingWidget::paintEvent(QPaintEvent *event) {
 
 bool FloatingWidget::acceptKeyboardFocus() const {
     return mAcceptKeyboardFocus;
-
 }
 void FloatingWidget::setAcceptKeyboardFocus(bool mode) {
     mAcceptKeyboardFocus = mode;

@@ -4,6 +4,7 @@
 #include <QProxyStyle>
 
 class ProxyStyle : public QProxyStyle {
-public:
-    void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget = 0) const override;
+  public:
+    void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
+                       const QWidget *widget = 0) const override;
 };

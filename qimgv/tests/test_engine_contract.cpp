@@ -23,13 +23,13 @@
 // mirror lives in lib.rs and architecture_rules.py R5 compares the two.
 
 static int failures = 0;
-#define CHECK(cond)                                                        \
-    do {                                                                   \
-        if (!(cond)) {                                                     \
-            std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);   \
-            ++failures;                                                    \
-        }                                                                  \
-    } while (0)
+#define CHECK(cond)                                                                                                    \
+    do {                                                                                                               \
+        if(!(cond)) {                                                                                                  \
+            std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                                                \
+            ++failures;                                                                                                \
+        }                                                                                                              \
+    } while(0)
 
 static std::string makeFixture() {
     namespace fs = std::filesystem;
@@ -49,7 +49,7 @@ int main() {
 
     qimgv_engine *engine = qimgv_engine_new(nullptr, nullptr, 1, "jpg");
     CHECK(engine != nullptr);
-    if (!engine)
+    if(!engine)
         return 1;
 
     // fresh state
@@ -59,8 +59,7 @@ int main() {
     qimgv_mutation mut{};
     char dirbuf[512];
     char oldbuf[512];
-    CHECK(qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf),
-                                 &mut, nullptr) == 0);
+    CHECK(qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr) == 0);
 
     // error paths leave a readable diagnostic
     CHECK(qimgv_engine_set_sort(engine, 99) == QIMGV_ERR_BAD_SORT);
@@ -74,10 +73,9 @@ int main() {
     CHECK(openEpoch > 0);
 
     int got = 0;
-    for (int i = 0; i < 1000; ++i) {
-        got = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf),
-                                      &mut, nullptr);
-        if (got != 0)
+    for(int i = 0; i < 1000; ++i) {
+        got = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr);
+        if(got != 0)
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
@@ -138,14 +136,13 @@ int main() {
         // outcome — the consumer would apply the PREVIOUS event's subject and
         // mutation struct again, believing the rename had arrived.
         int refused = 0;
-        for (int i = 0; i < 1000; ++i) {
-            const int r = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), nullptr, 0,
-                                                 &mut, nullptr);
-            if (r != 0 && r != 1) {
+        for(int i = 0; i < 1000; ++i) {
+            const int r = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), nullptr, 0, &mut, nullptr);
+            if(r != 0 && r != 1) {
                 refused = r;
                 break;
             }
-            if (r == 0)
+            if(r == 0)
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         CHECK(refused == QIMGV_ERR_INVALID);
@@ -153,10 +150,9 @@ int main() {
 
         // and the same event, now that both subjects have somewhere to go
         int took = 0;
-        for (int i = 0; i < 200; ++i) {
-            took = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf),
-                                          &mut, nullptr);
-            if (took == 1)
+        for(int i = 0; i < 200; ++i) {
+            took = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr);
+            if(took == 1)
                 break;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
@@ -170,12 +166,12 @@ int main() {
         CHECK(mut.index == 1);
 
         bool sawOld = false, sawNew = false;
-        for (uint32_t i = 0; i < uint32_t(qimgv_engine_file_count(engine)); ++i) {
-            if (qimgv_engine_file_entry_at(engine, i, &meta, name, sizeof(name), path, sizeof(path)) != QIMGV_OK)
+        for(uint32_t i = 0; i < uint32_t(qimgv_engine_file_count(engine)); ++i) {
+            if(qimgv_engine_file_entry_at(engine, i, &meta, name, sizeof(name), path, sizeof(path)) != QIMGV_OK)
                 continue;
-            if (std::strcmp(path, from.c_str()) == 0)
+            if(std::strcmp(path, from.c_str()) == 0)
                 sawOld = true;
-            if (std::strcmp(path, to.c_str()) == 0)
+            if(std::strcmp(path, to.c_str()) == 0)
                 sawNew = true;
         }
         CHECK(sawNew);
@@ -206,7 +202,8 @@ int main() {
     // CRC-free PNG is fine — the header parsers don't validate chunk CRCs
     auto chunk = [](const char tag[4], const unsigned char *data, uint32_t len) {
         std::string c;
-        for (int i = 3; i >= 0; --i) c.push_back(char((len >> (8 * i)) & 0xff));
+        for(int i = 3; i >= 0; --i)
+            c.push_back(char((len >> (8 * i)) & 0xff));
         c.append(tag, 4);
         c.append(reinterpret_cast<const char *>(data), len);
         return c;

@@ -18,22 +18,22 @@ class PrintDialog;
 class PrintDialog : public QDialog {
     Q_OBJECT
 
-public:
+  public:
     explicit PrintDialog(QWidget *parent = nullptr);
     ~PrintDialog() override;
     void setImage(std::shared_ptr<const QImage> _img);
     void setOutputPath(QString path);
 
-private slots:
+  private slots:
     void print();
     void exportPdf();
     QRectF getImagePrintRect(QPrinter *printer);
     void updatePreview();
     void setLandscape(bool mode);
-    void onPrinterSelected(const QString& name);
+    void onPrinterSelected(const QString &name);
     QString pdfPathDialog();
 
-private:
+  private:
     void saveSettings();
     Ui::PrintDialog *ui;
     std::shared_ptr<const QImage> img = nullptr;

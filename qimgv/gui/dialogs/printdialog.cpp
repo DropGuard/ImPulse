@@ -3,11 +3,9 @@
 #include <utility>
 #include "ui_printdialog.h"
 
-PrintDialog::PrintDialog(QWidget *parent)
-    : QDialog(parent), ui(new Ui::PrintDialog)
-{
+PrintDialog::PrintDialog(QWidget *parent) : QDialog(parent), ui(new Ui::PrintDialog) {
     ui->setupUi(this);
-    ui->previewLabel->setContentsMargins(0,0,0,0);
+    ui->previewLabel->setContentsMargins(0, 0, 0, 0);
     pdfPrinter.setOutputFormat(QPrinter::PdfFormat);
     pdfPrinter.setPageSize(QPageSize(QPageSize::A4));
     pdfPrinter.setOutputFileName(" ");
@@ -83,19 +81,22 @@ void PrintDialog::updatePreview() {
     // margins
     QMarginsF margins(targetPrinter->pageLayout().marginsPixels(targetPrinter->resolution()));
     // scaled page with margins
-    QRect fullRectScaled( QRectF(QPointF(0,0), fullRect.size().scaled(ui->previewLabel->size(), Qt::KeepAspectRatio)).toRect() );
+    QRect fullRectScaled(
+        QRectF(QPointF(0, 0), fullRect.size().scaled(ui->previewLabel->size(), Qt::KeepAspectRatio)).toRect());
     qreal scale = fullRectScaled.width() / fullRect.width();
     // scaled image rect with margins (not accurate, but good enough for a preview)
     QRect imgRectScaled(QRectF((imgRect.left() + margins.left()) * scale, (imgRect.top() + margins.top()) * scale,
-                               imgRect.width() * scale, imgRect.height() * scale).toRect());
+                               imgRect.width() * scale, imgRect.height() * scale)
+                            .toRect());
     QPixmap pagePixmap(fullRectScaled.size() * qApp->devicePixelRatio());
     pagePixmap.setDevicePixelRatio(qApp->devicePixelRatio());
-    auto scaledImg = img->scaled(imgRectScaled.size() * qApp->devicePixelRatio(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    auto scaledImg =
+        img->scaled(imgRectScaled.size() * qApp->devicePixelRatio(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     if(ui->grayscale->isChecked())
         scaledImg = scaledImg.convertToFormat(QImage::Format_Grayscale8);
     scaledImg.setDevicePixelRatio(qApp->devicePixelRatio());
     QPainter p(&pagePixmap);
-    p.fillRect(pagePixmap.rect(), QColor(255,255,255));
+    p.fillRect(pagePixmap.rect(), QColor(255, 255, 255));
     p.drawImage(imgRectScaled.left(), imgRectScaled.top(), scaledImg);
     // page border for white window bg
     QPalette palette;
@@ -103,7 +104,8 @@ void PrintDialog::updatePreview() {
     if(sys_window.valueF() > 0.45f) {
         p.setOpacity(0.25f);
         p.setPen(Qt::black);
-        p.drawRect(QRectF(QPointF(0.5f, 0.5f), QSizeF(pagePixmap.size() / qApp->devicePixelRatio() - QSizeF(1.0f, 1.0f))));
+        p.drawRect(
+            QRectF(QPointF(0.5f, 0.5f), QSizeF(pagePixmap.size() / qApp->devicePixelRatio() - QSizeF(1.0f, 1.0f))));
     }
     ui->previewLabel->setPixmap(pagePixmap);
 }
@@ -112,7 +114,7 @@ QRectF PrintDialog::getImagePrintRect(QPrinter *pr) {
     QRectF imgRect;
     if(!pr || !img)
         return QRect();
-    QRectF pageRect = QRectF(QPoint(0,0), pr->pageRect(QPrinter::DevicePixel).size());
+    QRectF pageRect = QRectF(QPoint(0, 0), pr->pageRect(QPrinter::DevicePixel).size());
     imgRect = img->rect();
     // downscale / upscale
     if(ui->fitToPageCheckBox->isChecked() || imgRect.width() > pageRect.width() || imgRect.height() > pageRect.height())
@@ -136,7 +138,7 @@ void PrintDialog::setLandscape(bool mode) {
     updatePreview();
 }
 
-void PrintDialog::onPrinterSelected(const QString& name) {
+void PrintDialog::onPrinterSelected(const QString &name) {
     if(printer)
         delete printer;
     printer = new QPrinter(QPrinterInfo::printerInfo(name));

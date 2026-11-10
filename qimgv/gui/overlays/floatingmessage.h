@@ -20,18 +20,18 @@ enum FloatingMessageIcon {
 };
 
 class FloatingMessage : public OverlayWidget {
-    Q_OBJECT 
-public:
+    Q_OBJECT
+  public:
     FloatingMessage(FloatingWidgetContainer *parent);
     ~FloatingMessage() override;
     void showMessage(QString text, FloatingMessageIcon icon, int fadeDuration);
     void showMessage(QString text, FloatingWidgetPosition anchor, FloatingMessageIcon icon, int duration);
 
-public slots:
+  public slots:
     void show();
-    void setText(const QString& text);
+    void setText(const QString &text);
 
-private:
+  private:
     QTimer visibilityTimer;
     int hideDelay;
     FloatingWidgetPosition preferredPosition;
@@ -39,9 +39,9 @@ private:
     void doShowMessage(QString text, FloatingMessageIcon icon, int duration);
     void setIcon(FloatingMessageIcon icon);
 
-protected:
+  protected:
     void mousePressEvent(QMouseEvent *event) override;
 
-private slots:
+  private slots:
     void readSettings();
 };

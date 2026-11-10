@@ -1,9 +1,7 @@
 #include "fullscreeninfooverlayproxy.h"
 
 FullscreenInfoOverlayProxy::FullscreenInfoOverlayProxy(FloatingWidgetContainer *parent)
-    : container(parent),
-      infoOverlay(nullptr)
-{
+    : container(parent), infoOverlay(nullptr) {
 }
 
 FullscreenInfoOverlayProxy::~FullscreenInfoOverlayProxy() {
@@ -28,7 +26,7 @@ void FullscreenInfoOverlayProxy::hide() {
         infoOverlay->hide();
 }
 
-void FullscreenInfoOverlayProxy::setInfo(const QString& _position, const QString& _fileName, const QString& _info) {
+void FullscreenInfoOverlayProxy::setInfo(const QString &_position, const QString &_fileName, const QString &_info) {
     if(infoOverlay) {
         infoOverlay->setInfo(_position, _fileName, _info);
     } else {

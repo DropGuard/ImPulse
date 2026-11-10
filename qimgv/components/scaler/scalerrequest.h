@@ -7,11 +7,14 @@
 #include "settings.h" // move enums somewhere else?
 
 class ScalerRequest {
-public:
-    ScalerRequest() : image(nullptr), size(QSize(0,0)), filter(QI_FILTER_BILINEAR) { }
+  public:
+    ScalerRequest() : image(nullptr), size(QSize(0, 0)), filter(QI_FILTER_BILINEAR) {
+    }
     ScalerRequest(std::shared_ptr<Image> _image, QSize _size, QString _path, ScalingFilter _filter,
-                  bool _smoothUpscaling) : image(std::move(_image)), size(_size), path(std::move(_path)), filter(_filter),
-                  smoothUpscaling(_smoothUpscaling) {}
+                  bool _smoothUpscaling)
+        : image(std::move(_image)), size(_size), path(std::move(_path)), filter(_filter),
+          smoothUpscaling(_smoothUpscaling) {
+    }
     std::shared_ptr<Image> image;
     QSize size;
     QString path;
@@ -32,8 +35,8 @@ public:
     // it identifies the file the result is for (Core checks that on delivery),
     // not what the result is.
     bool operator==(const ScalerRequest &another) const {
-        return another.image == image && another.size == size
-            && another.filter == filter && another.smoothUpscaling == smoothUpscaling;
+        return another.image == image && another.size == size && another.filter == filter &&
+               another.smoothUpscaling == smoothUpscaling;
     }
 };
 

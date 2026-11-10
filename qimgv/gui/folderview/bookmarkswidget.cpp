@@ -1,8 +1,8 @@
 #include "bookmarkswidget.h"
 
 BookmarksWidget::BookmarksWidget(QWidget *parent) : QWidget(parent), highlightedPath("") {
-    setContentsMargins(0,0,0,0);
-    layout.setContentsMargins(0,0,0,0);
+    setContentsMargins(0, 0, 0, 0);
+    layout.setContentsMargins(0, 0, 0, 0);
     layout.setSpacing(0);
     setLayout(&layout);
     connect(settings, &Settings::settingsChanged, this, &BookmarksWidget::readSettings);
@@ -24,7 +24,7 @@ void BookmarksWidget::saveBookmarks() {
     settings->setBookmarks(paths);
 }
 
-void BookmarksWidget::addBookmark(const QString& dirPath) {
+void BookmarksWidget::addBookmark(const QString &dirPath) {
     if(paths.contains(dirPath))
         return;
     paths.push_back(dirPath);
@@ -37,9 +37,9 @@ void BookmarksWidget::addBookmark(const QString& dirPath) {
     saveBookmarks();
 }
 
-void BookmarksWidget::removeBookmark(const QString& dirPath) {
+void BookmarksWidget::removeBookmark(const QString &dirPath) {
     for(int i = 0; i < layout.count(); i++) {
-        auto w = dynamic_cast<BookmarksItem*>(layout.itemAt(i)->widget());
+        auto w = dynamic_cast<BookmarksItem *>(layout.itemAt(i)->widget());
         if(w && w->path() == dirPath) {
             if(highlightedPath == dirPath)
                 highlightedPath = "";
@@ -55,18 +55,18 @@ void BookmarksWidget::removeBookmark(const QString& dirPath) {
     }
 }
 
-void BookmarksWidget::onPathChanged(const QString& path) {
+void BookmarksWidget::onPathChanged(const QString &path) {
     if(highlightedPath == path)
         return;
     if(paths.contains(highlightedPath)) {
         int currentIndex = paths.indexOf(highlightedPath);
-        auto w = dynamic_cast<BookmarksItem*>(layout.itemAt(currentIndex)->widget());
+        auto w = dynamic_cast<BookmarksItem *>(layout.itemAt(currentIndex)->widget());
         w->setHighlighted(false);
         highlightedPath = "";
     }
     if(paths.contains(path)) {
         int newIndex = paths.indexOf(path);
-        auto w = dynamic_cast<BookmarksItem*>(layout.itemAt(newIndex)->widget());
+        auto w = dynamic_cast<BookmarksItem *>(layout.itemAt(newIndex)->widget());
         w->setHighlighted(true);
         highlightedPath = path;
     }

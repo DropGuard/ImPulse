@@ -13,7 +13,7 @@ struct VideoControlsStateBuffer {
 
 class VideoControlsProxyWrapper : public QObject {
     Q_OBJECT
-public:
+  public:
     explicit VideoControlsProxyWrapper(FloatingWidgetContainer *parent = nullptr);
     ~VideoControlsProxyWrapper() override;
     void init();
@@ -23,19 +23,19 @@ public:
     bool underMouse();
     bool isVisible();
 
-signals:
+  signals:
     void seek(int pos);
     void seekForward();
     void seekBackward();
 
-public slots:
+  public slots:
     void setPlaybackDuration(int);
     void setPlaybackPosition(int);
     void setMode(PlaybackMode);
     void onPlaybackPaused(bool);
     void onVideoMuted(bool);
 
-private:
+  private:
     FloatingWidgetContainer *container;
     QPointer<VideoControls> videoControls;
     VideoControlsStateBuffer stateBuf;

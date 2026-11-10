@@ -10,10 +10,14 @@
 #include <QIcon>
 
 class ImageStatic : public Image {
-public:
+  public:
     ImageStatic(std::unique_ptr<DocumentInfo> _info, bool scaled, const LoadPolicy &policy);
-    bool isScaledRequest() const { return mScaledRequest; }
-    bool isScaledResult() const override { return mScaledApplied; }
+    bool isScaledRequest() const {
+        return mScaledRequest;
+    }
+    bool isScaledResult() const override {
+        return mScaledApplied;
+    }
     ~ImageStatic() override;
 
     std::unique_ptr<QPixmap> getPixmap() override;
@@ -28,11 +32,11 @@ public:
     bool setEditedImage(std::unique_ptr<const QImage> imageEditedNew);
     bool discardEditedImage();
 
-public slots:
+  public slots:
     void crop(QRect newRect);
     bool save(QString destPath, int jpegQuality) override;
 
-private:
+  private:
     bool mScaledRequest = false;
     bool mScaledApplied = false;
     QSize mOriginalSize;

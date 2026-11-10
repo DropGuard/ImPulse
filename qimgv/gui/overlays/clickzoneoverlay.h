@@ -13,10 +13,9 @@ enum ActiveHighlightZone {
     HIGHLIGHT_RIGHT
 };
 
-class ClickZoneOverlay : public FloatingWidget
-{
+class ClickZoneOverlay : public FloatingWidget {
     Q_OBJECT
-public:
+  public:
     explicit ClickZoneOverlay(FloatingWidgetContainer *parent);
     QRect leftZone();
     QRect rightZone();
@@ -27,10 +26,10 @@ public:
     bool isHighlighted();
     void setPressed(bool mode);
 
-public slots:
+  public slots:
     void readSettings();
 
-private:
+  private:
     QPixmap loadPixmap(QString path);
     QPixmap pixmapLeft, pixmapRight;
     QRect mLeftZone, mRightZone;
@@ -43,7 +42,7 @@ private:
     ActiveHighlightZone activeZone = HIGHLIGHT_NONE;
     void drawPixmap(QPainter &p, const QPixmap &pixmap, QRect rect);
 
-protected:
+  protected:
     void resizeEvent(QResizeEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void recalculateGeometry() override;

@@ -23,12 +23,16 @@ enum ThumbnailStyle {
 class ThumbnailWidgetCmp : public QGraphicsWidget {
     Q_OBJECT
 
-public:
+  public:
     ThumbnailWidgetCmp(QGraphicsItem *parent = nullptr);
     ~ThumbnailWidgetCmp() override;
 
-    enum { Type = UserType + 1 };
-    int type() const { return Type; }
+    enum {
+        Type = UserType + 1
+    };
+    int type() const {
+        return Type;
+    }
 
     bool isLoaded;
     void setThumbnail(std::shared_ptr<Thumbnail> _thumbnail);
@@ -56,16 +60,17 @@ public:
     void reset();
     void unsetThumbnail();
 
-protected:
+  protected:
     void setupTextLayout();
-    void drawThumbnail(QPainter* painter, const QPixmap *pixmap);
+    void drawThumbnail(QPainter *painter, const QPixmap *pixmap);
     void drawIcon(QPainter *painter, const QPixmap *pixmap);
     void drawHighlight(QPainter *painter);
     void drawHoverBg(QPainter *painter);
     void drawHoverHighlight(QPainter *painter);
     void drawLabel(QPainter *painter);
     void drawDropHover(QPainter *painter);
-    void drawSingleLineText(QPainter *painter, QFont &_fnt, QRect rect, QString text, const QColor &color, bool center = true);
+    void drawSingleLineText(QPainter *painter, QFont &_fnt, QRect rect, QString text, const QColor &color,
+                            bool center = true);
     void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override;
     void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *item, QWidget *widget) override;
