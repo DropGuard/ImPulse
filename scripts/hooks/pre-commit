@@ -30,7 +30,14 @@ cmake --build build -j"$(nproc)" > /tmp/qimgv-hook-build.log 2>&1 || {
     grep -E "error|FAILED" /tmp/qimgv-hook-build.log | head -10 >&2
     exit 1
 }
-if ! (cd build && ctest -Q); then
+# -j4: the six binaries are independent processes and the wall time halves
+# (measured 22.5/23.6/25.2s serial against 11.2/11.0/12.4s parallel, 6/6
+# green each). Safe by construction, not by luck: engine_stack_main sweeps
+# only its own pid-scoped fixture tree ("Sweeping the whole base was wrong:
+# it deletes the directories a concurrently running instance is watching"),
+# and FreshSettings gives every test instance a pid-unique application name,
+# so its config file is one nothing else reads or has cached.
+if ! (cd build && ctest -Q -j4); then
     echo "pre-commit: ctest red — evidence in build/Testing/Temporary/LastTest.log" >&2
     echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
     exit 1
