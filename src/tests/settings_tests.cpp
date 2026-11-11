@@ -374,46 +374,111 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         QVERIFY(QDir(alt).exists());
     }
 
-    // The 2026.11 rename: the fork answered to "qimgv", and the user's config
-    // and cache belong to them, not to the old name. The first run under the
-    // new identity carries the three conf files and the cache over — once, and
-    // only when the new identity has nothing yet. The identity set here is the
-    // one the fixture already runs under (testhelpers mirrors production), so
-    // nothing leaks sideways into the other slots.
-    void firstRunUnderTheNewIdentityCarriesTheLegacyFiles() {
-        // scratch paths: the carry is a file-level operation and QSettings'
-        // shared per-file state would poison any assertion made behind its back
+    // Importing a qimgv configuration is an explicit request, not a startup
+    // migration: until 2026.11 this fork and upstream qimgv shared the identity
+    // "qimgv/qimgv", so the directory is equally likely to be an upstream
+    // installation whose files are not ours to read unasked.
+    //
+    // Pinned here are the decisions this function makes and could get wrong:
+    // which file becomes which, that an existing destination is never
+    // overwritten, and that "the source has nothing" is its own answer rather
+    // than a failure. NOT pinned: that QFile::copy leaves its source alone, and
+    // that a function which is never handed a cache path does not touch one —
+    // both are properties of Qt and of the signature, and a test that restates
+    // them cannot fail for a reason this code owns.
+    void importingAQimgvConfigurationCopiesAndNeverOverwrites() {
         QTemporaryDir scratch;
         QVERIFY(scratch.isValid());
-        const QString legacyConf = scratch.filePath("legacy-conf");
-        const QString newConf = scratch.filePath("new-conf");
-        const QString legacyCache = scratch.filePath("legacy-cache");
-        const QString newCache = scratch.filePath("new-cache");
-        QDir().mkpath(legacyConf);
-        QDir().mkpath(legacyCache + "/thumbnails");
-        writeTestFile(legacyConf + "/qimgv.conf", "theConf=carried\n");
-        writeTestFile(legacyConf + "/savedState.conf", "[state]\nlastDir=/x\n");
-        writeTestFile(legacyConf + "/theme.conf", "[theme]\n");
-        writeTestFile(legacyCache + "/thumbnails/carried.png", "png");
+        const QString source = scratch.filePath("qimgv-conf");
+        const QString dest = scratch.filePath("impulse-conf");
+        QDir().mkpath(source);
+        writeTestFile(source + "/qimgv.conf", "theConf=imported\n");
+        writeTestFile(source + "/theme.conf", "[theme]\n");
 
-        Settings::carryIdentityFiles(legacyConf, newConf, legacyCache, newCache);
-        QCOMPARE(readTestFile(newConf + "/impulse.conf"), QByteArray("theConf=carried\n"));
-        QVERIFY(QFile::exists(newConf + "/savedState.conf"));
-        QVERIFY(QFile::exists(newConf + "/theme.conf"));
-        QVERIFY(QFile::exists(newCache + "/thumbnails/carried.png"));
-        // the conf files were COPIED: upstream qimgv keeps working if the user
-        // goes back — only the regenerable cache moved whole
-        QCOMPARE(readTestFile(legacyConf + "/qimgv.conf"), QByteArray("theConf=carried\n"));
-        QVERIFY(!QDir(legacyCache).exists());
+        auto report = Settings::importQimgvConfig(source, dest);
+        QVERIFY(report.outcome == Settings::ImportOutcome::Imported);
+        QVERIFY(report.detail.isEmpty());
+        // qimgv.conf is RENAMED on the way in; the companions keep their names
+        QCOMPARE(report.copied.size(), 2);
+        QCOMPARE(readTestFile(dest + "/impulse.conf"), QByteArray("theConf=imported\n"));
+        QVERIFY(QFile::exists(dest + "/theme.conf"));
+        // a file qimgv never had is not invented
+        QVERIFY(!QFile::exists(dest + "/savedState.conf"));
 
-        // the once-guard: a new identity that already exists is left alone —
-        // the second run of the new binary must not resurrect or clobber
-        writeTestFile(newConf + "/impulse.conf", "theConf=newer\n");
-        writeTestFile(legacyConf + "/qimgv.conf", "theConf=edited-after\n");
-        Settings::carryIdentityFiles(legacyConf, newConf, legacyCache, newCache);
-        QCOMPARE(readTestFile(newConf + "/impulse.conf"), QByteArray("theConf=newer\n"));
-        // and the legacy conf the user kept editing upstream is untouched
-        QCOMPARE(readTestFile(legacyConf + "/qimgv.conf"), QByteArray("theConf=edited-after\n"));
+        // a second run does not clobber what this app has been running with —
+        // this is the decision, not a side effect: the alternative (prefer the
+        // source) would silently revert the user's current settings
+        writeTestFile(dest + "/impulse.conf", "theConf=current\n");
+        writeTestFile(source + "/qimgv.conf", "theConf=upstream-edited-since\n");
+        auto again = Settings::importQimgvConfig(source, dest);
+        QVERIFY(again.outcome == Settings::ImportOutcome::AllSkipped);
+        QVERIFY(again.skipped.contains(QStringLiteral("impulse.conf")));
+        QCOMPARE(readTestFile(dest + "/impulse.conf"), QByteArray("theConf=current\n"));
+
+        // no qimgv.conf at all: "nothing to import", a distinct answer from a
+        // failure, because the dialog says something different for each
+        QTemporaryDir empty;
+        QVERIFY(empty.isValid());
+        auto none = Settings::importQimgvConfig(empty.path(), scratch.filePath("other-dest"));
+        QVERIFY(none.outcome == Settings::ImportOutcome::NoSource);
+        QVERIFY(none.copied.isEmpty());
+    }
+
+    // The import reads the directory where QSettings actually puts the legacy
+    // identity. Pinned against QSettings itself, not against a re-spelling of
+    // the same expression: a wrong guess makes the feature silently find
+    // nothing on every machine, and comparing the implementation to itself
+    // cannot catch that.
+    void theImportSourceIsWhereQSettingsPutsTheLegacyIdentity() {
+        const QString beforeOrg = QCoreApplication::organizationName();
+        const QString beforeApp = QCoreApplication::applicationName();
+        // the shared legacy identity, exactly as the 2026.11 rename left it
+        QCoreApplication::setOrganizationName(QStringLiteral("qimgv"));
+        QCoreApplication::setApplicationName(QStringLiteral("qimgv"));
+        const QString fromQSettings = QFileInfo(QSettings().fileName()).absolutePath();
+        QCoreApplication::setOrganizationName(beforeOrg);
+        QCoreApplication::setApplicationName(beforeApp);
+
+        QCOMPARE(Settings::qimgvConfigDir(), fromQSettings);
+    }
+
+    // This app's pre-XDG private store is removed once per cache root.
+    // Four things have to hold, and each has its own way of going wrong: our
+    // store goes, the upstream "qimgv" store SURVIVES (upstream may still be
+    // installed, and it is not ours to make regenerate), unrelated things in the
+    // cache root stay, and the marker makes the second call a no-op even when
+    // the directory has come back.
+    void retirePrivateThumbnailStoresRemovesOnlyOurOwnStore() {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const QString base = root.path();
+        QDir().mkpath(base + "/impulse/thumbnails");
+        QDir().mkpath(base + "/qimgv/thumbnails"); // upstream's, by name
+        QDir().mkpath(base + "/impulse/logs");
+        QDir().mkpath(base + "/other-app/thumbnails");
+        QDir().mkpath(base + "/thumbnails"); // the shared store itself
+        writeTestFile(base + "/impulse/thumbnails/a.png", "png");
+        writeTestFile(base + "/qimgv/thumbnails/b.png", "png");
+        writeTestFile(base + "/impulse/logs/session.log", "log");
+        writeTestFile(base + "/other-app/thumbnails/c.png", "png");
+        writeTestFile(base + "/thumbnails/d.png", "png");
+
+        QCoreApplication::setApplicationName(QStringLiteral("impulse"));
+        Settings::retirePrivateThumbnailStores(base);
+
+        QVERIFY(!QDir(base + "/impulse/thumbnails").exists());
+        QVERIFY2(QDir(base + "/qimgv/thumbnails").exists(),
+                 "the legacy name belongs to upstream too — deleting it would make upstream regenerate everything");
+        QVERIFY2(QDir(base + "/impulse/logs").exists(), "the app's own scratch space is not a thumbnail store");
+        QVERIFY2(QDir(base + "/other-app/thumbnails").exists(), "another app's cache is not ours to delete");
+        QVERIFY2(QDir(base + "/thumbnails").exists(), "the shared store is the replacement, not a casualty");
+
+        // the marker: a store that reappears (an older binary ran again) is not
+        // deleted on the next start — the migration already happened
+        QDir().mkpath(base + "/impulse/thumbnails");
+        writeTestFile(base + "/impulse/thumbnails/again.png", "png");
+        Settings::retirePrivateThumbnailStores(base);
+        QVERIFY2(QFile::exists(base + "/impulse/thumbnails/again.png"), "the retirement runs once, not on every start");
     }
 };
 
