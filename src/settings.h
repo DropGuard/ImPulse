@@ -140,8 +140,8 @@ class Settings : public QObject {
     void setPanelPosition(PanelPosition);
     bool loopSlideshow();
     void setLoopSlideshow(bool mode);
-    void readShortcuts(QMap<QString, QString> &shortcuts);
-    void saveShortcuts(const QMap<QString, QString> &shortcuts);
+    void readShortcuts(QMap<QString, QString> &shortcuts, const QString &key = QStringLiteral("shortcuts"));
+    void saveShortcuts(const QMap<QString, QString> &shortcuts, const QString &key = QStringLiteral("shortcuts"));
     bool panelEnabled();
     void setPanelEnabled(bool mode);
     int lastDisplay();
