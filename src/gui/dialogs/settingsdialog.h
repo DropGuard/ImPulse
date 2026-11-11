@@ -84,6 +84,10 @@ class SettingsDialog : public QDialog {
     void removeShortcut();
     void resetShortcuts();
     void selectMpvPath();
+    // Explicit, never automatic: until 2026.11 this fork and upstream qimgv
+    // shared the "qimgv/qimgv" identity, so the directory may belong to an
+    // upstream installation. The user asks, the dialog reports what happened.
+    void importQimgvConfig();
     void onBgOpacitySliderChanged(int value);
     void onThumbnailerThreadsSliderChanged(int value);
     void onExpandLimitSliderChanged(int value);
