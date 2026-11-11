@@ -164,6 +164,10 @@ void CopyOverlay::keyPressEvent(QKeyEvent *event) {
         hide();
         return;
     }
+    // a bare Enter is no answer here — the digits are the answers, and
+    // yielding Enter would toggle the folder view behind the menu
+    if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
+        return;
     QString key = actionManager->keyForNativeScancode(event->nativeScanCode());
     if(shortcuts.contains(key))
         requestFileOperation(pathWidgets.at(shortcuts[key])->directory());
