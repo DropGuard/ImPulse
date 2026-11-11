@@ -483,6 +483,15 @@ class TestCoreNav : public QObject {
         core.mw->overlays()->triggerCopyOverlay();
         auto *copyOverlay = core.mw->findChild<CopyOverlay *>();
         QVERIFY(copyOverlay && copyOverlay->isVisible());
+
+        // a bare Enter is no answer in a digits-answer menu: it must not
+        // toggle the folder view behind the overlay
+        QKeyEvent enterKey(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, scanCodeFor(QStringLiteral("Enter")), 0u,
+                           0u);
+        QApplication::sendEvent(copyOverlay, &enterKey);
+        QCOMPARE(core.mw->currentViewMode(), MODE_DOCUMENT);
+        QVERIFY(copyOverlay->isVisible());
+
         QApplication::sendEvent(copyOverlay, &esc);
         QVERIFY(!copyOverlay->isVisible());
 
