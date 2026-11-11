@@ -57,15 +57,20 @@ impl Default for MetaInfo {
 const HEAD_LEN: usize = 64 * 1024;
 
 pub fn probe(path: &Path) -> Result<MetaInfo, EngineError> {
-    let mut file = File::open(path)
-        .map_err(|source| EngineError::Io { path: path.to_owned(), source })?;
+    let mut file = File::open(path).map_err(|source| EngineError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
 
     let mut head = [0u8; HEAD_LEN];
     let mut filled = 0;
     loop {
         let n = file
             .read(&mut head[filled..])
-            .map_err(|source| EngineError::Io { path: path.to_owned(), source })?;
+            .map_err(|source| EngineError::Io {
+                path: path.to_owned(),
+                source,
+            })?;
         if n == 0 || filled + n == HEAD_LEN {
             filled += n;
             break;

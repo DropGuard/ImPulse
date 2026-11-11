@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::time::UNIX_EPOCH;
 
 use crate::error::EngineError;
@@ -52,8 +52,10 @@ pub fn scan_directory(path: &Path, opts: &ScanOptions) -> Result<ScanOutput, Eng
     let show_hidden = opts.show_hidden.load(AtomicOrdering::Relaxed);
     let mut out = ScanOutput::default();
 
-    let rd = fs::read_dir(path)
-        .map_err(|source| EngineError::Io { path: path.to_owned(), source })?;
+    let rd = fs::read_dir(path).map_err(|source| EngineError::Io {
+        path: path.to_owned(),
+        source,
+    })?;
 
     for entry in rd {
         let entry = match entry {

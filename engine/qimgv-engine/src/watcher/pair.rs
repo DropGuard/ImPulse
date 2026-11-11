@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{classify, event_is_live, is_dir_mask, RawWatchEvent, RawWatchKind};
+use super::{RawWatchEvent, RawWatchKind, classify, event_is_live, is_dir_mask};
 
 /// One raw inotify record, reduced to the fields the stream decisions read.
 /// The kernel's record header parsing stays in the fd layer (the inotify crate
@@ -53,12 +53,18 @@ pub enum DropReason {
 pub enum Out {
     /// Send this event. `paired_cookie` is set exactly when the event is a
     /// fold of two records — the trace names the move it closed.
-    Report { ev: RawWatchEvent, paired_cookie: Option<u32> },
+    Report {
+        ev: RawWatchEvent,
+        paired_cookie: Option<u32>,
+    },
     /// A held MOVED_FROM retired unpaired: its pair never showed up beside it,
     /// so it is reported as the removal it always would have been. The event
     /// names the watch and directory the FROM was SEEN in, which a retarget
     /// may no longer be watching.
-    Unpaired { ev: RawWatchEvent, cookie: u32 },
+    Unpaired {
+        ev: RawWatchEvent,
+        cookie: u32,
+    },
     Drop(DropReason),
 }
 
@@ -107,9 +113,7 @@ impl Pairer {
             return out;
         };
         let mut name = rec.name;
-        if name.is_none()
-            && !matches!(kind, RawWatchKind::Overflow | RawWatchKind::WatchGone)
-        {
+        if name.is_none() && !matches!(kind, RawWatchKind::Overflow | RawWatchKind::WatchGone) {
             out.push(Out::Drop(DropReason::NoName { kind }));
             return out;
         }
