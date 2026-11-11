@@ -57,6 +57,19 @@ void FileOperations::removeDir(const QString &dirPath, bool recursive, FileOpRes
     return;
 }
 
+QString FileOperations::nextFreeVariantPath(const QString &filePath) {
+    const QFileInfo fi(filePath);
+    const QString suffix = fi.suffix().isEmpty() ? QString() : QLatin1Char('.') + fi.suffix();
+    const QString stem = fi.completeBaseName(); // multi-dot names keep theirs: archive.tar, not archive
+    for(int n = 1; n < 1000; n++) {
+        const QString candidate = fi.absolutePath() + QLatin1Char('/') + stem + QStringLiteral(" (") +
+                                  QString::number(n) + QLatin1Char(')') + suffix;
+        if(!QFileInfo::exists(candidate))
+            return candidate;
+    }
+    return filePath; // a thousand variants: let the user type
+}
+
 QString FileOperations::decodeResult(const FileOpResult &result) {
     switch(result) {
     case FileOpResult::SUCCESS: return QObject::tr("Operation completed succesfully.");
