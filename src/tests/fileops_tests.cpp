@@ -33,7 +33,7 @@ class TestFileOps : public QObject, protected EngineStackFixture {
     void copyFileToRejectsADirectoryCollision();
     void copyFileToReportsAnUnwritableDestination();
     void moveFileToMovesContentAndRemovesTheSource();
-    void moveFileToRevertsWhenTheOriginalCannotBeRemoved();
+    void moveFileToReportsASourceItCouldNotRemove();
     void renameMovesTheFileAndRefusesCollisions();
     void removeFileAndRemoveDirReportExactResults();
     void decodeResultNamesEveryOutcome();
@@ -128,10 +128,26 @@ void TestFileOps::copyFileToReportsCollisionWithoutForceAndOverwritesWithForce()
     FileOperations::copyFileTo(src, destDir, true, result);
     QCOMPARE(result, SUCCESS);
     QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("new"));
-    // the overwrite moves the old file aside as a hash-named backup; the
-    // successful copy must have removed it again — no trail left behind
-    const QStringList trail = QDir(destDir).entryList(QStringList() << "a.txt_*", QDir::Files);
-    QVERIFY2(trail.isEmpty(), qPrintable("backup left behind: " + trail.join(", ")));
+    // the overwrite moves the old file aside first; the successful copy must
+    // have removed it again — no trail left behind
+    const QStringList trail = QDir(destDir).entryList(QStringList() << "a.txt*", QDir::Files);
+    QCOMPARE(trail, QStringList{QStringLiteral("a.txt")});
+
+    // The temporary carries this process's pid. A name that is a pure function
+    // of the destination is shared with every other process overwriting the
+    // same file, and the loser of that race restores the wrong bytes. Planting
+    // the old fixed name is how the property is observable without a second
+    // process: the overwrite must not touch a path it did not create.
+    const QString legacyName =
+        destDir + "/a.txt_" +
+        QString(QCryptographicHash::hash((destDir + "/a.txt").toUtf8(), QCryptographicHash::Md5).toHex());
+    makeFile(legacyName, "someone else's");
+    makeFile(destDir + "/a.txt", "old again");
+    result = OTHER_ERROR;
+    FileOperations::copyFileTo(src, destDir, true, result);
+    QCOMPARE(result, SUCCESS);
+    QVERIFY2(QFile::exists(legacyName), "the overwrite removed a file whose name it does not own");
+    QCOMPARE(contentOf(legacyName), QByteArray("someone else's"));
 }
 
 void TestFileOps::copyFileToRejectsADirectoryCollision() {
@@ -184,7 +200,14 @@ void TestFileOps::moveFileToMovesContentAndRemovesTheSource() {
     QCOMPARE(QFileInfo(destDir + "/a.txt").lastModified(), srcMTime);
 }
 
-void TestFileOps::moveFileToRevertsWhenTheOriginalCannotBeRemoved() {
+// A cross-directory move is a copy followed by a source removal, and those two
+// steps can disagree. The old contract answered that disagreement by undoing
+// the copy — the destination went back to its previous contents and the user
+// was told "Other error", while the file they had just seen move was gone from
+// the destination again. The new contract reports the half that actually
+// completed: the destination holds the file, the source is still there, and
+// SOURCE_NOT_REMOVED says so in those words.
+void TestFileOps::moveFileToReportsASourceItCouldNotRemove() {
     // act runs its container as root, and root ignores permission bits — "unwritable" is not
     // expressible there. The pin needs a user account to exist.
     if(geteuid() == 0)
@@ -198,18 +221,19 @@ void TestFileOps::moveFileToRevertsWhenTheOriginalCannotBeRemoved() {
     makeFile(destDir + "/a.txt", "old");
 
     // the removal happens through removeFile(), which needs a writable source
-    // directory on Linux — a read-only one forces the post-copy removal to
-    // fail, which is the path whose contract is the full revert: destination
-    // restored from the backup, source untouched, and an honest OTHER_ERROR
+    // directory on Linux — a read-only one forces the post-copy removal to fail
     QVERIFY(QFile::setPermissions(srcDir, QFile::Permissions(0x5555)));
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::moveFileTo(src, destDir, true, result);
-
-    QCOMPARE(result, OTHER_ERROR);
-    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("old")); // backup restored
-    QCOMPARE(contentOf(src), QByteArray("new"));                // source never lost
     QVERIFY(QFile::setPermissions(srcDir, QFile::Permissions(0x7755)));
+
+    QCOMPARE(result, SOURCE_NOT_REMOVED);
+    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("new")); // the copy stands
+    QCOMPARE(contentOf(src), QByteArray("new"));                // the source is still there
+    // and nothing else was left in the destination directory
+    const QStringList trail = QDir(destDir).entryList(QDir::Files, QDir::Name);
+    QCOMPARE(trail, QStringList{QStringLiteral("a.txt")});
 }
 
 void TestFileOps::renameMovesTheFileAndRefusesCollisions() {
