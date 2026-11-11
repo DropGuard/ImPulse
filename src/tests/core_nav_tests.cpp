@@ -632,8 +632,10 @@ class TestCoreNav : public QObject {
         QVERIFY(widthBox && heightBox);
         QVERIFY2(widthBox->maximum() > 1 && heightBox->maximum() > 1,
                  "precondition broken: the fixture image is too small to crop");
-        widthBox->setValue(widthBox->maximum() - 1);
-        heightBox->setValue(heightBox->maximum() - 1);
+        const int originalWidth = widthBox->maximum();
+        const int originalHeight = heightBox->maximum();
+        widthBox->setValue(originalWidth - 1);
+        heightBox->setValue(originalHeight - 1);
 
         QSignalSpy applied(panel, &CropPanel::crop);
         QSignalSpy savedToDisk(panel, &CropPanel::cropAndSave);
@@ -641,28 +643,31 @@ class TestCoreNav : public QObject {
         QApplication::sendEvent(overlay, &enter);
         QCOMPARE(applied.count(), 1);     // the subset existed, and the answer fired
         QCOMPARE(savedToDisk.count(), 0); // the bare key never writes
-        QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000); // applied and dismissed
+
+        // Apply does not dismiss: the surface stays open and, once the
+        // applied crop settles into the viewer, the selection becomes the
+        // whole new image — re-cropping is dragging again, no key needed
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QTRY_COMPARE_WITH_TIMEOUT(widthBox->value(), originalWidth - 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(heightBox->value(), originalHeight - 1, 10000);
+        QCOMPARE(widthBox->maximum(), originalWidth - 1); // the readout tracks the new ground truth
+        QCOMPARE(heightBox->maximum(), originalHeight - 1);
 
         // the save chord, pressed while a selection stands, commits the crop
-        // and writes — end to end, disk included: crop again, then Ctrl+S
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
-        auto *panel2 = core.mw->findChild<CropPanel *>();
-        QVERIFY(panel2);
-        auto *width2 = panel2->findChild<QSpinBox *>(QStringLiteral("width"));
-        auto *height2 = panel2->findChild<QSpinBox *>(QStringLiteral("height"));
-        QVERIFY(width2 && height2);
-        QVERIFY2(width2->maximum() > 1 && height2->maximum() > 1,
-                 "precondition broken: the first crop left nothing to crop");
-        width2->setValue(width2->maximum() - 1);
-        height2->setValue(height2->maximum() - 1);
+        // and writes — end to end, disk included, from the surface that
+        // never left
+        widthBox->setValue(widthBox->maximum() - 1);
+        heightBox->setValue(heightBox->maximum() - 1);
 
-        QSignalSpy applied2(panel2, &CropPanel::crop);
+        QSignalSpy applied2(panel, &CropPanel::crop);
         QKeyEvent ctrlS(QEvent::KeyPress, Qt::Key_S, Qt::ControlModifier, scanCodeFor(QStringLiteral("S")), 0u, 0u);
-        QApplication::sendEvent(core.mw->findChild<CropOverlay *>(), &ctrlS);
+        QApplication::sendEvent(overlay, &ctrlS);
         QCOMPARE(applied2.count(), 1); // the chord commits the pending crop...
         QTRY_COMPARE_WITH_TIMEOUT(QImage(QDir(base).filePath("cropkeys.png")).size(),
-                                  QSize(width2->maximum() - 1, height2->maximum() - 1), 10000); // ...and writes it
+                                  QSize(originalWidth - 2, originalHeight - 2), 10000); // ...and writes it
+        QVERIFY2(
+            core.mw->crop()->isCropPanelActive(),
+            "the write went through the global save action, which does not own the surface — Esc is the only exit");
     }
 
     // free zoom works mechanically on images that fit the viewport (small
