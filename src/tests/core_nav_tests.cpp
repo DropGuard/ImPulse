@@ -3161,6 +3161,61 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(dir).filePath("b.png"), 10000);
     }
 
+    // The keymap page renders as scenarios: one section per scope under a
+    // header row, and a row saves into the table its section stands for.
+    // The render half is pinned through readSettings (a public slot); the
+    // save half through saveShortcuts (public on the same seam) — an
+    // injected grid row must land in the grid table and nowhere else, and
+    // the cycle must otherwise be an identity.
+    void shortcutDialogSectionsRenderAndSaveApart() {
+        const QMap<QString, QString> gridSnapshot = actionManager->allGridShortcuts();
+        const int globalBefore = actionManager->allShortcuts().size();
+        const int gridBefore = gridSnapshot.size();
+        const int inspectBefore = actionManager->allInspectShortcuts().size();
+
+        SettingsDialog dialog;
+        dialog.readSettings();
+        auto *table = dialog.findChild<QTableWidget *>(QStringLiteral("shortcutsTableWidget"));
+        QVERIFY2(table, "the shortcuts table did not materialize");
+        int headers = 0, global = 0, grid = 0, inspect = 0;
+        for(int r = 0; r < table->rowCount(); r++) {
+            QTableWidgetItem *item = table->item(r, 0);
+            const QString tag = item ? item->data(Qt::UserRole).toString() : QString();
+            if(tag.isEmpty())
+                headers++;
+            else if(tag == QLatin1String("all"))
+                global++;
+            else if(tag == QLatin1String("grid"))
+                grid++;
+            else if(tag == QLatin1String("inspect"))
+                inspect++;
+        }
+        QCOMPARE(headers, 3);
+        QCOMPARE(global, globalBefore);
+        QCOMPARE(grid, gridBefore);
+        QCOMPARE(inspect, inspectBefore);
+
+        // an injected row in the grid section saves into the grid table only
+        const int injectRow = table->rowCount();
+        table->insertRow(injectRow);
+        QTableWidgetItem *actionItem = new QTableWidgetItem(QStringLiteral("gridSelectLast"));
+        actionItem->setData(Qt::UserRole, QStringLiteral("grid"));
+        table->setItem(injectRow, 0, actionItem);
+        table->setItem(injectRow, 1, new QTableWidgetItem(QStringLiteral("F7")));
+
+        dialog.saveShortcuts();
+
+        QCOMPARE(actionManager->allShortcuts().size(), globalBefore);
+        QCOMPARE(actionManager->allInspectShortcuts().size(), inspectBefore);
+        QCOMPARE(actionManager->allGridShortcuts().size(), gridBefore + 1);
+        QCOMPARE(actionManager->allGridShortcuts().value(QStringLiteral("F7")), QStringLiteral("gridSelectLast"));
+
+        // put the manager back the way the rest of the suite expects it
+        actionManager->removeAllGridShortcuts();
+        for(auto it = gridSnapshot.constBegin(); it != gridSnapshot.constEnd(); ++it)
+            actionManager->addGridShortcut(it.key(), it.value());
+    }
+
     void navigationMovesByColumnsAndBack() {
         FolderGridView grid;
         grid.resize(500, 600);
