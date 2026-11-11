@@ -43,6 +43,12 @@ class FileOperations {
 
     static QString decodeResult(const FileOpResult &result);
 
+    // The desktop's "file (1).jpg" pattern, owned here: the first
+    // non-existing numbered sibling of filePath — the Save As prefill for an
+    // edited image, so the quick path writes a copy instead of silently
+    // overwriting the original.
+    static QString nextFreeVariantPath(const QString &filePath);
+
     // The one implementation of "overwrite a file from memory, and put the old
     // contents back if the write fails". Both ImageStatic::save() and the
     // clipboard import carried their own copy; the copies had already diverged,

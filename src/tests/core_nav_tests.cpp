@@ -573,6 +573,27 @@ class TestCoreNav : public QObject {
         QVERIFY(!saveOverlay->isVisible()); // discard also dismisses the surface
     }
 
+    // The Save As prefill for an edited image: the desktop's numbered-variant
+    // pattern, so the quick path writes a copy and the original survives.
+    void saveAsSuggestsTheFirstFreeNumberedVariant() {
+        const QString dir = uniqueDir("variant");
+        QCOMPARE(FileOperations::nextFreeVariantPath(QDir(dir).filePath("test.jpg")),
+                 QDir(dir).filePath("test (1).jpg"));
+
+        QVERIFY(QFile(QDir(dir).filePath("test (1).jpg")).open(QIODevice::WriteOnly));
+        QCOMPARE(FileOperations::nextFreeVariantPath(QDir(dir).filePath("test.jpg")),
+                 QDir(dir).filePath("test (2).jpg"));
+
+        QVERIFY(QFile(QDir(dir).filePath("test (2).jpg")).open(QIODevice::WriteOnly));
+        QCOMPARE(FileOperations::nextFreeVariantPath(QDir(dir).filePath("test.jpg")),
+                 QDir(dir).filePath("test (3).jpg"));
+
+        // suffix-less and multi-dot names keep their shape
+        QCOMPARE(FileOperations::nextFreeVariantPath(QDir(dir).filePath("test")), QDir(dir).filePath("test (1)"));
+        QCOMPARE(FileOperations::nextFreeVariantPath(QDir(dir).filePath("archive.tar.jpg")),
+                 QDir(dir).filePath("archive.tar (1).jpg"));
+    }
+
     // The crop surface's answers are on faces, and the aspect presets answer
     // to their digits — 1 Free through 8 16:10 — keys that used to fall
     // through to the Framing-blocked fit slots and their toast noise. An
