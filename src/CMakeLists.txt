@@ -67,7 +67,10 @@ target_link_libraries(qimgv_nongui PUBLIC
     Qt6::PrintSupport
     Qt6::DBus
     qimgv_engine_ffi
-    qimgv_sanitizers)
+    qimgv_sanitizers
+    # the thumbnail store's key reader inflates zTXt/iTXt payloads itself:
+    # qUncompress wants Qt's own length prefix, which a PNG chunk does not carry
+    ZLIB::ZLIB)
 
 # OPTION DEFINITIONS, LINKING (mirrored from the executable below: these are the
 # same translation units that used to be compiled as part of the qimgv target)
