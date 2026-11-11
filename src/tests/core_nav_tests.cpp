@@ -504,6 +504,167 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000);
     }
 
+    // The save prompt keeps the disk off the bare keys: Save and Save as are
+    // the platform chords (which live in the global table and work through
+    // this surface's fall-through), Esc discards — and a bare Enter is no
+    // answer at all, because Enter once fell through to the folder-view
+    // toggle behind the prompt and must now neither overwrite in place nor
+    // abandon the edits. The keys are driven as physical events — with a
+    // real scan code, because a synthesized key with scan code 0 has no name
+    // and would fall through.
+    void saveConfirmOverlayAnswersItsKeys() {
+        writeImage(QDir(base).filePath("svkeys.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("svkeys.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        settings->setShowSaveOverlay(true);
+        core.mw->overlays()->showSaveOverlay();
+        auto *saveOverlay = core.mw->findChild<SaveConfirmOverlay *>();
+        QVERIFY(saveOverlay && saveOverlay->isVisible());
+
+        // the hints are the platform chords and the way out
+        QVERIFY2(saveOverlay->findChild<QPushButton *>(QStringLiteral("saveButton"))
+                     ->text()
+                     .contains(QLatin1String("[Ctrl+S]")),
+                 "the save button carries no key hint");
+        QVERIFY2(saveOverlay->findChild<QPushButton *>(QStringLiteral("saveAsButton"))
+                     ->text()
+                     .contains(QLatin1String("[Ctrl+Shift+S]")),
+                 "the save-as button carries no key hint");
+        QVERIFY2(saveOverlay->findChild<QPushButton *>(QStringLiteral("discardButton"))
+                     ->text()
+                     .contains(QLatin1String("[Esc]")),
+                 "the discard button carries no key hint");
+
+        QSignalSpy discard(saveOverlay, &SaveConfirmOverlay::discardClicked);
+
+        // the write chords are the global table's actions — the save-as one
+        // ends at Core::requestSavePath, whose file dialog would block this
+        // headless run forever, so its Core leg is disconnected and the
+        // assertion is on the action emission itself
+        QObject::disconnect(actionManager, &ActionManager::saveAs, nullptr, nullptr);
+        QSignalSpy saveAction(actionManager, &ActionManager::save);
+        QSignalSpy saveAsAction(actionManager, &ActionManager::saveAs);
+        QSignalSpy folderViewAction(actionManager, &ActionManager::folderView);
+
+        auto press = [&](Qt::Key key, const char *keyName, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+            QKeyEvent ev(QEvent::KeyPress, key, mods, scanCodeFor(QLatin1String(keyName)), 0u, 0u);
+            QApplication::sendEvent(saveOverlay, &ev);
+        };
+
+        press(Qt::Key_S, "S", Qt::ControlModifier);
+        QCOMPARE(saveAction.count(), 1);    // Ctrl+S: the deliberate write...
+        QVERIFY(!saveOverlay->isVisible()); // ...which also dismisses the prompt
+
+        press(Qt::Key_S, "S", Qt::ControlModifier | Qt::ShiftModifier);
+        QCOMPARE(saveAsAction.count(), 1); // Ctrl+Shift+S: save as
+
+        core.mw->overlays()->showSaveOverlay(); // back up for the way out
+        QVERIFY(saveOverlay->isVisible());
+
+        press(Qt::Key_Return, "Enter");
+        QCOMPARE(saveAction.count(), 1);
+        QCOMPARE(saveAsAction.count(), 1);
+        QCOMPARE(folderViewAction.count(), 0); // a bare Enter is swallowed, it toggles nothing
+        QVERIFY(saveOverlay->isVisible());
+
+        press(Qt::Key_Escape, "Esc");
+        QCOMPARE(discard.count(), 1);
+        QVERIFY(!saveOverlay->isVisible()); // discard also dismisses the surface
+    }
+
+    // The crop surface's answers are on faces, and the aspect presets answer
+    // to their digits — 1 Free through 8 16:10 — keys that used to fall
+    // through to the Framing-blocked fit slots and their toast noise. An
+    // out-of-range digit is dropped, Esc still leaves crop, and the
+    // keyboard's Apply is the in-memory crop only: the disk write never sits
+    // on a key, so Crop && Save carries no key hint and the retired
+    // Shift+Enter degrades to the safe answer.
+    void cropSurfaceHintsItsKeysAndDigitsPickPresets() {
+        writeImage(QDir(base).filePath("cropkeys.png"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("cropkeys.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        auto *panel = core.mw->findChild<CropPanel *>();
+        QVERIFY(panel);
+
+        QVERIFY2(
+            panel->findChild<QPushButton *>(QStringLiteral("cropButton"))->text().contains(QLatin1String("[Enter]")),
+            "the crop button carries no key hint");
+        QVERIFY2(!panel->findChild<QPushButton *>(QStringLiteral("cropSaveButton"))
+                      ->text()
+                      .contains(QLatin1String("[Shift+Enter]")),
+                 "the disk-writing button still advertises a key");
+        QVERIFY2(
+            panel->findChild<QPushButton *>(QStringLiteral("cancelButton"))->text().contains(QLatin1String("[Esc]")),
+            "the cancel button carries no key hint");
+
+        auto *combo = panel->findChild<QComboBox *>(QStringLiteral("ARcomboBox"));
+        QVERIFY(combo);
+        QCOMPARE(combo->currentIndex(), 0); // Free: reset on image change
+        QCOMPARE(combo->count(), 8);
+
+        auto *overlay = core.mw->findChild<CropOverlay *>();
+        QVERIFY(overlay);
+        auto pressDigit = [&](int digit) {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_0 + digit, Qt::NoModifier, scanCodeFor(QString::number(digit)), 0u,
+                         0u);
+            QApplication::sendEvent(overlay, &ev);
+        };
+
+        pressDigit(5); // the fifth preset: 1:1
+        QCOMPARE(combo->currentIndex(), 4);
+        pressDigit(8); // the eighth preset: 16:10
+        QCOMPARE(combo->currentIndex(), 7);
+        pressDigit(9); // no ninth preset: dropped
+        QCOMPARE(combo->currentIndex(), 7);
+
+        // the keyboard's Apply is the in-memory crop and nothing else: the
+        // Enter lands on the tool signal, and no bare key reaches the
+        // disk-writing signal. (A REAL subset first: a whole-image selection
+        // is refused by design — cropping everything changes no pixels — so
+        // the boxes drive one row/column off.)
+        auto *widthBox = panel->findChild<QSpinBox *>(QStringLiteral("width"));
+        auto *heightBox = panel->findChild<QSpinBox *>(QStringLiteral("height"));
+        QVERIFY(widthBox && heightBox);
+        QVERIFY2(widthBox->maximum() > 1 && heightBox->maximum() > 1,
+                 "precondition broken: the fixture image is too small to crop");
+        widthBox->setValue(widthBox->maximum() - 1);
+        heightBox->setValue(heightBox->maximum() - 1);
+
+        QSignalSpy applied(panel, &CropPanel::crop);
+        QSignalSpy savedToDisk(panel, &CropPanel::cropAndSave);
+        QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, scanCodeFor(QStringLiteral("Enter")), 0u, 0u);
+        QApplication::sendEvent(overlay, &enter);
+        QCOMPARE(applied.count(), 1);     // the subset existed, and the answer fired
+        QCOMPARE(savedToDisk.count(), 0); // the bare key never writes
+        QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000); // applied and dismissed
+
+        // the save chord, pressed while a selection stands, commits the crop
+        // and writes — end to end, disk included: crop again, then Ctrl+S
+        core.mw->crop()->trigger();
+        QVERIFY(core.mw->crop()->isCropPanelActive());
+        auto *panel2 = core.mw->findChild<CropPanel *>();
+        QVERIFY(panel2);
+        auto *width2 = panel2->findChild<QSpinBox *>(QStringLiteral("width"));
+        auto *height2 = panel2->findChild<QSpinBox *>(QStringLiteral("height"));
+        QVERIFY(width2 && height2);
+        QVERIFY2(width2->maximum() > 1 && height2->maximum() > 1,
+                 "precondition broken: the first crop left nothing to crop");
+        width2->setValue(width2->maximum() - 1);
+        height2->setValue(height2->maximum() - 1);
+
+        QSignalSpy applied2(panel2, &CropPanel::crop);
+        QKeyEvent ctrlS(QEvent::KeyPress, Qt::Key_S, Qt::ControlModifier, scanCodeFor(QStringLiteral("S")), 0u, 0u);
+        QApplication::sendEvent(core.mw->findChild<CropOverlay *>(), &ctrlS);
+        QCOMPARE(applied2.count(), 1); // the chord commits the pending crop...
+        QTRY_COMPARE_WITH_TIMEOUT(QImage(QDir(base).filePath("cropkeys.png")).size(),
+                                  QSize(width2->maximum() - 1, height2->maximum() - 1), 10000); // ...and writes it
+    }
+
     // free zoom works mechanically on images that fit the viewport (small
     // images included): + steps 1.0 -> 1.2 -> 1.44. Switching to a nominal
     // fit mode collapses the free zoom back to that mode's scale — the
@@ -1017,17 +1178,14 @@ class TestCoreNav : public QObject {
         QCOMPARE(crop.count(), 1);
         QCOMPARE(cropSave.count(), 1);
 
-        // overlay cropSave -> doCropSave -> cropAndSave, and no cancel
+        // overlay cropApply -> doCrop -> crop(rect), deterministic now: the
+        // keyboard's apply is always the in-memory crop, whatever the
+        // default-action setting emphasizes for the buttons
         cancel.clear();
-        emit overlay.cropSave();
-        QCOMPARE(cropSave.count(), 2);
+        emit overlay.cropApply();
+        QCOMPARE(crop.count(), 2);
+        QCOMPARE(cropSave.count(), 1);
         QCOMPARE(cancel.count(), 0);
-
-        // overlay cropDefault -> doCropDefaultAction -> exactly one crop
-        // action (which one is settings-driven, so only the total is pinned)
-        const int actions = crop.count() + cropSave.count();
-        emit overlay.cropDefault();
-        QCOMPARE(crop.count() + cropSave.count(), actions + 1);
     }
 
     // gcov reported execution_count == 0 for this whole cluster: no test had

@@ -47,12 +47,11 @@ class CropPanel : public SidePanelWidget {
     void doCrop();
     void doCropSave();
     void onSelectionChange();
-    void onAspectRatioChange();   // via manual input
-    void onAspectRatioSelected(); // via ComboBox
+    void onAspectRatioChange();              // via manual input
+    void onAspectRatioSelected();            // via ComboBox
+    void onAspectPresetRequested(int index); // via a digit on the overlay
     void setFocusCropBtn();
     void setFocusCropSaveBtn();
-
-    void doCropDefaultAction();
 
   private:
     Ui::CropPanel *ui;
