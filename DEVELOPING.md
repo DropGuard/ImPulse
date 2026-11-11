@@ -8,7 +8,8 @@ discipline (each rule mapped to the incident that earned it) lives in
 
 ## Platform: Linux only
 
-The directory listing belongs to a Rust engine whose watcher is inotify. On other
+The listing's watcher is inotify (the ownership story is the next
+section). On other
 platforms the event channel is `never()`, the old `QFileSystemWatcher` fallback is
 gone, and the `inotify` crate is an unconditional dependency (`libc` rides the
 linux target gate) — so live folder updates, and the build itself, are not
