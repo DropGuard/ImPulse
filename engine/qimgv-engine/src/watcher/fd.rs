@@ -7,8 +7,8 @@
 
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 
 use crossbeam_channel::{Receiver, Sender};
@@ -21,10 +21,18 @@ use inotify::{Inotify, WatchMask};
 /// not unnoticed, but undetectable. `session`/`dispatch` ride along so the
 /// result can be attributed to the request it answers.
 pub(crate) enum WatchCmd {
-    Watch { path: PathBuf, session: u64, dispatch: u64 },
+    Watch {
+        path: PathBuf,
+        session: u64,
+        dispatch: u64,
+    },
     /// Re-enumerate a folder that is already watched (a declared loss: the
     /// kernel queue overflowed, the folder vanished, or a caller asked).
-    Enumerate { path: PathBuf, session: u64, dispatch: u64 },
+    Enumerate {
+        path: PathBuf,
+        session: u64,
+        dispatch: u64,
+    },
     /// Drop the current watch. Explicit, because the previous implementation of
     /// "stop watching" was to add a watch on an empty path and rely on it failing.
     Unwatch,
@@ -59,7 +67,9 @@ impl WatcherHandle {
 
         let join = std::thread::Builder::new()
             .name("qimgv-watch".into())
-            .spawn(move || watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, loop_wake, running_flag))
+            .spawn(move || {
+                watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, loop_wake, running_flag)
+            })
             .expect("spawn watcher thread");
 
         (
@@ -77,7 +87,11 @@ impl WatcherHandle {
         let _ = self.cmd_tx.send(cmd);
         let one: u64 = 1;
         unsafe {
-            libc::write(self.wake.as_raw_fd(), &one as *const u64 as *const libc::c_void, 8);
+            libc::write(
+                self.wake.as_raw_fd(),
+                &one as *const u64 as *const libc::c_void,
+                8,
+            );
         }
     }
 
@@ -90,7 +104,11 @@ impl WatcherHandle {
         let _ = self.cmd_tx.send(WatchCmd::Stop);
         let one: u64 = 1;
         unsafe {
-            libc::write(self.wake.as_raw_fd(), &one as *const u64 as *const libc::c_void, 8);
+            libc::write(
+                self.wake.as_raw_fd(),
+                &one as *const u64 as *const libc::c_void,
+                8,
+            );
         }
         if let Some(j) = self.join.take() {
             let _ = j.join();
@@ -126,10 +144,12 @@ fn enumerate_and_report(
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         crate::scan::scan_directory(path, options)
     }))
-    .unwrap_or_else(|_| Err(crate::error::EngineError::Io {
-        path: path.to_path_buf(),
-        source: std::io::Error::other("scan worker panicked"),
-    }));
+    .unwrap_or_else(|_| {
+        Err(crate::error::EngineError::Io {
+            path: path.to_path_buf(),
+            source: std::io::Error::other("scan worker panicked"),
+        })
+    });
     let _ = res_tx.send(crate::engine::ScanDone {
         session,
         dispatch,
@@ -151,20 +171,32 @@ fn send(ev_tx: &Sender<super::RawWatchEvent>, raw: super::RawWatchEvent) -> bool
 /// is gone.
 fn dispatch(ev_tx: &Sender<super::RawWatchEvent>, out: super::Out, live_wd: Option<i32>) -> bool {
     match out {
-        super::Out::Report { ev, paired_cookie: Some(cookie) } => {
+        super::Out::Report {
+            ev,
+            paired_cookie: Some(cookie),
+        } => {
             let from = match &ev.kind {
                 super::RawWatchKind::Renamed { from } => from.as_str(),
                 _ => "?",
             };
             crate::trace::line("move", || {
-                format!("PAIRED cookie={cookie} {from} -> {}", ev.name.as_deref().unwrap_or("?"))
+                format!(
+                    "PAIRED cookie={cookie} {from} -> {}",
+                    ev.name.as_deref().unwrap_or("?")
+                )
             });
             send(ev_tx, ev)
         }
-        super::Out::Report { ev, paired_cookie: None } => send(ev_tx, ev),
+        super::Out::Report {
+            ev,
+            paired_cookie: None,
+        } => send(ev_tx, ev),
         super::Out::Unpaired { ev, cookie } => {
             crate::trace::line("move", || {
-                format!("UNPAIRED cookie={cookie} {} (no MOVED_TO beside it)", ev.name.as_deref().unwrap_or("?"))
+                format!(
+                    "UNPAIRED cookie={cookie} {} (no MOVED_TO beside it)",
+                    ev.name.as_deref().unwrap_or("?")
+                )
             });
             send(ev_tx, ev)
         }
@@ -176,9 +208,9 @@ fn dispatch(ev_tx: &Sender<super::RawWatchEvent>, out: super::Out, live_wd: Opti
                 super::DropReason::DeadWatch { wd, kind } => {
                     crate::trace::line("drop", || format!("kind={kind:?} wd={wd} live={live_wd:?}"))
                 }
-                super::DropReason::NoDirectory { kind } => {
-                    crate::trace::line("drop", || format!("kind={kind:?} no directory to attribute"))
-                }
+                super::DropReason::NoDirectory { kind } => crate::trace::line("drop", || {
+                    format!("kind={kind:?} no directory to attribute")
+                }),
                 super::DropReason::NoName { kind } => {
                     crate::trace::line("drop", || format!("kind={kind:?} no name"))
                 }
@@ -218,8 +250,16 @@ fn watcher_loop(
 
     while running.load(Ordering::Relaxed) {
         let mut fds = [
-            libc::pollfd { fd: inotify.as_raw_fd(), events: libc::POLLIN, revents: 0 },
-            libc::pollfd { fd: wake.as_raw_fd(), events: libc::POLLIN, revents: 0 },
+            libc::pollfd {
+                fd: inotify.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: wake.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
         ];
         let ready = unsafe { libc::poll(fds.as_mut_ptr(), 2, 500) };
         if ready < 0 {
@@ -284,7 +324,11 @@ fn watcher_loop(
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     WatchCmd::Stop => return,
-                    WatchCmd::Enumerate { path, session, dispatch } => {
+                    WatchCmd::Enumerate {
+                        path,
+                        session,
+                        dispatch,
+                    } => {
                         enumerate_and_report(&path, session, dispatch, &res_tx, options);
                     }
                     WatchCmd::Unwatch => {
@@ -293,7 +337,11 @@ fn watcher_loop(
                         }
                         watch_dir = PathBuf::new();
                     }
-                    WatchCmd::Watch { path, session, dispatch } => {
+                    WatchCmd::Watch {
+                        path,
+                        session,
+                        dispatch,
+                    } => {
                         if let Some(w) = watch.take() {
                             let _ = inotify.watches().remove(w);
                         }

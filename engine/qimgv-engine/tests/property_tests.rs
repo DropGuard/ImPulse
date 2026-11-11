@@ -48,10 +48,22 @@ impl Spec {
 /// milliseconds, and a field that small is always the true value squeezed into
 /// 32 bits. That is the exact bug this file exists to catch.
 fn specs(range: Range<usize>) -> impl Strategy<Value = Vec<Spec>> {
-    prop::collection::vec(("[a-z0-9.]{1,8}", any::<u64>(), 1_000_000_000u32..2_000_000_000), range).prop_map(|v| {
+    prop::collection::vec(
+        (
+            "[a-z0-9.]{1,8}",
+            any::<u64>(),
+            1_000_000_000u32..2_000_000_000,
+        ),
+        range,
+    )
+    .prop_map(|v| {
         v.into_iter()
             .enumerate()
-            .map(|(i, (name, size, secs))| Spec { name: format!("{i:02}{name}"), size, secs })
+            .map(|(i, (name, size, secs))| Spec {
+                name: format!("{i:02}{name}"),
+                size,
+                secs,
+            })
             .collect()
     })
 }
@@ -285,8 +297,12 @@ struct Rec {
 }
 
 fn read_arena(buf: &[u8]) -> (Vec<Rec>, Vec<Rec>) {
-    fn u32le(b: &[u8], p: usize) -> u32 { u32::from_le_bytes(b[p..p + 4].try_into().unwrap()) }
-    fn u64le(b: &[u8], p: usize) -> u64 { u64::from_le_bytes(b[p..p + 8].try_into().unwrap()) }
+    fn u32le(b: &[u8], p: usize) -> u32 {
+        u32::from_le_bytes(b[p..p + 4].try_into().unwrap())
+    }
+    fn u64le(b: &[u8], p: usize) -> u64 {
+        u64::from_le_bytes(b[p..p + 8].try_into().unwrap())
+    }
 
     let (fc, dc) = (u32le(buf, 0) as usize, u32le(buf, 4) as usize);
     let mut off = 8usize;
@@ -300,9 +316,17 @@ fn read_arena(buf: &[u8]) -> (Vec<Rec>, Vec<Rec>) {
             let nlen = u32le(buf, off + 24) as usize;
             let plen = u32le(buf, off + 28) as usize;
             let name = String::from_utf8(buf[off + 32..off + 32 + nlen].to_vec()).unwrap();
-            let path = String::from_utf8(buf[off + 32 + nlen..off + 32 + nlen + plen].to_vec()).unwrap();
+            let path =
+                String::from_utf8(buf[off + 32 + nlen..off + 32 + nlen + plen].to_vec()).unwrap();
             off += 32 + nlen + plen;
-            (if is_dir { &mut dirs } else { &mut files }).push(Rec { handle, name, path, size, mtime_ms, is_dir });
+            (if is_dir { &mut dirs } else { &mut files }).push(Rec {
+                handle,
+                name,
+                path,
+                size,
+                mtime_ms,
+                is_dir,
+            });
         }
     }
     (files, dirs)
@@ -335,7 +359,12 @@ fn assert_well_ordered(st: &DirectoryState) {
     let mode = st.sort();
     for i in 0..st.file_count() {
         let e = st.file_at(i).unwrap();
-        assert_eq!(st.index_of_file(e.handle), Some(i as u32), "position map lies about {}", e.data.name);
+        assert_eq!(
+            st.index_of_file(e.handle),
+            Some(i as u32),
+            "position map lies about {}",
+            e.data.name
+        );
         if i > 0 {
             let prev = st.file_at(i - 1).unwrap();
             assert_ne!(
@@ -352,7 +381,11 @@ fn assert_well_ordered(st: &DirectoryState) {
         assert_eq!(st.index_of_dir(e.handle), Some(i as u32));
         if i > 0 {
             let prev = st.dir_at(i - 1).unwrap();
-            assert_ne!(mode.compare(prev.data, e.data), Ordering::Greater, "dir order unsorted at {i}");
+            assert_ne!(
+                mode.compare(prev.data, e.data),
+                Ordering::Greater,
+                "dir order unsorted at {i}"
+            );
         }
     }
 }

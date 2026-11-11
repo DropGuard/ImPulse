@@ -1,5 +1,5 @@
 use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
 use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode};
@@ -20,7 +20,10 @@ fn wait_for(engine: &Engine, pred: impl Fn(&qimgv_engine::DirectoryState) -> boo
         if pred(&engine.state.read().unwrap()) {
             return;
         }
-        assert!(Instant::now() < deadline, "timed out waiting on engine state");
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting on engine state"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }
@@ -49,8 +52,16 @@ fn open_dir_lists_filtered_files() {
     std::fs::write(dir.path().join(".hidden.jpg"), b"x").unwrap(); // hidden
     std::fs::create_dir(dir.path().join("subdir")).unwrap();
 
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
-    notify_rx.recv_timeout(Duration::from_secs(5)).expect("no notify");
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
+    notify_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("no notify");
 
     let ev = engine.try_event().expect("no event");
     assert!(matches!(ev, Event::DirListed { .. }));
@@ -71,12 +82,13 @@ fn empty_extension_list_accepts_everything() {
     std::fs::write(dir.path().join("b.jpg"), b"x").unwrap();
     std::fs::write(dir.path().join("noextension"), b"x").unwrap();
 
-    engine.send(Command::OpenDir {
-        path: dir.path().to_owned(),
-        sort: None,
-        epoch: engine.next_epoch(),
-    })
-    .unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 3);
     assert_eq!(engine.state.read().unwrap().file_count(), 3);
 }
@@ -92,8 +104,16 @@ fn open_failed_event_on_missing_dir() {
     );
 
     let missing = std::env::temp_dir().join("qimgv-engine-test-does-not-exist-42");
-    engine.send(Command::OpenDir { path: missing.clone(), sort: None, epoch: engine.next_epoch() }).unwrap();
-    notify_rx.recv_timeout(Duration::from_secs(5)).expect("no notify");
+    engine
+        .send(Command::OpenDir {
+            path: missing.clone(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
+    notify_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("no notify");
 
     match engine.try_event().expect("no event") {
         Event::OpenFailed { dir, .. } => assert_eq!(dir, missing),
@@ -116,10 +136,24 @@ fn rapid_open_dir_keeps_only_latest() {
     let dir_a = make_dir_with("jpg", 1);
     let dir_b = make_dir_with("jpg", 3);
 
-    engine.send(Command::OpenDir { path: dir_a.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
-    engine.send(Command::OpenDir { path: dir_b.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir_a.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir_b.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
 
-    wait_for(&engine, |st| st.dir() == Some(dir_b.path()) && st.file_count() == 3);
+    wait_for(&engine, |st| {
+        st.dir() == Some(dir_b.path()) && st.file_count() == 3
+    });
     // drain whatever events accumulated; none may reference dir_a's listing
     while let Some(ev) = engine.try_event() {
         if let Event::DirListed { dir, .. } = ev {
@@ -129,6 +163,38 @@ fn rapid_open_dir_keeps_only_latest() {
 }
 
 #[test]
+// The owner's live mismatch (2026-11-11, /mnt/disk4t/已阅/色图新): Dolphin
+// (ICU/DUCET collation) orders the bracket-named file first; a codepoint
+// comparison puts the digit-named one first. The comparator weights
+// character classes punctuation < digits < letters, case-insensitively,
+// with numeric runs by value.
+#[test]
+fn natural_orders_classes_like_the_desktop_and_runs_digits_by_value() {
+    let bracket = "[Pure Media] VOL.003 Aya_1st [87P-199.47 MB]_00004.jpg";
+    let digit_led = "0老王论坛3184065655 (2)_00-00-26.367.jpg";
+    assert_eq!(
+        qimgv_engine::natural(bracket, digit_led),
+        std::cmp::Ordering::Less
+    );
+
+    // numeric runs by value, the natural-sort core
+    assert_eq!(
+        qimgv_engine::natural("2.jpg", "10.jpg"),
+        std::cmp::Ordering::Less
+    );
+    // class ordering inside a mixed pair: letters before digits at the same position
+    assert_eq!(
+        qimgv_engine::natural("1 (24)-0001.png", "1 (24)-a.png"),
+        std::cmp::Ordering::Less
+    );
+    // equal-modulo-case falls back to the byte tiebreak (the old contract):
+    // the wrapper has always byte-compared a case-insensitive tie
+    assert_eq!(
+        qimgv_engine::natural("IMG.png", "img.png"),
+        std::cmp::Ordering::Less
+    );
+}
+
 fn set_sort_reorders_and_notifies() {
     let (notify_tx, _notify_rx) = mpsc::channel::<()>();
     let engine = Engine::spawn(
@@ -139,14 +205,19 @@ fn set_sort_reorders_and_notifies() {
     );
 
     let dir = make_dir_with("jpg", 4);
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 4);
 
     engine.send(Command::SetSort(SortMode::NameDesc)).unwrap();
     wait_for(&engine, |st| st.sort() == SortMode::NameDesc);
 
-    let names: Vec<String> =
-        (0..4).map(|i| st_names(&engine, i)).collect();
+    let names: Vec<String> = (0..4).map(|i| st_names(&engine, i)).collect();
     let mut sorted = names.clone();
     sorted.sort();
     sorted.reverse();
@@ -154,7 +225,15 @@ fn set_sort_reorders_and_notifies() {
 }
 
 fn st_names(engine: &Engine, i: usize) -> String {
-    engine.state.read().unwrap().file_at(i).unwrap().data.name.clone()
+    engine
+        .state
+        .read()
+        .unwrap()
+        .file_at(i)
+        .unwrap()
+        .data
+        .name
+        .clone()
 }
 
 #[test]
@@ -173,7 +252,13 @@ fn mutated_event_carries_the_engine_position() {
 
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 1);
 
     std::fs::write(dir.path().join("b.jpg"), b"xx").unwrap();
@@ -185,14 +270,22 @@ fn mutated_event_carries_the_engine_position() {
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         match engine.try_event() {
-            Some(Event::Mutated { kind: qimgv_engine::WatchChangeKind::Added, index, is_dir, .. }) => {
+            Some(Event::Mutated {
+                kind: qimgv_engine::WatchChangeKind::Added,
+                index,
+                is_dir,
+                ..
+            }) => {
                 assert_eq!(index, 1, "b.jpg sits after a.jpg in natural order");
                 assert!(!is_dir);
                 break;
             }
             Some(_) => continue,
             None => {
-                assert!(std::time::Instant::now() < deadline, "no Added mutation event within 5s");
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "no Added mutation event within 5s"
+                );
                 std::thread::sleep(Duration::from_millis(5));
             }
         }

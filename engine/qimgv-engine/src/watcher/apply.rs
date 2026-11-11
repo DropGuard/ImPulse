@@ -44,7 +44,9 @@ pub enum RawWatchKind {
     /// the MOVED_FROM directly before it; `name` is the destination and `from`
     /// the source. Everything else about a rename is decided by `apply_event`,
     /// which is the half that can see the listing.
-    Renamed { from: String },
+    Renamed {
+        from: String,
+    },
     /// Kernel dropped events (queue full) — full rescan required.
     Overflow,
     /// The watched directory itself went away.
@@ -120,7 +122,9 @@ pub enum Applied {
     /// engine's order puts it. That is the whole result, so a consumer needs
     /// nothing else to decide — in particular not the old position: the row it
     /// replaces is found by path, the same way a Removed row is.
-    Renamed { from: String },
+    Renamed {
+        from: String,
+    },
 }
 
 /// Why an event touched nothing. A bare "ignored" is the one answer that cannot
@@ -168,9 +172,13 @@ pub enum WatchAction {
         index: u32,
     },
     /// The watcher snapshot can't be trusted for this directory.
-    Reconcile { dir: PathBuf },
+    Reconcile {
+        dir: PathBuf,
+    },
     /// The watched directory is gone.
-    DirGone { dir: PathBuf },
+    DirGone {
+        dir: PathBuf,
+    },
     Ignored(IgnoreReason),
 }
 
@@ -195,10 +203,30 @@ pub fn apply_event(
         return WatchAction::Ignored(IgnoreReason::WrongSubject);
     }
     match &ev.kind {
-        K::Overflow => WatchAction::Reconcile { dir: dir.to_path_buf() },
-        K::WatchGone => WatchAction::DirGone { dir: dir.to_path_buf() },
-        K::Created => arrive(state, filter, overrides, show_hidden, dir, ev, Arrival::Created),
-        K::MovedTo => arrive(state, filter, overrides, show_hidden, dir, ev, Arrival::Moved),
+        K::Overflow => WatchAction::Reconcile {
+            dir: dir.to_path_buf(),
+        },
+        K::WatchGone => WatchAction::DirGone {
+            dir: dir.to_path_buf(),
+        },
+        K::Created => arrive(
+            state,
+            filter,
+            overrides,
+            show_hidden,
+            dir,
+            ev,
+            Arrival::Created,
+        ),
+        K::MovedTo => arrive(
+            state,
+            filter,
+            overrides,
+            show_hidden,
+            dir,
+            ev,
+            Arrival::Moved,
+        ),
         K::Deleted | K::MovedFrom => remove_listed(state, dir, ev),
         K::Modified => {
             // A directory's own mtime carries no listing meaning (see the
@@ -207,7 +235,12 @@ pub fn apply_event(
             if ev.is_dir {
                 return WatchAction::Ignored(IgnoreReason::DirIsCanonical);
             }
-            restat(state, dir.join(ev.name.as_deref().unwrap_or("")).to_string_lossy().into_owned())
+            restat(
+                state,
+                dir.join(ev.name.as_deref().unwrap_or(""))
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         }
         K::Renamed { from } => rename(state, filter, overrides, show_hidden, dir, ev, from),
     }
@@ -259,7 +292,16 @@ fn arrive(
     arrival: Arrival,
 ) -> WatchAction {
     match &ev.name {
-        Some(name) => admit(state, filter, overrides, show_hidden, dir, name, ev.is_dir, arrival),
+        Some(name) => admit(
+            state,
+            filter,
+            overrides,
+            show_hidden,
+            dir,
+            name,
+            ev.is_dir,
+            arrival,
+        ),
         None => WatchAction::Ignored(IgnoreReason::NoName),
     }
 }
@@ -304,7 +346,11 @@ fn admit(
     // mode): scan.rs creates them that way, so a watched creation must not hand
     // them real metadata that would let a size/time sort reorder them against
     // the scanner's rule.
-    let mtime = if is_dir { UNIX_EPOCH } else { meta.modified().unwrap_or(UNIX_EPOCH) };
+    let mtime = if is_dir {
+        UNIX_EPOCH
+    } else {
+        meta.modified().unwrap_or(UNIX_EPOCH)
+    };
     let entry = crate::model::EntryData {
         name: name.to_owned(),
         path: path_str.clone(),
@@ -332,7 +378,10 @@ fn admit(
 /// held is nothing, and saying so is what keeps a stale event from taking a row
 /// out of the wrong folder.
 fn remove_listed(state: &mut DirectoryState, dir: &Path, ev: &RawWatchEvent) -> WatchAction {
-    let path = dir.join(ev.name.as_deref().unwrap_or("")).to_string_lossy().into_owned();
+    let path = dir
+        .join(ev.name.as_deref().unwrap_or(""))
+        .to_string_lossy()
+        .into_owned();
     remove_or_ignore(state, path, ev.is_dir)
 }
 
@@ -399,7 +448,9 @@ fn rename(
     ev: &RawWatchEvent,
     from: &str,
 ) -> WatchAction {
-    let Some(name) = &ev.name else { return WatchAction::Ignored(IgnoreReason::NoName) };
+    let Some(name) = &ev.name else {
+        return WatchAction::Ignored(IgnoreReason::NoName);
+    };
     let from_path = dir.join(from).to_string_lossy().into_owned();
     let to_path = dir.join(name);
     let to_str = to_path.to_string_lossy().into_owned();
@@ -411,7 +462,10 @@ fn rename(
         return WatchAction::Ignored(IgnoreReason::AlreadyListed);
     }
     let listed = state.contains_path(&from_path);
-    match (listed, rejection(ev.is_dir, &to_path, name, filter, overrides, show_hidden)) {
+    match (
+        listed,
+        rejection(ev.is_dir, &to_path, name, filter, overrides, show_hidden),
+    ) {
         // The row is here and the new name is a member: one entry, one path.
         (true, None) => {
             // The destination may be a listed row of its own — an overwrite by
@@ -429,7 +483,11 @@ fn rename(
                 Err(_) => return remove_or_ignore(state, from_path, ev.is_dir),
             };
             let size = if ev.is_dir { 0 } else { meta.len() };
-            let mtime = if ev.is_dir { UNIX_EPOCH } else { meta.modified().unwrap_or(UNIX_EPOCH) };
+            let mtime = if ev.is_dir {
+                UNIX_EPOCH
+            } else {
+                meta.modified().unwrap_or(UNIX_EPOCH)
+            };
             let Some(index) = state.rename_entry(&from_path, &to_str, name, size, mtime) else {
                 return WatchAction::Ignored(IgnoreReason::NotListed);
             };
@@ -450,11 +508,22 @@ fn rename(
         },
         // The source was never ours: this is an arrival from wherever it came,
         // including a save's backup landing on the file it is replacing.
-        (false, None) => admit(state, filter, overrides, show_hidden, dir, name, ev.is_dir, Arrival::Moved),
+        (false, None) => admit(
+            state,
+            filter,
+            overrides,
+            show_hidden,
+            dir,
+            name,
+            ev.is_dir,
+            Arrival::Moved,
+        ),
         (false, Some(reason)) => WatchAction::Ignored(reason),
     }
 }
 
 pub fn mtime_ms(t: SystemTime) -> i64 {
-    t.duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    t.duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
