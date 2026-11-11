@@ -1,12 +1,31 @@
 #include "fileoperations.h"
 
+#include <QCoreApplication>
 #include <QImage>
 #include <QSaveFile>
 
+#include <atomic>
 #include <cstdio> // ::rename — the atomic step in rename()
 
 QString FileOperations::generateHash(const QString &str) {
     return QString(QCryptographicHash::hash(str.toUtf8(), QCryptographicHash::Md5).toHex());
+}
+
+// A sibling path that belongs to THIS process. Used for the temporary a
+// forced overwrite moves the old file to, before the new one is written under
+// the real name.
+//
+// The pid is the point. The hash alone is a pure function of the destination,
+// so two processes overwriting the same file used the same path: one removed
+// the other's backup, and whichever lost that race could restore the wrong
+// contents — or find its restore already consumed. A counter separates two
+// operations inside one process, which is what a batch copy of the same file
+// name into two directories can otherwise reduce to if the path is reused
+// quickly.
+QString siblingTempPath(const QString &destPath) {
+    static std::atomic<quint64> seq{0};
+    return destPath + QStringLiteral(".impulse-tmp-") + QString::number(QCoreApplication::applicationPid()) +
+           QLatin1Char('-') + QString::number(seq.fetch_add(1, std::memory_order_relaxed));
 }
 
 void FileOperations::removeFile(const QString &filePath, FileOpResult &result) {
@@ -52,6 +71,7 @@ QString FileOperations::decodeResult(const FileOpResult &result) {
     case FileOpResult::SOURCE_DOES_NOT_EXIST: return QObject::tr("Source file does not exist.");
     case FileOpResult::DESTINATION_DOES_NOT_EXIST: return QObject::tr("Destination does not exist.");
     case FileOpResult::DIRECTORY_NOT_EMPTY: return QObject::tr("Directory is not empty.");
+    case FileOpResult::SOURCE_NOT_REMOVED: return QObject::tr("Copied, but the original could not be removed.");
     case FileOpResult::NOTHING_TO_DO: return QObject::tr("Nothing to do.");
     case FileOpResult::OTHER_ERROR: return QObject::tr("Other error.");
     }
@@ -97,9 +117,7 @@ void FileOperations::copyFileTo(const QString &srcFilePath, const QString &destD
             result = FileOpResult::DESTINATION_FILE_EXISTS;
             return;
         }
-        // remove just in case it exists
-        tmpPath = destFile.absoluteFilePath() + "_" + generateHash(destFile.absoluteFilePath());
-        QFile::remove(tmpPath);
+        tmpPath = siblingTempPath(destFile.absoluteFilePath());
         // move backup — and only claim a backup exists if the move happened
         if(!QFile::rename(destFile.absoluteFilePath(), tmpPath)) {
             result = FileOpResult::OTHER_ERROR;
@@ -180,21 +198,32 @@ void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destD
             result = FileOpResult::DESTINATION_FILE_EXISTS;
             return;
         }
-        tmpPath = destFile.absoluteFilePath() + "_" + generateHash(destFile.absoluteFilePath());
-        QFile::remove(tmpPath);
+        tmpPath = siblingTempPath(destFile.absoluteFilePath());
         // move backup
-        QFile::rename(destFile.absoluteFilePath(), tmpPath);
+        if(!QFile::rename(destFile.absoluteFilePath(), tmpPath)) {
+            result = FileOpResult::OTHER_ERROR;
+            return;
+        }
         exists = true;
     }
     // move
     auto srcModTime = srcFile.lastModified();
     auto srcReadTime = srcFile.lastRead();
     if(QFile::copy(srcFile.absoluteFilePath(), destFile.absoluteFilePath())) {
-        // remove original file
+        // The destination now holds the file. Whether the SOURCE can be removed
+        // is a separate fact, and it is reported as one: the move is done at
+        // the destination either way, and the old contract — undo the copy,
+        // put the old destination back — threw away work the user can see
+        // succeeded and answered with a generic error. A user told "moved to
+        // X, but the original could not be deleted" knows exactly what is left
+        // to do; a user told "Other error" after the file visibly appeared at
+        // the destination knows nothing.
+        //
+        // The backup is only restored when the COPY failed, which is the case
+        // where the destination never changed.
         FileOpResult removeResult;
         removeFile(srcFile.absoluteFilePath(), removeResult);
         if(removeResult == FileOpResult::SUCCESS) {
-            // OK
             result = FileOpResult::SUCCESS;
             // restore timestamps
             QFile dstF(destFile.absoluteFilePath());
@@ -210,17 +239,17 @@ void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destD
                 QFile::remove(tmpPath);
             return;
         }
-        // revert on failure
-        result = FileOpResult::SOURCE_NOT_WRITABLE;
-        if(QFile::remove(destFile.absoluteFilePath()))
-            result = FileOpResult::OTHER_ERROR;
-    } else {
-        // could not COPY
-        result = FileOpResult::OTHER_ERROR;
+        // the copy stands; only the source removal failed
+        result = FileOpResult::SOURCE_NOT_REMOVED;
+        if(exists)
+            QFile::remove(tmpPath);
+        return;
     }
-    if(exists) // failed; revert backup
-        QFile::rename(tmpPath, destFile.absoluteFilePath());
-    return;
+    // could not COPY: the destination is untouched, so the backup goes back
+    result = FileOpResult::OTHER_ERROR;
+    if(exists && !QFile::rename(tmpPath, destFile.absoluteFilePath()))
+        qCritical() << "[FileOperations] copy failed and the backup could not be"
+                    << "restored to" << destFile.absoluteFilePath() << "— it is still in" << tmpPath;
 }
 
 void FileOperations::rename(const QString &srcFilePath, const QString &newName, bool force, FileOpResult &result) {

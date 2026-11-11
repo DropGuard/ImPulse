@@ -950,7 +950,13 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
                 return;
             model->moveFileTo(path, destDirectory, true, result);
         }
-        if(result != FileOpResult::SUCCESS && !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
+        if(result == FileOpResult::SOURCE_NOT_REMOVED) {
+            // the destination has the file; only the source removal failed.
+            // A warning, not an error: reporting it red would contradict the
+            // file the user can see at the destination
+            mw->overlays()->showWarning(FileOperations::decodeResult(result));
+        } else if(result != FileOpResult::SUCCESS &&
+                  !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
             mw->overlays()->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
         }
@@ -1038,8 +1044,14 @@ void Core::moveCurrentFile(const QString &destDirectory) {
     if(result != FileOpResult::SUCCESS) {
         guiSetImage(model->getImage(selectedPath()));
         updateInfoString();
-        if(result != FileOpResult::DESTINATION_FILE_EXISTS)
-            outputError(result);
+        if(result != FileOpResult::DESTINATION_FILE_EXISTS) {
+            // a move whose copy landed but whose source could not be removed is
+            // a warning with an accurate message, not a plain error
+            if(result == FileOpResult::SOURCE_NOT_REMOVED)
+                mw->overlays()->showWarning(FileOperations::decodeResult(result));
+            else
+                outputError(result);
+        }
     }
     mw->setUpdatesEnabled(true);
     mw->repaint();

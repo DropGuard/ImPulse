@@ -25,6 +25,11 @@ enum FileOpResult {
     DESTINATION_DOES_NOT_EXIST,
     DIRECTORY_NOT_EMPTY,
     NOTHING_TO_DO, // todo: maybe just return SUCCESS?
+    // A cross-directory move copies, then removes the source. The copy landed
+    // and the source removal did not: the file exists at BOTH paths, and the
+    // caller must say so rather than report a failure that contradicts what
+    // the user can see at the destination.
+    SOURCE_NOT_REMOVED,
     OTHER_ERROR
 };
 
