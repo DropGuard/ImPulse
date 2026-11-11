@@ -65,6 +65,14 @@ class IsolatedHome {
         dir.setAutoRemove(true);
         Q_ASSERT(dir.isValid());
         qputenv("HOME", dir.path().toUtf8());
+        // HOME alone no longer isolates the cache: the thumbnail store lives in
+        // the shared freedesktop location, and QStandardPaths prefers
+        // XDG_CACHE_HOME over $HOME/.cache. On a machine where the developer set
+        // it (a common KDE setup), a test that reached the real store would read
+        // and DELETE the user's thumbnails. Pointing both at the fixture keeps
+        // the isolation true regardless of the caller's session.
+        qputenv("XDG_CACHE_HOME", QDir(dir.path()).filePath("cache").toUtf8());
+        qputenv("XDG_CONFIG_HOME", QDir(dir.path()).filePath("config").toUtf8());
         QCoreApplication::setOrganizationName("ImPulse");
         QCoreApplication::setApplicationName("impulse");
     }

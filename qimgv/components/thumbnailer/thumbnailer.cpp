@@ -8,8 +8,9 @@
 
 Thumbnailer::Thumbnailer(WorkerPool &_pool, EngineBridge &bridge) : mBridge(bridge), pool(_pool) {
     connect(&mBridge, &EngineBridge::thumbNext, this, &Thumbnailer::onThumbNext);
-    cache = new ThumbnailCache(settings->thumbnailCacheDir());
-    // the shared pool's size is decided once, where it is constructed (Core)
+    // the shared freedesktop store, not an app-private directory: this is the
+    // whole point of the format — a thumbnail Dolphin already made is a hit
+    cache = new ThumbnailCache(ThumbnailCache::rootDir());
     // startup sweep, after the first frames have settled; stat-only walk
     QTimer::singleShot(3000, this, [this]() {
         cache->purgeOlderThan(ThumbnailCache::cacheMaxIdleDays, ThumbnailCache::cacheMaxBytes);

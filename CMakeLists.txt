@@ -48,6 +48,10 @@ endif()
 # unconditionally), so the selection dance only made both builds half-broken.
 find_package(Qt6 6.9 REQUIRED COMPONENTS Core Widgets Svg PrintSupport OpenGLWidgets DBus)
 message(STATUS "Qt Version: " ${Qt6_VERSION})
+# The shared thumbnail store reads PNG text chunks directly (zTXt/iTXt payloads
+# are bare zlib streams, which qUncompress cannot take), so zlib is a direct
+# dependency rather than one inherited through libpng.
+find_package(ZLIB REQUIRED)
 
 if(EXIV2)
     find_package(PkgConfig REQUIRED)

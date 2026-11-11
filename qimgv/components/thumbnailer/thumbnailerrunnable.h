@@ -40,13 +40,22 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     static void waitForProcess(QProcess &process, const CancelToken *cancel, int timeoutMs);
 
   private:
-    static QString generateIdString(const QString &path, int size, bool crop);
-    static std::pair<std::unique_ptr<QImage>, QSize> createThumbnail(const QString &path, const char *format, int size,
-                                                                     bool crop, const CancelToken *cancel);
-    static std::pair<std::unique_ptr<QImage>, QSize> createVideoThumbnail(const QString &path, int size, bool crop,
+    static QString tempIdFor(const QString &path, int size, bool crop);
+    // Decodes at `box` (a square the result must fit inside, never upscaled
+    // past the source) WITHOUT cropping: a cropped image is not shareable, so
+    // the bucket store only ever holds aspect-preserved pictures.
+    static std::pair<std::unique_ptr<QImage>, QSize> createThumbnail(const QString &path, const char *format, int box,
+                                                                     const CancelToken *cancel);
+    static std::pair<std::unique_ptr<QImage>, QSize> createVideoThumbnail(const QString &path, int box,
                                                                           const QString &tmpDir,
                                                                           const QString &mpvBinary,
                                                                           const CancelToken *cancel);
+    // The display half: takes the stored (or freshly decoded) aspect-preserved
+    // image and produces what the widget wants — scaled to `size`, or cropped
+    // to a centered `size` square when the thumbnail strip asks for square
+    // previews (`squareThumbnails`); the folder grid never asks.
+    // This is the only place a crop happens.
+    static std::unique_ptr<QImage> fitForDisplay(const QImage &source, int size, bool crop);
     QString path;
     int size;
     bool crop, force;
