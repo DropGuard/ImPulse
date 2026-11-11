@@ -181,11 +181,24 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
     *tmpPixmap = QPixmap::fromImage(*image);
     tmpPixmap->setDevicePixelRatio(qGuiApp->devicePixelRatio());
 
+    // The label reports the SOURCE's dimensions, and on a cache hit nothing in
+    // the store reliably knows them: Thumb::Image::Width/Height are optional in
+    // the spec and KIO does not write them (measured: 0 of 679 entries in a live
+    // store). The probe ran before the cache lookup and already answered — it
+    // is a header read this path needs anyway for format and orientation — so a
+    // hit uses it rather than reporting 0x0. The stored keys still win when
+    // present, because they describe the decode that produced the pixels.
+    if(!originalSize.isValid() && probeSize.isValid())
+        originalSize = probeSize;
+
     QString label;
     if(tmpPixmap->width() == 0) {
         label = "error";
     } else {
-        label = QString::number(originalSize.width()) + "x" + QString::number(originalSize.height());
+        // A size nobody can establish is left out rather than invented: "0x0"
+        // is a number, and a viewer has no way to tell it from a real one.
+        if(originalSize.isValid())
+            label = QString::number(originalSize.width()) + "x" + QString::number(originalSize.height());
         if(animated)
             label.append(" [a]");
         else if(video)
