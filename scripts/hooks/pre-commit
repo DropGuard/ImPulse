@@ -31,6 +31,17 @@ if [ -n "$STAGED_CPP" ]; then
         exit 1
     fi
 fi
+# rustfmt gate on staged Rust files: cargo fmt --check walks every workspace
+# member and is edition-aware per crate. Same contract as the C++ gate — a
+# file the wrong formatter has mangled (clang-format happily accepts .rs) or
+# that was never formatted dies here.
+if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '^engine/.*\.rs$'; then
+    if ! cargo fmt --all --check > /tmp/qimgv-hook-rustfmt.log 2>&1; then
+        head -8 /tmp/qimgv-hook-rustfmt.log >&2
+        echo "pre-commit: not rustfmt-clean — run: cargo fmt" >&2
+        exit 1
+    fi
+fi
 
 python3 scripts/lint.py build --gate > /tmp/qimgv-hook-lint.log 2>&1 || {
     echo "pre-commit: lint gate red:" >&2

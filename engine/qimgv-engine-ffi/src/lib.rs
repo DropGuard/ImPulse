@@ -13,14 +13,17 @@
 #![allow(clippy::missing_safety_doc)]
 
 use std::cell::RefCell;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use qimgv_engine::{Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode, ThumbCommand, ThumbReq};
+use qimgv_engine::{
+    Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode, ThumbCommand,
+    ThumbReq,
+};
 
 // --- status codes (mirror include/qimgv_engine.h) ---------------------------
 pub const QIMGV_OK: c_int = 0;
@@ -255,7 +258,9 @@ fn with_engine<T>(engine: *mut QimgvEngine, f: impl FnOnce(&Engine) -> T) -> T {
 }
 
 fn mtime_ms(t: &SystemTime) -> i64 {
-    t.duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    t.duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 // --- lifecycle --------------------------------------------------------------
@@ -295,7 +300,10 @@ pub unsafe extern "C" fn qimgv_engine_new(
             },
             notify_fn,
         );
-        Ok(QimgvEngine { engine: Mutex::new(engine), stashed: Mutex::new(None) })
+        Ok(QimgvEngine {
+            engine: Mutex::new(engine),
+            stashed: Mutex::new(None),
+        })
     };
 
     match catch_unwind(attempt) {
@@ -329,7 +337,10 @@ pub extern "C" fn qimgv_engine_version() -> *const c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn qimgv_last_error() -> *const c_char {
     LAST_ERROR.with(|slot| {
-        slot.borrow().as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null())
+        slot.borrow()
+            .as_ref()
+            .map(|s| s.as_ptr())
+            .unwrap_or(std::ptr::null())
     })
 }
 
@@ -398,7 +409,10 @@ pub unsafe extern "C" fn qimgv_engine_set_sort(engine: *mut QimgvEngine, mode: c
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_set_show_hidden(engine: *mut QimgvEngine, show: c_int) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_set_show_hidden(
+    engine: *mut QimgvEngine,
+    show: c_int,
+) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         with_engine(engine, |e| {
             e.set_show_hidden(show != 0);
@@ -428,7 +442,11 @@ fn count(engine: *mut QimgvEngine, dirs: bool) -> c_int {
     let r = catch_unwind(AssertUnwindSafe(|| {
         with_engine(engine, |e| {
             let st = e.state.read().unwrap_or_else(|p| p.into_inner());
-            (if dirs { st.dir_count() } else { st.file_count() }) as c_int
+            (if dirs {
+                st.dir_count()
+            } else {
+                st.file_count()
+            }) as c_int
         })
     }));
     match r {
@@ -477,7 +495,9 @@ fn entry_at(
             } else {
                 st.file_at(index as usize)
             };
-            let Some(entry) = entry else { return Err(QIMGV_ERR_EMPTY) };
+            let Some(entry) = entry else {
+                return Err(QIMGV_ERR_EMPTY);
+            };
             write_str(name_buf, name_cap, &entry.data.name)?;
             write_str(path_buf, path_cap, &entry.data.path)?;
             unsafe {
@@ -514,7 +534,9 @@ pub unsafe extern "C" fn qimgv_engine_file_entry_at(
     path_buf: *mut c_char,
     path_cap: usize,
 ) -> c_int {
-    entry_at(engine, index, false, out, name_buf, name_cap, path_buf, path_cap)
+    entry_at(
+        engine, index, false, out, name_buf, name_cap, path_buf, path_cap,
+    )
 }
 
 #[unsafe(no_mangle)]
@@ -527,16 +549,12 @@ pub unsafe extern "C" fn qimgv_engine_dir_entry_at(
     path_buf: *mut c_char,
     path_cap: usize,
 ) -> c_int {
-    entry_at(engine, index, true, out, name_buf, name_cap, path_buf, path_cap)
+    entry_at(
+        engine, index, true, out, name_buf, name_cap, path_buf, path_cap,
+    )
 }
 
-fn neighbor(
-    engine: *mut QimgvEngine,
-    handle: u64,
-    dirs: bool,
-    next: bool,
-    out: *mut u64,
-) -> c_int {
+fn neighbor(engine: *mut QimgvEngine, handle: u64, dirs: bool, next: bool, out: *mut u64) -> c_int {
     if engine.is_null() || out.is_null() {
         set_last_error("invalid argument");
         return QIMGV_ERR_INVALID;
@@ -554,7 +572,9 @@ fn neighbor(
                 (true, true) => st.next_dir(key),
                 (true, false) => st.prev_dir(key),
             };
-            let Some(n) = n else { return Err(QIMGV_ERR_EMPTY) };
+            let Some(n) = n else {
+                return Err(QIMGV_ERR_EMPTY);
+            };
             unsafe { *out = qimgv_engine::key_to_ffi(n) };
             Ok(QIMGV_OK)
         })
@@ -573,19 +593,35 @@ fn neighbor(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_next_file(engine: *mut QimgvEngine, handle: u64, out: *mut u64) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_next_file(
+    engine: *mut QimgvEngine,
+    handle: u64,
+    out: *mut u64,
+) -> c_int {
     neighbor(engine, handle, false, true, out)
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_prev_file(engine: *mut QimgvEngine, handle: u64, out: *mut u64) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_prev_file(
+    engine: *mut QimgvEngine,
+    handle: u64,
+    out: *mut u64,
+) -> c_int {
     neighbor(engine, handle, false, false, out)
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_next_dir(engine: *mut QimgvEngine, handle: u64, out: *mut u64) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_next_dir(
+    engine: *mut QimgvEngine,
+    handle: u64,
+    out: *mut u64,
+) -> c_int {
     neighbor(engine, handle, true, true, out)
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_prev_dir(engine: *mut QimgvEngine, handle: u64, out: *mut u64) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_prev_dir(
+    engine: *mut QimgvEngine,
+    handle: u64,
+    out: *mut u64,
+) -> c_int {
     neighbor(engine, handle, true, false, out)
 }
 
@@ -603,7 +639,11 @@ pub unsafe extern "C" fn qimgv_engine_thumb_request(
         let path = read_path(path)?;
         with_engine(engine, |e| {
             e.send(Command::Thumb(ThumbCommand::Request {
-                req: ThumbReq { path, size, crop: crop != 0 },
+                req: ThumbReq {
+                    path,
+                    size,
+                    crop: crop != 0,
+                },
                 replace_batch: replace_batch != 0,
             }))
             .map(|_| QIMGV_OK)
@@ -634,7 +674,11 @@ pub unsafe extern "C" fn qimgv_engine_thumb_done(
         let path = read_path(path)?;
         with_engine(engine, |e| {
             e.send(Command::Thumb(ThumbCommand::Done {
-                req: ThumbReq { path, size, crop: crop != 0 },
+                req: ThumbReq {
+                    path,
+                    size,
+                    crop: crop != 0,
+                },
             }))
             .map(|_| QIMGV_OK)
             .map_err(|er| map_engine_error(&er))
@@ -670,7 +714,10 @@ pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_thumb_config(engine: *mut QimgvEngine, max_in_flight: u32) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_thumb_config(
+    engine: *mut QimgvEngine,
+    max_in_flight: u32,
+) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         with_engine(engine, |e| {
             e.send(Command::Thumb(ThumbCommand::Config { max_in_flight }))
@@ -703,7 +750,10 @@ pub unsafe extern "C" fn qimgv_engine_export_listing(
     dir_count_out: *mut u32,
 ) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
-        if engine.is_null() || needed_out.is_null() || file_count_out.is_null() || dir_count_out.is_null()
+        if engine.is_null()
+            || needed_out.is_null()
+            || file_count_out.is_null()
+            || dir_count_out.is_null()
         {
             return Err(QIMGV_ERR_INVALID);
         }
@@ -748,7 +798,10 @@ pub unsafe extern "C" fn qimgv_engine_export_listing(
 /// open, header-only parse. Parse failures are QIMGV_OK with FMT_UNKNOWN and
 /// zero dimensions; only an unreadable file is ERR_IO.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_probe(path: *const c_char, out: *mut QimgvProbeResult) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_probe(
+    path: *const c_char,
+    out: *mut QimgvProbeResult,
+) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         if out.is_null() {
             return Err(QIMGV_ERR_INVALID);
@@ -785,7 +838,10 @@ pub unsafe extern "C" fn qimgv_engine_probe(path: *const c_char, out: *mut Qimgv
 /// persists across rescans until the file disappears. Returns OK even if the
 /// file is gone — the state simply won't change.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_include_path(engine: *mut QimgvEngine, path: *const c_char) -> c_int {
+pub unsafe extern "C" fn qimgv_engine_include_path(
+    engine: *mut QimgvEngine,
+    path: *const c_char,
+) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         let path = read_path(path)?;
         with_engine(engine, |e| {
@@ -879,77 +935,110 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
         // not "leave take_event" — the latter would skip the put-it-back below,
         // which is the whole point of the stash.
         let outcome: Result<c_int, c_int> = (|| -> Result<c_int, c_int> {
-        match pending.as_ref() {
-            None => Ok(0),
-            Some(ev) => match ev {
-            Event::DirListed { dir, epoch } => {
-                write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
-                unsafe {
-                    *out = QimgvEvent { kind: QIMGV_EVENT_DIR_LISTED, code: QIMGV_OK, epoch: *epoch as u32, seq: 0 };
-                }
-                Ok(1)
-            }
-            Event::OpenFailed { dir, error, epoch } => {
-                write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
-                let code = map_engine_error(error);
-                set_last_error(&error.to_string());
-                unsafe {
-                    *out = QimgvEvent { kind: QIMGV_EVENT_OPEN_FAILED, code, epoch: *epoch as u32, seq: 0 };
-                }
-                Ok(1)
-            }
-            Event::ThumbNext { req } => {
-                write_str(subject_buf, subject_cap, &req.path.to_string_lossy())?;
-                if !thumb.is_null() {
-                    unsafe {
-                        *thumb = QimgvThumbReq { size: req.size, crop: req.crop as c_int };
+            match pending.as_ref() {
+                None => Ok(0),
+                Some(ev) => match ev {
+                    Event::DirListed { dir, epoch } => {
+                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        unsafe {
+                            *out = QimgvEvent {
+                                kind: QIMGV_EVENT_DIR_LISTED,
+                                code: QIMGV_OK,
+                                epoch: *epoch as u32,
+                                seq: 0,
+                            };
+                        }
+                        Ok(1)
                     }
-                }
-                unsafe {
-                    *out = QimgvEvent { kind: QIMGV_EVENT_THUMB_NEXT, code: QIMGV_OK, epoch: 0, seq: 0 };
-                }
-                Ok(1)
-            }
-            Event::Mutated { seq, kind, path, name: _, is_dir, size, mtime_ms, index, epoch } => {
-                // A rename is the one mutation with two subjects, and both have
-                // to fit before either is written: a caller that cannot receive
-                // the old path is left with an event it can only mis-apply, so
-                // the event stays queued instead.
-                let from = match kind {
-                    qimgv_engine::WatchChangeKind::Renamed { from } => Some(from),
-                    _ => None,
-                };
-                if let Some(from) = from {
-                    fits(old_buf, old_cap, from)?;
-                }
-                write_str(subject_buf, subject_cap, path)?;
-                if let Some(from) = from {
-                    write_str(old_buf, old_cap, from)?;
-                }
-                let mkind = match kind {
-                    qimgv_engine::WatchChangeKind::Added => QIMGV_MUT_ADDED,
-                    qimgv_engine::WatchChangeKind::Modified => QIMGV_MUT_MODIFIED,
-                    qimgv_engine::WatchChangeKind::Removed => QIMGV_MUT_REMOVED,
-                    qimgv_engine::WatchChangeKind::Renamed { .. } => QIMGV_MUT_RENAMED,
-                };
-                if !mutation.is_null() {
-                    unsafe {
-                        *mutation = QimgvMutation {
-                            kind: mkind,
-                            is_dir: *is_dir as c_int,
-                            size: *size,
-                            mtime_ms: *mtime_ms,
-                            index: *index as c_int,
+                    Event::OpenFailed { dir, error, epoch } => {
+                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        let code = map_engine_error(error);
+                        set_last_error(&error.to_string());
+                        unsafe {
+                            *out = QimgvEvent {
+                                kind: QIMGV_EVENT_OPEN_FAILED,
+                                code,
+                                epoch: *epoch as u32,
+                                seq: 0,
+                            };
+                        }
+                        Ok(1)
+                    }
+                    Event::ThumbNext { req } => {
+                        write_str(subject_buf, subject_cap, &req.path.to_string_lossy())?;
+                        if !thumb.is_null() {
+                            unsafe {
+                                *thumb = QimgvThumbReq {
+                                    size: req.size,
+                                    crop: req.crop as c_int,
+                                };
+                            }
+                        }
+                        unsafe {
+                            *out = QimgvEvent {
+                                kind: QIMGV_EVENT_THUMB_NEXT,
+                                code: QIMGV_OK,
+                                epoch: 0,
+                                seq: 0,
+                            };
+                        }
+                        Ok(1)
+                    }
+                    Event::Mutated {
+                        seq,
+                        kind,
+                        path,
+                        name: _,
+                        is_dir,
+                        size,
+                        mtime_ms,
+                        index,
+                        epoch,
+                    } => {
+                        // A rename is the one mutation with two subjects, and both have
+                        // to fit before either is written: a caller that cannot receive
+                        // the old path is left with an event it can only mis-apply, so
+                        // the event stays queued instead.
+                        let from = match kind {
+                            qimgv_engine::WatchChangeKind::Renamed { from } => Some(from),
+                            _ => None,
                         };
+                        if let Some(from) = from {
+                            fits(old_buf, old_cap, from)?;
+                        }
+                        write_str(subject_buf, subject_cap, path)?;
+                        if let Some(from) = from {
+                            write_str(old_buf, old_cap, from)?;
+                        }
+                        let mkind = match kind {
+                            qimgv_engine::WatchChangeKind::Added => QIMGV_MUT_ADDED,
+                            qimgv_engine::WatchChangeKind::Modified => QIMGV_MUT_MODIFIED,
+                            qimgv_engine::WatchChangeKind::Removed => QIMGV_MUT_REMOVED,
+                            qimgv_engine::WatchChangeKind::Renamed { .. } => QIMGV_MUT_RENAMED,
+                        };
+                        if !mutation.is_null() {
+                            unsafe {
+                                *mutation = QimgvMutation {
+                                    kind: mkind,
+                                    is_dir: *is_dir as c_int,
+                                    size: *size,
+                                    mtime_ms: *mtime_ms,
+                                    index: *index as c_int,
+                                };
+                            }
+                        }
+                        unsafe {
+                            *out = QimgvEvent {
+                                kind: QIMGV_EVENT_DIR_MUTATED,
+                                code: QIMGV_OK,
+                                epoch: *epoch as u32,
+                                seq: *seq as u32,
+                            };
+                        }
+                        Ok(1)
                     }
-                }
-                unsafe {
-                    *out = QimgvEvent { kind: QIMGV_EVENT_DIR_MUTATED, code: QIMGV_OK, epoch: *epoch as u32, seq: *seq as u32 };
-                }
-                Ok(1)
+                },
             }
-            },
-        }
         })();
         if outcome.is_err() {
             // Nothing was written: every arm checks the buffer before touching an
