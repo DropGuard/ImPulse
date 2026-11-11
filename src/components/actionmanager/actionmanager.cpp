@@ -129,10 +129,10 @@ void ActionManager::initShortcuts() {
     // still picks the new default up. The old all-or-nothing copy left any
     // config holding at least one entry permanently pinned to its own era.
     shortcuts = defaults;
-    inspectShortcuts = inspectDefaults;
     gridShortcuts = gridDefaults;
     readShortcuts();
     readGridShortcuts();
+    readInspectShortcuts();
 }
 //------------------------------------------------------------------------------
 void ActionManager::addShortcut(const QString &keys, const QString &action) {
@@ -274,6 +274,14 @@ void ActionManager::readGridShortcuts() {
     validateShortcuts(gridShortcuts);
 }
 
+// the inspect layer's user overrides: defaults first, config entries overlay
+// them — the same insert-if-present semantic the global table carries
+void ActionManager::readInspectShortcuts() {
+    inspectShortcuts = inspectDefaults;
+    settings->readShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
+    validateShortcuts(inspectShortcuts);
+}
+
 //------------------------------------------------------------------------------
 void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
@@ -305,6 +313,38 @@ void ActionManager::removeAllGridShortcuts(const QString &actionName) {
 
 void ActionManager::saveGridShortcuts() {
     settings->saveShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
+}
+
+void ActionManager::addInspectShortcut(const QString &keys, const QString &action) {
+    ActionType type = validateAction(action);
+    if(type != ActionType::ACTION_INVALID) {
+        inspectShortcuts.insert(keys, action);
+    }
+}
+
+const QMap<QString, QString> &ActionManager::allInspectShortcuts() {
+    return inspectShortcuts;
+}
+
+void ActionManager::removeAllInspectShortcuts() {
+    inspectShortcuts.clear();
+}
+
+// Removes all inspect shortcuts for specified action. Slow (reverse map lookup).
+void ActionManager::removeAllInspectShortcuts(const QString &actionName) {
+    if(validateAction(actionName) == ActionType::ACTION_INVALID)
+        return;
+
+    for(auto i = inspectShortcuts.begin(); i != inspectShortcuts.end();) {
+        if(i.value() == actionName)
+            i = inspectShortcuts.erase(i);
+        else
+            ++i;
+    }
+}
+
+void ActionManager::saveInspectShortcuts() {
+    settings->saveShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
 }
 //------------------------------------------------------------------------------
 bool ActionManager::processEvent(QInputEvent *event, ShortcutScope scope) {
