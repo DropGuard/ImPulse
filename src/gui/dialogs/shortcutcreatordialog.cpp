@@ -30,9 +30,21 @@ QString ShortcutCreatorDialog::selectedShortcut() {
 }
 
 void ShortcutCreatorDialog::onShortcutEdited() {
-    QString action = actionManager->actionForShortcut(ui->sequenceEdit->sequence());
-    if(!action.isEmpty())
-        ui->warningLabel->setText("This shortcut is used for action: " + action + ". Replace?");
+    // one key may legitimately live in several scopes — the warning names
+    // each table that already holds it, so "replace?" is an informed click
+    const QString sequence = ui->sequenceEdit->sequence();
+    QStringList held;
+    const QString global = actionManager->actionForShortcut(sequence);
+    if(!global.isEmpty())
+        held << global + " (global)";
+    const QString grid = actionManager->allGridShortcuts().value(sequence);
+    if(!grid.isEmpty())
+        held << grid + " (folder view)";
+    const QString inspect = actionManager->allInspectShortcuts().value(sequence);
+    if(!inspect.isEmpty())
+        held << inspect + " (inspect)";
+    if(!held.isEmpty())
+        ui->warningLabel->setText("This shortcut is used for: " + held.join(QStringLiteral(", ")) + ". Replace?");
     else
         ui->warningLabel->setText("");
 }
