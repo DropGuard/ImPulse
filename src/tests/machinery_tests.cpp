@@ -1205,6 +1205,48 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QVERIFY(a != ThumbnailerRunnable::videoFrameTempPath("/tmp/t/", "/videos/x/clip.mkv", 120, false));
     }
 
+    // The store's sweep must not run on the UI thread. Telling our entries from
+    // another program's means reading each PNG's text chunks, and that measured
+    // ~40x the stat-only walk it replaced (549 files: 135us -> 5519us on the
+    // development machine) — a startup freeze that grows with the library.
+    //
+    // Proved by THREAD IDENTITY, which is the only thing that distinguishes the
+    // two implementations: the sweep records the QThread it ran on, and the
+    // test compares it with its own. An earlier draft asserted "the work has
+    // not happened yet while the pool is busy" — that reads as plausible and
+    // stays green even when the sweep is run inline, because a call cannot
+    // observe its own absence. A break-test caught it.
+    void theStoreSweepRunsOnAWorkerNotOnTheCallingThread() {
+        resetFixture();
+        WorkerPool pool(1);
+        Thumbnailer thumb(pool, EngineBridge::instance());
+        const Qt::HANDLE caller = QThread::currentThreadId();
+
+        std::atomic<Qt::HANDLE> ranOn{nullptr};
+        thumb.scheduleSweep(15, ThumbnailCache::cacheMaxBytes, &ranOn);
+        // waitForOwner, not waitForDone: the latter is Thumbnailer's own owner
+        pool.waitForOwner(PoolOwner::Maintenance);
+
+        QVERIFY2(ranOn.load() != nullptr, "the sweep never ran");
+        QVERIFY2(ranOn.load() != caller, "the store sweep ran on the calling thread; it must run on a pool worker");
+    }
+
+    // Teardown half: the Thumbnailer owns the cache, and it must WAIT for a
+    // running sweep rather than cancel it. cancel() only marks; a marked sweep
+    // would keep walking the store and then touch a destroyed object. Reaching
+    // the end of this scope without a crash is the assertion — the repeated
+    // rounds are what make it likely to be reached at all.
+    void tearingDownAThumbnailerWaitsForARunningSweep() {
+        resetFixture();
+        for(int i = 0; i < 3; ++i) {
+            WorkerPool pool(2);
+            Thumbnailer thumb(pool, EngineBridge::instance());
+            thumb.scheduleSweep(15, ThumbnailCache::cacheMaxBytes);
+            // no wait here: the destructor has to do it
+        }
+        QVERIFY(true);
+    }
+
     void thumbnailerAccountingSurvivesAClearMidFlight() {
         resetFixture();
         WorkerPool pool(2);

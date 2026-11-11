@@ -2,19 +2,51 @@
 
 #include <utility>
 
+#include <QThread>
 #include <QTimer>
 
 #include "../directorymanager/enginebridge.h"
+
+namespace {
+
+// The sweep as a pool job. It owns nothing but the arguments: the store object
+// lives on Thumbnailer, which waits for this job before destroying it (see the
+// destructor), so the pointer is valid for the whole of run().
+class CacheSweepJob : public PoolJob {
+  public:
+    CacheSweepJob(ThumbnailCache *_cache, int _idleDays, qint64 _byteCap, std::atomic<Qt::HANDLE> *_ranOn)
+        : cache(_cache), idleDays(_idleDays), byteCap(_byteCap), ranOn(_ranOn) {
+    }
+    void run() override {
+        if(ranOn)
+            ranOn->store(QThread::currentThreadId(), std::memory_order_release);
+        cache->purgeOlderThan(idleDays, byteCap);
+    }
+
+  private:
+    ThumbnailCache *cache;
+    int idleDays;
+    qint64 byteCap;
+    std::atomic<Qt::HANDLE> *ranOn;
+};
+
+} // namespace
 
 Thumbnailer::Thumbnailer(WorkerPool &_pool, EngineBridge &bridge) : mBridge(bridge), pool(_pool) {
     connect(&mBridge, &EngineBridge::thumbNext, this, &Thumbnailer::onThumbNext);
     // the shared freedesktop store, not an app-private directory: this is the
     // whole point of the format — a thumbnail Dolphin already made is a hit
     cache = new ThumbnailCache(ThumbnailCache::rootDir());
-    // startup sweep, after the first frames have settled; stat-only walk
+    // startup sweep, after the first frames have settled. On a pool worker, not
+    // the UI thread: telling our entries from another program's means reading
+    // each PNG's text chunks, measured at ~40x the cost of the stat walk.
     QTimer::singleShot(3000, this, [this]() {
-        cache->purgeOlderThan(ThumbnailCache::cacheMaxIdleDays, ThumbnailCache::cacheMaxBytes);
+        scheduleSweep(ThumbnailCache::cacheMaxIdleDays, ThumbnailCache::cacheMaxBytes);
     });
+}
+
+void Thumbnailer::scheduleSweep(int idleDays, qint64 byteCap, std::atomic<Qt::HANDLE> *ranOn) {
+    pool.submit(PoolOwner::Maintenance, 0, std::make_unique<CacheSweepJob>(cache, idleDays, byteCap, ranOn));
 }
 
 Thumbnailer::~Thumbnailer() {
@@ -25,6 +57,13 @@ Thumbnailer::~Thumbnailer() {
     // bridge that holds it belongs to a process that is already going away.
     pool.cancel(PoolOwner::Thumbnailer);
     pool.waitForOwner(PoolOwner::Thumbnailer);
+    // A sweep still running holds `cache`, which is deleted below. It is the one
+    // job here that must be WAITED for rather than cancelled: cancel() only
+    // marks, and a marked sweep would keep walking the store and then touch a
+    // destroyed object. Draining first is not enough either — drain() returns
+    // queued jobs, but a running one is already past that point.
+    pool.drain(PoolOwner::Maintenance);
+    pool.waitForOwner(PoolOwner::Maintenance);
     // a parentless QObject: nothing else in the graph owns it, and the jobs
     // that were handed its pointer are gone with the drain and the wait above
     delete cache;
