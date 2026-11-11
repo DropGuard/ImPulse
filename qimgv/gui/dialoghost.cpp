@@ -91,7 +91,6 @@ QString DialogHost::getSaveFileName(const QString &filePath) {
         if(filters.filter(fmt).isEmpty())
             filters.append(fmt.toUpper() + " (*." + fmt + ")");
     }
-    QString filterString = filters.join(";; ");
 
     // find matching filter for the current image
     QString selectedFilter = "JPEG (*.jpg *.jpeg *jpe *jfif)";
@@ -102,8 +101,22 @@ QString DialogHost::getSaveFileName(const QString &filePath) {
             break;
         }
     }
-    QString newFilePath =
-        QFileDialog::getSaveFileName(window, tr("Save File as..."), filePath, filterString, &selectedFilter);
+    // the prefill is explicit, not an accident of backend: a full file path
+    // in the `dir` slot of the static getSaveFileName happens to prefill on
+    // some platform dialogs and is dropped by others (the portal backends
+    // have a history of it). setDirectory + selectFile is the documented
+    // form every backend forwards.
+    QFileDialog dialog(window);
+    dialog.setWindowTitle(tr("Save File as..."));
+    dialog.setDirectory(fi.absolutePath());
+    dialog.selectFile(fi.fileName());
+    dialog.setNameFilters(filters);
+    dialog.selectNameFilter(selectedFilter);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setWindowModality(Qt::ApplicationModal);
+    QString newFilePath;
+    if(dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty())
+        newFilePath = dialog.selectedFiles().constFirst();
     return newFilePath;
 }
 

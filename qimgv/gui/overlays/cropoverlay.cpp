@@ -1,5 +1,7 @@
 #include "cropoverlay.h"
 
+#include "components/actionmanager/actionmanager.h"
+#include "gui/overlays/cropanswer.h"
 #include "gui/viewers/viewerwidget.h"
 
 // TODO: this is pretty old. Clean up
@@ -562,18 +564,39 @@ void CropOverlay::onSelectionOutsideChange(QRect selection) {
 
 //------------------------------------------------------------------------------
 void CropOverlay::keyPressEvent(QKeyEvent *event) {
-    if((event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) && hasSelection()) {
-        if(event->modifiers() == Qt::ShiftModifier)
-            emit cropSave();
-        else
-            emit cropDefault();
-    } else if(event->key() == Qt::Key_Escape) {
+    event->accept();
+    // the save chords imply committing the pending crop: "save" while a
+    // selection stands means save it WITH the crop. The chord first applies
+    // the in-memory crop and then falls through below, so the global table
+    // still does the writing — the disk belongs to Ctrl+S / Ctrl+Shift+S,
+    // the tool just answers them.
+    if(hasSelection() && event->key() == Qt::Key_S && (event->modifiers() & Qt::ControlModifier))
+        emit cropApply();
+    if(const std::optional<CropAnswer> answer = cropAnswerForKey(event)) {
+        // Enter with nothing selected is not an answer yet — the key falls
+        // through to the action system like any unowned key
+        if(*answer == CropAnswer::Apply && !hasSelection()) {
+            actionManager->processEvent(event);
+            return;
+        }
+        if(*answer == CropAnswer::Apply) {
+            emit cropApply(); // the in-memory crop only; the save is Ctrl+S's job
+            return;
+        }
         clearSelection();
         emit escPressed();
-    } else if(event->matches(QKeySequence::SelectAll)) {
+        return;
+    }
+    if(event->matches(QKeySequence::SelectAll)) {
         selectAll();
+    } else if(event->key() >= Qt::Key_1 && event->key() <= Qt::Key_8) {
+        // the aspect presets, one digit each: 1 Free ... 8 16:10. The fit
+        // modes those digits reach globally are Framing-blocked while
+        // cropping, so capturing them costs nothing — and silences the
+        // "zoom disabled" toast they used to land in.
+        emit aspectPresetRequested(event->key() - Qt::Key_1);
     } else {
-        event->ignore();
+        actionManager->processEvent(event);
     }
 }
 
