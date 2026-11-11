@@ -3039,6 +3039,32 @@ class TestCoreNav : public QObject {
     // from the observed selectBelow jump instead of hardcoding layout
     // arithmetic, so the tests survive spacing/margin changes.
 
+    // The grid scope actions drive the grid through the FULL chain —
+    // ActionManager signal, core.cpp connect, FolderViewProxy, FolderView,
+    // grid — because R12 guards exactly this wiring, and a broken link is
+    // silent: the action validates, invokes, and does nothing. Movement and
+    // activation are both pinned; the key events land on this in the cutover.
+    void gridActionsDriveTheGridThroughTheFullChain() {
+        const QString dir = uniqueDir("gridact");
+        writeImage(QDir(dir).filePath("a.png"));
+        writeImage(QDir(dir).filePath("b.png"));
+
+        Core core;
+        QVERIFY(core.loadPath(QDir(dir).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        core.enableFolderView();
+        core.folderViewPresenter.selectAndFocus(0);
+        QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 1,
+                                  "precondition broken: the folder view holds no selection", 10000);
+
+        QVERIFY(actionManager->invokeAction(QStringLiteral("gridSelectNext")));
+        QCOMPARE(core.currentSelection().count(), 1);
+        QCOMPARE(core.currentSelection().constFirst(), QDir(dir).filePath("b.png"));
+
+        QVERIFY(actionManager->invokeAction(QStringLiteral("gridOpen")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(dir).filePath("b.png"), 10000);
+    }
+
     void navigationMovesByColumnsAndBack() {
         FolderGridView grid;
         grid.resize(500, 600);

@@ -190,6 +190,46 @@ void FolderView::onSortingChanged(SortingMode mode) {
     ui->sortingComboBox->blockSignals(false);
 }
 
+void FolderView::gridSelectNext() {
+    ui->thumbnailGrid->selectNext();
+}
+
+void FolderView::gridSelectPrev() {
+    ui->thumbnailGrid->selectPrev();
+}
+
+void FolderView::gridSelectAbove() {
+    ui->thumbnailGrid->selectAbove();
+}
+
+void FolderView::gridSelectBelow() {
+    ui->thumbnailGrid->selectBelow();
+}
+
+void FolderView::gridPageUp() {
+    ui->thumbnailGrid->pageUp();
+}
+
+void FolderView::gridPageDown() {
+    ui->thumbnailGrid->pageDown();
+}
+
+void FolderView::gridSelectFirst() {
+    ui->thumbnailGrid->selectFirst();
+}
+
+void FolderView::gridSelectLast() {
+    ui->thumbnailGrid->selectLast();
+}
+
+void FolderView::gridSelectAll() {
+    ui->thumbnailGrid->selectAll();
+}
+
+void FolderView::activateCurrent() {
+    ui->thumbnailGrid->activateCurrent();
+}
+
 FolderView::~FolderView() {
     delete ui;
 }

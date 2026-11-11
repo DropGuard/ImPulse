@@ -201,6 +201,12 @@ void FolderGridView::selectPrev() {
     scrollToCurrent();
 }
 
+void FolderGridView::activateCurrent() {
+    const int current = lastSelected();
+    if(current >= 0)
+        emit itemActivated(current);
+}
+
 void FolderGridView::pageUp() {
     if(!thumbnails.count() || lastSelected() == -1 || flowLayout->sameRow(0, lastSelected()))
         return;

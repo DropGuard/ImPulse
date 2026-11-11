@@ -39,6 +39,19 @@ class FolderViewProxy : public QWidget, public IDirectoryView {
     void addItem();
     void onFullscreenModeChanged(bool mode);
     void onSortingChanged(SortingMode mode);
+    // the grid scope actions land here: forward to the real widget, no-op
+    // before init() — an action can only fire at the grid it was keyed at,
+    // and keying at the grid means the grid exists
+    void gridSelectNext();
+    void gridSelectPrev();
+    void gridSelectAbove();
+    void gridSelectBelow();
+    void gridPageUp();
+    void gridPageDown();
+    void gridSelectFirst();
+    void gridSelectLast();
+    void gridSelectAll();
+    void activateCurrent();
 
   protected:
     void showEvent(QShowEvent *event) override;

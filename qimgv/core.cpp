@@ -259,6 +259,18 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::print, this, &Core::print);
     connect(actionManager, &ActionManager::toggleFullscreenInfoBar, this, &Core::toggleFullscreenInfoBar);
     connect(actionManager, &ActionManager::pasteFile, this, &Core::openFromClipboard);
+    // the folder grid's scope actions, landed on the proxy the same way the
+    // viewer commands land on ViewerWidget
+    connect(actionManager, &ActionManager::gridSelectNext, mw->getFolderView(), &FolderViewProxy::gridSelectNext);
+    connect(actionManager, &ActionManager::gridSelectPrev, mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
+    connect(actionManager, &ActionManager::gridSelectAbove, mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
+    connect(actionManager, &ActionManager::gridSelectBelow, mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
+    connect(actionManager, &ActionManager::gridPageUp, mw->getFolderView(), &FolderViewProxy::gridPageUp);
+    connect(actionManager, &ActionManager::gridPageDown, mw->getFolderView(), &FolderViewProxy::gridPageDown);
+    connect(actionManager, &ActionManager::gridSelectFirst, mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
+    connect(actionManager, &ActionManager::gridSelectLast, mw->getFolderView(), &FolderViewProxy::gridSelectLast);
+    connect(actionManager, &ActionManager::gridSelectAll, mw->getFolderView(), &FolderViewProxy::gridSelectAll);
+    connect(actionManager, &ActionManager::gridOpen, mw->getFolderView(), &FolderViewProxy::activateCurrent);
 }
 
 void Core::loadTranslation() {
