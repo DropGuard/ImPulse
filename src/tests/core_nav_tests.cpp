@@ -1459,6 +1459,27 @@ class TestCoreNav : public QObject {
         actionManager->removeAllGridShortcuts();
     }
 
+    // the inspect scope carries user overrides: while armed, an override
+    // replaces the inspect default for that key — the armed chain reads the
+    // layer, not the seed defaults. The table is snapshotted and restored;
+    // the singleton is process-wide.
+    void inspectShortcutsCarryUserOverrides() {
+        const QMap<QString, QString> inspectSnapshot = actionManager->allInspectShortcuts();
+        actionManager->addInspectShortcut(QStringLiteral("Left"), QStringLiteral("nextImage"));
+
+        QSignalSpy next(actionManager, &ActionManager::nextImage);
+        QSignalSpy scroll(actionManager, &ActionManager::scrollLeft);
+        actionManager->setInspectMode(true);
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(next.count(), 1);
+        QCOMPARE(scroll.count(), 0); // the scrollLeft default never fired
+        actionManager->setInspectMode(false);
+
+        actionManager->removeAllInspectShortcuts();
+        for(auto it = inspectSnapshot.constBegin(); it != inspectSnapshot.constEnd(); ++it)
+            actionManager->addInspectShortcut(it.key(), it.value());
+    }
+
     // ActionManager dispatches by name: an action lives in the Actions registry
     // and is fired as a metaobject method on ActionManager itself. Two lists
     // that have to agree, and the disagreement is silent — invokeMethod on a
