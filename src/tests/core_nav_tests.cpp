@@ -623,11 +623,18 @@ class TestCoreNav : public QObject {
         auto *combo = panel->findChild<QComboBox *>(QStringLiteral("ARcomboBox"));
         QVERIFY(combo);
         QCOMPARE(combo->currentIndex(), 0); // Free: reset on image change
-        QCOMPARE(combo->count(), 6);        // Free | Current Image | This Screen | 1:1 | 4:3 | 16:9
+        QCOMPARE(combo->count(), 7);        // Free | Custom | Current Image | This Screen | 1:1 | 4:3 | 16:9
 
-        // the combo drives the lock: Free unlocks, a preset locks to its ratio
-        combo->setCurrentIndex(3); // 1:1
-        QCOMPARE(combo->currentIndex(), 3);
+        // the hand-typed ratio's fields belong to Custom alone: hidden under
+        // every other preset, visible only while it is the chosen one — and
+        // they keep their own values instead of being seeded into confusion
+        auto *arInput = panel->findChild<QWidget *>(QStringLiteral("ARInputWidget"));
+        QVERIFY(arInput);
+        QVERIFY2(!arInput->isVisible(), "the custom-ratio fields leak into the Free preset");
+        combo->setCurrentIndex(1); // Custom
+        QVERIFY2(arInput->isVisible(), "choosing Custom did not reveal its fields");
+        combo->setCurrentIndex(4); // 1:1
+        QVERIFY2(!arInput->isVisible(), "the custom-ratio fields leak into a numeric preset");
         combo->setCurrentIndex(0); // back to Free
         QCOMPARE(combo->currentIndex(), 0);
 
