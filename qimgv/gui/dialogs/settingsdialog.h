@@ -35,6 +35,10 @@ class SettingsDialog : public QDialog {
     // both directions of the binding table; public so tests can drive them
     void readSettings();
     void saveSettings();
+    // rebuilds every scope's table from the rendered rows; public on the
+    // same seam as readSettings — the save-split (which row lands in which
+    // scope's table) is exactly what the test has to see
+    void saveShortcuts();
     // The message the import would show, built without showing it. The test
     // needs the text; QMessageBox::information blocks on a modal dialog that
     // no headless run can dismiss. Public for that seam, not for callers.
@@ -48,8 +52,10 @@ class SettingsDialog : public QDialog {
     void readScripts();
     Ui::SettingsDialog *ui;
 
-    void saveShortcuts();
-    void addShortcutToTable(const QString &action, const QString &shortcut);
+    void addShortcutToTable(const QString &action, const QString &shortcut, const QString &scope);
+    void addSectionHeader(const QString &title);
+    QString rowScope(int row) const;
+    QString selectedScope() const;
     void addScriptToList(const QString &name);
 
     void setupSidebar();
