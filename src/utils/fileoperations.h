@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QCryptographicHash>
 #include <QDebug>
 #include <QString>
 #include <QFileInfo>
@@ -54,5 +53,4 @@ class FileOperations {
 
   private:
     static bool moveToTrashImpl(const QString &path);
-    static QString generateHash(const QString &str);
 };

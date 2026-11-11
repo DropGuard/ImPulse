@@ -7,10 +7,6 @@
 #include <atomic>
 #include <cstdio> // ::rename — the atomic step in rename()
 
-QString FileOperations::generateHash(const QString &str) {
-    return QString(QCryptographicHash::hash(str.toUtf8(), QCryptographicHash::Md5).toHex());
-}
-
 // A sibling path that belongs to THIS process. Used for the temporary a
 // forced overwrite moves the old file to, before the new one is written under
 // the real name.
