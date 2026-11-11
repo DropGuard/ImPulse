@@ -17,10 +17,17 @@ void CropController::setupCropPanel() {
     cropOverlay = new CropOverlay(viewer);
     cropPanel = new CropPanel(cropOverlay, window);
     connect(cropPanel, &CropPanel::cancel, this, &CropController::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop, this, &CropController::hideCropPanel);
-    connect(cropPanel, &CropPanel::crop, this, &CropController::cropRequested);
+    // Apply does NOT close the surface: the applied crop settles into the
+    // viewer, the selection becomes the whole new image, and the user is
+    // still inside — re-cropping is dragging again. Esc is the only exit.
+    connect(cropPanel, &CropPanel::crop, this, &CropController::onPanelCrop);
     connect(cropPanel, &CropPanel::cropAndSave, this, &CropController::hideCropPanel);
     connect(cropPanel, &CropPanel::cropAndSave, this, &CropController::cropAndSaveRequested);
+}
+
+void CropController::onPanelCrop(QRect rect) {
+    cropJustApplied = true;
+    emit cropRequested(rect);
 }
 
 void CropController::showCropPanel() {
@@ -79,6 +86,15 @@ void CropController::updateCropPanelData() {
         // the overlay pulls its geometry from the viewer itself; the panel's
         // size readout is a label, so it still gets pushed
         cropPanel->setImageRealSize(viewer->sourceSize());
-        cropOverlay->onImageChanged();
+        if(cropJustApplied) {
+            // the applied crop just settled into the viewer: the selection
+            // becomes the whole new image — visually clean (the tint is
+            // fully subtracted), and the next drag starts from "here is
+            // everything you have now"
+            cropJustApplied = false;
+            cropOverlay->selectAll();
+        } else {
+            cropOverlay->onImageChanged();
+        }
     }
 }

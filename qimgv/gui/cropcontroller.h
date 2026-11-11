@@ -34,6 +34,13 @@ class CropController : public QObject {
     void cropRequested(QRect);
     void cropAndSaveRequested(QRect);
 
+  private slots:
+    // arms cropJustApplied, then relays: the panel-data nudge that follows
+    // the edit settling answers it by making the selection the whole new
+    // image — the surface never closes on Apply, so re-cropping is dragging
+    // again and Esc keeps meaning exactly one thing: leave.
+    void onPanelCrop(QRect rect);
+
   private:
     MW *window;
     ViewerWidget *viewer;
@@ -42,4 +49,5 @@ class CropController : public QObject {
     CropPanel *cropPanel = nullptr;
     CropOverlay *cropOverlay = nullptr;
     ActiveSidePanel activeSidePanel;
+    bool cropJustApplied = false;
 };
