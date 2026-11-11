@@ -131,6 +131,7 @@ class TestableFolderGridView : public FolderGridView {
     using FolderGridView::dragLeaveEvent;
     using FolderGridView::dragMoveEvent;
     using FolderGridView::dropEvent;
+    using FolderGridView::keyPressEvent;
 };
 
 // The presenter's remaining two view connections (thumbnailsRequested and
@@ -3039,6 +3040,80 @@ class TestCoreNav : public QObject {
     // from the observed selectBelow jump instead of hardcoding layout
     // arithmetic, so the tests survive spacing/margin changes.
 
+    // The cutover half of #365: a key event into the grid's keyPressEvent
+    // resolves through the grid's OWN scope table, whose defaults are the
+    // literal translation of the hardcoded switch this replaced — so each
+    // default binding is driven as a physical key and the grid must behave
+    // exactly as the hardcoded era did. The actions' receivers live in the
+    // Core window (proxy → view → grid, pinned by
+    // gridActionsDriveTheGridThroughTheFullChain); this pin is the key half,
+    // so the movement methods are connected locally. Scan codes are
+    // self-calibrated from the platform's own table — a synthesized event
+    // with scan code 0 yields an empty shortcut name and resolves to
+    // nothing, which is exactly the trap the sweep must not sit on.
+    void gridKeysResolveThroughTheScopeTable() {
+        TestableFolderGridView grid;
+        grid.resize(500, 600);
+        grid.populate(25);
+        grid.show();
+        grid.select(0);
+        connect(actionManager, &ActionManager::gridSelectNext, &grid, &FolderGridView::selectNext);
+        connect(actionManager, &ActionManager::gridSelectPrev, &grid, &FolderGridView::selectPrev);
+        connect(actionManager, &ActionManager::gridSelectAbove, &grid, &FolderGridView::selectAbove);
+        connect(actionManager, &ActionManager::gridSelectBelow, &grid, &FolderGridView::selectBelow);
+        connect(actionManager, &ActionManager::gridPageUp, &grid, &FolderGridView::pageUp);
+        connect(actionManager, &ActionManager::gridPageDown, &grid, &FolderGridView::pageDown);
+        connect(actionManager, &ActionManager::gridSelectFirst, &grid, &FolderGridView::selectFirst);
+        connect(actionManager, &ActionManager::gridSelectLast, &grid, &FolderGridView::selectLast);
+        connect(actionManager, &ActionManager::gridSelectAll, &grid, &FolderGridView::selectAll);
+        connect(actionManager, &ActionManager::gridOpen, &grid, &FolderGridView::activateCurrent);
+
+        pressGridKey(grid, "Right", Qt::Key_Right);
+        QCOMPARE(lastSelection(grid), 1);
+        pressGridKey(grid, "Left", Qt::Key_Left);
+        QCOMPARE(lastSelection(grid), 0);
+        pressGridKey(grid, "Left", Qt::Key_Left);
+        QCOMPARE(lastSelection(grid), 0); // past the start: stays
+        pressGridKey(grid, "Down", Qt::Key_Down);
+        pressGridKey(grid, "Up", Qt::Key_Up);
+        QCOMPARE(lastSelection(grid), 0);
+
+        pressGridKey(grid, "End", Qt::Key_End);
+        QCOMPARE(lastSelection(grid), 24);
+        pressGridKey(grid, "Home", Qt::Key_Home);
+        QCOMPARE(lastSelection(grid), 0);
+        pressGridKey(grid, "PgDown", Qt::Key_PageDown);
+        const int paged = lastSelection(grid);
+        QVERIFY2(paged > 0, "PgDown never left the first row");
+        pressGridKey(grid, "PgUp", Qt::Key_PageUp);
+        QCOMPARE(lastSelection(grid), 0); // and back
+
+        pressGridKey(grid, "A", Qt::Key_A, Qt::ControlModifier);
+        QCOMPARE(grid.selection().count(), 25); // Ctrl+A: everything
+
+        QSignalSpy up(actionManager, &ActionManager::goUp);
+        pressGridKey(grid, "Backspace", Qt::Key_Backspace);
+        QCOMPARE(up.count(), 1); // goUp is the grid scope's own binding
+
+        QSignalSpy activated(&grid, &FolderGridView::itemActivated);
+        pressGridKey(grid, "Enter", Qt::Key_Return);
+        QCOMPARE(activated.count(), 1);
+        QCOMPARE(activated.first().first().toInt(), 0);
+
+        grid.select(5);
+        pressGridKey(grid, "Esc", Qt::Key_Escape);
+        QCOMPARE(lastSelection(grid), 5); // an unscoped key never moves the grid
+
+        // activation on an empty selection is guarded, not emitted blind
+        TestableFolderGridView emptyGrid;
+        emptyGrid.resize(300, 300);
+        emptyGrid.populate(2);
+        emptyGrid.show();
+        QSignalSpy emptyActivation(&emptyGrid, &FolderGridView::itemActivated);
+        pressGridKey(emptyGrid, "Enter", Qt::Key_Return);
+        QCOMPARE(emptyActivation.count(), 0);
+    }
+
     // The grid scope actions drive the grid through the FULL chain —
     // ActionManager signal, core.cpp connect, FolderViewProxy, FolderView,
     // grid — because R12 guards exactly this wiring, and a broken link is
@@ -3172,6 +3247,24 @@ class TestCoreNav : public QObject {
     int lastSelection(FolderGridView &grid) {
         const QList<int> sel = grid.selection();
         return sel.last();
+    }
+    // the scancode the platform's own table pairs with a key name — looked
+    // up, not hardcoded, so the sweep survives table edits and stays honest
+    // about the platform it runs on
+    static quint32 scanCodeFor(const QString &keyName) {
+        const QMap<quint32, QString> keyTable = inputMap->keys();
+        for(auto it = keyTable.constBegin(); it != keyTable.constEnd(); ++it)
+            if(it.value() == keyName)
+                return it.key();
+        return 0;
+    }
+    // a KeyPress the way ShortcutBuilder will see it: with a real native scan
+    // code, because a synthesized event's default 0 yields an empty shortcut
+    // name and would silently resolve to nothing
+    static void pressGridKey(TestableFolderGridView &grid, const QString &keyName, Qt::Key key,
+                             Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+        QKeyEvent press(QEvent::KeyPress, key, modifiers, scanCodeFor(keyName), 0u, 0u, QString(), false, 0);
+        grid.keyPressEvent(&press);
     }
     QByteArray contentOf(const QString &path) {
         QFile f(path);
