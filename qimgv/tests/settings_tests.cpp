@@ -304,6 +304,36 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         QCOMPARE(back.value("ctrl+="), QStringLiteral("26"));
     }
 
+    // the scoped tables share the codec under their own Controls/ keys, and
+    // a scope's saved value must not bleed into the global one
+    void scopedShortcutTablesRoundTripIndependently() {
+        FreshSettings fresh;
+        QMap<QString, QString> grid;
+        grid.insert("Right", "gridSelectNext");
+        grid.insert("ctrl+=", "gridSelectAll"); // the escape, scoped
+        settings->saveShortcuts(grid, QStringLiteral("gridShortcuts"));
+
+        QMap<QString, QString> inspect;
+        inspect.insert("Left", "scrollLeft");
+        settings->saveShortcuts(inspect, QStringLiteral("inspectShortcuts"));
+
+        QMap<QString, QString> back;
+        settings->readShortcuts(back, QStringLiteral("gridShortcuts"));
+        QCOMPARE(back.size(), 2);
+        QCOMPARE(back.value("Right"), QStringLiteral("gridSelectNext"));
+        QCOMPARE(back.value("ctrl+="), QStringLiteral("gridSelectAll"));
+
+        QMap<QString, QString> backInspect;
+        settings->readShortcuts(backInspect, QStringLiteral("inspectShortcuts"));
+        QCOMPARE(backInspect.size(), 1);
+        QCOMPARE(backInspect.value("Left"), QStringLiteral("scrollLeft"));
+
+        // the global key never heard about any of it
+        QMap<QString, QString> global;
+        settings->readShortcuts(global);
+        QVERIFY(global.isEmpty());
+    }
+
     void freshSettingsGuardIsolatesConfigState() {
         // without the guard, every test had to reset the keys it depends on
         // and the suite was silently order-sensitive

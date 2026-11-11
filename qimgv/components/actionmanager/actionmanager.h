@@ -63,6 +63,13 @@ class ActionManager : public QObject {
     void removeAllGridShortcuts();
     void removeAllGridShortcuts(const QString &actionName);
     void saveGridShortcuts();
+    // the inspect scope's user override layer: defaults seeded from
+    // inspectDefaults, config entries overlay them, same as the global table
+    void addInspectShortcut(const QString &keys, const QString &action);
+    const QMap<QString, QString> &allInspectShortcuts();
+    void removeAllInspectShortcuts();
+    void removeAllInspectShortcuts(const QString &actionName);
+    void saveInspectShortcuts();
   public slots:
     bool invokeAction(const QString &actionName);
 
@@ -83,6 +90,7 @@ class ActionManager : public QObject {
     void validateShortcuts(QMap<QString, QString> &map);
     void readShortcuts();
     void readGridShortcuts();
+    void readInspectShortcuts();
     bool resolveShortcut(const QString &shortcut, ShortcutScope scope);
     ActionType validateAction(const QString &actionName);
 
