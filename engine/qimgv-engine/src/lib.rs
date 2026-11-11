@@ -20,5 +20,5 @@ pub use engine::{
 pub use error::EngineError;
 pub use filter::NameFilter;
 pub use meta::{ImageFormat, MetaInfo};
-pub use model::{key_from_ffi, key_to_ffi, DirectoryState, EntryData, EntryKey, EntryRef};
-pub use sort::SortMode;
+pub use model::{DirectoryState, EntryData, EntryKey, EntryRef, key_from_ffi, key_to_ffi};
+pub use sort::{SortMode, natural};

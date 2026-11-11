@@ -68,10 +68,7 @@ impl DirectoryState {
     pub fn replace_all(&mut self, dir: PathBuf, files: Vec<EntryData>, dirs: Vec<EntryData>) {
         self.dir = Some(dir);
         self.entries.clear();
-        self.file_order = files
-            .into_iter()
-            .map(|e| self.entries.insert(e))
-            .collect();
+        self.file_order = files.into_iter().map(|e| self.entries.insert(e)).collect();
         self.dir_order = dirs.into_iter().map(|e| self.entries.insert(e)).collect();
         self.reorder();
     }
@@ -142,7 +139,11 @@ impl DirectoryState {
 
     pub fn prev_file(&self, handle: EntryKey) -> Option<EntryKey> {
         let i = *self.file_pos.get(&handle)? as usize;
-        if i == 0 { None } else { self.file_order.get(i - 1).copied() }
+        if i == 0 {
+            None
+        } else {
+            self.file_order.get(i - 1).copied()
+        }
     }
 
     pub fn next_dir(&self, handle: EntryKey) -> Option<EntryKey> {
@@ -152,7 +153,11 @@ impl DirectoryState {
 
     pub fn prev_dir(&self, handle: EntryKey) -> Option<EntryKey> {
         let i = *self.dir_pos.get(&handle)? as usize;
-        if i == 0 { None } else { self.dir_order.get(i - 1).copied() }
+        if i == 0 {
+            None
+        } else {
+            self.dir_order.get(i - 1).copied()
+        }
     }
 
     // --- incremental mutations (engine watcher) ---------------------------------
@@ -170,7 +175,11 @@ impl DirectoryState {
         let pos = {
             let mode = self.sort;
             let entries = &self.entries;
-            let order = if is_dir { &mut self.dir_order } else { &mut self.file_order };
+            let order = if is_dir {
+                &mut self.dir_order
+            } else {
+                &mut self.file_order
+            };
             let idx = order
                 .binary_search_by(|&k| mode.compare(&entries[k], &entries[key]))
                 .unwrap_or_else(|i| i);
@@ -273,7 +282,14 @@ impl DirectoryState {
     /// The destination must not already be listed: an overwrite takes the old
     /// destination row out first (`remove_entry_by_path`), so the identity that
     /// survives is the moved-in file's, and one event can describe the result.
-    pub fn rename_entry(&mut self, from: &str, to: &str, name: &str, size: u64, mtime: SystemTime) -> Option<u32> {
+    pub fn rename_entry(
+        &mut self,
+        from: &str,
+        to: &str,
+        name: &str,
+        size: u64,
+        mtime: SystemTime,
+    ) -> Option<u32> {
         let key = self
             .entries
             .iter()
@@ -317,7 +333,11 @@ impl DirectoryState {
             .binary_search_by(|&k| mode.compare(&entries[k], &entries[key]))
             .unwrap_or_else(|i| i);
         order.insert(idx, key);
-        *pos = order.iter().enumerate().map(|(i, &k)| (k, i as u32)).collect();
+        *pos = order
+            .iter()
+            .enumerate()
+            .map(|(i, &k)| (k, i as u32))
+            .collect();
         Some(idx as u32)
     }
 

@@ -1,12 +1,12 @@
 use std::collections::HashSet;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 use std::thread;
+use std::time::Instant;
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crate::error::EngineError;
 use crate::filter::NameFilter;
@@ -27,7 +27,11 @@ pub enum Command {
     /// DirListed event) — passing it separately would emit a stale resort
     /// event for the *previous* directory's state. `epoch` identifies the
     /// session (allocated by the caller via `next_epoch`).
-    OpenDir { path: PathBuf, sort: Option<SortMode>, epoch: u64 },
+    OpenDir {
+        path: PathBuf,
+        sort: Option<SortMode>,
+        epoch: u64,
+    },
     SetSort(SortMode),
     /// Adds a path to the listing bypassing the extension filter (app-side
     /// mime fallback); persists across rescans until the file disappears.
@@ -82,7 +86,9 @@ pub enum WatchChangeKind {
     /// `path` would treat this as an add and leave the old row behind, which is
     /// why the old path rides in the kind rather than in a caller's memory of
     /// the previous event.
-    Renamed { from: String },
+    Renamed {
+        from: String,
+    },
 }
 
 #[derive(Debug)]
@@ -90,7 +96,11 @@ pub enum Event {
     /// Directory listing replaced (also emitted after SetSort so the UI
     /// repopulates; handles stay stable across re-sorts).
     DirListed { dir: PathBuf, epoch: u64 },
-    OpenFailed { dir: PathBuf, error: Arc<EngineError>, epoch: u64 },
+    OpenFailed {
+        dir: PathBuf,
+        error: Arc<EngineError>,
+        epoch: u64,
+    },
     /// Incremental change applied by the engine watcher. `index` is the
     /// entry's position in the engine's own order — the single order decision,
     /// handed to the mirror so it never re-derives one.
@@ -144,7 +154,11 @@ impl ListingRequest {
     fn rescan(&mut self, next: &mut u64) -> ScanJob {
         *next += 1;
         self.dispatch = *next;
-        ScanJob { session: self.session, dispatch: self.dispatch, path: self.dir.clone() }
+        ScanJob {
+            session: self.session,
+            dispatch: self.dispatch,
+            path: self.dir.clone(),
+        }
     }
 }
 
@@ -227,7 +241,9 @@ impl ThumbScheduler {
 
     fn pump(&mut self, ev_tx: &Sender<Event>, notify: &Notify) {
         while self.in_flight.len() < self.max_in_flight as usize {
-            let Some(req) = self.pending.pop_front() else { break };
+            let Some(req) = self.pending.pop_front() else {
+                break;
+            };
             if !self.in_flight.insert(req.clone()) {
                 continue;
             }
@@ -253,7 +269,6 @@ impl Engine {
         let show_hidden = cfg.show_hidden;
         let filter = cfg.filter;
         let overrides: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
-
 
         #[cfg(target_os = "linux")]
         let (watcher, watch_ev_rx) = {
@@ -289,7 +304,10 @@ impl Engine {
                 // mirror identify the same event, which is what makes the two
                 // halves of a trace comparable when one of them is missing a line.
                 let mut next_mutation: u64 = 0;
-                let mut thumbs = ThumbScheduler { max_in_flight: 2, ..Default::default() };
+                let mut thumbs = ThumbScheduler {
+                    max_in_flight: 2,
+                    ..Default::default()
+                };
                 loop {
                     crossbeam_channel::select! {
                         recv(cmd_rx) -> cmd => {

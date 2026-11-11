@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use qimgv_engine::{key_from_ffi, key_to_ffi, DirectoryState, EntryData, SortMode};
+use qimgv_engine::{DirectoryState, EntryData, SortMode, key_from_ffi, key_to_ffi};
 
 fn entry(name: &str, size: u64, age_secs: u64) -> EntryData {
     EntryData {
@@ -17,26 +17,42 @@ fn natural_name_order() {
     let mut st = DirectoryState::new(SortMode::Name);
     st.replace_all(
         "/tmp".into(),
-        vec![entry("img10.jpg", 1, 0), entry("img2.jpg", 1, 0), entry("img1.jpg", 1, 0)],
+        vec![
+            entry("img10.jpg", 1, 0),
+            entry("img2.jpg", 1, 0),
+            entry("img1.jpg", 1, 0),
+        ],
         vec![],
     );
-    let names: Vec<&str> = (0..3).map(|i| st.file_at(i).unwrap().data.name.as_str()).collect();
+    let names: Vec<&str> = (0..3)
+        .map(|i| st.file_at(i).unwrap().data.name.as_str())
+        .collect();
     assert_eq!(names, ["img1.jpg", "img2.jpg", "img10.jpg"]);
 }
 
 #[test]
 fn name_desc_reverses() {
     let mut st = DirectoryState::new(SortMode::Name);
-    st.replace_all("/tmp".into(), vec![entry("a.jpg", 1, 0), entry("b.jpg", 1, 0)], vec![]);
+    st.replace_all(
+        "/tmp".into(),
+        vec![entry("a.jpg", 1, 0), entry("b.jpg", 1, 0)],
+        vec![],
+    );
     st.resort(SortMode::NameDesc);
-    let names: Vec<&str> = (0..2).map(|i| st.file_at(i).unwrap().data.name.as_str()).collect();
+    let names: Vec<&str> = (0..2)
+        .map(|i| st.file_at(i).unwrap().data.name.as_str())
+        .collect();
     assert_eq!(names, ["b.jpg", "a.jpg"]);
 }
 
 #[test]
 fn size_and_time_sorts() {
     let mut st = DirectoryState::new(SortMode::Size);
-    st.replace_all("/tmp".into(), vec![entry("big.jpg", 100, 0), entry("small.jpg", 1, 0)], vec![]);
+    st.replace_all(
+        "/tmp".into(),
+        vec![entry("big.jpg", 100, 0), entry("small.jpg", 1, 0)],
+        vec![],
+    );
     assert_eq!(st.file_at(0).unwrap().data.name, "small.jpg");
     st.resort(SortMode::SizeDesc);
     assert_eq!(st.file_at(0).unwrap().data.name, "big.jpg");
@@ -44,7 +60,11 @@ fn size_and_time_sorts() {
     st.resort(SortMode::Time);
     // entry() ages newer files less; Time ascending = oldest first
     let mut st2 = DirectoryState::new(SortMode::Time);
-    st2.replace_all("/tmp".into(), vec![entry("new.jpg", 1, 10), entry("old.jpg", 1, 100)], vec![]);
+    st2.replace_all(
+        "/tmp".into(),
+        vec![entry("new.jpg", 1, 10), entry("old.jpg", 1, 100)],
+        vec![],
+    );
     assert_eq!(st2.file_at(0).unwrap().data.name, "old.jpg");
 }
 
@@ -53,7 +73,11 @@ fn next_prev_and_index() {
     let mut st = DirectoryState::new(SortMode::Name);
     st.replace_all(
         "/tmp".into(),
-        vec![entry("a.jpg", 1, 0), entry("b.jpg", 1, 0), entry("c.jpg", 1, 0)],
+        vec![
+            entry("a.jpg", 1, 0),
+            entry("b.jpg", 1, 0),
+            entry("c.jpg", 1, 0),
+        ],
         vec![],
     );
     let b = st.file_at(1).unwrap().handle;
@@ -68,11 +92,19 @@ fn next_prev_and_index() {
 #[test]
 fn handles_survive_resort_die_on_replace() {
     let mut st = DirectoryState::new(SortMode::Name);
-    st.replace_all("/tmp".into(), vec![entry("a.jpg", 1, 0), entry("b.jpg", 1, 0)], vec![]);
+    st.replace_all(
+        "/tmp".into(),
+        vec![entry("a.jpg", 1, 0), entry("b.jpg", 1, 0)],
+        vec![],
+    );
     let b = st.file_at(1).unwrap().handle;
 
     st.resort(SortMode::NameDesc);
-    assert_eq!(st.index_of_file(b), Some(0), "handle follows its entry across re-sort");
+    assert_eq!(
+        st.index_of_file(b),
+        Some(0),
+        "handle follows its entry across re-sort"
+    );
 
     st.replace_all("/tmp2".into(), vec![entry("x.jpg", 1, 0)], vec![]);
     assert_eq!(st.index_of_file(b), None);
@@ -99,7 +131,9 @@ fn insert_entry_reports_the_position_it_chose() {
     );
     let (_, pos) = st.insert_entry(entry("b.jpg", 1, 0)).unwrap();
     assert_eq!(pos, 1);
-    let names: Vec<&str> = (0..3).map(|i| st.file_at(i).unwrap().data.name.as_str()).collect();
+    let names: Vec<&str> = (0..3)
+        .map(|i| st.file_at(i).unwrap().data.name.as_str())
+        .collect();
     assert_eq!(names, ["a.jpg", "b.jpg", "c.jpg"]);
 }
 
@@ -124,7 +158,9 @@ fn meta_update_repositions_under_size_sort() {
 fn meta_update_keeps_the_position_under_name_sort() {
     let mut st = DirectoryState::new(SortMode::Name);
     st.replace_all("/tmp".into(), vec![entry("a.jpg", 1, 0)], vec![]);
-    let pos = st.update_entry_meta("/tmp/a.jpg", 9, SystemTime::now()).unwrap();
+    let pos = st
+        .update_entry_meta("/tmp/a.jpg", 9, SystemTime::now())
+        .unwrap();
     assert_eq!(pos, 0);
 }
 
@@ -139,9 +175,19 @@ fn a_rename_reseats_even_under_name_sort() {
         vec![entry("img2.jpg", 1, 0), entry("img3.jpg", 1, 0)],
         vec![],
     );
-    let pos = st.rename_entry("/tmp/img3.jpg", "/tmp/img1.jpg", "img1.jpg", 1, SystemTime::now()).unwrap();
+    let pos = st
+        .rename_entry(
+            "/tmp/img3.jpg",
+            "/tmp/img1.jpg",
+            "img1.jpg",
+            1,
+            SystemTime::now(),
+        )
+        .unwrap();
     assert_eq!(pos, 0);
-    let names: Vec<&str> = (0..2).map(|i| st.file_at(i).unwrap().data.name.as_str()).collect();
+    let names: Vec<&str> = (0..2)
+        .map(|i| st.file_at(i).unwrap().data.name.as_str())
+        .collect();
     assert_eq!(names, ["img1.jpg", "img2.jpg"]);
 }
 
@@ -152,17 +198,35 @@ fn a_rename_keeps_the_handle_it_moved() {
     // removed instead of moving, every one of those would be a dangling id —
     // so identity, not just order, is the contract here.
     let mut st = DirectoryState::new(SortMode::Name);
-    let Some((key, _)) = st.insert_entry(entry("img2.jpg", 1, 0)) else { panic!("first insert") };
-    let Some((other, _)) = st.insert_entry(entry("img1.jpg", 1, 0)) else { panic!("second insert") };
+    let Some((key, _)) = st.insert_entry(entry("img2.jpg", 1, 0)) else {
+        panic!("first insert")
+    };
+    let Some((other, _)) = st.insert_entry(entry("img1.jpg", 1, 0)) else {
+        panic!("second insert")
+    };
     assert_eq!(st.index_of_file(key), Some(1));
 
     let mtime = SystemTime::now();
-    let pos = st.rename_entry("/tmp/img2.jpg", "/tmp/img0.jpg", "img0.jpg", 1, mtime).unwrap();
+    let pos = st
+        .rename_entry("/tmp/img2.jpg", "/tmp/img0.jpg", "img0.jpg", 1, mtime)
+        .unwrap();
     assert_eq!(pos, 0);
-    assert_eq!(st.index_of_file(key), Some(0), "the same handle now names row 0");
+    assert_eq!(
+        st.index_of_file(key),
+        Some(0),
+        "the same handle now names row 0"
+    );
     assert_eq!(st.file_at(0).unwrap().data.path, "/tmp/img0.jpg");
-    assert_eq!(st.file_at(0).unwrap().handle, key, "the export hands out the surviving handle");
-    assert_eq!(st.next_file(key), Some(other), "and the neighbour links were re-woven, not left pointing at a dead row");
+    assert_eq!(
+        st.file_at(0).unwrap().handle,
+        key,
+        "the export hands out the surviving handle"
+    );
+    assert_eq!(
+        st.next_file(key),
+        Some(other),
+        "and the neighbour links were re-woven, not left pointing at a dead row"
+    );
     assert_eq!(st.prev_file(other), Some(key));
     assert!(st.contains_path("/tmp/img0.jpg"));
     assert!(!st.contains_path("/tmp/img2.jpg"));
@@ -175,8 +239,15 @@ fn a_rename_refuses_a_destination_the_listing_holds() {
     // destination row out first and then renames into it. Refusing is what keeps
     // the ordering a listing from ever holding the same path twice.
     let mut st = DirectoryState::new(SortMode::Name);
-    st.replace_all("/tmp".into(), vec![entry("a.jpg", 1, 0), entry("b.jpg", 2, 0)], vec![]);
-    assert_eq!(st.rename_entry("/tmp/a.jpg", "/tmp/b.jpg", "b.jpg", 1, SystemTime::now()), None);
+    st.replace_all(
+        "/tmp".into(),
+        vec![entry("a.jpg", 1, 0), entry("b.jpg", 2, 0)],
+        vec![],
+    );
+    assert_eq!(
+        st.rename_entry("/tmp/a.jpg", "/tmp/b.jpg", "b.jpg", 1, SystemTime::now()),
+        None
+    );
     assert_eq!(st.file_count(), 2, "a refusal changes nothing");
     assert_eq!(st.file_at(0).unwrap().data.name, "a.jpg");
 }

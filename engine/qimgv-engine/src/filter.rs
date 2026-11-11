@@ -23,7 +23,11 @@ impl NameFilter {
             .filter(|e| !e.is_empty())
             .collect();
         Self {
-            extensions: if set.is_empty() { None } else { Some(Arc::new(set)) },
+            extensions: if set.is_empty() {
+                None
+            } else {
+                Some(Arc::new(set))
+            },
         }
     }
 
@@ -32,9 +36,7 @@ impl NameFilter {
             return true;
         };
         match name.rsplit_once('.') {
-            Some((_, ext)) if !ext.is_empty() => {
-                extensions.contains(&ext.to_ascii_lowercase())
-            }
+            Some((_, ext)) if !ext.is_empty() => extensions.contains(&ext.to_ascii_lowercase()),
             _ => false,
         }
     }

@@ -4,7 +4,7 @@
 
 use std::io::Write;
 
-use qimgv_engine::meta::{probe, ImageFormat};
+use qimgv_engine::meta::{ImageFormat, probe};
 
 fn tmp_with(name: &str, bytes: &[u8]) -> (tempfile::TempDir, std::path::PathBuf) {
     let dir = tempfile::tempdir().unwrap();
@@ -133,7 +133,10 @@ fn jpeg_orientation_and_dimensions() {
     let (_d, p) = tmp_with("rot.jpg", &jpeg_bytes(6));
     let info = probe(&p).unwrap();
     assert_eq!(info.format, ImageFormat::Jpeg);
-    assert_eq!(info.orientation, 6, "EXIF orientation must come from one open");
+    assert_eq!(
+        info.orientation, 6,
+        "EXIF orientation must come from one open"
+    );
     assert_eq!((info.width, info.height), (32, 16));
 
     let (_d, p) = tmp_with("plain.jpg", &jpeg_bytes(1));
@@ -169,5 +172,8 @@ fn unknown_bytes_are_ok_not_error() {
 #[test]
 fn missing_file_is_io_error() {
     let p = std::path::Path::new("/nonexistent/qimgv-meta-test.bin");
-    assert!(matches!(probe(p), Err(qimgv_engine::EngineError::Io { .. })));
+    assert!(matches!(
+        probe(p),
+        Err(qimgv_engine::EngineError::Io { .. })
+    ));
 }

@@ -34,5 +34,9 @@ pub fn line(node: &str, detail: impl FnOnce() -> String) {
         return;
     }
     let t0 = T0.get_or_init(Instant::now);
-    eprintln!("[engine trace] +{:>8.1}ms {node} {}", t0.elapsed().as_secs_f64() * 1000.0, detail());
+    eprintln!(
+        "[engine trace] +{:>8.1}ms {node} {}",
+        t0.elapsed().as_secs_f64() * 1000.0,
+        detail()
+    );
 }

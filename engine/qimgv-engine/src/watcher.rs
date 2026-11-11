@@ -21,8 +21,8 @@ mod fd;
 mod pair;
 
 pub use apply::{
-    apply_event, classify, event_is_live, is_dir_mask, mtime_ms, Applied, IgnoreReason,
-    RawWatchEvent, RawWatchKind, WatchAction,
+    Applied, IgnoreReason, RawWatchEvent, RawWatchKind, WatchAction, apply_event, classify,
+    event_is_live, is_dir_mask, mtime_ms,
 };
 pub use pair::{DropReason, Out, Pairer, Record};
 

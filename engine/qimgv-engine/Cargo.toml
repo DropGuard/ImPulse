@@ -8,7 +8,6 @@ description = "UI-agnostic directory model / scheduler core for qimgv"
 [dependencies]
 crossbeam-channel = { workspace = true }
 slotmap = { workspace = true }
-natord = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 imagesize = { workspace = true }

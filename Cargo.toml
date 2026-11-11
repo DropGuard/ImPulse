@@ -5,7 +5,6 @@ members = ["engine/qimgv-engine", "engine/qimgv-engine-ffi"]
 [workspace.dependencies]
 crossbeam-channel = "0.5"
 slotmap = "1.0"
-natord = "1.0"
 thiserror = "2.0"
 log = "0.4"
 tempfile = "3"

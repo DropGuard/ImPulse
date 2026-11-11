@@ -4,12 +4,12 @@
 //! can't trigger deterministically without root).
 
 use std::sync::atomic::AtomicBool;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use qimgv_engine::watcher::{
-    apply_event, classify, event_is_live, is_dir_mask, Applied, DropReason, IgnoreReason, Out,
-    Pairer, RawWatchEvent, RawWatchKind, Record, WatchAction,
+    Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record,
+    WatchAction, apply_event, classify, event_is_live, is_dir_mask,
 };
 use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode, WatchChangeKind};
 
@@ -55,14 +55,31 @@ fn events_of_a_watch_that_is_no_longer_installed_are_dropped() {
     assert!(event_is_live(-1, &RawWatchKind::Overflow, None));
     // a paired move is decided by the MOVED_TO half it rode in on, so the same
     // rule has to hold for it — this is the kind the fd layer emits.
-    assert!(event_is_live(7, &RawWatchKind::Renamed { from: "a.jpg".into() }, Some(7)));
-    assert!(!event_is_live(7, &RawWatchKind::Renamed { from: "a.jpg".into() }, Some(9)));
+    assert!(event_is_live(
+        7,
+        &RawWatchKind::Renamed {
+            from: "a.jpg".into()
+        },
+        Some(7)
+    ));
+    assert!(!event_is_live(
+        7,
+        &RawWatchKind::Renamed {
+            from: "a.jpg".into()
+        },
+        Some(9)
+    ));
 }
 
 // --- state application --------------------------------------------------------
 
 /// A raw event as the watcher thread would emit it for `dir`.
-fn raw_event(dir: &std::path::Path, name: Option<&str>, is_dir: bool, kind: RawWatchKind) -> RawWatchEvent {
+fn raw_event(
+    dir: &std::path::Path,
+    name: Option<&str>,
+    is_dir: bool,
+    kind: RawWatchKind,
+) -> RawWatchEvent {
     RawWatchEvent {
         wd: 1,
         dir: dir.to_path_buf(),
@@ -72,7 +89,11 @@ fn raw_event(dir: &std::path::Path, name: Option<&str>, is_dir: bool, kind: RawW
     }
 }
 
-fn state_with_file() -> (qimgv_engine::DirectoryState, tempfile::TempDir, std::path::PathBuf) {
+fn state_with_file() -> (
+    qimgv_engine::DirectoryState,
+    tempfile::TempDir,
+    std::path::PathBuf,
+) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
     let mut st = qimgv_engine::DirectoryState::new(SortMode::Name);
@@ -100,15 +121,21 @@ fn apply_created_respects_filter_and_adds() {
     // filtered out
     std::fs::write(dir.path().join("skip.txt"), b"x").unwrap();
     let ev = raw_event(dir.path(), Some("skip.txt"), false, RawWatchKind::Created);
-    assert_eq!(apply_event(&mut st, &filter, &mut overrides, false, &ev),
-             WatchAction::Ignored(IgnoreReason::ExtensionRejected));
+    assert_eq!(
+        apply_event(&mut st, &filter, &mut overrides, false, &ev),
+        WatchAction::Ignored(IgnoreReason::ExtensionRejected)
+    );
     assert_eq!(st.file_count(), 1);
 
     // allowed → added
     std::fs::write(dir.path().join("b.jpg"), b"xx").unwrap();
     let ev = raw_event(dir.path(), Some("b.jpg"), false, RawWatchKind::Created);
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: qimgv_engine::watcher::Applied::Added, path, .. } => {
+        WatchAction::Changed {
+            kind: qimgv_engine::watcher::Applied::Added,
+            path,
+            ..
+        } => {
             assert!(path.ends_with("b.jpg"));
         }
         other => panic!("unexpected: {other:?}"),
@@ -128,7 +155,12 @@ fn apply_created_adds_directories_even_though_the_filter_rejects_their_names() {
     std::fs::create_dir(dir.path().join("newfolder")).unwrap();
     let ev = raw_event(dir.path(), Some("newfolder"), true, RawWatchKind::Created);
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: qimgv_engine::watcher::Applied::Added, path, is_dir, .. } => {
+        WatchAction::Changed {
+            kind: qimgv_engine::watcher::Applied::Added,
+            path,
+            is_dir,
+            ..
+        } => {
             assert!(path.ends_with("newfolder"));
             assert!(is_dir, "the mutation must still report it as a directory");
         }
@@ -149,14 +181,21 @@ fn apply_deleted_and_modified() {
     let ev = raw_event(dir.path(), Some("a.jpg"), false, RawWatchKind::Modified);
     assert!(matches!(
         apply_event(&mut st, &filter, &mut overrides, false, &ev),
-        WatchAction::Changed { kind: qimgv_engine::watcher::Applied::Modified, .. }
+        WatchAction::Changed {
+            kind: qimgv_engine::watcher::Applied::Modified,
+            ..
+        }
     ));
 
     // delete → Changed{Removed}
     std::fs::remove_file(&p).unwrap();
     let ev = raw_event(dir.path(), Some("a.jpg"), false, RawWatchKind::Deleted);
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: qimgv_engine::watcher::Applied::Removed, path, .. } => {
+        WatchAction::Changed {
+            kind: qimgv_engine::watcher::Applied::Removed,
+            path,
+            ..
+        } => {
             assert!(path.ends_with("a.jpg"));
         }
         other => panic!("unexpected: {other:?}"),
@@ -172,7 +211,9 @@ fn apply_overflow_requests_reconcile() {
     let ev = raw_event(dir.path(), None, false, RawWatchKind::Overflow);
     assert_eq!(
         apply_event(&mut st, &filter, &mut overrides, false, &ev),
-        WatchAction::Reconcile { dir: dir.path().to_path_buf() }
+        WatchAction::Reconcile {
+            dir: dir.path().to_path_buf()
+        }
     );
 }
 
@@ -190,9 +231,15 @@ fn a_delete_from_another_directory_cannot_empty_this_one() {
     let other = tempfile::tempdir().unwrap();
 
     let ev = raw_event(other.path(), Some("a.jpg"), false, RawWatchKind::Deleted);
-    assert_eq!(apply_event(&mut st, &filter, &mut overrides, false, &ev),
-             WatchAction::Ignored(IgnoreReason::WrongSubject));
-    assert_eq!(st.file_count(), 1, "the row for /B/a.jpg survived a delete meant for /A");
+    assert_eq!(
+        apply_event(&mut st, &filter, &mut overrides, false, &ev),
+        WatchAction::Ignored(IgnoreReason::WrongSubject)
+    );
+    assert_eq!(
+        st.file_count(),
+        1,
+        "the row for /B/a.jpg survived a delete meant for /A"
+    );
 
     // and a create named elsewhere lands where it was created, not here
     std::fs::write(other.path().join("c.jpg"), b"x").unwrap();
@@ -216,24 +263,46 @@ fn the_hidden_rule_is_the_scanner_s_rule() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
 
     std::fs::write(dir.path().join(".secret.jpg"), b"x").unwrap();
-    let ev = raw_event(dir.path(), Some(".secret.jpg"), false, RawWatchKind::Created);
-    assert_eq!(apply_event(&mut st, &filter, &mut overrides, false, &ev),
-             WatchAction::Ignored(IgnoreReason::Hidden));
-    assert_eq!(st.file_count(), 1, "a hidden file must not join the listing");
+    let ev = raw_event(
+        dir.path(),
+        Some(".secret.jpg"),
+        false,
+        RawWatchKind::Created,
+    );
+    assert_eq!(
+        apply_event(&mut st, &filter, &mut overrides, false, &ev),
+        WatchAction::Ignored(IgnoreReason::Hidden)
+    );
+    assert_eq!(
+        st.file_count(),
+        1,
+        "a hidden file must not join the listing"
+    );
 
     std::fs::create_dir(dir.path().join(".git")).unwrap();
     let ev = raw_event(dir.path(), Some(".git"), true, RawWatchKind::Created);
-    assert_eq!(apply_event(&mut st, &filter, &mut overrides, false, &ev),
-             WatchAction::Ignored(IgnoreReason::Hidden));
+    assert_eq!(
+        apply_event(&mut st, &filter, &mut overrides, false, &ev),
+        WatchAction::Ignored(IgnoreReason::Hidden)
+    );
     assert_eq!(st.dir_count(), 0, "nor may a hidden directory");
 
     // and the flag really is consulted rather than the check being hardcoded
-    let ev = raw_event(dir.path(), Some(".secret.jpg"), false, RawWatchKind::Created);
+    let ev = raw_event(
+        dir.path(),
+        Some(".secret.jpg"),
+        false,
+        RawWatchKind::Created,
+    );
     assert!(matches!(
         apply_event(&mut st, &filter, &mut overrides, true, &ev),
         WatchAction::Changed { .. }
     ));
-    assert_eq!(st.file_count(), 2, "show_hidden admits it, as the scanner would");
+    assert_eq!(
+        st.file_count(),
+        2,
+        "show_hidden admits it, as the scanner would"
+    );
 }
 
 // --- a rename, as one event ---------------------------------------------------
@@ -241,7 +310,12 @@ fn the_hidden_rule_is_the_scanner_s_rule() {
 /// A listing of `names` (one byte each) over `dir`, in `sort`. The mtimes are
 /// the epoch so a restat always sees the real file as newer — which is what
 /// makes a Changed answer the expected one rather than a coin flip.
-fn state_of(dir: &std::path::Path, names: &[&str], dirs: &[&str], sort: SortMode) -> qimgv_engine::DirectoryState {
+fn state_of(
+    dir: &std::path::Path,
+    names: &[&str],
+    dirs: &[&str],
+    sort: SortMode,
+) -> qimgv_engine::DirectoryState {
     let file_entries = names.iter().map(|n| qimgv_engine::EntryData {
         name: (*n).into(),
         path: dir.join(n).to_string_lossy().into_owned(),
@@ -257,7 +331,11 @@ fn state_of(dir: &std::path::Path, names: &[&str], dirs: &[&str], sort: SortMode
         mtime: std::time::UNIX_EPOCH,
     });
     let mut st = qimgv_engine::DirectoryState::new(sort);
-    st.replace_all(dir.to_path_buf(), file_entries.collect(), dir_entries.collect());
+    st.replace_all(
+        dir.to_path_buf(),
+        file_entries.collect(),
+        dir_entries.collect(),
+    );
     st
 }
 
@@ -278,20 +356,45 @@ fn a_paired_rename_is_one_event_about_one_entry() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
     std::fs::rename(&p, dir.path().join("z.jpg")).unwrap();
 
-    let ev = raw_event(dir.path(), Some("z.jpg"), false, RawWatchKind::Renamed { from: "a.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("z.jpg"),
+        false,
+        RawWatchKind::Renamed {
+            from: "a.jpg".into(),
+        },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Renamed { from }, path, name, size, mtime_ms, index, is_dir } => {
+        WatchAction::Changed {
+            kind: Applied::Renamed { from },
+            path,
+            name,
+            size,
+            mtime_ms,
+            index,
+            is_dir,
+        } => {
             assert_eq!(from, s(&p), "the event names the path the entry had");
             assert_eq!(path, s(&dir.path().join("z.jpg")));
             assert_eq!(name, "z.jpg");
-            assert_eq!(size, 1, "the destination's own stat, not the listing's memory");
-            assert_ne!(mtime_ms, 0, "a file's rename carries its real mtime, so the thumbnail cache can invalidate");
+            assert_eq!(
+                size, 1,
+                "the destination's own stat, not the listing's memory"
+            );
+            assert_ne!(
+                mtime_ms, 0,
+                "a file's rename carries its real mtime, so the thumbnail cache can invalidate"
+            );
             assert!(!is_dir);
             assert_eq!(index, 0, "one row, where the engine's order puts it");
         }
         other => panic!("unexpected: {other:?}"),
     }
-    assert_eq!(st.file_count(), 1, "a rename must not leave the old row behind");
+    assert_eq!(
+        st.file_count(),
+        1,
+        "a rename must not leave the old row behind"
+    );
     assert!(st.contains_path(&s(&dir.path().join("z.jpg"))));
     assert!(!st.contains_path(&s(&p)));
 }
@@ -305,12 +408,24 @@ fn a_rename_moves_the_row_the_name_sort_says_to() {
     for n in ["a.jpg", "b.jpg", "c.jpg"] {
         std::fs::write(dir.path().join(n), b"x").unwrap();
     }
-    let mut st = state_of(dir.path(), &["a.jpg", "b.jpg", "c.jpg"], &[], SortMode::Name);
+    let mut st = state_of(
+        dir.path(),
+        &["a.jpg", "b.jpg", "c.jpg"],
+        &[],
+        SortMode::Name,
+    );
     let filter = NameFilter::from_extensions(["jpg"]);
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
 
     std::fs::rename(dir.path().join("c.jpg"), dir.path().join("0.jpg")).unwrap();
-    let ev = raw_event(dir.path(), Some("0.jpg"), false, RawWatchKind::Renamed { from: "c.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("0.jpg"),
+        false,
+        RawWatchKind::Renamed {
+            from: "c.jpg".into(),
+        },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
         WatchAction::Changed { index, .. } => assert_eq!(index, 0, "c.jpg's row is now first"),
         other => panic!("unexpected: {other:?}"),
@@ -318,7 +433,11 @@ fn a_rename_moves_the_row_the_name_sort_says_to() {
     let got: Vec<String> = (0..st.file_count())
         .map(|i| st.file_at(i).unwrap().data.name.clone())
         .collect();
-    assert_eq!(got, vec!["0.jpg", "a.jpg", "b.jpg"], "the order follows the names it holds");
+    assert_eq!(
+        got,
+        vec!["0.jpg", "a.jpg", "b.jpg"],
+        "the order follows the names it holds"
+    );
 }
 
 #[test]
@@ -336,9 +455,22 @@ fn a_rename_onto_a_listed_name_overwrites_instead_of_leaving_two_rows() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
 
     std::fs::rename(dir.path().join("a.jpg"), dir.path().join("b.jpg")).unwrap();
-    let ev = raw_event(dir.path(), Some("b.jpg"), false, RawWatchKind::Renamed { from: "a.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("b.jpg"),
+        false,
+        RawWatchKind::Renamed {
+            from: "a.jpg".into(),
+        },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Renamed { from }, path, size, index, .. } => {
+        WatchAction::Changed {
+            kind: Applied::Renamed { from },
+            path,
+            size,
+            index,
+            ..
+        } => {
             assert_eq!(from, s(&dir.path().join("a.jpg")));
             assert_eq!(path, s(&dir.path().join("b.jpg")));
             assert_eq!(size, 4, "the row describes the file that is there now");
@@ -366,13 +498,22 @@ fn an_unpaired_move_onto_a_listed_name_is_not_a_no_op() {
 
     let ev = raw_event(dir.path(), Some("b.jpg"), false, RawWatchKind::MovedTo);
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Modified, path, size, .. } => {
+        WatchAction::Changed {
+            kind: Applied::Modified,
+            path,
+            size,
+            ..
+        } => {
             assert_eq!(path, s(&dir.path().join("b.jpg")));
             assert_eq!(size, 4);
         }
         other => panic!("unexpected: {other:?}"),
     }
-    assert_eq!(st.file_count(), 1, "an overwrite replaces a row, it does not add one");
+    assert_eq!(
+        st.file_count(),
+        1,
+        "an overwrite replaces a row, it does not add one"
+    );
 }
 
 #[test]
@@ -385,9 +526,20 @@ fn a_rename_to_a_name_that_is_not_a_member_is_the_removal_it_was() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
     std::fs::rename(&p, dir.path().join("notes.txt")).unwrap();
 
-    let ev = raw_event(dir.path(), Some("notes.txt"), false, RawWatchKind::Renamed { from: "a.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("notes.txt"),
+        false,
+        RawWatchKind::Renamed {
+            from: "a.jpg".into(),
+        },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Removed, path, .. } => assert_eq!(path, s(&p)),
+        WatchAction::Changed {
+            kind: Applied::Removed,
+            path,
+            ..
+        } => assert_eq!(path, s(&p)),
         other => panic!("unexpected: {other:?}"),
     }
     assert_eq!(st.file_count(), 0);
@@ -395,10 +547,20 @@ fn a_rename_to_a_name_that_is_not_a_member_is_the_removal_it_was() {
     // and a hidden destination is not a member either
     let (mut st, dir, p) = state_with_file();
     std::fs::rename(&p, dir.path().join(".a.jpg")).unwrap();
-    let ev = raw_event(dir.path(), Some(".a.jpg"), false, RawWatchKind::Renamed { from: "a.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some(".a.jpg"),
+        false,
+        RawWatchKind::Renamed {
+            from: "a.jpg".into(),
+        },
+    );
     assert!(matches!(
         apply_event(&mut st, &filter, &mut overrides, false, &ev),
-        WatchAction::Changed { kind: Applied::Removed, .. }
+        WatchAction::Changed {
+            kind: Applied::Removed,
+            ..
+        }
     ));
     assert_eq!(st.file_count(), 0);
 }
@@ -412,10 +574,20 @@ fn a_rename_in_from_outside_the_watch_is_an_arrival() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
     std::fs::write(dir.path().join("in.jpg"), b"x").unwrap();
 
-    let ev = raw_event(dir.path(), Some("in.jpg"), false,
-                       RawWatchKind::Renamed { from: "/somewhere/else/in.jpg".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("in.jpg"),
+        false,
+        RawWatchKind::Renamed {
+            from: "/somewhere/else/in.jpg".into(),
+        },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Added, path, .. } => assert_eq!(path, s(&dir.path().join("in.jpg"))),
+        WatchAction::Changed {
+            kind: Applied::Added,
+            path,
+            ..
+        } => assert_eq!(path, s(&dir.path().join("in.jpg"))),
         other => panic!("unexpected: {other:?}"),
     }
     assert_eq!(st.file_count(), 2);
@@ -434,9 +606,21 @@ fn a_renamed_directory_stays_canonical() {
     let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
     std::fs::rename(dir.path().join("sub"), dir.path().join("sub2")).unwrap();
 
-    let ev = raw_event(dir.path(), Some("sub2"), true, RawWatchKind::Renamed { from: "sub".into() });
+    let ev = raw_event(
+        dir.path(),
+        Some("sub2"),
+        true,
+        RawWatchKind::Renamed { from: "sub".into() },
+    );
     match apply_event(&mut st, &filter, &mut overrides, false, &ev) {
-        WatchAction::Changed { kind: Applied::Renamed { from }, path, is_dir, size, mtime_ms, .. } => {
+        WatchAction::Changed {
+            kind: Applied::Renamed { from },
+            path,
+            is_dir,
+            size,
+            mtime_ms,
+            ..
+        } => {
             assert!(is_dir, "the event must still say it is a folder");
             assert_eq!(from, s(&dir.path().join("sub")));
             assert_eq!(path, s(&dir.path().join("sub2")));
@@ -468,7 +652,10 @@ fn wait_for(engine: &Engine, pred: impl Fn(&qimgv_engine::DirectoryState) -> boo
         if pred(&engine.state.read().unwrap()) {
             return;
         }
-        assert!(std::time::Instant::now() < deadline, "timed out waiting on engine state");
+        assert!(
+            std::time::Instant::now() < deadline,
+            "timed out waiting on engine state"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }
@@ -479,9 +666,14 @@ fn next_session_event(engine: &qimgv_engine::Engine) -> u64 {
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
         match engine.try_event() {
-            Some(Event::DirListed { epoch, .. }) | Some(Event::OpenFailed { epoch, .. }) => return epoch,
+            Some(Event::DirListed { epoch, .. }) | Some(Event::OpenFailed { epoch, .. }) => {
+                return epoch;
+            }
             Some(_) => {}
-            None => assert!(std::time::Instant::now() < deadline, "no listing event arrived"),
+            None => assert!(
+                std::time::Instant::now() < deadline,
+                "no listing event arrived"
+            ),
         }
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -498,19 +690,23 @@ fn an_engine_initiated_rescan_answers_the_session_it_belongs_to() {
     // its result away and emitted nothing about the decision: the caller waits
     // forever for a listing nobody cancelled out loud.
     let (tx, _rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = tx.send(());
+        }),
+    );
 
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
     let opened = engine.next_epoch();
-    engine.send(Command::OpenDir {
-        path: dir.path().to_owned(),
-        sort: None,
-        epoch: opened,
-    })
-    .unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: opened,
+        })
+        .unwrap();
     assert_eq!(next_session_event(&engine), opened);
 
     // the engine's own reason to re-scan: the watched folder is gone
@@ -526,13 +722,22 @@ fn an_engine_initiated_rescan_answers_the_session_it_belongs_to() {
 #[cfg_attr(miri, ignore = "drives the real fd machinery: no interpreter")]
 fn live_watch_applies_creates_and_deletes() {
     let (notify_tx, _notify_rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = notify_tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = notify_tx.send(());
+        }),
+    );
 
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 1, 10);
 
     // create → watch → state gains the entry without a rescan
@@ -555,14 +760,21 @@ fn the_watcher_pairs_a_live_rename_into_one_event() {
     // worth changing) or nothing at all (the row vanishes). Both are asserted
     // against, and so is the count: one event, not two.
     let (tx, _rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = tx.send(());
+        }),
+    );
 
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
     engine
-        .send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() })
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
         .unwrap();
     wait_for(&engine, |st| st.file_count() == 1, 10);
     // the listing event this open produced is not what this test is about
@@ -570,7 +782,10 @@ fn the_watcher_pairs_a_live_rename_into_one_event() {
 
     let old = dir.path().join("a.jpg");
     let new = dir.path().join("z.jpg");
-    let (want_old, want_new) = (old.to_string_lossy().into_owned(), new.to_string_lossy().into_owned());
+    let (want_old, want_new) = (
+        old.to_string_lossy().into_owned(),
+        new.to_string_lossy().into_owned(),
+    );
     std::fs::rename(&old, &new).unwrap();
 
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
@@ -595,15 +810,26 @@ fn the_watcher_pairs_a_live_rename_into_one_event() {
             other_mutations += 1;
         }
     }
-    assert_eq!(renamed.len(), 1, "no rename event arrived (other mutations: {other_mutations})");
-    assert_eq!(renamed[0].0, want_old, "the event names the path the entry had");
+    assert_eq!(
+        renamed.len(),
+        1,
+        "no rename event arrived (other mutations: {other_mutations})"
+    );
+    assert_eq!(
+        renamed[0].0, want_old,
+        "the event names the path the entry had"
+    );
     assert_eq!(renamed[0].1, want_new);
     assert_eq!(
         other_mutations, 0,
         "a paired rename must not also arrive as the remove+add pair it replaced"
     );
 
-    wait_for(&engine, |st| st.file_count() == 1 && st.contains_path(&want_new), 10);
+    wait_for(
+        &engine,
+        |st| st.file_count() == 1 && st.contains_path(&want_new),
+        10,
+    );
 }
 
 #[test]
@@ -612,12 +838,21 @@ fn live_watch_burst_keeps_up() {
     // the drain discipline: 2000 creates in a burst must all land in the
     // state (the kernel queue must not lose events at this scale)
     let (notify_tx, _notify_rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = notify_tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = notify_tx.send(());
+        }),
+    );
 
     let dir = tempfile::tempdir().unwrap();
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.dir() == Some(dir.path()), 10);
 
     for i in 0..2000 {
@@ -630,24 +865,39 @@ fn live_watch_burst_keeps_up() {
 #[cfg_attr(miri, ignore = "drives the real fd machinery: no interpreter")]
 fn include_path_bypasses_filter_and_survives_rescan() {
     let (notify_tx, _notify_rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = notify_tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = notify_tx.send(());
+        }),
+    );
 
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
     std::fs::write(dir.path().join("mime-ok.xyz"), b"x").unwrap();
-    engine.send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() }).unwrap();
+    engine
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 1, 10);
 
-    engine.send(Command::IncludePath(dir.path().join("mime-ok.xyz"))).unwrap();
+    engine
+        .send(Command::IncludePath(dir.path().join("mime-ok.xyz")))
+        .unwrap();
     wait_for(&engine, |st| st.file_count() == 2, 10);
 
     // rescan must keep the override (filter still doesn't match)
     engine.send(Command::SetSort(SortMode::NameDesc)).unwrap();
     wait_for(&engine, |st| st.sort() == SortMode::NameDesc, 10);
     std::thread::sleep(Duration::from_millis(200));
-    assert_eq!(engine.state.read().unwrap().file_count(), 2, "override lost on resort");
+    assert_eq!(
+        engine.state.read().unwrap().file_count(),
+        2,
+        "override lost on resort"
+    );
 }
 
 #[test]
@@ -660,16 +910,23 @@ fn operations_on_a_settled_folder_all_land_in_the_listing() {
     // or the kernel not telling us at all — and the message says which end state
     // was reached.
     let (tx, _rx) = mpsc::channel::<()>();
-    let engine = Engine::spawn(config(), Arc::new(move || {
-        let _ = tx.send(());
-    }));
+    let engine = Engine::spawn(
+        config(),
+        Arc::new(move || {
+            let _ = tx.send(());
+        }),
+    );
     let dir = tempfile::tempdir().unwrap();
     for name in ["img1.jpg", "img2.jpg", "img10.jpg"] {
         std::fs::write(dir.path().join(name), b"x").unwrap();
     }
     std::fs::create_dir(dir.path().join("subdir")).unwrap();
     engine
-        .send(Command::OpenDir { path: dir.path().to_owned(), sort: None, epoch: engine.next_epoch() })
+        .send(Command::OpenDir {
+            path: dir.path().to_owned(),
+            sort: None,
+            epoch: engine.next_epoch(),
+        })
         .unwrap();
     // settled first: three jpgs listed, skip-nothing, and the folder is quiet
     wait_for(&engine, |st| st.file_count() == 3, 10);
@@ -714,11 +971,9 @@ fn operations_on_a_settled_folder_all_land_in_the_listing() {
         std::thread::sleep(Duration::from_millis(5));
     };
     assert_eq!(
-        got,
-        want,
+        got, want,
         "engine listing holds {:?} while the folder holds {:?}",
-        got,
-        want
+        got, want
     );
 }
 
@@ -732,7 +987,12 @@ fn operations_on_a_settled_folder_all_land_in_the_listing() {
 use std::path::Path;
 
 fn rec(wd: i32, bits: u32, cookie: u32, name: Option<&str>) -> Record {
-    Record { wd, bits, cookie, name: name.map(|s| s.to_string()) }
+    Record {
+        wd,
+        bits,
+        cookie,
+        name: name.map(|s| s.to_string()),
+    }
 }
 
 #[test]
@@ -744,9 +1004,19 @@ fn a_pair_folds_into_one_renamed_event() {
 
     let out = p.intake(rec(7, 0x80, 42, Some("b.jpg")), Some(dir), Some(7));
     match out.as_slice() {
-        [Out::Report { ev, paired_cookie: Some(42) }] => {
+        [
+            Out::Report {
+                ev,
+                paired_cookie: Some(42),
+            },
+        ] => {
             assert_eq!(ev.name.as_deref(), Some("b.jpg"));
-            assert_eq!(ev.kind, RawWatchKind::Renamed { from: "a.jpg".into() });
+            assert_eq!(
+                ev.kind,
+                RawWatchKind::Renamed {
+                    from: "a.jpg".into()
+                }
+            );
             assert_eq!(ev.dir, dir);
         }
         other => panic!("{other:?}"),
@@ -757,7 +1027,11 @@ fn a_pair_folds_into_one_renamed_event() {
 #[test]
 fn a_move_out_of_the_watch_is_a_removal_at_batch_end() {
     let mut p = Pairer::new();
-    let out = p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(Path::new("/A")), Some(7));
+    let out = p.intake(
+        rec(7, 0x40, 42, Some("a.jpg")),
+        Some(Path::new("/A")),
+        Some(7),
+    );
     assert!(out.is_empty());
 
     match p.settle().as_slice() {
@@ -773,9 +1047,18 @@ fn a_move_out_of_the_watch_is_a_removal_at_batch_end() {
 #[test]
 fn a_move_in_from_outside_the_watch_is_an_arrival() {
     let mut p = Pairer::new();
-    let out = p.intake(rec(7, 0x80, 42, Some("a.jpg")), Some(Path::new("/A")), Some(7));
+    let out = p.intake(
+        rec(7, 0x80, 42, Some("a.jpg")),
+        Some(Path::new("/A")),
+        Some(7),
+    );
     match out.as_slice() {
-        [Out::Report { ev, paired_cookie: None }] => assert_eq!(ev.kind, RawWatchKind::MovedTo),
+        [
+            Out::Report {
+                ev,
+                paired_cookie: None,
+            },
+        ] => assert_eq!(ev.kind, RawWatchKind::MovedTo),
         other => panic!("{other:?}"),
     }
 }
@@ -784,18 +1067,28 @@ fn a_move_in_from_outside_the_watch_is_an_arrival() {
 fn interleaved_cookies_split_into_a_removal_and_an_arrival() {
     let mut p = Pairer::new();
     let dir = Path::new("/A");
-    assert!(p.intake(rec(7, 0x40, 1, Some("x.jpg")), Some(dir), Some(7)).is_empty());
+    assert!(
+        p.intake(rec(7, 0x40, 1, Some("x.jpg")), Some(dir), Some(7))
+            .is_empty()
+    );
 
     // a MOVED_TO whose cookie does not match the hold: the held move retires
     // first, in stream order, and the arrival reports after it
     let out = p.intake(rec(7, 0x80, 2, Some("y.jpg")), Some(dir), Some(7));
-    assert_eq!(out.len(), 2, "one held move retired and one arrival reported");
+    assert_eq!(
+        out.len(),
+        2,
+        "one held move retired and one arrival reported"
+    );
     match &out[0] {
         Out::Unpaired { ev, cookie: 1 } => assert_eq!(ev.name.as_deref(), Some("x.jpg")),
         other => panic!("{other:?}"),
     }
     match &out[1] {
-        Out::Report { ev, paired_cookie: None } => assert_eq!(ev.kind, RawWatchKind::MovedTo),
+        Out::Report {
+            ev,
+            paired_cookie: None,
+        } => assert_eq!(ev.kind, RawWatchKind::MovedTo),
         other => panic!("{other:?}"),
     }
 }
@@ -804,37 +1097,64 @@ fn interleaved_cookies_split_into_a_removal_and_an_arrival() {
 fn bookkeeping_records_do_not_break_the_adjacency() {
     let mut p = Pairer::new();
     let dir = Path::new("/A");
-    assert!(p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7)).is_empty());
+    assert!(
+        p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7))
+            .is_empty()
+    );
 
     // IN_IGNORED between the halves: not part of this watch's stream, so
     // holding past it costs nothing and the pair still folds
     let out = p.intake(rec(7, 0x8000, 0, None), Some(dir), Some(7));
-    assert!(matches!(&out[..], [Out::Drop(DropReason::Bookkeeping { .. })]));
+    assert!(matches!(
+        &out[..],
+        [Out::Drop(DropReason::Bookkeeping { .. })]
+    ));
 
     let out = p.intake(rec(7, 0x80, 42, Some("b.jpg")), Some(dir), Some(7));
-    assert!(matches!(&out[..], [Out::Report { paired_cookie: Some(42), .. }]));
+    assert!(matches!(
+        &out[..],
+        [Out::Report {
+            paired_cookie: Some(42),
+            ..
+        }]
+    ));
 }
 
 #[test]
 fn a_dead_watch_record_does_not_break_the_adjacency() {
     let mut p = Pairer::new();
     let dir = Path::new("/A");
-    assert!(p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7)).is_empty());
+    assert!(
+        p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7))
+            .is_empty()
+    );
 
     // a record from a watch that is no longer installed (the delete for /A
     // delivered after the watch moved on) — dropped, hold untouched
     let out = p.intake(rec(9, 0x200, 0, Some("gone.jpg")), Some(dir), Some(7));
-    assert!(matches!(&out[..], [Out::Drop(DropReason::DeadWatch { wd: 9, .. })]));
+    assert!(matches!(
+        &out[..],
+        [Out::Drop(DropReason::DeadWatch { wd: 9, .. })]
+    ));
 
     let out = p.intake(rec(7, 0x80, 42, Some("b.jpg")), Some(dir), Some(7));
-    assert!(matches!(&out[..], [Out::Report { paired_cookie: Some(42), .. }]));
+    assert!(matches!(
+        &out[..],
+        [Out::Report {
+            paired_cookie: Some(42),
+            ..
+        }]
+    ));
 }
 
 #[test]
 fn a_pair_split_across_batches_reports_a_removal_then_an_arrival() {
     let mut p = Pairer::new();
     let dir = Path::new("/A");
-    assert!(p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7)).is_empty());
+    assert!(
+        p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(dir), Some(7))
+            .is_empty()
+    );
 
     // a 64 KiB read can in principle split a pair across its boundary; the
     // declared loss is that the move is reported the way it always was
@@ -855,10 +1175,26 @@ fn a_pair_reports_with_the_destination_record_s_identity() {
     // the two halves of one move carry the same watch in production; the rule
     // being pinned is that the folded event reports with the DESTINATION
     // record's wd and directory, never the held half's
-    assert!(p.intake(rec(7, 0x40, 42, Some("a.jpg")), Some(Path::new("/A")), Some(7)).is_empty());
-    let out = p.intake(rec(9, 0x80, 42, Some("b.jpg")), Some(Path::new("/B")), Some(9));
+    assert!(
+        p.intake(
+            rec(7, 0x40, 42, Some("a.jpg")),
+            Some(Path::new("/A")),
+            Some(7)
+        )
+        .is_empty()
+    );
+    let out = p.intake(
+        rec(9, 0x80, 42, Some("b.jpg")),
+        Some(Path::new("/B")),
+        Some(9),
+    );
     match out.as_slice() {
-        [Out::Report { ev, paired_cookie: Some(42) }] => {
+        [
+            Out::Report {
+                ev,
+                paired_cookie: Some(42),
+            },
+        ] => {
             assert_eq!((ev.wd, ev.dir.as_path()), (9, Path::new("/B")));
         }
         other => panic!("{other:?}"),
@@ -889,10 +1225,26 @@ fn a_nameless_subject_is_dropped_but_bookkeeping_kinds_still_travel() {
 fn a_directory_flag_rides_through_the_pairing() {
     let mut p = Pairer::new();
     let dir = Path::new("/A");
-    assert!(p.intake(rec(7, 0x40 | 0x4000_0000, 42, Some("sub")), Some(dir), Some(7)).is_empty());
-    let out = p.intake(rec(7, 0x80 | 0x4000_0000, 42, Some("sub2")), Some(dir), Some(7));
+    assert!(
+        p.intake(
+            rec(7, 0x40 | 0x4000_0000, 42, Some("sub")),
+            Some(dir),
+            Some(7)
+        )
+        .is_empty()
+    );
+    let out = p.intake(
+        rec(7, 0x80 | 0x4000_0000, 42, Some("sub2")),
+        Some(dir),
+        Some(7),
+    );
     match out.as_slice() {
-        [Out::Report { ev, paired_cookie: Some(_) }] => {
+        [
+            Out::Report {
+                ev,
+                paired_cookie: Some(_),
+            },
+        ] => {
             assert!(ev.is_dir);
             assert_eq!(ev.kind, RawWatchKind::Renamed { from: "sub".into() });
         }
