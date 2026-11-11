@@ -22,6 +22,14 @@ enum ActionType {
 // over the global one: the same physical key may mean different things per
 // surface (Right pages in the document view, moves the grid selection in the
 // folder view), and one flat table cannot hold both.
+//
+// The whole keyboard answers to one law, least surprise by focus: keys are
+// handled by the surface that holds it — the focused one owns its keys,
+// yields the rest to the action system explicitly, and ranks above any
+// state-armed scope. Inside that law every floating surface answers Esc the
+// same way (close this layer — the flavors differ, the outcome does not),
+// and a disk write never sits on a bare key: in-memory answers only, the
+// save chords (Ctrl+S, Ctrl+Shift+S) and clicks do the writing.
 enum class ShortcutScope {
     None,      // no surface declared: the state-armed scopes and the global
                // table decide
