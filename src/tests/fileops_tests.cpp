@@ -1,6 +1,7 @@
 #include <QTest>
 #include <unistd.h>
 #include <QFile>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
 #include <QDateTime>
@@ -227,6 +228,35 @@ void TestFileOps::renameMovesTheFileAndRefusesCollisions() {
     result = OTHER_ERROR;
     FileOperations::rename(fixtureDir + "/c.txt", "b.txt", false, result);
     QCOMPARE(result, DESTINATION_FILE_EXISTS);
+
+    // FORCED overwrite replaces the destination in one rename(2).
+    //
+    // What is asserted here is the property the old design could not offer, and
+    // an earlier draft of this test missed it: "no backup file is left behind"
+    // does NOT separate the two implementations, because the old one also
+    // cleaned up after a successful rename. What it cannot do is survive a
+    // second actor: its backup name was a fixed md5 of the destination, so any
+    // process touching the same file shared one backup path.
+    //
+    // Simulated without a second process by planting that exact path: the old
+    // implementation would remove the planted file as part of its dance; the
+    // single rename does not know the name and leaves it untouched.
+    {
+        const QString planted =
+            fixtureDir + "/b.txt_" +
+            QString(QCryptographicHash::hash((fixtureDir + "/b.txt").toUtf8(), QCryptographicHash::Md5).toHex());
+        makeFile(planted, "not ours");
+        result = OTHER_ERROR;
+        FileOperations::rename(fixtureDir + "/c.txt", "b.txt", true, result);
+        QCOMPARE(result, SUCCESS);
+        QCOMPARE(contentOf(fixtureDir + "/b.txt"), QByteArray("x")); // the source's bytes won
+        QVERIFY(!QFileInfo::exists(fixtureDir + "/c.txt"));
+        QVERIFY2(QFile::exists(planted),
+                 "the rename deleted a file whose name it does not own — the old fixed-md5 backup path");
+        QCOMPARE(contentOf(planted), QByteArray("not ours"));
+        QVERIFY(QFile::remove(planted));
+        makeFile(fixtureDir + "/c.txt", "x"); // restore for the cases below
+    }
 
     QVERIFY(QDir(fixtureDir).mkdir("dircollision"));
     result = OTHER_ERROR;
