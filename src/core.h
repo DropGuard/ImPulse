@@ -286,6 +286,7 @@ class Core : public QObject {
     void toggleShuffle();
     void onModelLoaded();
     void outputError(const FileOpResult &error) const;
+    void reportBatchRemoval(const QString &doneVerb, int total, int successCount) const;
     void showOpenDialog();
     void showInDirectory();
     void quickCopyToFixedDirectory();
