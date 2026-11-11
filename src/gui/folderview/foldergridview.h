@@ -31,6 +31,9 @@ class FolderGridView : public ThumbnailView {
     void selectBelow();
     void selectNext();
     void selectPrev();
+    // the gridOpen action's landing: activates the current selection the way
+    // the Enter key always has
+    void activateCurrent();
 
     void zoomIn();
     void zoomOut();

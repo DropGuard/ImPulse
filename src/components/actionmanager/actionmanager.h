@@ -158,6 +158,18 @@ class ActionManager : public QObject {
     void print();
     void toggleFullscreenInfoBar();
     void pasteFile();
+    // the folder grid's scope actions: the navigation the grid used to
+    // hardcode in its keyPressEvent (upstream #365)
+    void gridSelectNext();
+    void gridSelectPrev();
+    void gridSelectAbove();
+    void gridSelectBelow();
+    void gridPageUp();
+    void gridPageDown();
+    void gridSelectFirst();
+    void gridSelectLast();
+    void gridSelectAll();
+    void gridOpen();
 };
 
 extern ActionManager *actionManager;
