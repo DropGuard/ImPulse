@@ -119,39 +119,46 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         return f.readAll();
     }
 
+    // The overwrite is atomic now (QSaveFile: unique temp in the same directory,
+    // rename on commit), so there is no backup file to look for — what replaces
+    // that assertion is stronger: the directory must contain the destination and
+    // nothing else, before and after, and a failed write must leave the original
+    // byte-identical with no residue.
     void saveWithBackupOverwritesAndRestores() {
         resetFixture();
         const QString dest = fixtureDir + "/saved.png";
-        const QString backupName =
-            dest + "_" + QString(QCryptographicHash::hash(dest.toUtf8(), QCryptographicHash::Md5).toHex());
+        // the fixture directory holds other files, so "no residue" is asserted
+        // as "the set of names did not grow", not as an exact listing
+        auto filesHere = [this]() {
+            return QDir(fixtureDir).entryList(QDir::Files | QDir::Hidden, QDir::Name);
+        };
 
         QImage first(8, 8, QImage::Format_RGB32);
         first.fill(Qt::blue);
         QVERIFY(first.save(dest, "PNG"));
         const QByteArray firstBytes = readBytes(dest);
+        const QStringList before = filesHere();
 
-        // a successful overwrite: new content, no leftover backup
+        // a successful overwrite: new content, and not one extra name
         QImage second(8, 8, QImage::Format_RGB32);
         second.fill(Qt::green);
         QVERIFY(FileOperations::saveWithBackup(second, dest, 95));
         QVERIFY2(readBytes(dest) != firstBytes, "the overwrite did not change the file");
-        QVERIFY2(!QFile::exists(backupName),
-                 qPrintable(QStringLiteral("the backup survived a successful save: ") + backupName));
+        QCOMPARE(filesHere(), before);
 
         // a write that cannot happen at all (no encoder for this suffix) must
-        // leave the original exactly as it was, backup included
+        // leave the original exactly as it was, and leave no temporary behind:
+        // QSaveFile names its temp uniquely, so a leftover would be a new name
         QImage third(8, 8, QImage::Format_RGB32);
         third.fill(Qt::red);
         const QString odd = fixtureDir + "/saved.unknownsuffix";
         QVERIFY(QFile::copy(dest, odd));
-        const QString oddBackup =
-            odd + "_" + QString(QCryptographicHash::hash(odd.toUtf8(), QCryptographicHash::Md5).toHex());
         const QByteArray oddBytesBefore = readBytes(odd);
+        const QStringList beforeFailure = filesHere();
 
         QVERIFY2(!FileOperations::saveWithBackup(third, odd, 95), "an unsupported format reported success");
         QCOMPARE(readBytes(odd), oddBytesBefore);
-        QVERIFY2(!QFile::exists(oddBackup),
-                 qPrintable(QStringLiteral("the backup was left behind after a restored rollback: ") + oddBackup));
+        QCOMPARE(filesHere(), beforeFailure);
     }
 
     static QStringList readPaths(const QSignalSpy &spy) {
