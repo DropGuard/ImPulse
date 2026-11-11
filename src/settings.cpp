@@ -250,6 +250,11 @@ QString Settings::resolveCacheDir() {
     if(genericCacheLocation.isEmpty())
         genericCacheLocation = QDir::homePath() + "/.cache";
     genericCacheLocation.append("/" + QApplication::applicationName());
+    // cacheDir is a hand-edit key: no settings UI has ever exposed it. It
+    // moves the temp frame directory and the session logs, but NOT the
+    // thumbnails — those live in the shared freedesktop store
+    // (~/.cache/thumbnails) and moving them would end the interop that is
+    // their point (upstream #599/#603).
     QString cacheLocation = QSettings().value("cacheDir", genericCacheLocation).toString();
     QDir(cacheLocation).mkpath(cacheLocation);
     QFileInfo dirTest(cacheLocation);
