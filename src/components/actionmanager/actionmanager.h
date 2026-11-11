@@ -44,7 +44,6 @@ class ActionManager : public QObject {
     void removeAllShortcuts();
     void removeAllShortcuts(const QString &actionName);
     QString keyForNativeScancode(quint32 scanCode);
-    void adjustFromVersion(const QVersionNumber &lastVer);
     void saveShortcuts();
   public slots:
     bool invokeAction(const QString &actionName);

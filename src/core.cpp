@@ -290,9 +290,6 @@ void Core::loadTranslation() {
 }
 
 void Core::onUpdate() {
-    QVersionNumber lastVer = settings->lastVersion();
-
-    actionManager->adjustFromVersion(lastVer);
 
     qDebug() << "Updated: " << settings->lastVersion().toString() << ">" << appVersion.toString();
     // TODO: finish changelogs
