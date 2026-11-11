@@ -846,6 +846,45 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QVERIFY2(!cache.exists(source, 128), "the smaller request must be answered from the stored larger bucket");
     }
 
+    // A cache hit still has to label the row with the SOURCE's dimensions, and
+    // the store cannot be trusted for them: Thumb::Image::Width/Height are
+    // optional in the spec and KIO does not write them (measured 0 of 679
+    // entries in a live store). The probe ran before the lookup and knows the
+    // answer, so a hit uses it instead of reporting 0x0 — which is what the
+    // first version of this path did, and 0x0 is a number a viewer cannot tell
+    // from a real one.
+    void aCacheHitStillReportsTheSourceSizeWhenTheEntryCarriesNoSizeKeys() {
+        resetFixture();
+        QTemporaryDir own;
+        QVERIFY(own.isValid());
+        ThumbnailCache cache(own.filePath("sizeless"));
+        const QString source = fixtureDir + "/big.png";
+        QVERIFY(writeBigImage(source, "png", QSize(1200, 900)));
+        LoadPolicy policy = loadPolicy();
+
+        QVERIFY(ThumbnailerRunnable::generate(&cache, source, 128, /*crop=*/false, /*force=*/true, policy));
+
+        // replace the entry with one shaped like KIO's: spec keys and Software,
+        // but no Thumb::Image::Width/Height
+        const QString path = cache.thumbnailPath(source, 128);
+        const QFileInfo info(source);
+        QImage theirs(128, 96, QImage::Format_ARGB32);
+        theirs.fill(Qt::red);
+        theirs.setText(QStringLiteral("Thumb::URI"), ThumbnailCache::uriFor(source));
+        theirs.setText(QStringLiteral("Thumb::MTime"), QString::number(info.lastModified().toSecsSinceEpoch()));
+        theirs.setText(QStringLiteral("Thumb::Size"), QString::number(info.size()));
+        theirs.setText(QStringLiteral("Software"), QStringLiteral("KDE Thumbnail Generator Images"));
+        QVERIFY(theirs.save(path, "png"));
+        auto hit = cache.read(source, 128, info);
+        QVERIFY2(hit.has_value(), "fixture degenerate: the entry must be a valid hit");
+        QVERIFY2(!hit->originalSize.isValid(), "fixture degenerate: this entry must carry no size keys");
+
+        auto thumb = ThumbnailerRunnable::generate(&cache, source, 128, /*crop=*/false, /*force=*/false, policy);
+        QVERIFY(thumb && thumb->pixmap());
+        QCOMPARE(thumb->pixmap()->size(), QSize(128, 96));
+        QCOMPARE(thumb->info(), QStringLiteral("1200x900"));
+    }
+
     void canceledThumbnailJobStillProducesAWellFormedReport() {
         resetFixture();
         QVERIFY(writeBigImage(fixtureDir + "/canceled.png", "png", QSize(4, 4)));
