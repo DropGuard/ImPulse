@@ -115,24 +115,95 @@ template <class T> void Settings::store(const SettingDesc &d, const T &v) {
     settingsConf->setValue(d.key, v);
 }
 
-// The fork answered to "qimgv" until 2026.11, and a user trying ImPulse should
-// not pay for the trial: the conf files are COPIED, so upstream qimgv keeps
-// working if they go back — the cache (regenerable thumbnails, megabytes)
-// RENAMES, because duplicating it buys nothing. Once, and only when the new
-// identity has nothing yet. An IsolatedHome test has no legacy identity under
-// its redirected HOME, so this is a no-op there.
-void Settings::carryIdentityFiles(const QString &legacyConfDir, const QString &newConfDir,
-                                  const QString &legacyCacheDir, const QString &newCacheDir) {
-    const QDir legacyConf(legacyConfDir);
-    const QDir currentConf(newConfDir);
-    if(legacyConf.exists() && !currentConf.exists()) {
-        QDir().mkpath(currentConf.absolutePath());
-        QFile::copy(legacyConf.filePath("qimgv.conf"), currentConf.filePath("impulse.conf"));
-        QFile::copy(legacyConf.filePath("savedState.conf"), currentConf.filePath("savedState.conf"));
-        QFile::copy(legacyConf.filePath("theme.conf"), currentConf.filePath("theme.conf"));
+QString Settings::qimgvConfigDir() {
+    // QStandardPaths' GenericConfigLocation is $XDG_CONFIG_HOME (or ~/.config),
+    // and QSettings' NativeFormat puts an org/app pair under <that>/<org>/. The
+    // shared legacy identity was organization "qimgv", application "qimgv".
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/qimgv");
+}
+
+Settings::ImportReport Settings::importQimgvConfig(const QString &sourceDir, const QString &destinationDir) {
+    ImportReport report;
+    const QDir source(sourceDir);
+    // The one file whose absence means "nothing to import". savedState and theme
+    // are optional companions — a qimgv that never changed its theme has no
+    // theme.conf, and that is not a failure.
+    if(!QFileInfo::exists(source.filePath(QStringLiteral("qimgv.conf")))) {
+        report.detail = source.absolutePath();
+        return report; // NoSource
     }
-    if(QDir(legacyCacheDir).exists() && !QDir(newCacheDir).exists())
-        QDir().rename(legacyCacheDir, newCacheDir);
+
+    QDir dest(destinationDir);
+    if(!dest.exists() && !QDir().mkpath(dest.absolutePath())) {
+        report.outcome = ImportOutcome::Failed;
+        report.detail = dest.absolutePath();
+        return report;
+    }
+
+    // Copies, never moves, and never overwrites: the source belongs to qimgv,
+    // and a destination file that already exists is this app's own current
+    // configuration — replacing it would silently discard what the user has
+    // been running with.
+    const struct {
+        const char *from;
+        const char *to;
+    } files[] = {
+        {"qimgv.conf", "impulse.conf"},
+        {"savedState.conf", "savedState.conf"},
+        {"theme.conf", "theme.conf"},
+    };
+    for(const auto &f : files) {
+        const QString from = source.filePath(QString::fromLatin1(f.from));
+        const QString to = dest.filePath(QString::fromLatin1(f.to));
+        if(!QFileInfo::exists(from))
+            continue;
+        if(QFileInfo::exists(to)) {
+            report.skipped << QString::fromLatin1(f.to);
+        } else if(QFile::copy(from, to)) {
+            report.copied << QString::fromLatin1(f.to);
+        } else if(report.outcome != ImportOutcome::Failed) {
+            // first failure names the file; later ones do not overwrite it
+            report.outcome = ImportOutcome::Failed;
+            report.detail = from;
+        }
+    }
+
+    // One answer derived once, at the end: a partial success is still a
+    // success, and a run that copied nothing but skipped something is its own
+    // case rather than "failed".
+    if(report.outcome == ImportOutcome::Failed)
+        return report;
+    report.outcome = report.copied.isEmpty() ? ImportOutcome::AllSkipped : ImportOutcome::Imported;
+    return report;
+}
+
+// The private thumbnail store this fork used before the XDG adoption is dead
+// weight: nothing reads it any more, and it is regenerable by definition. It is
+// removed once per cache root, and the marker makes that "once" true across
+// runs — without it a missing directory would mean "empty store" on every
+// start instead of "migration done".
+//
+// ONLY this identity's store is removed, and the reason is the same one that
+// kept the legacy config directory out of the import: "<root>/qimgv/thumbnails"
+// is not unambiguously ours. The fork answered to that name until 2026.11, but
+// so does upstream qimgv, which a user may still have installed — deleting that
+// store would make upstream regenerate every thumbnail, which is the exact
+// waste this change exists to remove. The legacy name is therefore not a
+// parameter: the signature says what may be touched.
+//
+// Everything else in the cache root (logs, scratch files, another app's cache,
+// the shared store itself) is left alone.
+void Settings::retirePrivateThumbnailStores(const QString &cacheRoot) {
+    const QDir root(cacheRoot);
+    const QString marker = root.filePath(QStringLiteral(".impulse-thumbnails-retired"));
+    if(QFileInfo::exists(marker))
+        return;
+    const QString app = QCoreApplication::applicationName();
+    if(!app.isEmpty())
+        QDir(QDir(root.filePath(app)).filePath(QStringLiteral("thumbnails"))).removeRecursively();
+    QFile done(marker);
+    if(done.open(QIODevice::WriteOnly))
+        done.write(QByteArrayLiteral("thumbnails moved to the freedesktop store\n"));
 }
 
 Settings::Settings(QObject *parent) : QObject(parent) {
@@ -150,12 +221,6 @@ Settings::Settings(QObject *parent) : QObject(parent) {
     stateConf = new QSettings(mConfDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
     themeConf = new QSettings(mConfDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
 #endif
-    carryIdentityFiles(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/qimgv",
-                       QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" +
-                           QCoreApplication::organizationName(),
-                       QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/qimgv",
-                       QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/" +
-                           QCoreApplication::applicationName());
     fillVideoFormats();
     // cache paths live in the constructor, not in an external protocol: a
     // directly-constructed instance (tests) used to carry uninitialized
@@ -165,7 +230,6 @@ Settings::Settings(QObject *parent) : QObject(parent) {
 //------------------------------------------------------------------------------
 Settings::~Settings() {
     saveTheme();
-    delete mThumbCacheDir;
     delete mTmpDir;
     delete settingsConf;
     delete stateConf;
@@ -205,18 +269,15 @@ QString Settings::resolveCacheDir() {
 }
 //------------------------------------------------------------------------------
 void Settings::setupCache() {
+    // The private subtree under the app's cache dir is gone: thumbnails live in
+    // the shared freedesktop store ($XDG_CACHE_HOME/thumbnails, owned by
+    // ThumbnailCache), so the app's own directory is only scratch space now.
     mTmpDir = new QDir(resolveCacheDir());
-    mThumbCacheDir = new QDir(mTmpDir->absolutePath() + "/thumbnails");
-    mThumbCacheDir->mkpath(mThumbCacheDir->absolutePath());
 }
 //------------------------------------------------------------------------------
 void Settings::sync() {
     settingsConf->sync();
     stateConf->sync();
-}
-//------------------------------------------------------------------------------
-QString Settings::thumbnailCacheDir() {
-    return mThumbCacheDir->path() + "/";
 }
 //------------------------------------------------------------------------------
 QString Settings::tmpDir() {

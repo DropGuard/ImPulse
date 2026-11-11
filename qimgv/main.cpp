@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>
+#include <QStandardPaths>
 #include <QStyleFactory>
 #include <QEvent>
 
@@ -105,6 +106,12 @@ int main(int argc, char *argv[]) {
     inputMap = InputMap::getInstance();
     appActions = Actions::getInstance();
     settings = Settings::getInstance();
+    // Migration, not a property of being constructed. It used to live in the
+    // Settings constructor, which made every `new Settings()` — tests included —
+    // a potential deletion of the user's files, with an implicit contract that
+    // the caller had redirected its HOME. One explicit call at startup says what
+    // happens, once, where a reader can see it.
+    Settings::retirePrivateThumbnailStores(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation));
     scriptManager = ScriptManager::getInstance();
     actionManager = ActionManager::getInstance();
     shrRes = SharedResources::getInstance();
