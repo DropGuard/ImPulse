@@ -3,7 +3,7 @@
 #include <QImage>
 #include <QSaveFile>
 
-#include <cstdio> // ::rename — see copyFileTo/moveFileTo/rename rollbacks
+#include <cstdio> // ::rename — the atomic step in rename()
 
 QString FileOperations::generateHash(const QString &str) {
     return QString(QCryptographicHash::hash(str.toUtf8(), QCryptographicHash::Md5).toHex());
@@ -225,7 +225,6 @@ void FileOperations::moveFileTo(const QString &srcFilePath, const QString &destD
 
 void FileOperations::rename(const QString &srcFilePath, const QString &newName, bool force, FileOpResult &result) {
     QFileInfo srcFile(srcFilePath);
-    QString tmpPath;
     // error checks
     if(!srcFile.exists()) {
         result = FileOpResult::SOURCE_DOES_NOT_EXIST;
@@ -256,20 +255,22 @@ void FileOperations::rename(const QString &srcFilePath, const QString &newName, 
             result = FileOpResult::DESTINATION_FILE_EXISTS;
             return;
         }
-        tmpPath = newFilePath + "_" + generateHash(newFilePath);
-        QFile::remove(tmpPath);
-        // move dest file
-        QFile::rename(newFilePath, tmpPath);
     }
-    if(QFile::rename(srcFile.filePath(), newFilePath)) {
-        result = FileOpResult::SUCCESS;
-        if(QFile::exists(tmpPath))
-            QFile::remove(tmpPath);
-    } else {
-        result = FileOpResult::OTHER_ERROR;
-        // restore dest file
-        QFile::rename(tmpPath, newFilePath);
-    }
+    // One rename(2), which replaces an existing destination atomically. The
+    // previous shape moved the destination aside under a fixed
+    // "<name>_<md5>" backup, renamed the source on top, then deleted the
+    // backup — three syscalls where one does, and a backup file that a
+    // concurrent process could delete (the name carried no pid) and that a
+    // SIGKILL could leave on disk forever.
+    //
+    // ::rename rather than QFile::rename because Qt's is RENAME_NOREPLACE:
+    // it answers EEXIST when the destination exists, which is exactly the
+    // forced-overwrite case this branch is in. The bytes of the name are
+    // UTF-8 for the same reason saveWithBackup's rollback used them — that is
+    // what the listing keys on.
+    const QByteArray from = srcFile.filePath().toUtf8();
+    const QByteArray to = newFilePath.toUtf8();
+    result = ::rename(from.constData(), to.constData()) == 0 ? FileOpResult::SUCCESS : FileOpResult::OTHER_ERROR;
 }
 
 void FileOperations::moveToTrash(const QString &filePath, FileOpResult &result) {
