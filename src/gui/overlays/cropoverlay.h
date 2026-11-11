@@ -42,8 +42,6 @@ class CropOverlay : public FloatingWidget {
     void escPressed();
     // the keyboard's Apply: always the in-memory crop, never the save
     void cropApply();
-    // a digit on the surface picked an aspect preset; the panel owns the combo
-    void aspectPresetRequested(int index);
 
   protected:
     void paintEvent(QPaintEvent *event) override;

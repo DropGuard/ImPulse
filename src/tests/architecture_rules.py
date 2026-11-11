@@ -314,8 +314,8 @@ ALLOWED_KEY_DOORS = {
     'gui/customwidgets/thumbnailview.cpp',   # shift state for range selection
     'gui/folderview/treeviewcustom.cpp',     # widget-standard tree navigation
     'gui/folderview/fvoptionspopup.cpp',     # Esc-only popup
-    'gui/panels/croppanel/croppanel.cpp',    # modal editing surface: crop workflow keys + preset digits
-    'gui/overlays/cropoverlay.cpp',          # crop workflow keys + preset digits; save chords commit the pending crop
+    'gui/panels/croppanel/croppanel.cpp',    # modal editing surface: crop workflow keys
+    'gui/overlays/cropoverlay.cpp',          # crop workflow keys; save chords commit the pending crop
     'gui/overlays/renameoverlay.cpp',        # modal input with a curated passthrough
     'gui/overlays/copyoverlay.cpp',          # modal surface with its own per-destination hotkeys
     'gui/overlays/saveconfirmoverlay.cpp',   # modal prompt: its three answers + Esc, rest to the action system
