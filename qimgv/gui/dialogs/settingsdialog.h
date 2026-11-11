@@ -35,6 +35,10 @@ class SettingsDialog : public QDialog {
     // both directions of the binding table; public so tests can drive them
     void readSettings();
     void saveSettings();
+    // The message the import would show, built without showing it. The test
+    // needs the text; QMessageBox::information blocks on a modal dialog that
+    // no headless run can dismiss. Public for that seam, not for callers.
+    QString importMessage(const QString &sourceDir, const QString &destinationDir);
 
   private:
     void readColorScheme();
