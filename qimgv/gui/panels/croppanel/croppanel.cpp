@@ -33,6 +33,8 @@ CropPanel::CropPanel(CropOverlay *_overlay, QWidget *parent)
     connect(ui->height, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
     connect(ui->posX, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
     connect(ui->posY, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
+    connect(ui->ARX, &QDoubleSpinBox::valueChanged, this, &CropPanel::onAspectRatioChange);
+    connect(ui->ARY, &QDoubleSpinBox::valueChanged, this, &CropPanel::onAspectRatioChange);
     connect(ui->ARcomboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, &CropPanel::onAspectRatioSelected);
 
     connect(overlay, &CropOverlay::selectionChanged, this, &CropPanel::onSelectionOutsideChange);
@@ -87,14 +89,24 @@ void CropPanel::onSelectionChange() {
     emit selectionChanged(QRect(ui->posX->value(), ui->posY->value(), ui->width->value(), ui->height->value()));
 }
 
+// the fields are Custom's own face — typing here IS the ratio, live. They
+// keep their own values (the last custom ratio), never seeded by the
+// presets: that seeding was what made Custom and Current Image twins.
+void CropPanel::onAspectRatioChange() {
+    if(ui->ARX->value() > 0 && ui->ARY->value() > 0)
+        overlay->setAspectRatio(QPointF(ui->ARX->value(), ui->ARY->value()));
+}
+
 // 0 == free
-// 1 == current image
-// 2 == current screen
-// 3 ...
+// 1 == custom (the hand-typed ratio; its fields are visible only now)
+// 2 == current image
+// 3 == current screen
+// 4 ...
 void CropPanel::onAspectRatioSelected() {
     QPointF newAR(1, 1);
 
     int index = ui->ARcomboBox->currentIndex();
+    ui->ARInputWidget->setVisible(index == 1);
     switch(index) {
     case 0: {
         overlay->setLockAspectRatio(false);
@@ -103,10 +115,14 @@ void CropPanel::onAspectRatioSelected() {
         break;
     }
     case 1: {
-        newAR = QPointF(qreal(realSize.width()) / realSize.height(), 1.0);
+        newAR = QPointF(ui->ARX->value(), ui->ARY->value());
         break;
     }
     case 2: {
+        newAR = QPointF(qreal(realSize.width()) / realSize.height(), 1.0);
+        break;
+    }
+    case 3: {
         QScreen *screen = nullptr;
         screen = QGuiApplication::screenAt(mapToGlobal(ui->ARcomboBox->geometry().topLeft()));
         if(!screen)
@@ -114,19 +130,19 @@ void CropPanel::onAspectRatioSelected() {
         newAR = QPointF(qreal(screen->geometry().width()) / screen->geometry().height(), 1.0);
         break;
     }
-    case 3: {
+    case 4: {
         newAR = QPointF(1.0, 1.0);
         break;
     }
-    case 4: {
+    case 5: {
         newAR = QPointF(4.0, 3.0);
         break;
     }
-    case 5: {
+    case 6: {
         newAR = QPointF(16.0, 9.0);
         break;
     }
-    default: // apply aspect ratio; update input fields
+    default: // apply aspect ratio
     {
         break;
     }

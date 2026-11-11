@@ -46,6 +46,7 @@ class CropPanel : public SidePanelWidget {
     void doCrop();
     void doCropSave();
     void onSelectionChange();
+    void onAspectRatioChange();   // the Custom fields, typed live
     void onAspectRatioSelected(); // via ComboBox
     void setFocusCropBtn();
     void setFocusCropSaveBtn();
