@@ -103,7 +103,23 @@ void ActionManager::initDefaults() {
     inspectDefaults.insert("Left", "scrollLeft");
     inspectDefaults.insert("Right", "scrollRight");
 
-    //defaults.insert("Backspace", "goUp"); // todo: shortcut scopes?
+    // the folder grid's scope defaults are the navigation the grid hardcoded
+    // before the scope system existed — one translation of that switch, so
+    // the default grid behaves byte-identically to the hardcoded era. goUp
+    // is the global action the switch used to invoke directly; Enter opens
+    // the selection rather than toggling the view (the global Enter binding
+    // is the toggle, and the grid's capture used to precede it).
+    gridDefaults.insert("Left", "gridSelectPrev");
+    gridDefaults.insert("Right", "gridSelectNext");
+    gridDefaults.insert("Up", "gridSelectAbove");
+    gridDefaults.insert("Down", "gridSelectBelow");
+    gridDefaults.insert("PgUp", "gridPageUp");
+    gridDefaults.insert("PgDown", "gridPageDown");
+    gridDefaults.insert("Home", "gridSelectFirst");
+    gridDefaults.insert("End", "gridSelectLast");
+    gridDefaults.insert("Enter", "gridOpen");
+    gridDefaults.insert("Backspace", "goUp");
+    gridDefaults.insert(InputMap::keyNameCtrl() + "+A", "gridSelectAll");
 }
 
 //------------------------------------------------------------------------------
@@ -114,7 +130,9 @@ void ActionManager::initShortcuts() {
     // config holding at least one entry permanently pinned to its own era.
     shortcuts = defaults;
     inspectShortcuts = inspectDefaults;
+    gridShortcuts = gridDefaults;
     readShortcuts();
+    readGridShortcuts();
 }
 //------------------------------------------------------------------------------
 void ActionManager::addShortcut(const QString &keys, const QString &action) {
@@ -163,6 +181,7 @@ QString ActionManager::keyForNativeScancode(quint32 scanCode) {
 void ActionManager::resetDefaults() {
     shortcuts = defaults;
     inspectShortcuts = inspectDefaults;
+    gridShortcuts = gridDefaults;
 }
 
 void ActionManager::setInspectMode(bool inspect) {
@@ -202,25 +221,32 @@ bool ActionManager::invokeAction(const QString &actionName) {
     return false;
 }
 //------------------------------------------------------------------------------
-bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
+bool ActionManager::invokeActionForShortcut(const QString &shortcut, ShortcutScope scope) {
     if(shortcut.isEmpty())
         return false;
-    // the inspect scope's bindings win while it is armed — fit original /
-    // free zoom means "I am inspecting this image", and the software does
-    // not get to decide the inspection is over
-    if(inspectMode && inspectShortcuts.contains(shortcut)) {
+    return resolveShortcut(shortcut, scope);
+}
+
+// one resolution order for every event: the surface the caller declares wins
+// (the surface being typed at is the freshest intent — a grid holding focus
+// outranks an inspect mode armed before the folder view was opened), then the
+// state-armed scopes (inspect: fit original / free zoom means "I am
+// inspecting this image", and the software does not get to decide the
+// inspection is over), then the global table.
+bool ActionManager::resolveShortcut(const QString &shortcut, ShortcutScope scope) {
+    if(scope == ShortcutScope::FolderGrid && gridShortcuts.contains(shortcut))
+        return invokeAction(gridShortcuts[shortcut]);
+    if(inspectMode && inspectShortcuts.contains(shortcut))
         return invokeAction(inspectShortcuts[shortcut]);
-    }
-    if(shortcuts.contains(shortcut)) {
+    if(shortcuts.contains(shortcut))
         return invokeAction(shortcuts[shortcut]);
-    }
     return false;
 }
 //------------------------------------------------------------------------------
-void ActionManager::validateShortcuts() {
-    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
+void ActionManager::validateShortcuts(QMap<QString, QString> &map) {
+    for(auto i = map.begin(); i != map.end();) {
         if(validateAction(i.value()) == ActionType::ACTION_INVALID)
-            i = shortcuts.erase(i);
+            i = map.erase(i);
         else
             ++i;
     }
@@ -240,10 +266,48 @@ inline ActionType ActionManager::validateAction(const QString &actionName) {
 //------------------------------------------------------------------------------
 void ActionManager::readShortcuts() {
     settings->readShortcuts(shortcuts);
-    validateShortcuts();
+    validateShortcuts(shortcuts);
+}
+
+void ActionManager::readGridShortcuts() {
+    settings->readShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
+    validateShortcuts(gridShortcuts);
+}
+
+//------------------------------------------------------------------------------
+void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
+    ActionType type = validateAction(action);
+    if(type != ActionType::ACTION_INVALID) {
+        gridShortcuts.insert(keys, action);
+    }
+}
+
+const QMap<QString, QString> &ActionManager::allGridShortcuts() {
+    return gridShortcuts;
+}
+
+void ActionManager::removeAllGridShortcuts() {
+    gridShortcuts.clear();
+}
+
+// Removes all grid shortcuts for specified action. Slow (reverse map lookup).
+void ActionManager::removeAllGridShortcuts(const QString &actionName) {
+    if(validateAction(actionName) == ActionType::ACTION_INVALID)
+        return;
+
+    for(auto i = gridShortcuts.begin(); i != gridShortcuts.end();) {
+        if(i.value() == actionName)
+            i = gridShortcuts.erase(i);
+        else
+            ++i;
+    }
+}
+
+void ActionManager::saveGridShortcuts() {
+    settings->saveShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
 }
 //------------------------------------------------------------------------------
-bool ActionManager::processEvent(QInputEvent *event) {
-    return invokeActionForShortcut(ShortcutBuilder::fromEvent(event));
+bool ActionManager::processEvent(QInputEvent *event, ShortcutScope scope) {
+    return invokeActionForShortcut(ShortcutBuilder::fromEvent(event), scope);
 }
 //------------------------------------------------------------------------------

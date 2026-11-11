@@ -1417,6 +1417,47 @@ class TestCoreNav : public QObject {
             actionManager->addShortcut(it.key(), it.value());
     }
 
+    // The scope chain's order is the contract: the surface the caller declares
+    // wins (a grid holding focus outranks an inspect mode armed before the
+    // folder view was opened — the stale-arm case), then the armed inspect
+    // layer, then the global table. Each layer is heard through its own
+    // signal, so the assertion is on what FIRED, not on what returned. The
+    // grid binding is injected through the public API and swept away after —
+    // the singleton is process-wide and every later test inherits whatever
+    // this leaves.
+    void shortcutScopeChainResolvesCallerFirst() {
+        actionManager->addGridShortcut(QStringLiteral("Left"), QStringLiteral("nextImage"));
+
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        core.mw->fitOriginal(); // arms the inspect scope through the real observer
+        QTRY_COMPARE_WITH_TIMEOUT(core.mw->viewer()->fitMode(), FIT_ORIGINAL, 5000);
+
+        QSignalSpy next(actionManager, &ActionManager::nextImage);
+        QSignalSpy scroll(actionManager, &ActionManager::scrollLeft);
+
+        // caller-declared grid scope wins over the armed inspect layer
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left"), ShortcutScope::FolderGrid));
+        QCOMPARE(next.count(), 1);
+        QCOMPARE(scroll.count(), 0);
+
+        // the same key, no surface declared: the armed inspect layer answers
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(scroll.count(), 1);
+        QCOMPARE(next.count(), 1);
+
+        // disarmed, the same key falls through to the global table
+        core.mw->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(core.mw->viewer()->fitMode(), FIT_WINDOW, 5000);
+        QSignalSpy prev(actionManager, &ActionManager::prevImage);
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(prev.count(), 1);
+        QCOMPARE(scroll.count(), 1);
+
+        actionManager->removeAllGridShortcuts();
+    }
+
     // ActionManager dispatches by name: an action lives in the Actions registry
     // and is fired as a metaobject method on ActionManager itself. Two lists
     // that have to agree, and the disagreement is silent — invokeMethod on a

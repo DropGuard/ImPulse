@@ -18,17 +18,29 @@ enum ActionType {
     ACTION_SCRIPT
 };
 
+// Which surface a key event arrives at. A scope is a binding table layered
+// over the global one: the same physical key may mean different things per
+// surface (Right pages in the document view, moves the grid selection in the
+// folder view), and one flat table cannot hold both.
+enum class ShortcutScope {
+    None,      // no surface declared: the state-armed scopes and the global
+               // table decide
+    FolderGrid // the folder view's thumbnail grid holds focus; its bindings
+               // win for this event — the surface being typed at is the
+               // freshest intent, fresher than a mode armed earlier
+};
+
 class ActionManager : public QObject {
     Q_OBJECT
   public:
     static ActionManager *getInstance();
     ~ActionManager() override;
-    bool processEvent(QInputEvent *);
+    bool processEvent(QInputEvent *, ShortcutScope scope = ShortcutScope::None);
     // the keymap's resolution primitive: shortcut string -> action dispatch,
-    // honoring the inspect scope while it is armed. Public so the input
+    // walking caller scope -> armed scopes -> global. Public so the input
     // funnel's decision itself is testable (ShortcutBuilder's physical event
     // mapping is covered separately in machinery_tests).
-    bool invokeActionForShortcut(const QString &shortcut);
+    bool invokeActionForShortcut(const QString &shortcut, ShortcutScope scope = ShortcutScope::None);
     // arms/disarms the inspect scope: while armed, the inspect layer's
     // bindings override the base ones — in fit original / free zoom the
     // arrow keys pan the canvas and never change images (mode = intent)
@@ -45,6 +57,12 @@ class ActionManager : public QObject {
     void removeAllShortcuts(const QString &actionName);
     QString keyForNativeScancode(quint32 scanCode);
     void saveShortcuts();
+    // the folder grid's scope layer, same shape as the global one
+    void addGridShortcut(const QString &keys, const QString &action);
+    const QMap<QString, QString> &allGridShortcuts();
+    void removeAllGridShortcuts();
+    void removeAllGridShortcuts(const QString &actionName);
+    void saveGridShortcuts();
   public slots:
     bool invokeAction(const QString &actionName);
 
@@ -55,12 +73,17 @@ class ActionManager : public QObject {
     // free zoom pan with the arrows instead of changing images)
     QMap<QString, QString> inspectDefaults, inspectShortcuts; // <shortcut, action>
     bool inspectMode = false;
+    // the folder grid's scope layer: defaults mirror the navigation the grid
+    // hardcoded before the scope system existed
+    QMap<QString, QString> gridDefaults, gridShortcuts; // <shortcut, action>
 
     void initDefaults();
     void initShortcuts();
     QString modifierKeys(QEvent *event);
-    void validateShortcuts();
+    void validateShortcuts(QMap<QString, QString> &map);
     void readShortcuts();
+    void readGridShortcuts();
+    bool resolveShortcut(const QString &shortcut, ShortcutScope scope);
     ActionType validateAction(const QString &actionName);
 
   signals:
