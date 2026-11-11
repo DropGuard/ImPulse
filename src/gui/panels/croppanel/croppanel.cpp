@@ -1,6 +1,9 @@
 #include "croppanel.h"
 #include "ui_croppanel.h"
 
+#include "components/actionmanager/actionmanager.h"
+#include "gui/overlays/cropanswer.h"
+
 CropPanel::CropPanel(CropOverlay *_overlay, QWidget *parent)
     : SidePanelWidget(parent), ui(new Ui::CropPanel), overlay(_overlay) {
     ui->setupUi(this);
@@ -38,9 +41,19 @@ CropPanel::CropPanel(CropOverlay *_overlay, QWidget *parent)
     connect(this, &CropPanel::selectionChanged, overlay, &CropOverlay::onSelectionOutsideChange);
     connect(this, &CropPanel::aspectRatioChanged, overlay, &CropOverlay::setAspectRatio);
     connect(overlay, &CropOverlay::escPressed, this, &CropPanel::cancel);
-    connect(overlay, &CropOverlay::cropDefault, this, &CropPanel::doCropDefaultAction);
-    connect(overlay, &CropOverlay::cropSave, this, &CropPanel::doCropSave);
+    // the keyboard's Apply is always the in-memory crop — the keyboard never
+    // writes the disk; Crop && Save stays a button-only convenience
+    connect(overlay, &CropOverlay::cropApply, this, &CropPanel::doCrop);
+    connect(overlay, &CropOverlay::aspectPresetRequested, this, &CropPanel::onAspectPresetRequested);
     connect(this, &CropPanel::selectAll, overlay, &CropOverlay::selectAll);
+
+    // the answers' keys on their faces — the .ui text stays the base. The
+    // save chord commits the pending crop before writing, so Crop && Save
+    // and Ctrl+S are the same action whenever a selection stands.
+    ui->cropButton->setText(ui->cropButton->text() + QStringLiteral("  [Enter]"));
+    ui->cropSaveButton->setText(ui->cropSaveButton->text() + QStringLiteral("  [Ctrl+S]"));
+    ui->cancelButton->setText(ui->cancelButton->text() + QStringLiteral("  [Esc]"));
+    ui->ARcomboBox->setToolTip(tr("Aspect ratio presets — keys 1 to 8"));
 }
 
 CropPanel::~CropPanel() {
@@ -56,13 +69,6 @@ void CropPanel::setImageRealSize(QSize sz) {
     // update aspect ratio in input fields
 
     onAspectRatioSelected();
-}
-
-void CropPanel::doCropDefaultAction() {
-    if(settings->defaultCropAction() == ACTION_CROP)
-        doCrop();
-    else
-        doCropSave();
 }
 
 void CropPanel::doCrop() {
@@ -97,6 +103,13 @@ void CropPanel::onAspectRatioChange() {
 // 2 == current image
 // 3 == current screen
 // 4 ...
+// a digit on the overlay picked a preset; index arrives 0-based, and an
+// out-of-range digit is dropped rather than clamped
+void CropPanel::onAspectPresetRequested(int index) {
+    if(index >= 0 && index < ui->ARcomboBox->count())
+        ui->ARcomboBox->setCurrentIndex(index);
+}
+
 void CropPanel::onAspectRatioSelected() {
     QPointF newAR(1, 1);
 
@@ -200,17 +213,21 @@ void CropPanel::show() {
 }
 
 void CropPanel::keyPressEvent(QKeyEvent *event) {
-    if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
-        if(event->modifiers() == Qt::ShiftModifier)
-            doCropSave();
-        else
-            doCropDefaultAction();
-    } else if(event->key() == Qt::Key_Escape) {
+    event->accept();
+    if(const std::optional<CropAnswer> answer = cropAnswerForKey(event)) {
+        if(*answer == CropAnswer::Apply) {
+            doCrop();
+            return;
+        }
         emit cancel();
-    } else if(event->matches(QKeySequence::SelectAll)) {
+        return;
+    }
+    if(event->matches(QKeySequence::SelectAll)) {
         emit selectAll();
     } else {
-        event->ignore();
+        // the overlay's idiom: keys the surface does not own stay live in
+        // the action system (zoom fine-tuning is the point of Framing)
+        actionManager->processEvent(event);
     }
 }
 
