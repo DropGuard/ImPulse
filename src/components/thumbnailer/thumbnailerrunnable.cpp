@@ -7,6 +7,17 @@
 #include <QFileInfo>
 #include <utility>
 
+namespace {
+
+// Buckets are square boxes; a thumbnail never exceeds its box on either edge.
+QSize boundedBox(const QSize &natural, int box) {
+    if(natural.width() <= box && natural.height() <= box)
+        return natural; // never upscale: the spec's sizes are maxima
+    return natural.scaled(box, box, Qt::KeepAspectRatio);
+}
+
+} // namespace
+
 ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
                                          const LoadPolicy &_policy)
     : path(std::move(_path)), size(_size), crop(_crop), force(_force), policy(_policy), cache(_cache) {
@@ -35,15 +46,32 @@ QString ThumbnailerRunnable::videoFrameTempPath(const QString &tmpDir, const QSt
     // sharing one file: the grid and the strip each run their own thumbnailer,
     // and so do two app instances.
     return tmpDir + QFileInfo(path).fileName() + "-" + QString::number(QCoreApplication::applicationPid()) + "-" +
-           generateIdString(path, size, crop) + ".png";
+           tempIdFor(path, size, crop) + ".png";
 }
 
-QString ThumbnailerRunnable::generateIdString(const QString &path, int size, bool crop) {
+QString ThumbnailerRunnable::tempIdFor(const QString &path, int size, bool crop) {
     QString queryStr = path + QString::number(size);
     if(crop)
         queryStr.append("s");
     queryStr = QString("%1").arg(QString(QCryptographicHash::hash(queryStr.toUtf8(), QCryptographicHash::Md5).toHex()));
     return queryStr;
+}
+
+std::unique_ptr<QImage> ThumbnailerRunnable::fitForDisplay(const QImage &source, int size, bool crop) {
+    if(source.isNull())
+        return std::make_unique<QImage>();
+    // Upscaling is only for a source smaller than the box: a bucket image is
+    // exactly this size already, and a small original must not lose its
+    // picture. KeepAspectRatio so nothing is stretched.
+    if(!crop)
+        return std::make_unique<QImage>(source.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    // Cropped display covers `size` x `size`: expand, then take the centered
+    // square. This is the thumbnail strip's `squareThumbnails` mode (the grid
+    // never crops) and it happens here — after the read — so the shared store
+    // never holds a cropped picture.
+    const QImage scaled = source.scaled(size, size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+    const QRect clip((scaled.width() - size) / 2, (scaled.height() - size) / 2, size, size);
+    return std::make_unique<QImage>(scaled.copy(clip));
 }
 
 std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, const QString &path, int size,
@@ -57,6 +85,7 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
     DocumentType type;
     QString format;
     int orientation = 1;
+    QSize probeSize;
     qimgv_probe_result pr{};
     if(qimgv_engine_probe(fileInfo.absoluteFilePath().toUtf8().constData(), &pr) == QIMGV_OK &&
        pr.format != QIMGV_FMT_UNKNOWN) {
@@ -73,6 +102,8 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
         }
         type = pr.animated ? DocumentType::ANIMATED : DocumentType::STATIC;
         orientation = (pr.orientation >= 1 && pr.orientation <= 8) ? pr.orientation : 1;
+        if(pr.width > 0 && pr.height > 0)
+            probeSize = QSize(pr.width, pr.height);
     } else {
         imgInfo = std::make_unique<DocumentInfo>(path, policy);
         type = imgInfo->type();
@@ -80,49 +111,72 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
         orientation = imgInfo->exifOrientation();
     }
 
-    QString thumbnailId = generateIdString(path, size, crop);
-    std::unique_ptr<QImage> image;
+    // Identity is the spec's: the bucket is chosen from the request, and the
+    // stored file is keyed by the source URI alone. A zoom step therefore
+    // reuses a stored bucket instead of writing a new file per pixel size.
+    const int bucket = ThumbnailCache::bucketForRequest(size, crop, probeSize);
 
-    QString time = QString::number(fileInfo.lastModified().toMSecsSinceEpoch());
+    QImage stored;      // the aspect-preserved picture (bucket-sized)
+    QSize originalSize; // the source's own dimensions, for the label and the spec keys
+    bool animated = (type == ANIMATED);
+    bool video = (type == VIDEO);
 
     if(!force && cache) {
-        image.reset(cache->readThumbnail(thumbnailId));
-        if(image && image->text("lastModified") != time)
-            image.reset(nullptr);
+        // The spec's rule reads one way (smaller requests read the small bucket
+        // and downscale) and the useful reading of it is symmetric: any bucket
+        // at least as large as the request can answer it. So the search starts
+        // at the requested bucket and stops at the first hit — a thumbnail
+        // written at 256 for the grid serves a 128 request from the panel
+        // without a decode, and a 128 one still cannot serve a 256 request.
+        for(int i = 0; i < ThumbnailCache::bucketCount; ++i) {
+            if(ThumbnailCache::bucketSizes[i] < bucket)
+                continue;
+            if(auto hit = cache->read(path, ThumbnailCache::bucketSizes[i], fileInfo)) {
+                stored = std::move(hit->image);
+                originalSize = hit->originalSize;
+                // The spec keys make the cached animation/video classification
+                // authoritative: it is what this app recorded when it decoded.
+                animated = hit->animated;
+                video = hit->video;
+                break;
+            }
+        }
     }
 
-    if(!image) {
+    if(stored.isNull()) {
         if(type == DocumentType::NONE) {
-            std::shared_ptr<Thumbnail> thumbnail(new Thumbnail(fileInfo.fileName(), "", size, nullptr));
-            return thumbnail;
+            return std::make_shared<Thumbnail>(fileInfo.fileName(), "", size, nullptr);
         }
+        // Decode straight into the bucket box, aspect preserved. Sizes are the
+        // spec's maxima, so an image already inside the box is not enlarged.
         std::pair<std::unique_ptr<QImage>, QSize> pair;
         if(type == VIDEO)
-            pair = createVideoThumbnail(path, size, crop, policy.tmpDir, policy.mpvBinary, cancel);
+            pair = createVideoThumbnail(path, bucket, policy.tmpDir, policy.mpvBinary, cancel);
         else
-            pair = createThumbnail(fileInfo.absoluteFilePath(), format.toStdString().c_str(), size, crop, cancel);
-        image = std::move(pair.first);
-        QSize originalSize = pair.second;
-
-        image = ImageLib::exifRotated(std::move(image), orientation);
-
-        // put in image info
-        image->setText("originalWidth", QString::number(originalSize.width()));
-        image->setText("originalHeight", QString::number(originalSize.height()));
-        image->setText("lastModified", time);
-
-        if(type == ANIMATED)
-            image->setText("label", " [a]");
-        else if(type == VIDEO)
-            image->setText("label", " [v]");
+            pair = createThumbnail(fileInfo.absoluteFilePath(), format.toStdString().c_str(), bucket, cancel);
+        if(cancel && cancel->requested()) {
+            // the contract the accounting pins: a canceled decode still
+            // arrives as a well-formed, empty, error-labelled attempt
+            auto empty = std::make_shared<Thumbnail>(fileInfo.fileName(), "error", size, nullptr);
+            return empty;
+        }
+        originalSize = pair.second;
+        const std::unique_ptr<QImage> rotated = ImageLib::exifRotated(std::move(pair.first), orientation);
+        if(!rotated || rotated->isNull())
+            return std::make_shared<Thumbnail>(fileInfo.fileName(), "error", size, nullptr);
+        stored = *rotated;
 
         if(cache) {
-            // save thumbnail if it makes sense
-            // FIXME: avoid too much i/o
-            if(originalSize.width() > size || originalSize.height() > size)
-                cache->saveThumbnail(image.get(), thumbnailId);
+            // Save only when the source is larger than the box — a thumbnail
+            // of a thumbnail buys nothing (the spec says the same).
+            if(originalSize.width() > bucket || originalSize.height() > bucket)
+                cache->save(stored, path, bucket, fileInfo, originalSize, animated, video);
         }
     }
+
+    // Display presentation is applied after the read, never stored.
+    std::unique_ptr<QImage> image = fitForDisplay(stored, size, crop);
+
     auto &&tmpPixmap = new QPixmap(image->size());
     *tmpPixmap = QPixmap::fromImage(*image);
     tmpPixmap->setDevicePixelRatio(qGuiApp->devicePixelRatio());
@@ -131,20 +185,21 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
     if(tmpPixmap->width() == 0) {
         label = "error";
     } else {
-        // put info into Thumbnail object
-        label = image->text("originalWidth") + "x" + image->text("originalHeight") + image->text("label");
+        label = QString::number(originalSize.width()) + "x" + QString::number(originalSize.height());
+        if(animated)
+            label.append(" [a]");
+        else if(video)
+            label.append(" [v]");
     }
     std::shared_ptr<QPixmap> pixmapPtr(tmpPixmap);
-    std::shared_ptr<Thumbnail> thumbnail(new Thumbnail(fileInfo.fileName(), label, size, pixmapPtr));
-    return thumbnail;
+    return std::make_shared<Thumbnail>(fileInfo.fileName(), label, size, pixmapPtr);
 }
 
 ThumbnailerRunnable::~ThumbnailerRunnable() {
 }
 
 std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(const QString &path, const char *format,
-                                                                               int size, bool squared,
-                                                                               const CancelToken *cancel) {
+                                                                               int box, const CancelToken *cancel) {
     // The decode itself is one call inside QImageReader, so the checkpoint can
     // only sit in front of it. Empty means "no picture", not "no image": the
     // caller writes info into it and builds the error thumbnail from it, and a
@@ -152,21 +207,14 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
     if(cancel && cancel->requested())
         return std::make_pair(std::make_unique<QImage>(), QSize());
     QImageReader *reader = new QImageReader(path, format);
-    Qt::AspectRatioMode ARMode = squared ? (Qt::KeepAspectRatioByExpanding) : (Qt::KeepAspectRatio);
     std::unique_ptr<QImage> result;
     QSize originalSize;
     bool indexed = (reader->imageFormat() == QImage::Format_Indexed8);
     bool manualResize = indexed || !reader->supportsOption(QImageIOHandler::Size);
     if(!manualResize) { // resize during read via QImageReader (faster)
-        QSize scaledSize = reader->size().scaled(size, size, ARMode);
-        reader->setScaledSize(scaledSize);
-        if(squared) {
-            QRect clip(0, 0, size, size);
-            QRect scaledRect(QPoint(0, 0), scaledSize);
-            clip.moveCenter(scaledRect.center());
-            reader->setScaledClipRect(clip);
-        }
-        originalSize = reader->size();
+        const QSize natural = reader->size();
+        originalSize = natural;
+        reader->setScaledSize(boundedBox(natural, box));
         result = std::make_unique<QImage>();
         if(!reader->read(result.get())) {
             // If read() returns false there's no guarantee that size conversion worked properly.
@@ -181,7 +229,7 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
             reader = new QImageReader(path, format);
         }
     }
-    if(manualResize) { // manual resize & crop. slower but should just work
+    if(manualResize) { // manual resize. slower but should just work
         std::unique_ptr<QImage> fullSize = std::make_unique<QImage>();
         reader->read(fullSize.get());
         if(indexed) {
@@ -191,17 +239,8 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createThumbnail(c
             fullSize = std::make_unique<QImage>(fullSize->convertToFormat(newFmt));
         }
         originalSize = fullSize->size();
-        QSize scaledSize = fullSize->size().scaled(size, size, ARMode);
-        if(squared) {
-            QRect clip(0, 0, size, size);
-            QRect scaledRect(QPoint(0, 0), scaledSize);
-            clip.moveCenter(scaledRect.center());
-            QImage scaled = QImage(fullSize->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
-            result = ImageLib::croppedRaw(scaled, clip);
-        } else {
-            result =
-                std::make_unique<QImage>(fullSize->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
-        }
+        result = std::make_unique<QImage>(
+            fullSize->scaled(boundedBox(fullSize->size(), box), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
     // force reader to close file so it can be deleted later
     reader->setFileName("");
@@ -234,12 +273,12 @@ void ThumbnailerRunnable::waitForProcess(QProcess &process, const CancelToken *c
     }
 }
 
-std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbnail(const QString &path, int size,
-                                                                                    bool squared, const QString &tmpDir,
+std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbnail(const QString &path, int box,
+                                                                                    const QString &tmpDir,
                                                                                     const QString &mpvBinary,
                                                                                     const CancelToken *cancel) {
     QImageReader reader;
-    const QString tmpFilePath = videoFrameTempPath(tmpDir, path, size, squared);
+    const QString tmpFilePath = videoFrameTempPath(tmpDir, path, box, false);
     QString tmpFilePathEsc = tmpFilePath;
     tmpFilePathEsc.replace("%", "%%");
     QProcess process;
@@ -257,19 +296,13 @@ std::pair<std::unique_ptr<QImage>, QSize> ThumbnailerRunnable::createVideoThumbn
 
     reader.setFileName(tmpFilePath);
     reader.setFormat("png");
-    Qt::AspectRatioMode ARMode = squared ? (Qt::KeepAspectRatioByExpanding) : (Qt::KeepAspectRatio);
     std::unique_ptr<QImage> result;
 
-    // scale & crop
-    QSize scaledSize = reader.size().scaled(size, size, ARMode);
-    reader.setScaledSize(scaledSize);
-    if(squared) {
-        QRect clip(0, 0, size, size);
-        QRect scaledRect(QPoint(0, 0), scaledSize);
-        clip.moveCenter(scaledRect.center());
-        reader.setScaledClipRect(clip);
-    }
-    QSize originalSize = reader.size();
+    // mpv wrote the frame at its native size; bound it to the bucket box.
+    // Aspect is preserved, so nothing here needs a crop.
+    const QSize natural = reader.size();
+    reader.setScaledSize(boundedBox(natural, box));
+    QSize originalSize = natural;
     result = std::make_unique<QImage>(reader.read());
 
     // force reader to close file so it can be deleted later
