@@ -799,10 +799,15 @@ void Settings::sendChangeNotification() {
     emit settingsChanged();
 }
 //------------------------------------------------------------------------------
-void Settings::readShortcuts(QMap<QString, QString> &shortcuts) {
+// the shortcut codec is shared by every scope's table: one "action=key"
+// list format per named value under Controls/, the trailing-= escape (a
+// shortcut can literally be "=") folded into "eq". `key` selects the
+// value: "shortcuts" is the global table, "gridShortcuts" the folder
+// grid's, and the same escape rules apply to each.
+void Settings::readShortcuts(QMap<QString, QString> &shortcuts, const QString &key) {
     settingsConf->beginGroup("Controls");
     QStringList in, pair;
-    in = settingsConf->value("shortcuts").toStringList();
+    in = settingsConf->value(key).toStringList();
     for(int i = 0; i < in.count(); i++) {
         pair = in[i].split("=");
         if(!pair[0].isEmpty() && !pair[1].isEmpty()) {
@@ -814,7 +819,7 @@ void Settings::readShortcuts(QMap<QString, QString> &shortcuts) {
     settingsConf->endGroup();
 }
 
-void Settings::saveShortcuts(const QMap<QString, QString> &shortcuts) {
+void Settings::saveShortcuts(const QMap<QString, QString> &shortcuts, const QString &key) {
     settingsConf->beginGroup("Controls");
     QMapIterator<QString, QString> i(shortcuts);
     QStringList out;
@@ -825,7 +830,7 @@ void Settings::saveShortcuts(const QMap<QString, QString> &shortcuts) {
         else
             out << i.value() + "=" + i.key();
     }
-    settingsConf->setValue("shortcuts", out);
+    settingsConf->setValue(key, out);
     settingsConf->endGroup();
 }
 //------------------------------------------------------------------------------
