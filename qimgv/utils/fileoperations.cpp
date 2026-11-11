@@ -1,8 +1,9 @@
 #include "fileoperations.h"
 
 #include <QImage>
+#include <QSaveFile>
 
-#include <cstdio> // ::rename — see the rollback in saveWithBackup
+#include <cstdio> // ::rename — see copyFileTo/moveFileTo/rename rollbacks
 
 QString FileOperations::generateHash(const QString &str) {
     return QString(QCryptographicHash::hash(str.toUtf8(), QCryptographicHash::Md5).toHex());
@@ -292,50 +293,44 @@ bool FileOperations::moveToTrashImpl(const QString &filePath) {
     return QFile::moveToTrash(filePath);
 }
 
-bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality) {
-    const QString tmpPath = destPath + "_" + generateHash(destPath);
+// One question, one place: the encoder for this suffix, and the quality it
+// deserves. png gets libpng's flat 30 (levels 3-6 perform as well as 9 here),
+// jpeg gets the user's setting, anything else is left to the default and will
+// simply fail to encode.
+static bool writeImageTo(const QImage &image, const QString &destPath, int jpegQuality) {
     const QString ext = QFileInfo(destPath).suffix();
-    // png compression note from libpng: levels 3-6 usually perform as well as
-    // level 9 for PNG images and do considerably fewer calculations
     int quality = 95;
     if(ext.compare("png", Qt::CaseInsensitive) == 0)
         quality = 30;
     else if(ext.compare("jpg", Qt::CaseInsensitive) == 0 || ext.compare("jpeg", Qt::CaseInsensitive) == 0)
         quality = jpegQuality;
 
-    const bool originalExists = QFile::exists(destPath);
-    bool backupExists = false;
-    if(originalExists) {
-        QFile::remove(tmpPath);
-        if(!QFile::copy(destPath, tmpPath)) {
-            qDebug() << "[FileOperations] could not create a backup before overwriting" << destPath;
-            return false;
-        }
-        backupExists = true;
+    // QSaveFile writes a uniquely named temporary in the SAME directory and
+    // rename(2)s it into place on commit, so the old, hand-rolled
+    // "copy the original aside, write over it, rename the copy back on failure"
+    // is gone. That scheme had three defects this replaces by construction:
+    // the backup's name was a fixed md5 of the path (two processes overwriting
+    // the same file deleted each other's backup), a SIGKILL left the backup on
+    // disk forever, and a failed write was undone by a second filesystem
+    // operation that could itself fail.
+    //
+    // The guarantees now: the destination holds either its previous contents or
+    // the complete new image, never a partial write, and a failure leaves no
+    // residue. QSaveFile preserves an existing file's permissions on commit
+    // (measured), so chmod through a save is not a behaviour change.
+    QSaveFile out(destPath);
+    if(!out.open(QIODevice::WriteOnly))
+        return false;
+    if(!image.save(&out, ext.toStdString().c_str(), quality)) {
+        // cancelWriting(), not just returning: the temporary must go, and on
+        // this path it would otherwise be removed only by the destructor — the
+        // same effect, stated once where a reader looks for it
+        out.cancelWriting();
+        return false;
     }
+    return out.commit();
+}
 
-    const bool success = image.save(destPath, ext.toStdString().c_str(), quality);
-
-    if(backupExists && success)
-        QFile::remove(tmpPath);
-    else if(backupExists) {
-        // Restore the backup to the path it was taken FROM, which is destPath —
-        // not to "the file's current path", which is a different file whenever
-        // this is a Save As. One rename(2) does it: it replaces an existing
-        // destination, which QFile::rename cannot (that call is RENAME_NOREPLACE
-        // and answers EEXIST on the half-written file image.save just left
-        // behind), and it consumes the backup, so there is no third step and no
-        // window in which the destination exists but holds nothing. The remove +
-        // copy this replaces was visible to the watch as a death and a birth, and
-        // the mirror rebuilt a row that only ever needed its bytes put back.
-        // toUtf8 because these are the bytes the listing keys on: EngineBridge
-        // hands the engine UTF-8 paths, so a locale-encoded name here would be a
-        // different file to the mirror than the one the filesystem just got.
-        const QByteArray from = tmpPath.toUtf8();
-        const QByteArray to = destPath.toUtf8();
-        if(::rename(from.constData(), to.constData()) != 0)
-            qCritical() << "[FileOperations] save failed AND the backup could not be"
-                        << "restored; the previous contents of" << destPath << "are still in" << tmpPath;
-    }
-    return success;
+bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality) {
+    return writeImageTo(image, destPath, jpegQuality);
 }
