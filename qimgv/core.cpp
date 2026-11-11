@@ -413,6 +413,8 @@ void Core::removePermanent() {
             result = removeFile(path, false);
         if(result == FileOpResult::SUCCESS)
             successCount++;
+        else
+            qDebug() << "remove failed:" << path << FileOperations::decodeResult(result);
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
@@ -420,7 +422,7 @@ void Core::removePermanent() {
         else
             outputError(result);
     } else if(paths.count() > 1) {
-        mw->overlays()->showMessageSuccess(tr("Removed: ") + QString::number(successCount) + tr(" files"));
+        reportBatchRemoval(tr("Removed: "), paths.count(), successCount);
     }
 }
 
@@ -443,6 +445,8 @@ void Core::moveToTrash() {
         result = removeFile(path, true);
         if(result == FileOpResult::SUCCESS)
             successCount++;
+        else
+            qDebug() << "trash failed:" << path << FileOperations::decodeResult(result);
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
@@ -450,7 +454,7 @@ void Core::moveToTrash() {
         else
             outputError(result);
     } else if(paths.count() > 1) {
-        mw->overlays()->showMessageSuccess(tr("Moved to trash: ") + QString::number(successCount) + tr(" files"));
+        reportBatchRemoval(tr("Moved to trash: "), paths.count(), successCount);
     }
 }
 
@@ -749,6 +753,20 @@ void Core::outputError(const FileOpResult &error) const {
         return;
     mw->overlays()->showError(FileOperations::decodeResult(error));
     qDebug() << FileOperations::decodeResult(error);
+}
+
+// A batch reports its failures, not just its successes (#467): a selection
+// where some members could not be removed used to show only the success
+// count, and the refusals vanished. Both numbers in one message — a second
+// call would replace the first — error-styled whenever anything failed, so
+// the success styling keeps meaning "all of it worked".
+void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCount) const {
+    const int failedCount = total - successCount;
+    if(failedCount == 0)
+        mw->overlays()->showMessageSuccess(doneVerb + QString::number(successCount) + tr(" files"));
+    else
+        mw->overlays()->showError(doneVerb + QString::number(successCount) + tr(" files, ") +
+                                  QString::number(failedCount) + tr(" failed"));
 }
 
 void Core::showOpenDialog() {
