@@ -779,6 +779,56 @@ class TestCoreNav : public QObject {
         QVERIFY(dlg.findChild<QCheckBox *>("confirmDeleteCheckBox") == nullptr);
     }
 
+    // The import is a user request, so its two UI facts matter: whether the
+    // button is offered at all, and what the user is told afterwards. Both are
+    // decided in the dialog, not in Settings::importQimgvConfig, and until now
+    // neither had a pin.
+    //
+    // The message is built by importMessage() rather than read off a
+    // QMessageBox: information() blocks on a modal dialog no headless run can
+    // dismiss, so the text had to become reachable without showing it.
+    void importIsOfferedOnlyWhenThereIsSomethingToImportAndReportsWhatHappened() {
+        FreshSettings fresh;
+        // IsolatedHome already redirected XDG_CONFIG_HOME, so the "qimgv" tree
+        // below is the one Settings::qimgvConfigDir() resolves
+        const QString qimgvDir = Settings::qimgvConfigDir();
+        QVERIFY(QDir().mkpath(qimgvDir));
+        const QString qimgvConf = qimgvDir + "/qimgv.conf";
+
+        // nothing to import: the control is not offered, and its absence is the
+        // message — a permanently dead button would teach the user nothing
+        QVERIFY(QFile::remove(qimgvConf) || !QFileInfo::exists(qimgvConf));
+        {
+            SettingsDialog dlg;
+            auto *button = dlg.findChild<QPushButton *>("importQimgvButton");
+            QVERIFY(button != nullptr);
+            QVERIFY2(button->isHidden(), "the import was offered with no qimgv configuration to import");
+        }
+
+        // with a source present, the button appears
+        writeTestFile(qimgvConf, "theConf=fromQimgv\n");
+        {
+            SettingsDialog dlg;
+            auto *button = dlg.findChild<QPushButton *>("importQimgvButton");
+            QVERIFY(button != nullptr);
+            QVERIFY2(!button->isHidden(), "the import was hidden although a source exists");
+
+            // and each outcome has its own text, because they ask the user to do
+            // different things ("restart" vs "nothing happened" vs "this failed")
+            const QString dest = QDir(home.path()).filePath("imported-conf");
+            const QString imported = dlg.importMessage(qimgvDir, dest);
+            QVERIFY2(imported.contains(QStringLiteral("Imported")), qPrintable(imported));
+            QVERIFY2(imported.contains(QStringLiteral("Restart")), qPrintable(imported));
+
+            const QString again = dlg.importMessage(qimgvDir, dest);
+            QVERIFY2(again.contains(QStringLiteral("already exists")), qPrintable(again));
+
+            const QString none = dlg.importMessage(QDir(home.path()).filePath("nothing-here"), dest);
+            QVERIFY2(none.contains(QStringLiteral("No qimgv configuration")), qPrintable(none));
+        }
+        QFile::remove(qimgvConf);
+    }
+
     void dialogComboBindingFollowsTheSetting() {
         FreshSettings fresh;
         settings->setLanguage("ja_JP");

@@ -732,7 +732,11 @@ void SettingsDialog::selectMpvPath() {
 void SettingsDialog::importQimgvConfig() {
     const QString source = Settings::qimgvConfigDir();
     const QString dest = QFileInfo(QSettings().fileName()).absolutePath();
-    const Settings::ImportReport report = Settings::importQimgvConfig(source, dest);
+    QMessageBox::information(this, tr("Import settings from qimgv"), importMessage(source, dest));
+}
+
+QString SettingsDialog::importMessage(const QString &sourceDir, const QString &destinationDir) {
+    const Settings::ImportReport report = Settings::importQimgvConfig(sourceDir, destinationDir);
 
     // One message per outcome. The outcome is a value the import already
     // decided; re-deriving it from flags here is how caller and callee end up
@@ -754,7 +758,7 @@ void SettingsDialog::importQimgvConfig() {
         break;
     case Settings::ImportOutcome::Failed: message = tr("Could not import from %1.").arg(report.detail); break;
     }
-    QMessageBox::information(this, tr("Import settings from qimgv"), message);
+    return message;
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onExpandLimitSliderChanged(int value) {
