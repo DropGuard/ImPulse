@@ -38,7 +38,13 @@
 enum class PoolOwner : quint8 {
     Loader,
     Scaler,
-    Thumbnailer
+    Thumbnailer,
+    // Background upkeep that belongs to no request: the thumbnail store's
+    // sweep is the first such job. It gets its own owner rather than riding
+    // Thumbnailer's, because the two have opposite lifetimes — a sweep must not
+    // be cancelled by the user changing folders (clearTasks cancels every
+    // Thumbnailer job), and a sweep must not keep a folder change waiting.
+    Maintenance
 };
 
 // One job's cancellation state, held by the job and readable by the static
