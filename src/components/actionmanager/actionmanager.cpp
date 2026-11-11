@@ -170,28 +170,6 @@ void ActionManager::setInspectMode(bool inspect) {
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void ActionManager::adjustFromVersion(const QVersionNumber &lastVer) {
-    // this member used to reach for the global actionManager pointer instead of
-    // its own object; it has exactly one caller (Core::onUpdate) and operating
-    // on `this` is what makes that call mean anything
-    // add new default actions
-    QMapIterator<QString, QString> i(defaults);
-    while(i.hasNext()) {
-        i.next();
-        if(appActions->getMap().value(i.value()) > lastVer) {
-            if(!shortcuts.contains(i.key())) {
-                shortcuts.insert(i.key(), i.value());
-                qDebug() << "[ActionManager] new action " << i.value() << " - assigning as [" << i.key() << "]";
-            } else if(i.value() != actionForShortcut(i.key())) {
-                qDebug() << "[ActionManager] new action " << i.value() << " - shortcut [" << i.key()
-                         << "] already assigned to another action " << actionForShortcut(i.key());
-            }
-        }
-    }
-    // apply
-    saveShortcuts();
-}
-//------------------------------------------------------------------------------
 void ActionManager::saveShortcuts() {
     settings->saveShortcuts(shortcuts);
 }

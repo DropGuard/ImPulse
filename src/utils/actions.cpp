@@ -21,6 +21,11 @@ QList<QString> Actions::getList() {
 }
 
 void Actions::init() {
+    // the QVersionNumber values are decorative since the version-gated
+    // distribution they served proved to be a no-op (initShortcuts loads
+    // every default binding before adjustFromVersion ever ran, so its
+    // insert-if-absent could never fire): the map is a registry of valid
+    // action names. Nothing compares these numbers any more.
     mActions.insert("nextImage", QVersionNumber(0, 6, 2));
     mActions.insert("prevImage", QVersionNumber(0, 6, 2));
     mActions.insert("toggleFullscreen", QVersionNumber(0, 6, 2));
