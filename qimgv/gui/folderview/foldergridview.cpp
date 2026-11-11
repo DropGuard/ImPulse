@@ -333,40 +333,14 @@ bool FolderGridView::focusNextPrevChild(bool) {
 }
 
 void FolderGridView::keyPressEvent(QKeyEvent *event) {
-    ThumbnailView::keyPressEvent(event);
+    ThumbnailView::keyPressEvent(event); // shift state for range selection
     event->accept();
-
-    if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
-        emit itemActivated(lastSelected());
-        return;
-    }
-
-    // temporary, will be configurable later
-    if(event->key() == Qt::Key_Backspace) {
-        actionManager->invokeAction("goUp");
-        return;
-    }
-
-    if(event->modifiers() & Qt::ControlModifier) {
-        if(ShortcutBuilder::fromEvent(event) == "Ctrl+A")
-            selectAll();
-        else
-            actionManager->processEvent(event);
-        return;
-    }
-
-    // handle selection
-    switch(event->key()) {
-    case Qt::Key_Left: selectPrev(); break;
-    case Qt::Key_Right: selectNext(); break;
-    case Qt::Key_Up: selectAbove(); break;
-    case Qt::Key_Down: selectBelow(); break;
-    case Qt::Key_PageUp: pageUp(); break;
-    case Qt::Key_PageDown: pageDown(); break;
-    case Qt::Key_Home: selectFirst(); break;
-    case Qt::Key_End: selectLast(); break;
-    default: actionManager->processEvent(event);
-    }
+    // the grid's own scope: the same key means something else in the
+    // document view, so the event resolves against the grid's table first
+    // (upstream #365 — the hardcoded switch this replaces was the
+    // "configurable later" that never came; its defaults now live in
+    // ActionManager's gridDefaults, user-rebindable)
+    actionManager->processEvent(event, ShortcutScope::FolderGrid);
 }
 
 void FolderGridView::wheelEvent(QWheelEvent *event) {
