@@ -589,12 +589,6 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
     }
     if(event->matches(QKeySequence::SelectAll)) {
         selectAll();
-    } else if(event->key() >= Qt::Key_1 && event->key() <= Qt::Key_8) {
-        // the aspect presets, one digit each: 1 Free ... 8 16:10. The fit
-        // modes those digits reach globally are Framing-blocked while
-        // cropping, so capturing them costs nothing — and silences the
-        // "zoom disabled" toast they used to land in.
-        emit aspectPresetRequested(event->key() - Qt::Key_1);
     } else {
         actionManager->processEvent(event);
     }

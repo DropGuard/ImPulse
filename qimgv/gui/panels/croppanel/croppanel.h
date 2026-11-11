@@ -36,7 +36,6 @@ class CropPanel : public SidePanelWidget {
     void cancel();
     void selectionChanged(QRect);
     void selectAll();
-    void aspectRatioChanged(QPointF);
 
   protected:
     void paintEvent(QPaintEvent *) override;
@@ -47,9 +46,7 @@ class CropPanel : public SidePanelWidget {
     void doCrop();
     void doCropSave();
     void onSelectionChange();
-    void onAspectRatioChange();              // via manual input
-    void onAspectRatioSelected();            // via ComboBox
-    void onAspectPresetRequested(int index); // via a digit on the overlay
+    void onAspectRatioSelected(); // via ComboBox
     void setFocusCropBtn();
     void setFocusCropSaveBtn();
 

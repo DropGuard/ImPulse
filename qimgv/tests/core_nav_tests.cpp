@@ -594,14 +594,11 @@ class TestCoreNav : public QObject {
                  QDir(dir).filePath("archive.tar (1).jpg"));
     }
 
-    // The crop surface's answers are on faces, and the aspect presets answer
-    // to their digits — 1 Free through 8 16:10 — keys that used to fall
-    // through to the Framing-blocked fit slots and their toast noise. An
-    // out-of-range digit is dropped, Esc still leaves crop, and the
-    // keyboard's Apply is the in-memory crop only: the disk write never sits
-    // on a key, so Crop && Save carries no key hint and the retired
-    // Shift+Enter degrades to the safe answer.
-    void cropSurfaceHintsItsKeysAndDigitsPickPresets() {
+    // The crop surface's answers are on faces — Enter crops, Ctrl+S
+    // commits-and-writes, Esc leaves — and the preset combo is six entries
+    // with distinct meanings (no Custom twin). The keyboard's Apply is the
+    // in-memory crop only: the disk write never sits on a bare key.
+    void cropSurfaceHintsItsKeys() {
         writeImage(QDir(base).filePath("cropkeys.png"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("cropkeys.png")));
@@ -626,22 +623,16 @@ class TestCoreNav : public QObject {
         auto *combo = panel->findChild<QComboBox *>(QStringLiteral("ARcomboBox"));
         QVERIFY(combo);
         QCOMPARE(combo->currentIndex(), 0); // Free: reset on image change
-        QCOMPARE(combo->count(), 8);
+        QCOMPARE(combo->count(), 6);        // Free | Current Image | This Screen | 1:1 | 4:3 | 16:9
+
+        // the combo drives the lock: Free unlocks, a preset locks to its ratio
+        combo->setCurrentIndex(3); // 1:1
+        QCOMPARE(combo->currentIndex(), 3);
+        combo->setCurrentIndex(0); // back to Free
+        QCOMPARE(combo->currentIndex(), 0);
 
         auto *overlay = core.mw->findChild<CropOverlay *>();
         QVERIFY(overlay);
-        auto pressDigit = [&](int digit) {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_0 + digit, Qt::NoModifier, scanCodeFor(QString::number(digit)), 0u,
-                         0u);
-            QApplication::sendEvent(overlay, &ev);
-        };
-
-        pressDigit(5); // the fifth preset: 1:1
-        QCOMPARE(combo->currentIndex(), 4);
-        pressDigit(8); // the eighth preset: 16:10
-        QCOMPARE(combo->currentIndex(), 7);
-        pressDigit(9); // no ninth preset: dropped
-        QCOMPARE(combo->currentIndex(), 7);
 
         // the keyboard's Apply is the in-memory crop and nothing else: the
         // Enter lands on the tool signal, and no bare key reaches the
@@ -1134,14 +1125,12 @@ class TestCoreNav : public QObject {
         auto *posX = panel.findChild<QSpinBox *>("posX");
         auto *width = panel.findChild<QSpinBox *>("width");
         auto *height = panel.findChild<QSpinBox *>("height");
-        auto *ary = panel.findChild<QDoubleSpinBox *>("ARY");
-        QVERIFY(cancelBtn && cropBtn && cropSaveBtn && posX && width && height && ary);
+        QVERIFY(cancelBtn && cropBtn && cropSaveBtn && posX && width && height);
 
         QSignalSpy cancel(&panel, &CropPanel::cancel);
         QSignalSpy crop(&panel, &CropPanel::crop);
         QSignalSpy cropSave(&panel, &CropPanel::cropAndSave);
         QSignalSpy selection(&panel, &CropPanel::selectionChanged);
-        QSignalSpy ratio(&panel, &CropPanel::aspectRatioChanged);
         QSignalSpy overlaySelection(&overlay, &CropOverlay::selectionChanged);
 
         // CropPanel selectAll -> CropOverlay::selectAll, and the overlay's
@@ -1190,11 +1179,6 @@ class TestCoreNav : public QObject {
         selection.clear();
         posX->setValue(7);
         QCOMPARE(selection.count(), 1);
-
-        // ui->ARY valueChanged -> onAspectRatioChange -> aspectRatioChanged
-        ratio.clear();
-        ary->setValue(3.0);
-        QCOMPARE(ratio.count(), 1);
 
         // overlay escPressed -> cancel only: a connection to either crop
         // action would move crop/cropSave and leave cancel at zero
