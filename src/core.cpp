@@ -1113,7 +1113,13 @@ void Core::toggleFullscreenInfoBar() {
 void Core::requestSavePath() {
     if(model->isEmpty())
         return;
-    mw->dialogs()->showSaveDialog(selectedPath());
+    const QString path = selectedPath();
+    // an edited image earns a fresh target: Save As's quick path writes a
+    // copy, and the original survives until Ctrl+S deliberately says
+    // otherwise — the same law that keeps the disk off the bare keys
+    const auto img = model->getImage(path);
+    const QString suggested = (img && img->isEdited()) ? FileOperations::nextFreeVariantPath(path) : path;
+    mw->dialogs()->showSaveDialog(suggested);
 }
 
 void Core::showResizeDialog() {
