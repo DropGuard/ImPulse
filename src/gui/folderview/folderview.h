@@ -44,6 +44,18 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     void addItem();
     void onFullscreenModeChanged(bool mode);
     void onSortingChanged(SortingMode mode);
+    // the grid scope actions' landing strip: one-liners to the thumbnail
+    // grid, which owns the actual movement (upstream #365)
+    void gridSelectNext();
+    void gridSelectPrev();
+    void gridSelectAbove();
+    void gridSelectBelow();
+    void gridPageUp();
+    void gridPageDown();
+    void gridSelectFirst();
+    void gridSelectLast();
+    void gridSelectAll();
+    void activateCurrent();
 
   protected:
     void wheelEvent(QWheelEvent *event) override;

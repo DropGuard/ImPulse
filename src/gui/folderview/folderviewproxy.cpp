@@ -183,6 +183,58 @@ void FolderViewProxy::onSortingChanged(SortingMode mode) {
     }
 }
 
+// the grid scope actions: forward-only — there is nothing to buffer, since
+// movement without a materialized grid has nothing to move
+void FolderViewProxy::gridSelectNext() {
+    if(folderView)
+        folderView->gridSelectNext();
+}
+
+void FolderViewProxy::gridSelectPrev() {
+    if(folderView)
+        folderView->gridSelectPrev();
+}
+
+void FolderViewProxy::gridSelectAbove() {
+    if(folderView)
+        folderView->gridSelectAbove();
+}
+
+void FolderViewProxy::gridSelectBelow() {
+    if(folderView)
+        folderView->gridSelectBelow();
+}
+
+void FolderViewProxy::gridPageUp() {
+    if(folderView)
+        folderView->gridPageUp();
+}
+
+void FolderViewProxy::gridPageDown() {
+    if(folderView)
+        folderView->gridPageDown();
+}
+
+void FolderViewProxy::gridSelectFirst() {
+    if(folderView)
+        folderView->gridSelectFirst();
+}
+
+void FolderViewProxy::gridSelectLast() {
+    if(folderView)
+        folderView->gridSelectLast();
+}
+
+void FolderViewProxy::gridSelectAll() {
+    if(folderView)
+        folderView->gridSelectAll();
+}
+
+void FolderViewProxy::activateCurrent() {
+    if(folderView)
+        folderView->activateCurrent();
+}
+
 void FolderViewProxy::showEvent(QShowEvent *event) {
     init();
     QWidget::showEvent(event);

@@ -97,4 +97,15 @@ void Actions::init() {
     mActions.insert("print", QVersionNumber(1, 0, 0));
     mActions.insert("toggleFullscreenInfoBar", QVersionNumber(1, 0, 0));
     mActions.insert("pasteFile", QVersionNumber(1, 0, 3));
+    // the folder grid's scope actions — the fork's own version line
+    mActions.insert("gridSelectNext", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectPrev", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectAbove", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectBelow", QVersionNumber(0, 1, 0));
+    mActions.insert("gridPageUp", QVersionNumber(0, 1, 0));
+    mActions.insert("gridPageDown", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectFirst", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectLast", QVersionNumber(0, 1, 0));
+    mActions.insert("gridSelectAll", QVersionNumber(0, 1, 0));
+    mActions.insert("gridOpen", QVersionNumber(0, 1, 0));
 }
