@@ -33,18 +33,14 @@ CropPanel::CropPanel(CropOverlay *_overlay, QWidget *parent)
     connect(ui->height, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
     connect(ui->posX, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
     connect(ui->posY, &QSpinBox::valueChanged, this, &CropPanel::onSelectionChange);
-    connect(ui->ARX, &QDoubleSpinBox::valueChanged, this, &CropPanel::onAspectRatioChange);
-    connect(ui->ARY, &QDoubleSpinBox::valueChanged, this, &CropPanel::onAspectRatioChange);
     connect(ui->ARcomboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, &CropPanel::onAspectRatioSelected);
 
     connect(overlay, &CropOverlay::selectionChanged, this, &CropPanel::onSelectionOutsideChange);
     connect(this, &CropPanel::selectionChanged, overlay, &CropOverlay::onSelectionOutsideChange);
-    connect(this, &CropPanel::aspectRatioChanged, overlay, &CropOverlay::setAspectRatio);
     connect(overlay, &CropOverlay::escPressed, this, &CropPanel::cancel);
     // the keyboard's Apply is always the in-memory crop — the keyboard never
     // writes the disk; Crop && Save stays a button-only convenience
     connect(overlay, &CropOverlay::cropApply, this, &CropPanel::doCrop);
-    connect(overlay, &CropOverlay::aspectPresetRequested, this, &CropPanel::onAspectPresetRequested);
     connect(this, &CropPanel::selectAll, overlay, &CropOverlay::selectAll);
 
     // the answers' keys on their faces — the .ui text stays the base. The
@@ -53,7 +49,6 @@ CropPanel::CropPanel(CropOverlay *_overlay, QWidget *parent)
     ui->cropButton->setText(ui->cropButton->text() + QStringLiteral("  [Enter]"));
     ui->cropSaveButton->setText(ui->cropSaveButton->text() + QStringLiteral("  [Ctrl+S]"));
     ui->cancelButton->setText(ui->cancelButton->text() + QStringLiteral("  [Esc]"));
-    ui->ARcomboBox->setToolTip(tr("Aspect ratio presets — keys 1 to 8"));
 }
 
 CropPanel::~CropPanel() {
@@ -92,24 +87,10 @@ void CropPanel::onSelectionChange() {
     emit selectionChanged(QRect(ui->posX->value(), ui->posY->value(), ui->width->value(), ui->height->value()));
 }
 
-void CropPanel::onAspectRatioChange() {
-    ui->ARcomboBox->setCurrentIndex(1); // "Custom"
-    if(ui->ARX->value() && ui->ARY->value())
-        emit aspectRatioChanged(QPointF(ui->ARX->value(), ui->ARY->value()));
-}
-
 // 0 == free
-// 1 == custom (from input fields)
-// 2 == current image
-// 3 == current screen
-// 4 ...
-// a digit on the overlay picked a preset; index arrives 0-based, and an
-// out-of-range digit is dropped rather than clamped
-void CropPanel::onAspectPresetRequested(int index) {
-    if(index >= 0 && index < ui->ARcomboBox->count())
-        ui->ARcomboBox->setCurrentIndex(index);
-}
-
+// 1 == current image
+// 2 == current screen
+// 3 ...
 void CropPanel::onAspectRatioSelected() {
     QPointF newAR(1, 1);
 
@@ -122,14 +103,10 @@ void CropPanel::onAspectRatioSelected() {
         break;
     }
     case 1: {
-        newAR = QPointF(ui->ARX->value(), ui->ARY->value());
-        break;
-    }
-    case 2: {
         newAR = QPointF(qreal(realSize.width()) / realSize.height(), 1.0);
         break;
     }
-    case 3: {
+    case 2: {
         QScreen *screen = nullptr;
         screen = QGuiApplication::screenAt(mapToGlobal(ui->ARcomboBox->geometry().topLeft()));
         if(!screen)
@@ -137,20 +114,16 @@ void CropPanel::onAspectRatioSelected() {
         newAR = QPointF(qreal(screen->geometry().width()) / screen->geometry().height(), 1.0);
         break;
     }
-    case 4: {
+    case 3: {
         newAR = QPointF(1.0, 1.0);
         break;
     }
-    case 5: {
+    case 4: {
         newAR = QPointF(4.0, 3.0);
         break;
     }
-    case 6: {
+    case 5: {
         newAR = QPointF(16.0, 9.0);
-        break;
-    }
-    case 7: {
-        newAR = QPointF(16.0, 10.0);
         break;
     }
     default: // apply aspect ratio; update input fields
@@ -159,12 +132,6 @@ void CropPanel::onAspectRatioSelected() {
     }
     }
 
-    ui->ARX->blockSignals(true);
-    ui->ARY->blockSignals(true);
-    ui->ARX->setValue(newAR.x());
-    ui->ARY->setValue(newAR.y());
-    ui->ARX->blockSignals(false);
-    ui->ARY->blockSignals(false);
     if(index)
         overlay->setAspectRatio(newAR);
 }
