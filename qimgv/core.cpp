@@ -491,17 +491,25 @@ void Core::reloadImage(const QString &filePath) {
     model->reload(filePath);
 }
 
+// the mode is Core's decision, recorded in state; the window follows. The
+// mode reads across Core's decision points are state reads — the window is a
+// subscriber, not the source of truth.
+void Core::enterMode(ViewMode mode) {
+    state.viewMode = mode;
+    (mode == MODE_FOLDERVIEW) ? mw->enableFolderView() : mw->enableDocumentView();
+}
+
 void Core::enableFolderView() {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    if(state.viewMode == MODE_FOLDERVIEW)
         return;
     stopSlideshow();
-    mw->enableFolderView();
+    enterMode(MODE_FOLDERVIEW);
 }
 
 void Core::enableDocumentView() {
-    if(mw->currentViewMode() == MODE_DOCUMENT)
+    if(state.viewMode == MODE_DOCUMENT)
         return;
-    mw->enableDocumentView();
+    enterMode(MODE_DOCUMENT);
     if(model && model->fileCount() && state.currentFilePath == "") {
         const QString selected = folderViewPresenter.selectedPaths().value(0);
         // if it is a directory - ignore and just open the first file
@@ -513,7 +521,7 @@ void Core::enableDocumentView() {
 }
 
 void Core::toggleFolderView() {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    if(state.viewMode == MODE_FOLDERVIEW)
         enableDocumentView();
     else
         enableFolderView();
@@ -736,7 +744,7 @@ void Core::onFileRemoved(const QString &filePath, int index) {
     }
     // image mode && removed current file
     if(state.currentFilePath == filePath) {
-        if(mw->currentViewMode() == MODE_DOCUMENT) {
+        if(state.viewMode == MODE_DOCUMENT) {
             if(!loadFileIndex(index, true, settings->usePreloader()))
                 loadFileIndex(--index, true, settings->usePreloader());
         } else {
@@ -1177,15 +1185,15 @@ void Core::edit_template(
 }
 
 void Core::flipH() {
-    edit_template((mw->currentViewMode() == MODE_FOLDERVIEW), tr("Flip horizontal"), {ImageLib::flippedH});
+    edit_template((state.viewMode == MODE_FOLDERVIEW), tr("Flip horizontal"), {ImageLib::flippedH});
 }
 
 void Core::flipV() {
-    edit_template((mw->currentViewMode() == MODE_FOLDERVIEW), tr("Flip vertical"), {ImageLib::flippedV});
+    edit_template((state.viewMode == MODE_FOLDERVIEW), tr("Flip vertical"), {ImageLib::flippedV});
 }
 
 void Core::rotateByDegrees(int degrees) {
-    edit_template((mw->currentViewMode() == MODE_FOLDERVIEW), tr("Rotate"), {ImageLib::rotated}, degrees);
+    edit_template((state.viewMode == MODE_FOLDERVIEW), tr("Rotate"), {ImageLib::rotated}, degrees);
 }
 
 void Core::resize(QSize size) {
@@ -1193,13 +1201,13 @@ void Core::resize(QSize size) {
 }
 
 void Core::crop(QRect rect) {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    if(state.viewMode == MODE_FOLDERVIEW)
         return;
     edit_template(false, tr("Crop"), {ImageLib::cropped}, rect);
 }
 
 void Core::cropAndSave(QRect rect) {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    if(state.viewMode == MODE_FOLDERVIEW)
         return;
     edit_template(false, tr("Crop"), {ImageLib::cropped}, rect);
     saveFile(selectedPath());
@@ -1219,7 +1227,7 @@ bool Core::saveFile(const QString &filePath, const QString &newPath) {
     // switch to the new file
     if(model->containsFile(newPath) && state.currentFilePath != newPath) {
         discardEdits();
-        if(mw->currentViewMode() == MODE_DOCUMENT)
+        if(state.viewMode == MODE_DOCUMENT)
             loadPath(newPath);
     }
     return true;
@@ -1257,7 +1265,7 @@ void Core::discardEdits() {
 QString Core::selectedPath() {
     if(!model)
         return "";
-    else if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    else if(state.viewMode == MODE_FOLDERVIEW)
         return folderViewPresenter.selectedPaths().constLast();
     else
         return state.currentFilePath;
@@ -1266,7 +1274,7 @@ QString Core::selectedPath() {
 QList<QString> Core::currentSelection() {
     if(!model)
         return QList<QString>();
-    else if(mw->currentViewMode() == MODE_FOLDERVIEW)
+    else if(state.viewMode == MODE_FOLDERVIEW)
         return folderViewPresenter.selectedPaths();
     else
         return QList<QString>() << state.currentFilePath;
@@ -1442,7 +1450,7 @@ bool Core::loadPath(QString path) {
         // filter does not admit is not openable, no mime-sniff rescue, no
         // local insert (forceInsert retired 2026-11 — the mirror has no
         // writers besides the apply path)
-        mw->enableDocumentView();
+        enterMode(MODE_DOCUMENT);
         int index = model->indexOfFile(fileInfo.absoluteFilePath());
         if(index != -1)
             return loadFileIndex(index, false, settings->usePreloader());
@@ -1528,7 +1536,7 @@ bool Core::loadFileIndex(int index, bool async, bool preload) {
 }
 
 void Core::loadParentDir() {
-    if(model->directoryPath().isEmpty() || mw->currentViewMode() != MODE_FOLDERVIEW)
+    if(model->directoryPath().isEmpty() || state.viewMode != MODE_FOLDERVIEW)
         return;
     stopSlideshow();
     QFileInfo currentDir(model->directoryPath());
@@ -1539,7 +1547,7 @@ void Core::loadParentDir() {
 }
 
 void Core::nextDirectory() {
-    if(model->directoryPath().isEmpty() || mw->currentViewMode() != MODE_DOCUMENT)
+    if(model->directoryPath().isEmpty() || state.viewMode != MODE_DOCUMENT)
         return;
     stopSlideshow();
     QString next = DirectoryManager::adjacentDirectory(model->directoryPath(), true, model->sortingMode());
@@ -1558,7 +1566,7 @@ void Core::nextDirectory() {
 }
 
 void Core::prevDirectory(bool selectLast) {
-    if(model->directoryPath().isEmpty() || mw->currentViewMode() != MODE_DOCUMENT)
+    if(model->directoryPath().isEmpty() || state.viewMode != MODE_DOCUMENT)
         return;
     QString prev = DirectoryManager::adjacentDirectory(model->directoryPath(), false, model->sortingMode());
     if(prev.isEmpty()) {
@@ -1578,7 +1586,7 @@ void Core::prevDirectory() {
 }
 
 void Core::nextImage() {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
+    if(state.viewMode == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
     if(state.shuffle) {
@@ -1597,7 +1605,7 @@ void Core::nextImage() {
 }
 
 void Core::prevImage() {
-    if(mw->currentViewMode() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
+    if(state.viewMode == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
     if(state.shuffle) {
@@ -1617,7 +1625,7 @@ void Core::prevImage() {
 }
 
 void Core::nextImageSlideshow() {
-    if(model->isEmpty() || mw->currentViewMode() == MODE_FOLDERVIEW)
+    if(model->isEmpty() || state.viewMode == MODE_FOLDERVIEW)
         return;
     if(state.shuffle) {
         loadFileIndex(randomizer.next(), false, false);

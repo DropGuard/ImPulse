@@ -112,6 +112,10 @@ struct State {
     // scalar state lives in QProperties: bindable storage for the pull-style
     // views (P2 of the unidirectional-flow refactor), plain operator= writes
     QProperty<bool> hasActiveImage{false};
+    // the view mode is Core's decision, recorded here; the window follows it.
+    // Every mode read in Core's decision points is a state read — the window
+    // is a subscriber, not the source of truth
+    ViewMode viewMode = MODE_DOCUMENT;
     // the GUI is waiting for the first ready frame: main defers showGui while
     // set, and onModelItemReady raises the window with the image already in it
     QProperty<bool> delayModel{false};
@@ -307,6 +311,7 @@ class Core : public QObject {
     DirectoryPresenter thumbPanelPresenter, folderViewPresenter;
 
     void rotateByDegrees(int degrees);
+    void enterMode(ViewMode mode);
     void reset();
     bool setDirectory(const QString &path);
 
