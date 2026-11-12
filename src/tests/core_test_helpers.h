@@ -101,8 +101,6 @@ class FakeInteractions : public IUserInteractions {
     int replaceCalls = 0;
     int confirmCalls = 0;
     bool confirmAnswer = true;
-    int messageCalls = 0;
-    QString lastMessage;
 
     bool showConfirmation(const QString &, const QString &) override {
         ++confirmCalls;
@@ -112,10 +110,6 @@ class FakeInteractions : public IUserInteractions {
         ++replaceCalls;
         replaceArgs.append({src, dst});
         return replaceAnswers.isEmpty() ? DialogResult{} : replaceAnswers.dequeue();
-    }
-    void showMessage(const QString &text) override {
-        ++messageCalls;
-        lastMessage = text;
     }
 };
 

@@ -19,5 +19,4 @@ class IUserInteractions {
     virtual DialogResult fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode mode,
                                            bool multiple) = 0;
     // non-blocking notice over the current view (auto-hiding overlay)
-    virtual void showMessage(const QString &text) = 0;
 };
