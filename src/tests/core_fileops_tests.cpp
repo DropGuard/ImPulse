@@ -531,6 +531,43 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         QCOMPARE(overlayFake.saveOverlayShows, 0); // the request leg saves; it never opens the prompt
     }
 
+    // The headless consumer: Core constructed with NO window tree at all —
+    // the three seams are the whole surface. The smoke half catches any
+    // construction-phase mw-> the guards missed (a widget appearing is a
+    // leaked window dependency); the ops half drives the file operations and
+    // watches them land in the seams, not in widgets.
+    void headlessCoreConstructsWithoutAnyWidget() {
+        const int widgetsBefore = QApplication::allWidgets().size();
+
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+
+        QCOMPARE(QApplication::allWidgets().size(), widgetsBefore);
+        QVERIFY2(core.mainWindow() == nullptr, "a headless Core still built a window");
+
+        // the operations run, the display sink records, the messages land in
+        // the overlay fake — the full file-ops contract without a single widget
+        const QString img = QDir(alpha).filePath("a.png");
+        QVERIFY(core.loadPath(img));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), img, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(view.showImageCalls, 1, 10000);
+        QCOMPARE(view.lastImageSize, QSize(8, 8));
+
+        core.copyCurrentFile(QStringLiteral("/nonexistent-dir-xyz/nowhere"));
+        QVERIFY2(overlayFake.errorCalls > 0, "the failed copy never reached the injected host");
+
+        core.enableFolderView();
+        QCOMPARE(view.folderEntries, 1);   // the folder leg fired exactly once
+        QCOMPARE(view.documentEntries, 1); // loadPath's entry stands; no new document push
+    }
+
     void renameCurrentSelectionForcesAfterScriptedConfirmation() {
         Core core;
         coretest::FakeInteractions fake;

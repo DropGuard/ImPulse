@@ -275,7 +275,7 @@ class Core : public QObject {
     void onFirstRun();
 
     // ui stuff
-    MW *mw;
+    MW *mw = nullptr; // null in a headless Core; every read is guarded
 
     // The one executor Loader/Scaler/Thumbnailer run on, injected into every
     // component that needs it.
