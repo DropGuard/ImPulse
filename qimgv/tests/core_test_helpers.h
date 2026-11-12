@@ -24,6 +24,12 @@
 #include "utils/actions.h"
 #include "gui/iuserinteractions.h"
 #include "gui/ioverlayhost.h"
+#include "gui/folderview/foldergridview.h"
+#include "gui/panels/mainpanel/thumbnailstripproxy.h"
+#include "shortcutbuilder.h"
+#include "utils/inputmap.h"
+#include <QPainter>
+#include "gui/ioverlayhost.h"
 #include "utils/inputmap.h"
 
 namespace coretest {
@@ -129,6 +135,108 @@ inline quint32 scanCodeFor(const QString &keyName) {
 // would silently resolve to nothing.
 inline QKeyEvent keyPressFor(Qt::Key key, const QString &keyName, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
     return QKeyEvent(QEvent::KeyPress, key, modifiers, scanCodeFor(keyName), 0u, 0u, QString(), false, 0);
+}
+
+// ---- grid/test helpers shared by the widget-facing suites ----
+
+// a scoped TestableFolderGridView for suites that drive the grid directly
+class TestableFolderGridView : public FolderGridView {
+  public:
+    using FolderGridView::dragEnterEvent;
+    using FolderGridView::dragLeaveEvent;
+    using FolderGridView::dragMoveEvent;
+    using FolderGridView::dropEvent;
+    using FolderGridView::keyPressEvent;
+};
+
+// a grid-targeted key press over keyPressFor: the crop and grid suites drive
+// their surfaces by name+scancode, not by raw Qt::Key
+inline void pressGridKey(TestableFolderGridView &grid, const QString &keyName, Qt::Key key,
+                         Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    QKeyEvent press = keyPressFor(key, keyName, modifiers);
+    grid.keyPressEvent(&press);
+}
+
+// selection() returns QList by value: a named local keeps clazy's
+// detaching-temporary quiet AND avoids a real detach per .last()
+inline int lastSelection(FolderGridView &grid) {
+    const QList<int> sel = grid.selection();
+    return sel.last();
+}
+
+// a 16x8 with two colored halves: a solid square could never show a rotation
+inline QString writeRectImage(const QString &path) {
+    QImage img(16, 8, QImage::Format_RGB32);
+    img.fill(Qt::red);
+    QPainter p(&img);
+    p.fillRect(8, 0, 8, 8, Qt::blue);
+    p.end();
+    if(!img.save(path, "png")) {
+        QTest::qFail(qPrintable(QStringLiteral("cannot encode %1").arg(path)), __FILE__, __LINE__);
+        return {};
+    }
+    return path;
+}
+
+class CountingStripProxy : public ThumbnailStripProxy {
+  public:
+    using ThumbnailStripProxy::ThumbnailStripProxy;
+    void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override {
+        ++thumbnailCalls;
+        lastThumbnailPos = pos;
+        ThumbnailStripProxy::setThumbnail(pos, thumb);
+    }
+    void setDragHover(int index) override {
+        ++hoverCalls;
+        ThumbnailStripProxy::setDragHover(index);
+    }
+    void removeItem(int index) override {
+        removed << index;
+        ThumbnailStripProxy::removeItem(index);
+    }
+    void insertItem(int index) override {
+        inserted << index;
+        ThumbnailStripProxy::insertItem(index);
+    }
+    void reloadItem(int index) override {
+        reloaded << index;
+        ThumbnailStripProxy::reloadItem(index);
+    }
+    void renameItem(int oldIndex, int newIndex, const QString &name) override {
+        renamed << oldIndex << newIndex;
+        renamedTo << name;
+        ThumbnailStripProxy::renameItem(oldIndex, newIndex, name);
+    }
+    int thumbnailCalls = 0;
+    int hoverCalls = 0;
+    int lastThumbnailPos = -1;
+    QList<int> removed, inserted, reloaded, renamed;
+    QList<QString> renamedTo;
+};
+
+// the thumbnail widgets in layout order — the drop helper needs positions
+inline QList<ThumbnailWidget *> orderedThumbnails(FolderGridView &grid) {
+    QList<ThumbnailWidget *> widgets;
+    const QList<QGraphicsItem *> sceneItems = grid.items(); // named: no detach
+    for(QGraphicsItem *item : sceneItems)
+        if(auto *tw = dynamic_cast<ThumbnailWidget *>(item))
+            widgets << tw;
+    std::sort(widgets.begin(), widgets.end(), [](const ThumbnailWidget *a, const ThumbnailWidget *b) {
+        const QPointF pa = a->scenePos(), pb = b->scenePos();
+        return pa.y() != pb.y() ? pa.y() < pb.y() : pa.x() < pb.x();
+    });
+    return widgets;
+}
+
+// the viewport position over a given thumbnail index, for synthesized drops
+inline QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
+    const QList<ThumbnailWidget *> widgets = orderedThumbnails(grid);
+    if(widgets.count() <= index) {
+        QTest::qFail(qPrintable(QStringLiteral("no thumbnail #%1").arg(index)), __FILE__, __LINE__);
+        return {};
+    }
+    const QPointF center = widgets.at(index)->mapToScene(widgets.at(index)->boundingRect().center());
+    return grid.mapFromScene(center);
 }
 
 // A file's bytes, with a test failure (not a silent empty array) when it cannot
