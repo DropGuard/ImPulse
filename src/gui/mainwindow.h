@@ -18,6 +18,7 @@ class CropController;
 
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/iuserinteractions.h"
+#include "gui/icoreview.h"
 #include "gui/viewers/viewerwidget.h"
 #include "gui/overlays/fullscreeninfooverlayproxy.h"
 #include "gui/panels/mainpanel/thumbnailstrip.h"
@@ -38,15 +39,15 @@ enum ActiveSidePanel {
     SIDEPANEL_NONE
 };
 
-class MW : public FloatingWidgetContainer, public IUserInteractions {
+class MW : public FloatingWidgetContainer, public IUserInteractions, public ICoreView {
     Q_OBJECT
   public:
     explicit MW(State *state, QWidget *parent = nullptr);
     ~MW() override;
-    void onScalingFinished(std::unique_ptr<QPixmap> scaled);
-    void showImage(std::unique_ptr<QPixmap> pixmap);
-    void showAnimation(const std::shared_ptr<QMovie> &movie);
-    void showVideo(const QString &file);
+    void onScalingFinished(std::unique_ptr<QPixmap> scaled) override;
+    void showImage(std::unique_ptr<QPixmap> pixmap) override;
+    void showAnimation(const std::shared_ptr<QMovie> &movie) override;
+    void showVideo(const QString &file) override;
 
     FolderViewProxy *getFolderView();
     ThumbnailStripProxy *getThumbnailPanel();
@@ -126,7 +127,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     void scalingRequested(QSize, ScalingFilter);
     void droppedIn(const QMimeData *, QObject *);
     void draggedOut();
-    void setLoopPlayback(bool);
+    void setLoopPlayback(bool) override;
     void playbackFinished();
 
   public slots:
@@ -135,22 +136,26 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     // These were 17 declared signals relay-connected to the same-named viewer
     // signals — plumbing with no body of its own; ActionManager connects to
     // the slots unchanged.
-    void enableFolderView();
-    void enableDocumentView();
+    void enableFolderView() override;
+    void enableDocumentView() override;
     void close();
     void fitWindow();
     void fitWidth();
     void fitOriginal();
     void cycleFitMode();
     void switchFitMode();
-    void closeImage();
+    void closeImage() override;
     void showContextMenu();
-    void onSortingChanged(SortingMode);
+    void onSortingChanged(SortingMode) override;
     void setFilter(ScalingFilter filter);
     void setFilterNearest();
     void setFilterBilinear();
     void toggleScalingFilter();
     void toggleLockZoom();
     void toggleLockView();
-    void toggleFullscreenInfoBar();
+    void toggleFullscreenInfoBar() override;
+    void repaintView() override;
+    void setUpdatesEnabled(bool enabled) override;
+    void showWindowDefault() override;
+    bool isWindowVisible() override;
 };
