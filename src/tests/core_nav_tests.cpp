@@ -241,13 +241,13 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("t.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("t.png"), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.mw->windowTitle().contains(QStringLiteral("t.png")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.mainWindow()->windowTitle().contains(QStringLiteral("t.png")), 10000);
 
         // the slideshow toggle rides the same wiring
         core.toggleSlideshow();
-        QTRY_VERIFY_WITH_TIMEOUT(core.mw->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.mainWindow()->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
         core.toggleSlideshow();
-        QTRY_VERIFY_WITH_TIMEOUT(!core.mw->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!core.mainWindow()->windowTitle().contains(QStringLiteral("[slideshow]")), 10000);
     }
 
     // the folder view learns its directory through the state projection, the
@@ -260,7 +260,8 @@ class TestCoreNav : public QObject {
         QDir().mkpath(QDir(base).filePath("projdir"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("projdir")));
-        QTRY_COMPARE_WITH_TIMEOUT(core.mw->getFolderView()->directoryPath(), QDir(base).filePath("projdir"), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->getFolderView()->directoryPath(), QDir(base).filePath("projdir"),
+                                  10000);
     }
 
     // the crop action wiring is live from initActions, but the crop panel is
@@ -279,8 +280,8 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("insA.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
-        core.mw->fitOriginal();
-        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        core.mainWindow()->fitOriginal();
+        auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
         QVERIFY(viewer);
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
 
@@ -293,7 +294,7 @@ class TestCoreNav : public QObject {
         QCOMPARE(core.currentFilePath(), QDir(base).filePath("insB.png"));
 
         // back in a browse mode the same key navigates again
-        core.mw->fitWindow();
+        core.mainWindow()->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
@@ -311,14 +312,14 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("big.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("big.png"), 10000);
-        core.mw->fitOriginal();
-        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        core.mainWindow()->fitOriginal();
+        auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
         QVERIFY(viewer);
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
         float scaleBefore = viewer->currentScale();
 
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
         QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
         QVERIFY2(qAbs(viewer->currentScale() - scaleBefore) < 0.001f, "the zoom must survive crop entry");
     }
@@ -334,8 +335,8 @@ class TestCoreNav : public QObject {
         QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, 0, 1);
 
         // copy overlay (serves copy and move alike)
-        core.mw->overlays()->triggerCopyOverlay();
-        auto *copyOverlay = core.mw->findChild<CopyOverlay *>();
+        core.mainWindow()->overlays()->triggerCopyOverlay();
+        auto *copyOverlay = core.mainWindow()->findChild<CopyOverlay *>();
         QVERIFY(copyOverlay && copyOverlay->isVisible());
 
         // a bare Enter is no answer in a digits-answer menu: it must not
@@ -343,7 +344,7 @@ class TestCoreNav : public QObject {
         QKeyEvent enterKey(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier,
                            coretest::scanCodeFor(QStringLiteral("Enter")), 0u, 0u);
         QApplication::sendEvent(copyOverlay, &enterKey);
-        QCOMPARE(core.mw->currentViewMode(), MODE_DOCUMENT);
+        QCOMPARE(core.mainWindow()->currentViewMode(), MODE_DOCUMENT);
         QVERIFY(copyOverlay->isVisible());
 
         QApplication::sendEvent(copyOverlay, &esc);
@@ -352,19 +353,19 @@ class TestCoreNav : public QObject {
         // save-confirm prompt (surfaced by edits — flips H/V land here too):
         // Esc means "discard edits", the same chain as the discard button
         settings->setShowSaveOverlay(true);
-        core.mw->overlays()->showSaveOverlay();
-        auto *saveOverlay = core.mw->findChild<SaveConfirmOverlay *>();
+        core.mainWindow()->overlays()->showSaveOverlay();
+        auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
         QVERIFY(saveOverlay && saveOverlay->isVisible());
         QApplication::sendEvent(saveOverlay, &esc);
         QVERIFY(!saveOverlay->isVisible());
 
         // crop surface: Esc = cancel the selection and leave crop
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
-        auto *cropOverlay = core.mw->findChild<CropOverlay *>();
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        auto *cropOverlay = core.mainWindow()->findChild<CropOverlay *>();
         QVERIFY(cropOverlay);
         QApplication::sendEvent(cropOverlay, &esc);
-        QTRY_COMPARE_WITH_TIMEOUT(!core.mw->crop()->isCropPanelActive(), true, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(!core.mainWindow()->crop()->isCropPanelActive(), true, 5000);
     }
 
     // The save prompt keeps the disk off the bare keys: Save and Save as are
@@ -381,8 +382,8 @@ class TestCoreNav : public QObject {
         QVERIFY(core.loadPath(QDir(base).filePath("svkeys.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         settings->setShowSaveOverlay(true);
-        core.mw->overlays()->showSaveOverlay();
-        auto *saveOverlay = core.mw->findChild<SaveConfirmOverlay *>();
+        core.mainWindow()->overlays()->showSaveOverlay();
+        auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
         QVERIFY(saveOverlay && saveOverlay->isVisible());
 
         // the hints are the platform chords and the way out
@@ -422,7 +423,7 @@ class TestCoreNav : public QObject {
         press(Qt::Key_S, "S", Qt::ControlModifier | Qt::ShiftModifier);
         QCOMPARE(saveAsAction.count(), 1); // Ctrl+Shift+S: save as
 
-        core.mw->overlays()->showSaveOverlay(); // back up for the way out
+        core.mainWindow()->overlays()->showSaveOverlay(); // back up for the way out
         QVERIFY(saveOverlay->isVisible());
 
         press(Qt::Key_Return, "Enter");
@@ -441,9 +442,9 @@ class TestCoreNav : public QObject {
         QVERIFY(core.loadPath(QDir(base).filePath("cropkeys.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
-        auto *panel = core.mw->findChild<CropPanel *>();
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        auto *panel = core.mainWindow()->findChild<CropPanel *>();
         QVERIFY(panel);
 
         QVERIFY2(
@@ -475,7 +476,7 @@ class TestCoreNav : public QObject {
         combo->setCurrentIndex(0); // back to Free
         QCOMPARE(combo->currentIndex(), 0);
 
-        auto *overlay = core.mw->findChild<CropOverlay *>();
+        auto *overlay = core.mainWindow()->findChild<CropOverlay *>();
         QVERIFY(overlay);
 
         // the keyboard's Apply is the in-memory crop and nothing else: the
@@ -504,7 +505,7 @@ class TestCoreNav : public QObject {
         // Apply does not dismiss: the surface stays open and, once the
         // applied crop settles into the viewer, the selection becomes the
         // whole new image — re-cropping is dragging again, no key needed
-        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
         QTRY_COMPARE_WITH_TIMEOUT(widthBox->value(), originalWidth - 1, 10000);
         QTRY_COMPARE_WITH_TIMEOUT(heightBox->value(), originalHeight - 1, 10000);
         QCOMPARE(widthBox->maximum(), originalWidth - 1); // the readout tracks the new ground truth
@@ -524,7 +525,7 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(QImage(QDir(base).filePath("cropkeys.png")).size(),
                                   QSize(originalWidth - 2, originalHeight - 2), 10000); // ...and writes it
         QVERIFY2(
-            core.mw->crop()->isCropPanelActive(),
+            core.mainWindow()->crop()->isCropPanelActive(),
             "the write went through the global save action, which does not own the surface — Esc is the only exit");
     }
 
@@ -539,9 +540,9 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("small.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("small.png"), 10000);
-        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
         QVERIFY(viewer);
-        core.mw->fitOriginal();
+        core.mainWindow()->fitOriginal();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
         QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.0f));
 
@@ -550,7 +551,7 @@ class TestCoreNav : public QObject {
         viewer->zoomIn();
         QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.44f));
 
-        core.mw->switchFitMode();
+        core.mainWindow()->switchFitMode();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
         QVERIFY(qFuzzyCompare(viewer->currentScale(), 1.0f));
     }
@@ -566,13 +567,13 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("fine.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("fine.png"), 10000);
-        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
         QVERIFY(viewer);
-        core.mw->fitOriginal();
+        core.mainWindow()->fitOriginal();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
-        auto *overlay = core.mw->findChild<CropOverlay *>();
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        auto *overlay = core.mainWindow()->findChild<CropOverlay *>();
         QVERIFY(overlay);
         overlay->selectAll();
 
@@ -588,14 +589,14 @@ class TestCoreNav : public QObject {
         viewer->scrollLeft();
         // scrollSmooth animates through a QTimeLine — poll until it moves
         QTRY_VERIFY_WITH_TIMEOUT(viewer->imageRect() != rectBefore, 2000);
-        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
 
         // fit remains blocked while framing — a fit would reset the very
         // view the user is framing in
         float scale = viewer->currentScale();
         viewer->fitWindow();
         QVERIFY(qAbs(viewer->currentScale() - scale) < 0.001f);
-        QVERIFY(core.mw->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
 
         // leaving crop releases the policy: the fit keys work again — the
         // mode semantics were never vetoed, only deferred while the overlay
@@ -605,8 +606,8 @@ class TestCoreNav : public QObject {
         // forbids — prevImage in a one-file directory legitimately no-ops.
         // The arrows' navigation is pinned in
         // fitOriginalPersistsAndArrowsStayInInspectMode.)
-        core.mw->crop()->trigger();
-        QVERIFY(!core.mw->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(!core.mainWindow()->crop()->isCropPanelActive());
         viewer->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
     }
@@ -623,12 +624,12 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("framed.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("framed.png"), 10000);
-        auto *viewer = core.mw->findChild<ViewerWidget *>();
+        auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
         QVERIFY(viewer);
-        core.mw->resize(1600, 900);
-        core.mw->show();
+        core.mainWindow()->resize(1600, 900);
+        core.mainWindow()->show();
         coretest::drainEvents();
-        core.mw->fitOriginal();
+        core.mainWindow()->fitOriginal();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
         viewer->zoomIn();
         viewer->zoomIn();
@@ -636,8 +637,8 @@ class TestCoreNav : public QObject {
         coretest::drainEvents();
         float scaleBefore = viewer->currentScale();
         QRect rectBefore = viewer->imageRect();
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
         coretest::drainEvents();
         QVERIFY(qFuzzyCompare(viewer->currentScale(), scaleBefore));
         QCOMPARE(static_cast<int>(viewer->fitMode()), static_cast<int>(FIT_FREE));
@@ -648,10 +649,10 @@ class TestCoreNav : public QObject {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("crop.png")));
-        core.mw->crop()->trigger();
-        QVERIFY(core.mw->crop()->isCropPanelActive());
-        core.mw->crop()->trigger();
-        QVERIFY(!core.mw->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->trigger();
+        QVERIFY(!core.mainWindow()->crop()->isCropPanelActive());
     }
 
     void preloaderFollowsTheDirectionOfTravel() {
@@ -669,10 +670,15 @@ class TestCoreNav : public QObject {
             files << path;
         }
 
-        QSignalSpy listed(&EngineBridge::instance(), &EngineBridge::dirListed);
+        // The bridge this test watches must be the one Core drives. Before
+        // Deps these were the same object only because both reached for the
+        // process-wide singleton; now the link is explicit, and a Core built
+        // without the bridge would make every wait below time out.
+        EngineBridge bridge;
+        QSignalSpy listed(&bridge, &EngineBridge::dirListed);
         QVERIFY(listed.isValid());
 
-        Core core;
+        Core core({.bridge = &bridge});
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, seq), 10000);
         // the cold-open load rides whenListed: it fires against a landed
@@ -681,25 +687,25 @@ class TestCoreNav : public QObject {
         // one flip forward: from b the forward neighbor c decodes
         emit actionManager->nextImage();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(1), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(files.at(2)), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(2)), 10000);
 
         // another flip forward: from c the forward neighbor is d
         emit actionManager->nextImage();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(2), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(files.at(3)), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(3)), 10000);
 
         // jump to the last file: still a forward move, so the backward
         // neighbor b must not decode — and the cache trim drops it
         QVERIFY(core.loadPath(files.at(3)));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(3), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.model->isLoaded(files.at(1)));
+        QVERIFY(!core.directoryModel()->isLoaded(files.at(1)));
 
         // one backward move: the preload must follow the travel direction and
         // decode b, which a forward-facing policy would never have touched
         emit actionManager->prevImage();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(2), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(files.at(1)), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(1)), 10000);
     }
 
     // 14a61f7a armed the cold open to the listing landing but left main's
@@ -716,16 +722,16 @@ class TestCoreNav : public QObject {
         }
 
         Core core;
-        QVERIFY(!core.mw->isVisible());
+        QVERIFY(!core.mainWindow()->isVisible());
         QVERIFY(core.loadPath(files.at(0)));
         QVERIFY(core.firstFramePending());
         // main's tail, faithfully: show only when nothing is pending
         if(!core.firstFramePending())
             core.showGui();
-        QVERIFY(!core.mw->isVisible());
+        QVERIFY(!core.mainWindow()->isVisible());
 
         QTRY_VERIFY_WITH_TIMEOUT(!core.firstFramePending(), 10000);
-        QVERIFY(core.mw->isVisible());
+        QVERIFY(core.mainWindow()->isVisible());
         QCOMPARE(core.currentFilePath(), files.at(0));
     }
 
@@ -912,11 +918,11 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QSignalSpy loop(core.mw, &MW::setLoopPlayback);
+        QSignalSpy loop(core.mainWindow(), &MW::setLoopPlayback);
         QVERIFY(loop.isValid());
 
         core.startSlideshow();
-        QVERIFY(core.state.slideshow);
+        QVERIFY(core.viewState().slideshow);
         QCOMPARE(loop.count(), 1);
         QCOMPARE(loop.at(0).at(0).toBool(), false);
 
@@ -926,7 +932,7 @@ class TestCoreNav : public QObject {
         QCOMPARE(loop.count(), 1);
 
         core.stopSlideshow();
-        QVERIFY(!core.state.slideshow);
+        QVERIFY(!core.viewState().slideshow);
         QCOMPARE(loop.count(), 2);
         QCOMPARE(loop.at(1).at(0).toBool(), true);
 
@@ -944,11 +950,11 @@ class TestCoreNav : public QObject {
         // startSlideshow arms the timer itself, through startSlideshowTimer,
         // for a static image — measured, this assertion's first draft claimed
         // the opposite and failed
-        QVERIFY(core.slideshowTimer.isActive());
+        QVERIFY(core.slideshowClock().isActive());
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), files.at(1));
-        QVERIFY2(core.slideshowTimer.isActive(), "a static image under slideshow must keep the timer armed");
+        QVERIFY2(core.slideshowClock().isActive(), "a static image under slideshow must keep the timer armed");
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), files.at(2));
@@ -959,12 +965,12 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.loopSlideshow);
+        QVERIFY(!core.slideshowLoops());
 
         core.jumpToLast();
         QCOMPARE(core.currentFilePath(), files.at(3));
         // jumpToLast stops the show, so the state below is a fresh arm
-        QVERIFY(!core.state.slideshow);
+        QVERIFY(!core.viewState().slideshow);
 
         core.jumpToFirst();
         QCOMPARE(core.currentFilePath(), files.at(0));
@@ -972,13 +978,13 @@ class TestCoreNav : public QObject {
         core.startSlideshow();
         core.jumpToLast();
         core.startSlideshow();
-        QVERIFY(core.state.slideshow);
+        QVERIFY(core.viewState().slideshow);
         const QString atEnd = core.currentFilePath();
 
         core.nextImageSlideshow();
         QCOMPARE(core.currentFilePath(), atEnd);
-        QVERIFY2(!core.state.slideshow, "a non-looping slideshow must stop itself at the end of the directory");
-        QVERIFY(!core.slideshowTimer.isActive());
+        QVERIFY2(!core.viewState().slideshow, "a non-looping slideshow must stop itself at the end of the directory");
+        QVERIFY(!core.slideshowClock().isActive());
     }
 
     void shuffleKeepsTheSlideshowCyclingPastTheEnd() {
@@ -986,20 +992,20 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.state.shuffle);
+        QVERIFY(!core.viewState().shuffle);
 
         core.toggleShuffle();
-        QVERIFY(core.state.shuffle); // this is what syncRandomizer sized for
+        QVERIFY(core.viewState().shuffle); // this is what syncRandomizer sized for
 
         core.startSlideshow();
         core.jumpToLast();
         core.startSlideshow();
-        QVERIFY(core.state.slideshow);
+        QVERIFY(core.viewState().slideshow);
 
         // the sequential branch would have stopped here (pinned above with the
         // same setup); the randomizer branch starts a new cycle instead
         core.nextImageSlideshow();
-        QVERIFY2(core.state.slideshow, "shuffle mode stopped at the end of the listing");
+        QVERIFY2(core.viewState().slideshow, "shuffle mode stopped at the end of the listing");
         QVERIFY(files.contains(core.currentFilePath()));
     }
 
@@ -1050,12 +1056,12 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(dirB + QStringLiteral("/two.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QCOMPARE(core.model->directoryPath(), dirB);
+        QCOMPARE(core.directoryModel()->directoryPath(), dirB);
 
         core.prevDirectory(false);
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QCOMPARE(core.currentFilePath(), dirA + QStringLiteral("/one.png"));
-        QCOMPARE(core.model->directoryPath(), dirA);
+        QCOMPARE(core.directoryModel()->directoryPath(), dirA);
 
         core.nextDirectory();
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -1073,15 +1079,15 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QVERIFY(!core.state.slideshow);
+        QVERIFY(!core.viewState().slideshow);
 
         core.toggleSlideshow();
-        QVERIFY(core.state.slideshow);
-        QVERIFY(core.slideshowTimer.isActive());
+        QVERIFY(core.viewState().slideshow);
+        QVERIFY(core.slideshowClock().isActive());
 
         core.toggleSlideshow();
-        QVERIFY2(!core.state.slideshow, "the second toggle did not stop the slideshow");
-        QVERIFY(!core.slideshowTimer.isActive());
+        QVERIFY2(!core.viewState().slideshow, "the second toggle did not stop the slideshow");
+        QVERIFY(!core.slideshowClock().isActive());
     }
 
     // Core::openFromClipboard is 84 lines that gcov had never entered. The URL
@@ -1150,10 +1156,10 @@ class TestCoreNav : public QObject {
 
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(img), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(img), 10000);
         const QByteArray diskBefore = coretest::contentOf(img);
 
         core.flipH();
@@ -1161,7 +1167,7 @@ class TestCoreNav : public QObject {
         QCOMPARE(fake.confirmCalls, 0);
         QCOMPARE(coretest::contentOf(img), diskBefore);
 
-        auto edited = std::dynamic_pointer_cast<ImageStatic>(core.model->getImage(img));
+        auto edited = std::dynamic_pointer_cast<ImageStatic>(core.directoryModel()->getImage(img));
         QVERIFY2(edited && edited->isEdited(), "flipH left no edited image in memory");
         const QImage shown = edited->getPixmap()->toImage();
         QCOMPARE(shown.size(), QSize(16, 8));
@@ -1176,7 +1182,7 @@ class TestCoreNav : public QObject {
         // the folder view is where an edit hits the disk, so the question has
         // to come first — and a declined question must mean nothing was written
         core.enableFolderView();
-        QCOMPARE(core.mw->currentViewMode(), MODE_FOLDERVIEW);
+        QCOMPARE(core.mainWindow()->currentViewMode(), MODE_FOLDERVIEW);
         fake.confirmAnswer = false;
         core.flipH();
         QCOMPARE(fake.confirmCalls, 1);
@@ -1230,8 +1236,8 @@ class TestCoreNav : public QObject {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        core.mw->fitOriginal(); // arms the inspect scope through the real observer
-        QTRY_COMPARE_WITH_TIMEOUT(core.mw->viewer()->fitMode(), FIT_ORIGINAL, 5000);
+        core.mainWindow()->fitOriginal(); // arms the inspect scope through the real observer
+        QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_ORIGINAL, 5000);
 
         QSignalSpy next(actionManager, &ActionManager::nextImage);
         QSignalSpy scroll(actionManager, &ActionManager::scrollLeft);
@@ -1247,8 +1253,8 @@ class TestCoreNav : public QObject {
         QCOMPARE(next.count(), 1);
 
         // disarmed, the same key falls through to the global table
-        core.mw->fitWindow();
-        QTRY_COMPARE_WITH_TIMEOUT(core.mw->viewer()->fitMode(), FIT_WINDOW, 5000);
+        core.mainWindow()->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_WINDOW, 5000);
         QSignalSpy prev(actionManager, &ActionManager::prevImage);
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QCOMPARE(prev.count(), 1);
@@ -1264,12 +1270,12 @@ class TestCoreNav : public QObject {
 
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
         core.enableFolderView();
-        core.folderViewPresenter.selectAndFocus(img);
+        core.folderPresenter().selectAndFocus(img);
         QTRY_VERIFY2_WITH_TIMEOUT(!core.currentSelection().isEmpty(),
                                   "precondition broken: the folder view holds no selection", 10000);
 
@@ -1355,7 +1361,7 @@ class TestCoreNav : public QObject {
         // and rebinding to a fresh view still works afterwards
         ThumbnailStripProxy second;
         presenter.setView(&second);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         presenter.setModel(model);
@@ -1393,17 +1399,17 @@ class TestCoreNav : public QObject {
         writeImage(QDir(base).filePath("keep.png"));
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(base).filePath("keep.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("keep.png"), 10000);
         int before = fake.messageCalls;
 
         // a failure for a file the user never opened stays silent
-        emit core.model->loadFailed(QDir(base).filePath("never-seen.png"));
+        emit core.directoryModel()->loadFailed(QDir(base).filePath("never-seen.png"));
         QCOMPARE(fake.messageCalls, before);
 
         // the on-screen file's own failure announces itself and closes the view
-        emit core.model->loadFailed(QDir(base).filePath("keep.png"));
+        emit core.directoryModel()->loadFailed(QDir(base).filePath("keep.png"));
         QCOMPARE(fake.messageCalls, before + 1);
         QVERIFY(fake.lastMessage.contains(QStringLiteral("Load failed")));
     }
@@ -1417,7 +1423,7 @@ class TestCoreNav : public QObject {
         writeImage(QDir(alpha).filePath("mid.png"));
         const QString far = QDir(alpha).filePath("far.png");
         writeImage(far);
-        QVERIFY2(!core.model->isLoaded(far),
+        QVERIFY2(!core.directoryModel()->isLoaded(far),
                  "precondition broken: the far image is decoded, the test measures nothing");
 
         std::unique_ptr<QMimeData> mime(core.mimeDataForPaths({far}));
@@ -1477,7 +1483,7 @@ class TestCoreNav : public QObject {
 
     void presenterPopulatesTheViewWhenModelArrives() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
@@ -1493,7 +1499,7 @@ class TestCoreNav : public QObject {
 
     void presenterSetViewTwiceKeepsTheFirstBinding() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy first, second;
@@ -1511,7 +1517,7 @@ class TestCoreNav : public QObject {
 
     void presenterForwardsActivationToTheFilePath() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
@@ -1531,7 +1537,7 @@ class TestCoreNav : public QObject {
 
     void presenterDisconnectViewStopsForwardingAndAllowsRebinding() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy first, second;
@@ -1559,7 +1565,7 @@ class TestCoreNav : public QObject {
 
     void presenterUnsetModelKeepsTheViewBinding() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
@@ -1572,7 +1578,7 @@ class TestCoreNav : public QObject {
         presenter.unsetModel(); // detaches the model, keeps the view on purpose
 
         QVERIFY(proxy.isInitialized()); // the binding survived the model swap
-        auto model2 = std::make_shared<DirectoryModel>(pool);
+        auto model2 = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model2->setDirectory(beta));
         QTRY_COMPARE_WITH_TIMEOUT(model2->fileCount(), 1, 10000);
         presenter.setModel(model2);
@@ -1614,7 +1620,7 @@ class TestCoreNav : public QObject {
     // the call back into the view rather than by spying on a signal.
     void presenterRoutesThumbnailsAndDragHoverToTheView() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         CountingStripProxy view;
@@ -1666,7 +1672,7 @@ class TestCoreNav : public QObject {
 
     void presenterForwardsDragFromTheView() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
@@ -1702,7 +1708,7 @@ class TestCoreNav : public QObject {
     // index provenance are pinned by the mirror-contract test.
     void presenterTranslatesEngineIndicesIntoGridIndices() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         const QString dir = uniqueDir("splice");
         QVERIFY(QDir(dir).mkpath("d1"));
         QVERIFY(QDir(dir).mkpath("d2"));
@@ -1777,7 +1783,7 @@ class TestCoreNav : public QObject {
     }
     void viewlessProxyRemapsItsBufferedSelectionOnRename() {
         WorkerPool pool(2);
-        auto model = std::make_shared<DirectoryModel>(pool);
+        auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
         const QString dir = uniqueDir("proxyrename");
         writeImage(QDir(dir).filePath("a.png"));
         writeImage(QDir(dir).filePath("b.png"));
@@ -1812,7 +1818,7 @@ class TestCoreNav : public QObject {
         Core core;
         std::atomic_bool gate{false};
         std::atomic_int holds{0};
-        core.pool_.submit(PoolOwner::Loader, 0, std::make_unique<DeadlineJob>(&gate, &holds));
+        core.executor().submit(PoolOwner::Loader, 0, std::make_unique<DeadlineJob>(&gate, &holds));
         QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 1, 10000);
 
         QElapsedTimer t;
@@ -1839,7 +1845,7 @@ class TestCoreNav : public QObject {
     void settingsBusReachesTheThumbnailStripThroughThePanelChain() {
         Core core;
         const int original = settings->panelPreviewsSize(); // singleton: snapshot and restore
-        auto *strip = core.mw->findChild<ThumbnailStripProxy *>();
+        auto *strip = core.mainWindow()->findChild<ThumbnailStripProxy *>();
         QVERIFY2(strip, "no ThumbnailStripProxy under MW — the chain is not what this claims");
         // init(), not show(): the proxy is a child here, and a child's show()
         // fires no showEvent while its ancestors are hidden, which is what made
@@ -1870,17 +1876,17 @@ class TestCoreNav : public QObject {
     void editingInDocumentModeEditsInMemoryWithoutConfirmation() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(img), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(img), 10000);
         const QByteArray diskBefore = coretest::contentOf(img);
 
         core.rotateLeft();
 
-        QTRY_COMPARE_WITH_TIMEOUT(core.model->getImage(img)->size(), QSize(8, 16), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(8, 16), 10000);
         QCOMPARE(fake.confirmCalls, 0);                 // document mode: in memory, no save, no ask
         QCOMPARE(coretest::contentOf(img), diskBefore); // the disk file is untouched until save
     }
@@ -1897,9 +1903,9 @@ class TestCoreNav : public QObject {
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->isLoaded(img), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(img), 10000);
         core.rotateLeft();
-        auto image = core.model->getImage(img);
+        auto image = core.directoryModel()->getImage(img);
         QVERIFY(image->isEdited());
 
         QMimeData *first = core.getMimeDataForImage(image, TARGET_DROP);
@@ -1920,7 +1926,7 @@ class TestCoreNav : public QObject {
     void editingInFolderViewSavesAfterScriptedConfirmation() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -1937,7 +1943,7 @@ class TestCoreNav : public QObject {
         Core core;
         coretest::FakeInteractions fake;
         fake.confirmAnswer = false;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -1953,7 +1959,7 @@ class TestCoreNav : public QObject {
     void resizeEditsTheLoadedImage() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -1961,14 +1967,14 @@ class TestCoreNav : public QObject {
 
         core.resize(QSize(4, 4));
 
-        QTRY_COMPARE_WITH_TIMEOUT(core.model->getImage(img)->size(), QSize(4, 4), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(4, 4), 10000);
         QCOMPARE(fake.confirmCalls, 0); // resize never asks
     }
 
     void cropAndSaveWritesTheCroppedFile() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -1983,18 +1989,18 @@ class TestCoreNav : public QObject {
     void discardEditsRestoresTheOnDiskImage() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         writeRectImage(img);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
         core.rotateLeft();
-        QTRY_COMPARE_WITH_TIMEOUT(core.model->getImage(img)->size(), QSize(8, 16), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(8, 16), 10000);
 
         core.discardEdits();
 
-        QCOMPARE(core.model->getImage(img)->size(), QSize(16, 8)); // back to the disk state
+        QCOMPARE(core.directoryModel()->getImage(img)->size(), QSize(16, 8)); // back to the disk state
     }
     void gridActionsDriveTheGridThroughTheFullChain() {
         const QString dir = uniqueDir("gridact");
@@ -2005,7 +2011,7 @@ class TestCoreNav : public QObject {
         QVERIFY(core.loadPath(QDir(dir).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         core.enableFolderView();
-        core.folderViewPresenter.selectAndFocus(0);
+        core.folderPresenter().selectAndFocus(0);
         QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 1,
                                   "precondition broken: the folder view holds no selection", 10000);
 

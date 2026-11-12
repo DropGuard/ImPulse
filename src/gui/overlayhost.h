@@ -9,6 +9,8 @@
 
 #include <QObject>
 
+#include "gui/ioverlayhost.h"
+
 #include "gui/overlays/floatingmessageproxy.h"
 #include "gui/overlays/imageinfooverlayproxy.h"
 
@@ -20,24 +22,24 @@ class SaveConfirmOverlay;
 class RenameOverlay;
 class ControlsOverlay;
 
-class OverlayHost : public QObject {
+class OverlayHost : public IOverlayHost {
     Q_OBJECT
   public:
     explicit OverlayHost(MW *container, ViewerWidget *viewer, DocumentWidget *docWidget);
     ~OverlayHost() override;
 
-    void triggerCopyOverlay();
-    void triggerMoveOverlay();
-    void showSaveOverlay();
-    void hideSaveOverlay();
-    void toggleRenameOverlay(const QString &currentName);
-    void toggleImageInfoOverlay();
-    void setExifInfo(const QMap<QString, QString> &exifInfo);
-    void showMessageDirectory(const QString &dirName);
-    void showMessage(const QString &text, int duration = 1500);
-    void showMessageSuccess(const QString &text);
-    void showWarning(const QString &text);
-    void showError(const QString &text);
+    void triggerCopyOverlay() override;
+    void triggerMoveOverlay() override;
+    void showSaveOverlay() override;
+    void hideSaveOverlay() override;
+    void toggleRenameOverlay(const QString &currentName) override;
+    void toggleImageInfoOverlay() override;
+    void setExifInfo(const QMap<QString, QString> &exifInfo) override;
+    void showMessageDirectory(const QString &dirName) override;
+    void showMessage(const QString &text, int duration = 1500) override;
+    void showMessageSuccess(const QString &text) override;
+    void showWarning(const QString &text) override;
+    void showError(const QString &text) override;
     // settings-driven visibility of the fullscreen controls overlay
     void updateControlsOverlay();
     void hideControlsOverlay();
@@ -48,12 +50,6 @@ class OverlayHost : public QObject {
     void saveCopySettings();
 
   signals:
-    void copyRequested(QString);
-    void moveRequested(QString);
-    void renameRequested(QString);
-    void saveRequested();
-    void saveAsClicked();
-    void discardEditsRequested();
 
   private:
     void setupCopyOverlay();
