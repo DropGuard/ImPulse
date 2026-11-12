@@ -49,9 +49,6 @@ Core::Core(const Deps &deps)
       folderEndAction(FOLDER_END_NO_ACTION), loopSlideshow(false), thumbnailer(pool, mBridge),
       thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
     loadTranslation();
-    initGui();
-    // the main window owns the dialogs, so it is the production provider of the
-    // interaction interface; tests replace this pointer with a scripted fake
     if(deps.headless) {
         // no window tree at all: the three seams are the whole surface, and a
         // missing one would surface as a null deref on first use — assert it
@@ -62,6 +59,7 @@ Core::Core(const Deps &deps)
         ownedDialogs = std::make_unique<DialogHost>(nullptr, nullptr);
         dialogs_ = ownedDialogs.get();
     } else {
+        initGui();
         // the main window owns the dialogs and the interaction interface, so it
         // is the production provider of both; tests replace these pointers with
         // scripted fakes
@@ -177,22 +175,13 @@ void Core::connectComponents() {
 
     connect(scriptManager, &ScriptManager::error, overlays_, &IOverlayHost::showError);
 
-    connect(mw, &MW::droppedIn, this, &Core::onDropIn);
     connect(overlays_, &IOverlayHost::copyRequested, this, &Core::copyCurrentFile);
     connect(overlays_, &IOverlayHost::moveRequested, this, &Core::moveCurrentFile);
-    connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
-    connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
     connect(overlays_, &IOverlayHost::saveAsClicked, this, &Core::requestSavePath);
     connect(overlays_, &IOverlayHost::saveRequested, this, &Core::saveCurrentFile);
     connect(overlays_, &IOverlayHost::renameRequested, this, &Core::renameCurrentSelection);
-    connect(mw, &MW::sortingSelected, this, &Core::sortBy);
-    connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
     connect(overlays_, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
-    connect(mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
 
-    connect(mw, &MW::playbackFinished, this, &Core::onPlaybackFinished);
-
-    connect(mw, &MW::scalingRequested, this, &Core::scalingRequest);
     connect(model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
 
     connect(model.get(), &DirectoryModel::fileAdded, this, &Core::onFileAdded);
@@ -214,6 +203,14 @@ void Core::connectComponents() {
 // window->Core legs. Headless Core skips the whole method — a windowless
 // process has no drops, no drags, no folder-view clicks, no keys.
 void Core::connectWindowComponents() {
+    connect(mw, &MW::droppedIn, this, &Core::onDropIn);
+    connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
+    connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
+    connect(mw, &MW::sortingSelected, this, &Core::sortBy);
+    connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
+    connect(mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
+    connect(mw, &MW::playbackFinished, this, &Core::onPlaybackFinished);
+    connect(mw, &MW::scalingRequested, this, &Core::scalingRequest);
     thumbPanelPresenter.setView(mw->getThumbnailPanel());
     folderViewPresenter.setView(mw->getFolderView());
     connect(mw->dialogs(), &DialogHost::opened, this, &Core::loadPath);
