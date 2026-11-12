@@ -67,6 +67,36 @@ target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
 set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 
+# ---- the LLVM idiom: the tests are build targets, and the check targets fuse
+# the build in front of the run. A green suite on a stale binary is not
+# evidence — three encounters in one session were the prompt — so "run the
+# tests" is a build-system target whose dependencies the build system itself
+# guarantees. No wrapper script can say that from outside the graph.
+#   cmake --build build --target check              # everything ctest knows
+#   cmake --build build --target check-crop_tests   # one suite, incremental
+# The cp/mv mtime trap keeps its documented ritual: no target can see a lie
+# the file system tells the build system.
+
+set(CPP_TEST_TARGETS
+    engine_contract_tests engine_stack_tests
+    core_nav_tests core_fileops_tests gui_widget_tests
+    crop_tests grid_tests shortcut_scope_tests overlay_keys_tests
+    presenter_tests edit_save_tests slideshow_tests clipboard_tests)
+
+add_custom_target(check
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -j4
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    DEPENDS ${CPP_TEST_TARGETS}
+    USES_TERMINAL)
+
+foreach(t IN LISTS CPP_TEST_TARGETS)
+    add_custom_target(check-${t}
+        COMMAND ${t}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        DEPENDS ${t}
+        USES_TERMINAL)
+endforeach()
+
 # The core_nav family, split by subject (the same widget-tree link as CORE_NAV):
 # crop, the grid widget, the shortcut scopes, the floating-layer keyboard, the
 # presenter over its scripted view, the edit/save contract, the slideshow, and

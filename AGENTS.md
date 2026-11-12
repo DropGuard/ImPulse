@@ -26,10 +26,12 @@ pipeline thread).
 # build (warnings are contractual: -Wall -Wextra -Wpedantic, zero is normal)
 cmake --build build -j$(nproc)
 
-# all tests (6 suites, independent processes: -j4 halves the wall time and is
-# safe because fixture trees are pid-scoped and FreshSettings uses a pid-unique
-# app name; ARCH_RULES is the architecture contract — read its output first on failure)
-cd build && ctest -j4
+# all tests — the check targets are build-system targets whose DEPENDS fuse
+# the build in front of the run (the LLVM idiom): a green suite on a stale
+# binary is not evidence, and the build graph itself now guarantees freshness
+cmake --build build --target check
+# one suite (incremental: builds just that binary, then runs it)
+cmake --build build --target check-crop_tests
 
 # static-analysis gate (counts may only shrink; a new family fails; a reduction
 # ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
