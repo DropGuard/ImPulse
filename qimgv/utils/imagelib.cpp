@@ -8,6 +8,14 @@ void ImageLib::recolor(QPixmap &pixmap, QColor color) {
     p.drawRect(pixmap.rect());
 }
 
+void ImageLib::recolor(QImage &image, QColor color) {
+    QPainter p(&image);
+    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    p.setBrush(color);
+    p.setPen(color);
+    p.drawRect(image.rect());
+}
+
 std::unique_ptr<QImage> ImageLib::rotatedRaw(const QImage &src, int grad) {
     QTransform transform;
     transform.rotate(grad);

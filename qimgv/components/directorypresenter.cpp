@@ -175,16 +175,16 @@ void DirectoryPresenter::generateThumbnails(const QList<int> &indexes, int size,
             QSvgRenderer svgRenderer;
             svgRenderer.load(QString(":/res/icons/common/other/folder32-scalable.svg"));
             int factor = (size * 0.90f) / svgRenderer.defaultSize().width();
-            QPixmap *pixmap = new QPixmap(svgRenderer.defaultSize() * factor);
-            pixmap->fill(Qt::transparent);
-            QPainter pixPainter(pixmap);
+            QImage *image = new QImage(svgRenderer.defaultSize() * factor, QImage::Format_ARGB32);
+            image->fill(Qt::transparent);
+            QPainter pixPainter(image);
             svgRenderer.render(&pixPainter);
             pixPainter.end();
 
-            ImageLib::recolor(*pixmap, settings->colorScheme().icons);
+            ImageLib::recolor(*image, settings->colorScheme().icons);
 
             std::shared_ptr<Thumbnail> thumb(
-                new Thumbnail(model->dirNameAt(i), "Folder", size, std::shared_ptr<QPixmap>(pixmap)));
+                new Thumbnail(model->dirNameAt(i), "Folder", size, std::shared_ptr<QImage>(image)));
             // ^----------------------------------------------------------------
             view->setThumbnail(i, thumb);
         } else {

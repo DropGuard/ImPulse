@@ -526,8 +526,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         LoadPolicy policy = loadPolicy();
 
         auto square = ThumbnailerRunnable::generate(&cache, source, 128, /*crop=*/true, /*force=*/true, policy);
-        QVERIFY(square && square->pixmap());
-        QCOMPARE(square->pixmap()->size(), QSize(128, 128));
+        QVERIFY(square && square->image());
+        QCOMPARE(square->image()->size(), QSize(128, 128));
 
         // what was stored is NOT the square: the bucket image keeps the 4:1
         // shape, so Dolphin shows the whole picture instead of a slice of it.
@@ -544,8 +544,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // and the same entry answers a non-cropped request without a decode:
         // force is what would bypass the store, so this one must not use it
         auto plain = ThumbnailerRunnable::generate(&cache, source, 128, /*crop=*/false, /*force=*/false, policy);
-        QVERIFY(plain && plain->pixmap());
-        QCOMPARE(plain->pixmap()->size(), QSize(128, 32));
+        QVERIFY(plain && plain->image());
+        QCOMPARE(plain->image()->size(), QSize(128, 32));
         // the label still reports the SOURCE geometry, from the spec keys
         QCOMPARE(plain->info(), QStringLiteral("800x200"));
     }
@@ -565,13 +565,13 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         LoadPolicy policy = loadPolicy();
 
         auto grid = ThumbnailerRunnable::generate(&cache, source, 400, /*crop=*/false, /*force=*/true, policy);
-        QVERIFY(grid && grid->pixmap());
-        QCOMPARE(grid->pixmap()->size(), QSize(400, 300)); // 512 bucket, aspect kept
+        QVERIFY(grid && grid->image());
+        QCOMPARE(grid->image()->size(), QSize(400, 300)); // 512 bucket, aspect kept
         QVERIFY(cache.exists(source, 512));
 
         auto panel = ThumbnailerRunnable::generate(&cache, source, 120, /*crop=*/false, /*force=*/false, policy);
-        QVERIFY(panel && panel->pixmap());
-        QCOMPARE(panel->pixmap()->size(), QSize(120, 90));
+        QVERIFY(panel && panel->image());
+        QCOMPARE(panel->image()->size(), QSize(120, 90));
         QVERIFY2(!cache.exists(source, 128), "the smaller request must be answered from the stored larger bucket");
     }
 
@@ -617,8 +617,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         QVERIFY2(!hit->originalSize.isValid(), "fixture degenerate: this entry must carry no size keys");
 
         auto thumb = ThumbnailerRunnable::generate(&cache, source, 128, /*crop=*/false, /*force=*/false, policy);
-        QVERIFY(thumb && thumb->pixmap());
-        QCOMPARE(thumb->pixmap()->size(), QSize(128, 96));
+        QVERIFY(thumb && thumb->image());
+        QCOMPARE(thumb->image()->size(), QSize(128, 96));
         QCOMPARE(thumb->info(), QStringLiteral("1200x900"));
     }
 };
