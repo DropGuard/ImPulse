@@ -16,6 +16,7 @@
 #include "settings.h"
 #include "components/workerpool/workerpool.h"
 #include "gui/iuserinteractions.h"
+#include "gui/icoreview.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
 #include "components/directorymanager/enginebridge.h"
@@ -158,6 +159,9 @@ class Core : public QObject {
         // null -> the one MainWindow builds. Supplying one detaches Core from
         // the widget tree for every path that only talks to the overlays.
         IOverlayHost *overlays = nullptr;
+        // null -> the window itself (production). The display sink, the mode
+        // legs, and the visibility query.
+        ICoreView *view = nullptr;
     };
 
     // The no-argument form is the production assembly. Kept as a separate
@@ -285,6 +289,9 @@ class Core : public QObject {
     // scripted fake here to drive the interactive command machines. Non-owning:
     // it points at mw in production and is set in initGui
     IUserInteractions *ui_ = nullptr;
+    // where Core's display sink and mode legs go: the window in production, a
+    // recording stub in a headless test. Not owned.
+    ICoreView *view_ = nullptr;
 
     // where Core's messages and overlay commands go: MainWindow's OverlayHost in
     // production, a scripted host in a test that does not want a window. Not

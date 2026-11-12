@@ -258,6 +258,22 @@ void MW::toggleFullscreenInfoBar() {
     else
         infoBarFullscreen->hide();
 }
+// ICoreView adaptations of the QWidget bits the interface covers
+void MW::repaintView() {
+    repaint();
+}
+
+void MW::setUpdatesEnabled(bool enabled) {
+    QWidget::setUpdatesEnabled(enabled);
+}
+
+void MW::showWindowDefault() {
+    shell()->showDefault();
+}
+
+bool MW::isWindowVisible() {
+    return isVisible();
+}
 
 void MW::toggleScalingFilter() {
     ScalingFilter configuredFilter = settings->scalingFilter();

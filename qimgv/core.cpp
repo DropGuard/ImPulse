@@ -53,6 +53,8 @@ Core::Core(const Deps &deps)
     // the main window owns the dialogs, so it is the production provider of the
     // interaction interface; tests replace this pointer with a scripted fake
     ui_ = mw;
+    // the production view is the window itself; a test names its own
+    view_ = deps.view ? deps.view : mw;
     // same rule for the overlay surface: MainWindow's host unless a test named
     // its own, in which case Core never touches the widget tree for messages
     overlays_ = deps.overlays ? deps.overlays : mw->overlays();
@@ -118,8 +120,8 @@ void Core::readSettings() {
 }
 
 void Core::showGui() {
-    if(mw && !mw->isVisible())
-        mw->shell()->showDefault();
+    if(mw && !view_->isWindowVisible())
+        view_->showWindowDefault();
     // TODO: this is unreliable.
     // how to make it wait until a window is shown?
     qApp->processEvents();
@@ -356,7 +358,7 @@ void Core::toggleSlideshow() {
 void Core::startSlideshow() {
     if(!state.slideshow) {
         state.slideshow = true;
-        emit mw->setLoopPlayback(false);
+        view_->setLoopPlayback(false);
         enableDocumentView();
         startSlideshowTimer();
         updateInfoString();
@@ -366,7 +368,7 @@ void Core::startSlideshow() {
 void Core::stopSlideshow() {
     if(state.slideshow) {
         state.slideshow = false;
-        emit mw->setLoopPlayback(true);
+        view_->setLoopPlayback(true);
         slideshowTimer.stop();
         updateInfoString();
     }
@@ -496,7 +498,7 @@ void Core::reloadImage(const QString &filePath) {
 // subscriber, not the source of truth.
 void Core::enterMode(ViewMode mode) {
     state.viewMode = mode;
-    (mode == MODE_FOLDERVIEW) ? mw->enableFolderView() : mw->enableDocumentView();
+    (mode == MODE_FOLDERVIEW) ? view_->enableFolderView() : view_->enableDocumentView();
 }
 
 void Core::enableFolderView() {
@@ -724,7 +726,7 @@ FileOpResult Core::removeFile(const QString &filePath, bool trash) {
     if(state.currentFilePath == filePath) {
         img = model->getImage(filePath);
         if(img->type() == ANIMATED || img->type() == VIDEO) {
-            mw->closeImage();
+            view_->closeImage();
             reopen = true;
         }
     }
@@ -738,7 +740,7 @@ FileOpResult Core::removeFile(const QString &filePath, bool trash) {
 void Core::onFileRemoved(const QString &filePath, int index) {
     // no files left
     if(model->isEmpty()) {
-        mw->closeImage();
+        view_->closeImage();
         state.hasActiveImage = false;
         state.currentFilePath = "";
     }
@@ -1076,9 +1078,9 @@ void Core::moveCurrentFile(const QString &destDirectory) {
     if(model->isEmpty())
         return;
     // pause updates to avoid flicker
-    mw->setUpdatesEnabled(false);
+    view_->setUpdatesEnabled(false);
     // move fails during file playback, so we close it temporarily
-    mw->closeImage();
+    view_->closeImage();
     FileOpResult result;
     model->moveFileTo(selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
@@ -1099,8 +1101,8 @@ void Core::moveCurrentFile(const QString &destDirectory) {
                 outputError(result);
         }
     }
-    mw->setUpdatesEnabled(true);
-    mw->repaint();
+    view_->setUpdatesEnabled(true);
+    view_->repaintView();
 }
 
 void Core::copyCurrentFile(const QString &destDirectory) {
@@ -1126,7 +1128,7 @@ void Core::toggleCropPanel() {
 }
 
 void Core::toggleFullscreenInfoBar() {
-    mw->toggleFullscreenInfoBar();
+    view_->toggleFullscreenInfoBar();
 }
 
 void Core::requestSavePath() {
@@ -1385,7 +1387,7 @@ void Core::print() {
 
 void Core::scalingRequest(QSize size, ScalingFilter filter) {
     // filter out an unnecessary scale request at statup
-    if(mw->isVisible() && state.hasActiveImage) {
+    if(view_->isWindowVisible() && state.hasActiveImage) {
         std::shared_ptr<Image> forScale = model->getImage(state.currentFilePath);
         if(forScale) {
             model->scaler->requestScaled(
@@ -1399,7 +1401,7 @@ void Core::onScalingFinished(QPixmap scaled, const ScalerRequest &req) {
     // the viewer takes a unique_ptr, so hand it one from a value instead of
     // passing a naked QPixmap* and hoping somebody deletes it
     if(state.hasActiveImage /* TODO: a better fix > */ && req.path == state.currentFilePath) {
-        mw->onScalingFinished(std::make_unique<QPixmap>(std::move(scaled)));
+        view_->onScalingFinished(std::make_unique<QPixmap>(std::move(scaled)));
     }
 }
 
@@ -1471,7 +1473,7 @@ bool Core::loadPath(QString path) {
         });
         return true;
     } else {
-        mw->enableFolderView();
+        view_->enableFolderView();
         return true;
     }
 }
@@ -1710,7 +1712,7 @@ void Core::onModelItemUpdated(const QString &filePath) {
 }
 
 void Core::onModelSortingChanged(SortingMode mode) {
-    mw->onSortingChanged(mode);
+    view_->onSortingChanged(mode);
     thumbPanelPresenter.reloadModel();
     thumbPanelPresenter.selectAndFocus(state.currentFilePath);
     folderViewPresenter.reloadModel();
@@ -1725,16 +1727,16 @@ void Core::guiSetImage(std::shared_ptr<Image> img) {
     }
     DocumentType type = img->type();
     if(type == STATIC) {
-        mw->showImage(img->getPixmap());
+        view_->showImage(img->getPixmap());
     } else if(type == ANIMATED) {
         auto animated = dynamic_cast<ImageAnimated *>(img.get());
-        mw->showAnimation(animated->getMovie());
+        view_->showAnimation(animated->getMovie());
     } else if(type == VIDEO) {
         auto video = dynamic_cast<Video *>(img.get());
         // workaround for mpv. If we play video while mainwindow is hidden we get black screen.
         // affects only initial startup (e.g. we open webm from file manager)
         showGui();
-        mw->showVideo(video->filePath());
+        view_->showVideo(video->filePath());
     }
     img->isEdited() ? overlays_->showSaveOverlay() : overlays_->hideSaveOverlay();
     overlays_->setExifInfo(img->getExifTags());
