@@ -1,5 +1,10 @@
 #include "engine_stack_fixture.h"
+#include "utils/stuff.h"
 #include <unistd.h>
+
+#ifdef USE_EXIV2
+#include <exiv2/exiv2.hpp>
+#endif
 
 // FileOperations through the engine, the save path, and ImageLib's transforms
 class TestImageOps : public QObject, protected EngineStackFixture {
@@ -10,7 +15,6 @@ class TestImageOps : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // tier-1 decodes a large JPEG at screen size via libjpeg DCT scaling, and
@@ -612,6 +616,88 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         QImage flipThen90 = src.flipped(Qt::Vertical).transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         QCOMPARE(*E(T::TransformationFlipAndRotate90), flipThen90);
         QCOMPARE(*E(T::TransformationRotate270), *ImageLib::rotated(S(), -90));
+    }
+
+    // The edit that used to destroy the camera's metadata. Qt's writers emit no
+    // EXIF/XMP/IPTC (measured: a JPEG with Make/Orientation/GPS loaded and
+    // re-saved by QImage comes back with an empty text-key set and nothing
+    // exiftool can read), so a save has to carry the blocks over explicitly.
+    //
+    // The fixture is built with Exiv2 because no other tool here can put EXIF
+    // into a JPEG — which is the point of the test, not a shortcut.
+    void editingAnImageCarriesItsExifXmpAndIptcOntoTheSavedFile() {
+        resetFixture();
+        const QString source = fixtureDir + "/shot.jpg";
+        QImage img(64, 32, QImage::Format_RGB32);
+        img.fill(qRgb(200, 10, 10));
+        QVERIFY(img.save(source, "JPEG", 95));
+
+#ifdef USE_EXIV2
+        {
+            auto meta = Exiv2::ImageFactory::open(toStdString(source));
+            meta->readMetadata();
+            Exiv2::ExifData &exif = meta->exifData();
+            exif["Exif.Image.Make"] = "Canon";
+            exif["Exif.Image.Orientation"] = uint16_t(6); // rotated 90 CW
+            exif["Exif.Photo.DateTimeOriginal"] = "2024:05:01 10:00:00";
+            exif["Exif.GPSInfo.GPSLatitude"] = "31/1 11/1 60/1";
+            meta->xmpData()["Xmp.dc.subject"] = "holiday";
+            meta->iptcData()["Iptc.Application2.Keywords"] = "beach";
+            meta->writeMetadata();
+        }
+
+        // the edit: rotate the pixels, as ImageLib::exifRotated does for a
+        // camera whose EXIF says "rotate 90 CW"
+        const QString dest = fixtureDir + "/edited.jpg";
+        const QImage rotated = img.transformed(QTransform().rotate(90), Qt::SmoothTransformation);
+        QVERIFY(FileOperations::saveWithBackup(rotated, dest, 95, source));
+
+        auto check = Exiv2::ImageFactory::open(toStdString(dest));
+        check->readMetadata();
+        const Exiv2::ExifData &exif = check->exifData();
+        QVERIFY2(!exif.empty(), "the saved file carries no EXIF at all");
+        auto make = exif.findKey(Exiv2::ExifKey("Exif.Image.Make"));
+        QVERIFY(make != exif.end());
+        QCOMPARE(QString::fromStdString(make->value().toString()), QStringLiteral("Canon"));
+        // provenance survives, including the GPS block the crop/rotate does not
+        // invalidate
+        QVERIFY(exif.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude")) != exif.end());
+        QVERIFY(!check->xmpData().empty());
+        QVERIFY(!check->iptcData().empty());
+
+        // and the orientation is reset: the pixels already carry the rotation,
+        // so a carried "rotate 90 CW" would make every viewer rotate them again
+        auto orientation = exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"));
+        QVERIFY2(orientation != exif.end(), "orientation was dropped instead of reset");
+        QCOMPARE(orientation->toInt64(), qint64(1));
+
+        // the file is still a valid image after Exiv2 rewrote it
+        QImage back(dest);
+        QVERIFY2(!back.isNull(), "the metadata write left an unreadable file");
+        QCOMPARE(back.size(), QSize(32, 64));
+#else
+        QSKIP("built without Exiv2: the metadata path is compiled out");
+#endif
+    }
+
+    // A source with no metadata must not fail the save, and neither must a
+    // format Exiv2 cannot write into: the pixels are already on disk, so a
+    // failed carry is a note, never a failed save.
+    void aSaveWithoutMetadataStillSucceeds() {
+        resetFixture();
+        const QString source = fixtureDir + "/plain.jpg";
+        const QString dest = fixtureDir + "/plain-out.jpg";
+        QImage img(16, 16, QImage::Format_RGB32);
+        img.fill(Qt::blue);
+        QVERIFY(img.save(source, "JPEG", 95));
+
+        QVERIFY(FileOperations::saveWithBackup(img, dest, 95, source));
+        QVERIFY(QFile::exists(dest));
+        QVERIFY(!QImage(dest).isNull());
+
+        // and the no-source form the clipboard import uses is unchanged
+        QVERIFY(FileOperations::saveWithBackup(img, fixtureDir + "/nosrc.jpg", 95));
+        QVERIFY(QFile::exists(fixtureDir + "/nosrc.jpg"));
     }
 };
 

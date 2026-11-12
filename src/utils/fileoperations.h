@@ -55,8 +55,20 @@ class FileOperations {
     // and the clipboard one still held the rollback bug the other fixed - it
     // deleted the original, then deleted the backup even when the restore
     // itself failed, turning "save failed" into "your file is gone".
-    static bool saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality);
+    //
+    // `metadataSource`, when it names an existing file, is where the metadata
+    // to carry over is read from: Qt writes pixels and nothing else (its
+    // writers emit no EXIF, XMP or IPTC), so an edit that goes through here
+    // would otherwise strip everything the camera recorded. Empty for a source
+    // that has none — the clipboard import, a brand-new file.
+    static bool saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality,
+                               const QString &metadataSource = QString());
 
   private:
     static bool moveToTrashImpl(const QString &path);
+    // Copies EXIF, XMP and IPTC from `source` onto the file at `dest`, which
+    // must already hold the written pixels. Returns false when the source has
+    // no metadata to carry or the format cannot hold it; the pixels are
+    // already saved either way, so a false here is never a failed save.
+    static bool carryMetadata(const QString &source, const QString &dest, bool resetOrientation);
 };
