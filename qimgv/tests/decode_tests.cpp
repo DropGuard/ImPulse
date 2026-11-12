@@ -25,7 +25,7 @@ class TestDecode : public QObject, protected EngineStackFixture {
         QVERIFY(writeBigImage(fixtureDir + "/big.jpg", "jpg", orig));
 
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy ready(&model, &DirectoryModel::imageReady);
         QVERIFY(ready.isValid());
         QVERIFY(model.setDirectory(fixtureDir));
@@ -52,7 +52,7 @@ class TestDecode : public QObject, protected EngineStackFixture {
         QVERIFY(writeBigImage(fixtureDir + "/big.png", "png", orig));
 
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy ready(&model, &DirectoryModel::imageReady);
         QVERIFY(model.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(model.fileCount(), 4, 10000);
@@ -72,7 +72,7 @@ class TestDecode : public QObject, protected EngineStackFixture {
         QVERIFY(writeBigImage(fixtureDir + "/big.jpg", "jpg", orig));
 
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy ready(&model, &DirectoryModel::imageReady);
         QVERIFY(model.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(model.fileCount(), 4, 10000);
@@ -90,7 +90,7 @@ class TestDecode : public QObject, protected EngineStackFixture {
         QVERIFY(writeBigImage(fixtureDir + "/big.jpg", "jpg", screen * 2));
 
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy ready(&model, &DirectoryModel::imageReady);
         QVERIFY(model.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(model.fileCount(), 4, 10000);
@@ -116,7 +116,7 @@ class TestDecode : public QObject, protected EngineStackFixture {
         QVERIFY(writeBigImage(fixtureDir + "/big.png", "png", offscreenScreenPixels() * 2));
 
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy ready(&model, &DirectoryModel::imageReady);
         QVERIFY(model.setDirectory(fixtureDir));
         QTRY_COMPARE_WITH_TIMEOUT(model.fileCount(), 4, 10000);

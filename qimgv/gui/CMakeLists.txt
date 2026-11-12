@@ -5,6 +5,8 @@ target_sources(qimgv_gui PRIVATE
     contextmenu.cpp
     flowlayout.cpp
     idirectoryview.cpp
+    ioverlayhost.cpp
+    ioverlayhost.h
     mainwindow.cpp
 
     customwidgets/actionbutton.cpp

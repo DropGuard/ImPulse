@@ -287,7 +287,7 @@ class TestListing : public QObject, protected EngineStackFixture {
     void modelFileOperationsRideTheEngineRoundTrip() {
         resetFixture();
         WorkerPool pool(2);
-        DirectoryModel model(pool);
+        DirectoryModel model(pool, EngineBridge::instance());
         QSignalSpy removed(&model, &DirectoryModel::fileRemoved);
         QSignalSpy added(&model, &DirectoryModel::fileAdded);
         QVERIFY(model.setDirectory(fixtureDir));
