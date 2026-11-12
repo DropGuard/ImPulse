@@ -10,7 +10,12 @@
 class DirectoryModel : public QObject {
     Q_OBJECT
   public:
-    explicit DirectoryModel(WorkerPool &pool, QObject *parent = nullptr);
+    // The bridge is required, not defaulted: the model drives whichever engine
+    // it is given, and reaching for the process-wide instance here made every
+    // Core built with an injected bridge silently drive the global one instead.
+    // The rule is the one Thumbnailer already follows (pool + bridge named at
+    // the construction site).
+    DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent = nullptr);
     ~DirectoryModel() override;
 
     Scaler *scaler = nullptr;

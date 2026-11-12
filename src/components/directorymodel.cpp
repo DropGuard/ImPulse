@@ -2,8 +2,8 @@
 
 #include "components/directorymanager/enginebridge.h"
 
-DirectoryModel::DirectoryModel(WorkerPool &pool, QObject *parent)
-    : QObject(parent), dirManager(EngineBridge::instance()), loader(pool) {
+DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
+    : QObject(parent), dirManager(bridge), loader(pool) {
     scaler = new Scaler(&cache, pool);
 
     connect(&dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);

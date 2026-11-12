@@ -67,7 +67,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QString img = QDir(base).filePath("qc.png");
         writeImage(img);
         QVERIFY(core.loadPath(img));
@@ -90,7 +90,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 
         Core core;
         coretest::FakeInteractions fake; // must be installed: see below
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -123,7 +123,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         Core core;
         coretest::FakeInteractions fake;
         fake.confirmAnswer = false; // the overwrite question is answered NO
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -143,7 +143,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyPlacesFileWithoutDialogs() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString src = makeTxt(base, "f1.txt", "one");
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
@@ -158,7 +158,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyOverwritesWhenScriptedYes() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString src = makeTxt(base, "f1.txt", "new");
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
@@ -175,7 +175,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyYesToAllSticksAcrossTheBatch() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -195,7 +195,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyNoToAllSkipsTheRestWithoutAsking() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -215,7 +215,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyPlainYesAsksAgainForEachCollision() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -236,7 +236,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyCancelStopsTheBatch() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -256,7 +256,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyOverwritesADirectoryCollisionWhenScriptedYes() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -274,7 +274,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -293,7 +293,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void interactiveMoveOverwritesADirectoryCollisionWhenScriptedYes() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -311,9 +311,16 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     }
 
     void interactiveMoveYesToAllSticksAcrossTheBatch() {
-        Core core;
+        // Constructed through Deps rather than the no-argument form: this test
+        // moves files and answers a dialog, so it needs neither the process-wide
+        // engine nor a MainWindow's overlay surface. Supplying its own bridge is
+        // the domain this suite owns -- the global one keeps its inotify watch
+        // state for the life of the process, and two tests sharing it would be
+        // sharing a watch.
+        EngineBridge bridge;
+        Core core({.bridge = &bridge});
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -353,7 +360,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         core.interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
 
         // dotted directory names survive the move whole
@@ -378,14 +385,14 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void removePermanentDeletesAfterScriptedConfirmation() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        const int before = core.model->fileCount();
+        const int before = core.directoryModel()->fileCount();
 
         core.removePermanent();
 
-        QTRY_COMPARE_WITH_TIMEOUT(core.model->fileCount(), before - 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->fileCount(), before - 1, 10000);
         QVERIFY2(!QFileInfo::exists(QDir(alpha).filePath("a.png")), "the confirmed removal never reached the disk");
         QCOMPARE(fake.confirmCalls, 1);
     }
@@ -394,15 +401,15 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         Core core;
         coretest::FakeInteractions fake;
         fake.confirmAnswer = false;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        const int before = core.model->fileCount();
+        const int before = core.directoryModel()->fileCount();
 
         core.moveToTrash();
 
         QCOMPARE(fake.confirmCalls, 1);
-        QCOMPARE(core.model->fileCount(), before);
+        QCOMPARE(core.directoryModel()->fileCount(), before);
         QVERIFY(QFileInfo::exists(QDir(alpha).filePath("a.png")));
     }
 
@@ -431,19 +438,19 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         Core core;
         coretest::FakeInteractions fake;
         fake.confirmAnswer = true;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
         core.enableFolderView();
-        core.mw->getFolderView()->select(QList<int>{0, 1});
+        core.mainWindow()->getFolderView()->select(QList<int>{0, 1});
         QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 2,
                                   "precondition broken: the folder view holds no two-file selection", 10000);
 
         core.moveToTrash();
 
         QVERIFY2(QFileInfo::exists(longFile), "the refused file vanished anyway");
-        auto *floating = core.mw->findChild<FloatingMessage *>();
+        auto *floating = core.mainWindow()->findChild<FloatingMessage *>();
         QVERIFY2(floating, "no floating message widget exists after a batch removal");
         auto *label = floating->findChild<QLabel *>("textLabel");
         QVERIFY2(label, "the floating message carries no text label");
@@ -477,12 +484,12 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         Core core;
         coretest::FakeInteractions fake;
         fake.confirmAnswer = true;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(dir).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
         core.enableFolderView();
-        core.mw->getFolderView()->select(QList<int>{0, 1});
+        core.mainWindow()->getFolderView()->select(QList<int>{0, 1});
         QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 2,
                                   "precondition broken: the folder view holds no two-file selection", 10000);
 
@@ -490,7 +497,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 
         QVERIFY(!QFileInfo::exists(QDir(dir).filePath("a.png")));
         QVERIFY(!QFileInfo::exists(QDir(dir).filePath("b.png")));
-        auto *floating = core.mw->findChild<FloatingMessage *>();
+        auto *floating = core.mainWindow()->findChild<FloatingMessage *>();
         QVERIFY2(floating, "no floating message widget exists after a batch removal");
         auto *label = floating->findChild<QLabel *>("textLabel");
         QVERIFY2(label, "the floating message carries no text label");
@@ -501,7 +508,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void renameCurrentSelectionForcesAfterScriptedConfirmation() {
         Core core;
         coretest::FakeInteractions fake;
-        core.ui_ = &fake;
+        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         // the collision the rename will hit: renamed.png already exists
@@ -542,20 +549,20 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         writeImage(QDir(dir).filePath("zzz.png"));
         Core core;
         QVERIFY(core.loadPath(from));
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->containsFile(from), 10000);
-        QCOMPARE(core.model->fileCount(), 2);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->containsFile(from), 10000);
+        QCOMPARE(core.directoryModel()->fileCount(), 2);
 
         core.renameCurrentSelection("renamed.png");
 
         // isSettled() cannot wait for this: it asks about pending model work,
         // not about whether the watch events arrived, and it is already true
         // the moment the rename returns. Wait on the facts themselves.
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->containsFile(to), 10000);
-        QVERIFY(!core.model->containsFile(from));
-        QCOMPARE(core.model->fileCount(), 2); // lossless: nothing dropped
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->containsFile(to), 10000);
+        QVERIFY(!core.directoryModel()->containsFile(from));
+        QCOMPARE(core.directoryModel()->fileCount(), 2); // lossless: nothing dropped
         QTRY_VERIFY_WITH_TIMEOUT(core.currentFilePath() == to, 10000);
-        QVERIFY(core.model->isLoaded(to));    // landed on it, not merely listed
-        QVERIFY(!core.model->isLoaded(from)); // and the old name is gone from memory
+        QVERIFY(core.directoryModel()->isLoaded(to));    // landed on it, not merely listed
+        QVERIFY(!core.directoryModel()->isLoaded(from)); // and the old name is gone from memory
     }
 
     // The other half of 跟手: a rename this process never issued, done by another
@@ -583,15 +590,15 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         writeImage(QDir(dir).filePath("zzz.png"));
         Core core;
         QVERIFY(core.loadPath(from));
-        QTRY_VERIFY_WITH_TIMEOUT(core.model->containsFile(from), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->containsFile(from), 10000);
         QCOMPARE(core.currentFilePath(), from);
 
         QVERIFY(std::rename(from.toLocal8Bit().constData(), to.toLocal8Bit().constData()) == 0);
 
         QTRY_VERIFY_WITH_TIMEOUT(core.currentFilePath() == to, 10000);
-        QVERIFY(core.model->isLoaded(to)); // on it, not merely pointing at it
-        QVERIFY(!core.model->isLoaded(from));
-        QCOMPARE(core.model->fileCount(), 2); // lossless, as under an issued rename
+        QVERIFY(core.directoryModel()->isLoaded(to)); // on it, not merely pointing at it
+        QVERIFY(!core.directoryModel()->isLoaded(from));
+        QCOMPARE(core.directoryModel()->fileCount(), 2); // lossless, as under an issued rename
     }
 
     // ---- DirectoryPresenter lifecycle: the view is an injected observer, the

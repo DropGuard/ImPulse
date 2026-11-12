@@ -10,7 +10,7 @@
 #include "settings.h"
 
 OverlayHost::OverlayHost(MW *containerArg, ViewerWidget *viewerArg, DocumentWidget *docWidgetArg)
-    : QObject(containerArg), container(containerArg), viewer(viewerArg), docWidget(docWidgetArg) {
+    : IOverlayHost(containerArg), container(containerArg), viewer(viewerArg), docWidget(docWidgetArg) {
     floatingMessage = new FloatingMessageProxy(viewer); // todo: use additional one for folderview?
     imageInfoOverlay = new ImageInfoOverlayProxy(viewer);
     controlsOverlay = new ControlsOverlay(docWidget);
