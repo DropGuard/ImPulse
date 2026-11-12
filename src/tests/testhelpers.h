@@ -64,6 +64,20 @@ class IsolatedHome {
     IsolatedHome() {
         dir.setAutoRemove(true);
         Q_ASSERT(dir.isValid());
+        // What was there before: restored on destruction, because a fixture that
+        // only writes is a fixture that leaks. Today every use is a suite member
+        // living as long as the process, so the restore never fires in practice
+        // -- which is the other reason to have it: the day someone scopes one of
+        // these to a function (the way FreshSettings is used), the code after it
+        // must not keep running against a directory that was just deleted.
+        savedHome = qgetenv("HOME");
+        savedCache = qgetenv("XDG_CACHE_HOME");
+        savedConfig = qgetenv("XDG_CONFIG_HOME");
+        savedOrg = QCoreApplication::organizationName();
+        savedApp = QCoreApplication::applicationName();
+        hadHome = qEnvironmentVariableIsSet("HOME");
+        hadCache = qEnvironmentVariableIsSet("XDG_CACHE_HOME");
+        hadConfig = qEnvironmentVariableIsSet("XDG_CONFIG_HOME");
         qputenv("HOME", dir.path().toUtf8());
         // HOME alone no longer isolates the cache: the thumbnail store lives in
         // the shared freedesktop location, and QStandardPaths prefers
@@ -77,11 +91,32 @@ class IsolatedHome {
         QCoreApplication::setApplicationName("impulse");
     }
 
+    ~IsolatedHome() {
+        restore("HOME", savedHome, hadHome);
+        restore("XDG_CACHE_HOME", savedCache, hadCache);
+        restore("XDG_CONFIG_HOME", savedConfig, hadConfig);
+        QCoreApplication::setOrganizationName(savedOrg);
+        QCoreApplication::setApplicationName(savedApp);
+    }
+
+    IsolatedHome(const IsolatedHome &) = delete;
+    IsolatedHome &operator=(const IsolatedHome &) = delete;
+
     QString path() const {
         return dir.path();
     }
 
   private:
+    static void restore(const char *name, const QByteArray &value, bool wasSet) {
+        if(wasSet)
+            qputenv(name, value);
+        else
+            qunsetenv(name);
+    }
+
+    QByteArray savedHome, savedCache, savedConfig;
+    QString savedOrg, savedApp;
+    bool hadHome = false, hadCache = false, hadConfig = false;
     QTemporaryDir dir;
 };
 
@@ -97,6 +132,7 @@ class FreshSettings {
         // has cached: the fresh instance starts from defaults, deterministically
         const QString fresh =
             QStringLiteral("qimgv-test-%1-%2").arg(QCoreApplication::applicationPid()).arg(++counter, 0, 16);
+        savedApp = QCoreApplication::applicationName();
         QCoreApplication::setApplicationName(fresh);
         ::settings = new Settings();
     }
@@ -104,6 +140,11 @@ class FreshSettings {
     ~FreshSettings() {
         delete ::settings;
         ::settings = saved;
+        // the name is part of the identity this fixture swaps: leaving it at the
+        // unique test name meant the next QSettings wrote to a config path that
+        // nothing else in the run expects -- IsolatedHome, in particular,
+        // assumes applicationName is the production one.
+        QCoreApplication::setApplicationName(savedApp);
     }
 
     FreshSettings(const FreshSettings &) = delete;
@@ -112,4 +153,5 @@ class FreshSettings {
   private:
     inline static int counter = 0;
     Settings *saved = nullptr;
+    QString savedApp;
 };

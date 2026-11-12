@@ -51,7 +51,6 @@ class TestMachinery : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // Randomizer, Cache and the settings getters fail silently by design: a
