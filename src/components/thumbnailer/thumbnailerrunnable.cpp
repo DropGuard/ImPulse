@@ -177,9 +177,11 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
     // Display presentation is applied after the read, never stored.
     std::unique_ptr<QImage> image = fitForDisplay(stored, size, crop);
 
-    auto &&tmpPixmap = new QPixmap(image->size());
-    *tmpPixmap = QPixmap::fromImage(*image);
-    tmpPixmap->setDevicePixelRatio(qGuiApp->devicePixelRatio());
+    // QImage, not QPixmap: this runs on a pool thread, and QPixmap is bound
+    // to the display — the conversion to the paint device happens where the
+    // thumbnail is consumed, on the GUI thread
+    std::shared_ptr<QImage> imagePtr(image.release());
+    imagePtr->setDevicePixelRatio(qGuiApp->devicePixelRatio());
 
     // The label reports the SOURCE's dimensions, and on a cache hit nothing in
     // the store reliably knows them: Thumb::Image::Width/Height are optional in
@@ -192,7 +194,7 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
         originalSize = probeSize;
 
     QString label;
-    if(tmpPixmap->width() == 0) {
+    if(imagePtr->width() == 0) {
         label = "error";
     } else {
         // A size nobody can establish is left out rather than invented: "0x0"
@@ -204,8 +206,7 @@ std::shared_ptr<Thumbnail> ThumbnailerRunnable::generate(ThumbnailCache *cache, 
         else if(video)
             label.append(" [v]");
     }
-    std::shared_ptr<QPixmap> pixmapPtr(tmpPixmap);
-    return std::make_shared<Thumbnail>(fileInfo.fileName(), label, size, pixmapPtr);
+    return std::make_shared<Thumbnail>(fileInfo.fileName(), label, size, imagePtr);
 }
 
 ThumbnailerRunnable::~ThumbnailerRunnable() {
