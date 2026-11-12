@@ -52,12 +52,24 @@ Core::Core(const Deps &deps)
     initGui();
     // the main window owns the dialogs, so it is the production provider of the
     // interaction interface; tests replace this pointer with a scripted fake
-    ui_ = mw;
-    // the production view is the window itself; a test names its own
-    view_ = deps.view ? deps.view : mw;
-    // same rule for the overlay surface: MainWindow's host unless a test named
-    // its own, in which case Core never touches the widget tree for messages
-    overlays_ = deps.overlays ? deps.overlays : mw->overlays();
+    if(deps.headless) {
+        // no window tree at all: the three seams are the whole surface, and a
+        // missing one would surface as a null deref on first use — assert it
+        Q_ASSERT(deps.ui && deps.overlays && deps.view);
+        ui_ = deps.ui;
+        overlays_ = deps.overlays;
+        view_ = deps.view;
+        ownedDialogs = std::make_unique<DialogHost>(nullptr, nullptr);
+        dialogs_ = ownedDialogs.get();
+    } else {
+        // the main window owns the dialogs and the interaction interface, so it
+        // is the production provider of both; tests replace these pointers with
+        // scripted fakes
+        ui_ = mw;
+        view_ = deps.view ? deps.view : mw;
+        overlays_ = deps.overlays ? deps.overlays : mw->overlays();
+        dialogs_ = mw->dialogs();
+    }
     initComponents();
     connectComponents();
     initActions();
@@ -120,7 +132,9 @@ void Core::readSettings() {
 }
 
 void Core::showGui() {
-    if(mw && !view_->isWindowVisible())
+    if(!mw)
+        return; // headless Core has nothing to show
+    if(!view_->isWindowVisible())
         view_->showWindowDefault();
     // TODO: this is unreliable.
     // how to make it wait until a window is shown?
@@ -149,11 +163,9 @@ void Core::initComponents() {
 }
 
 void Core::connectComponents() {
-    thumbPanelPresenter.setView(mw->getThumbnailPanel());
     connect(&thumbPanelPresenter, &DirectoryPresenter::fileActivated, this, &Core::onDirectoryViewFileActivated);
     connect(&thumbPanelPresenter, &DirectoryPresenter::dirActivated, this, &Core::loadPath);
 
-    folderViewPresenter.setView(mw->getFolderView());
     connect(&folderViewPresenter, &DirectoryPresenter::fileActivated, this, &Core::onDirectoryViewFileActivated);
     connect(&folderViewPresenter, &DirectoryPresenter::dirActivated, this, &Core::loadPath);
 
@@ -165,18 +177,13 @@ void Core::connectComponents() {
 
     connect(scriptManager, &ScriptManager::error, overlays_, &IOverlayHost::showError);
 
-    connect(mw->dialogs(), &DialogHost::opened, this, &Core::loadPath);
     connect(mw, &MW::droppedIn, this, &Core::onDropIn);
     connect(overlays_, &IOverlayHost::copyRequested, this, &Core::copyCurrentFile);
     connect(overlays_, &IOverlayHost::moveRequested, this, &Core::moveCurrentFile);
     connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
     connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
-    connect(mw->crop(), &CropController::cropRequested, this, &Core::crop);
-    connect(mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
     connect(overlays_, &IOverlayHost::saveAsClicked, this, &Core::requestSavePath);
     connect(overlays_, &IOverlayHost::saveRequested, this, &Core::saveCurrentFile);
-    connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
-    connect(mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
     connect(overlays_, &IOverlayHost::renameRequested, this, &Core::renameCurrentSelection);
     connect(mw, &MW::sortingSelected, this, &Core::sortBy);
     connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
@@ -199,11 +206,76 @@ void Core::connectComponents() {
     connect(model.get(), &DirectoryModel::loadFailed, this, &Core::onLoadFailed);
 
     connect(&slideshowTimer, &QTimer::timeout, this, &Core::nextImageSlideshow);
+    if(mw)
+        connectWindowComponents();
+}
+
+// The window-connected bindings and relays: view binding, dialog host signals, and the
+// window->Core legs. Headless Core skips the whole method — a windowless
+// process has no drops, no drags, no folder-view clicks, no keys.
+void Core::connectWindowComponents() {
+    thumbPanelPresenter.setView(mw->getThumbnailPanel());
+    folderViewPresenter.setView(mw->getFolderView());
+    connect(mw->dialogs(), &DialogHost::opened, this, &Core::loadPath);
+    connect(mw->crop(), &CropController::cropRequested, this, &Core::crop);
+    connect(mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
+    connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
+    connect(mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
 }
 
 void Core::initActions() {
     connect(actionManager, &ActionManager::nextImage, this, &Core::nextImage);
     connect(actionManager, &ActionManager::prevImage, this, &Core::prevImage);
+    connect(actionManager, &ActionManager::resize, this, &Core::showResizeDialog);
+    connect(actionManager, &ActionManager::flipH, this, &Core::flipH);
+    connect(actionManager, &ActionManager::flipV, this, &Core::flipV);
+    connect(actionManager, &ActionManager::rotateLeft, this, &Core::rotateLeft);
+    connect(actionManager, &ActionManager::rotateRight, this, &Core::rotateRight);
+    connect(actionManager, &ActionManager::crop, this, &Core::toggleCropPanel);
+    connect(actionManager, &ActionManager::setWallpaper, this, &Core::setWallpaper);
+    connect(actionManager, &ActionManager::open, this, &Core::showOpenDialog);
+    connect(actionManager, &ActionManager::save, this, &Core::saveCurrentFile);
+    connect(actionManager, &ActionManager::saveAs, this, &Core::requestSavePath);
+    connect(actionManager, &ActionManager::exit, this, &Core::close);
+    connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
+    connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
+    connect(actionManager, &ActionManager::copyFile, overlays_, &IOverlayHost::triggerCopyOverlay);
+    connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
+    connect(actionManager, &ActionManager::moveFile, overlays_, &IOverlayHost::triggerMoveOverlay);
+    connect(actionManager, &ActionManager::jumpToFirst, this, &Core::jumpToFirst);
+    connect(actionManager, &ActionManager::jumpToLast, this, &Core::jumpToLast);
+    connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
+    connect(actionManager, &ActionManager::folderView, this, &Core::enableFolderView);
+    connect(actionManager, &ActionManager::documentView, this, &Core::enableDocumentView);
+    connect(actionManager, &ActionManager::toggleFolderView, this, &Core::toggleFolderView);
+    connect(actionManager, &ActionManager::reloadImage, this, qOverload<>(&Core::reloadImage));
+    connect(actionManager, &ActionManager::copyFileClipboard, this, &Core::copyFileClipboard);
+    connect(actionManager, &ActionManager::copyPathClipboard, this, &Core::copyPathClipboard);
+    connect(actionManager, &ActionManager::renameFile, this, &Core::showRenameDialog);
+    connect(actionManager, &ActionManager::sortByName, this, &Core::sortByName);
+    connect(actionManager, &ActionManager::sortByTime, this, &Core::sortByTime);
+    connect(actionManager, &ActionManager::sortBySize, this, &Core::sortBySize);
+    connect(actionManager, &ActionManager::toggleImageInfo, overlays_, &IOverlayHost::toggleImageInfoOverlay);
+    connect(actionManager, &ActionManager::toggleShuffle, this, &Core::toggleShuffle);
+    connect(actionManager, &ActionManager::showInDirectory, this, &Core::showInDirectory);
+    connect(actionManager, &ActionManager::toggleSlideshow, this, &Core::toggleSlideshow);
+    connect(actionManager, &ActionManager::goUp, this, &Core::loadParentDir);
+    connect(actionManager, &ActionManager::discardEdits, this, &Core::discardEdits);
+    connect(actionManager, &ActionManager::nextDirectory, this, &Core::nextDirectory);
+    connect(actionManager, &ActionManager::prevDirectory, this, qOverload<>(&Core::prevDirectory));
+    connect(actionManager, &ActionManager::print, this, &Core::print);
+    connect(actionManager, &ActionManager::toggleFullscreenInfoBar, this, &Core::toggleFullscreenInfoBar);
+    connect(actionManager, &ActionManager::pasteFile, this, &Core::openFromClipboard);
+    // the folder grid's scope actions, landed on the proxy the same way the
+    // viewer commands land on ViewerWidget
+    if(mw)
+        connectWindowActions();
+}
+
+// The window-connected actions, kept as one block: headless Core has no keys and skips the whole
+// method — its tests call the slots directly. The connects stay in core.cpp
+// because R12 reads this file's text for the registry.
+void Core::connectWindowActions() {
     connect(actionManager, &ActionManager::fitWindow, mw->viewer(), &ViewerWidget::fitWindow);
     connect(actionManager, &ActionManager::fitWidth, mw->viewer(), &ViewerWidget::fitWidth);
     connect(actionManager, &ActionManager::fitNormal, mw->viewer(), &ViewerWidget::fitOriginal);
@@ -220,61 +292,19 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::scrollDown, mw->viewer(), &ViewerWidget::scrollDown);
     connect(actionManager, &ActionManager::scrollLeft, mw->viewer(), &ViewerWidget::scrollLeft);
     connect(actionManager, &ActionManager::scrollRight, mw->viewer(), &ViewerWidget::scrollRight);
-    connect(actionManager, &ActionManager::resize, this, &Core::showResizeDialog);
-    connect(actionManager, &ActionManager::flipH, this, &Core::flipH);
-    connect(actionManager, &ActionManager::flipV, this, &Core::flipV);
-    connect(actionManager, &ActionManager::rotateLeft, this, &Core::rotateLeft);
-    connect(actionManager, &ActionManager::rotateRight, this, &Core::rotateRight);
     connect(actionManager, &ActionManager::openSettings, mw->dialogs(), &DialogHost::showSettings);
-    connect(actionManager, &ActionManager::crop, this, &Core::toggleCropPanel);
-    connect(actionManager, &ActionManager::setWallpaper, this, &Core::setWallpaper);
-    connect(actionManager, &ActionManager::open, this, &Core::showOpenDialog);
-    connect(actionManager, &ActionManager::save, this, &Core::saveCurrentFile);
-    connect(actionManager, &ActionManager::saveAs, this, &Core::requestSavePath);
-    connect(actionManager, &ActionManager::exit, this, &Core::close);
     connect(actionManager, &ActionManager::closeFullScreenOrExit, mw->shell(), &WindowShell::closeFullScreenOrExit);
-    connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
-    connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
-    connect(actionManager, &ActionManager::copyFile, overlays_, &IOverlayHost::triggerCopyOverlay);
-    connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
-    connect(actionManager, &ActionManager::moveFile, overlays_, &IOverlayHost::triggerMoveOverlay);
-    connect(actionManager, &ActionManager::jumpToFirst, this, &Core::jumpToFirst);
-    connect(actionManager, &ActionManager::jumpToLast, this, &Core::jumpToLast);
-    connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
     connect(actionManager, &ActionManager::pauseVideo, mw->viewer(), &ViewerWidget::pauseResumePlayback);
     connect(actionManager, &ActionManager::seekVideoForward, mw->viewer(), &ViewerWidget::seekForward);
     connect(actionManager, &ActionManager::seekVideoBackward, mw->viewer(), &ViewerWidget::seekBackward);
     connect(actionManager, &ActionManager::frameStep, mw->viewer(), &ViewerWidget::frameStep);
     connect(actionManager, &ActionManager::frameStepBack, mw->viewer(), &ViewerWidget::frameStepBack);
-    connect(actionManager, &ActionManager::folderView, this, &Core::enableFolderView);
-    connect(actionManager, &ActionManager::documentView, this, &Core::enableDocumentView);
-    connect(actionManager, &ActionManager::toggleFolderView, this, &Core::toggleFolderView);
-    connect(actionManager, &ActionManager::reloadImage, this, qOverload<>(&Core::reloadImage));
-    connect(actionManager, &ActionManager::copyFileClipboard, this, &Core::copyFileClipboard);
-    connect(actionManager, &ActionManager::copyPathClipboard, this, &Core::copyPathClipboard);
-    connect(actionManager, &ActionManager::renameFile, this, &Core::showRenameDialog);
     connect(actionManager, &ActionManager::contextMenu, mw, &MW::showContextMenu);
     connect(actionManager, &ActionManager::toggleTransparencyGrid, mw->viewer(), &ViewerWidget::toggleTransparencyGrid);
-    connect(actionManager, &ActionManager::sortByName, this, &Core::sortByName);
-    connect(actionManager, &ActionManager::sortByTime, this, &Core::sortByTime);
-    connect(actionManager, &ActionManager::sortBySize, this, &Core::sortBySize);
-    connect(actionManager, &ActionManager::toggleImageInfo, overlays_, &IOverlayHost::toggleImageInfoOverlay);
-    connect(actionManager, &ActionManager::toggleShuffle, this, &Core::toggleShuffle);
     connect(actionManager, &ActionManager::toggleScalingFilter, mw, &MW::toggleScalingFilter);
-    connect(actionManager, &ActionManager::showInDirectory, this, &Core::showInDirectory);
     connect(actionManager, &ActionManager::toggleMute, mw->viewer(), &ViewerWidget::toggleMute);
     connect(actionManager, &ActionManager::volumeUp, mw->viewer(), &ViewerWidget::volumeUp);
     connect(actionManager, &ActionManager::volumeDown, mw->viewer(), &ViewerWidget::volumeDown);
-    connect(actionManager, &ActionManager::toggleSlideshow, this, &Core::toggleSlideshow);
-    connect(actionManager, &ActionManager::goUp, this, &Core::loadParentDir);
-    connect(actionManager, &ActionManager::discardEdits, this, &Core::discardEdits);
-    connect(actionManager, &ActionManager::nextDirectory, this, &Core::nextDirectory);
-    connect(actionManager, &ActionManager::prevDirectory, this, qOverload<>(&Core::prevDirectory));
-    connect(actionManager, &ActionManager::print, this, &Core::print);
-    connect(actionManager, &ActionManager::toggleFullscreenInfoBar, this, &Core::toggleFullscreenInfoBar);
-    connect(actionManager, &ActionManager::pasteFile, this, &Core::openFromClipboard);
-    // the folder grid's scope actions, landed on the proxy the same way the
-    // viewer commands land on ViewerWidget
     connect(actionManager, &ActionManager::gridSelectNext, mw->getFolderView(), &FolderViewProxy::gridSelectNext);
     connect(actionManager, &ActionManager::gridSelectPrev, mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
     connect(actionManager, &ActionManager::gridSelectAbove, mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
@@ -412,6 +442,8 @@ void Core::rotateRight() {
 }
 
 void Core::close() {
+    if(!mw)
+        return; // headless: nothing to close
     mw->close();
 }
 
@@ -579,7 +611,7 @@ void Core::openFromClipboard() {
             return;
         QString destPath = (!model->isEmpty() ? model->directoryPath() : QDir::homePath());
         destPath.append("/clipboard.png");
-        destPath = mw->dialogs()->getSaveFileName(destPath);
+        destPath = dialogs_->getSaveFileName(destPath);
         if(destPath.isEmpty())
             return;
         // the same save-with-rollback the on-disk editors use; this used to be
@@ -803,7 +835,7 @@ void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCou
 }
 
 void Core::showOpenDialog() {
-    mw->dialogs()->showOpenDialog(model->directoryPath());
+    dialogs_->showOpenDialog(model->directoryPath());
 }
 
 void Core::showInDirectory() {
@@ -1121,6 +1153,8 @@ void Core::copyCurrentFile(const QString &destDirectory) {
 }
 
 void Core::toggleCropPanel() {
+    if(!mw)
+        return; // crop is a surface over the window; headless has none
     if(model->isEmpty())
         return;
     if(mw->crop()->isCropPanelActive() || state.hasActiveImage)
@@ -1140,7 +1174,7 @@ void Core::requestSavePath() {
     // otherwise — the same law that keeps the disk off the bare keys
     const auto img = model->getImage(path);
     const QString suggested = (img && img->isEdited()) ? FileOperations::nextFreeVariantPath(path) : path;
-    mw->dialogs()->showSaveDialog(suggested);
+    dialogs_->showSaveDialog(suggested);
 }
 
 void Core::showResizeDialog() {
@@ -1148,7 +1182,7 @@ void Core::showResizeDialog() {
         return;
     auto img = model->getImage(selectedPath());
     if(img)
-        mw->dialogs()->showResizeDialog(img->size());
+        dialogs_->showResizeDialog(img->size());
 }
 
 // ---------------------------------------------------------------- image operations
@@ -1367,6 +1401,8 @@ void Core::setWallpaper() {
 }
 
 void Core::print() {
+    if(!mw)
+        return; // the print dialog parents to the window; headless has none
     if(model->isEmpty())
         return;
     PrintDialog p(mw);

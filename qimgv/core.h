@@ -17,6 +17,7 @@
 #include "components/workerpool/workerpool.h"
 #include "gui/iuserinteractions.h"
 #include "gui/icoreview.h"
+#include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
 #include "components/directorymanager/enginebridge.h"
@@ -159,6 +160,11 @@ class Core : public QObject {
         // null -> the one MainWindow builds. Supplying one detaches Core from
         // the widget tree for every path that only talks to the overlays.
         IOverlayHost *overlays = nullptr;
+        // headless construction: no window tree at all. Requires ui, overlays
+        // and view to be supplied — the three seams are the whole surface.
+        bool headless = false;
+        // null -> the window in production. Required when headless.
+        IUserInteractions *ui = nullptr;
         // null -> the window itself (production). The display sink, the mode
         // legs, and the visibility query.
         ICoreView *view = nullptr;
@@ -261,7 +267,9 @@ class Core : public QObject {
     void initGui();
     void initComponents();
     void connectComponents();
+    void connectWindowComponents();
     void initActions();
+    void connectWindowActions();
     void loadTranslation();
     void onUpdate();
     void onFirstRun();
@@ -292,6 +300,10 @@ class Core : public QObject {
     // where Core's display sink and mode legs go: the window in production, a
     // recording stub in a headless test. Not owned.
     ICoreView *view_ = nullptr;
+    // the dialog host: the window's in production, a parent-less one in a
+    // headless test. Borrow/own — the window owns its own.
+    DialogHost *dialogs_ = nullptr;
+    std::unique_ptr<DialogHost> ownedDialogs;
 
     // where Core's messages and overlay commands go: MainWindow's OverlayHost in
     // production, a scripted host in a test that does not want a window. Not
