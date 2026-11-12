@@ -64,7 +64,6 @@ void Actions::init() {
     mActions.insert("pauseVideo", QVersionNumber(0, 6, 85));
     mActions.insert("frameStep", QVersionNumber(0, 6, 85));
     mActions.insert("frameStepBack", QVersionNumber(0, 6, 85));
-    mActions.insert("folderView", QVersionNumber(0, 6, 85));
     mActions.insert("documentView", QVersionNumber(0, 6, 88));
     mActions.insert("toggleFolderView", QVersionNumber(0, 6, 88));
     mActions.insert("moveToTrash", QVersionNumber(0, 6, 89));
