@@ -67,6 +67,14 @@ target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
 set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 
+# Core's file operations: copy, move, rename, delete and trash driven through
+# scripted dialogs. Same object libraries as CORE_NAV, but no engine listing is
+# read, so it runs as its own binary with its own fixture domain.
+add_executable(core_fileops_tests core_fileops_tests.cpp)
+target_link_libraries(core_fileops_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
+add_test(NAME CORE_FILEOPS COMMAND core_fileops_tests)
+set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+
 # The widget surfaces: overlays, panels, the grid's keyboard and drag, the
 # settings dialog. Same object libraries, but nothing here builds a Core — this
 # suite exists so the checks that only need a widget do not pay for an engine,

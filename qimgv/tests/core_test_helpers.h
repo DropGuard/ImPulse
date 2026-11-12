@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QString>
 #include <QEventLoop>
+#include <QQueue>
 #include <QWidget>
 
 #include "components/actionmanager/actionmanager.h"
@@ -21,6 +22,7 @@
 #include "settings.h"
 #include "sharedresources.h"
 #include "utils/actions.h"
+#include "gui/iuserinteractions.h"
 #include "utils/inputmap.h"
 
 namespace coretest {
@@ -82,6 +84,39 @@ inline void drainEvents(int rounds = 3) {
     for(int i = 0; i < rounds; ++i)
         QCoreApplication::processEvents(QEventLoop::AllEvents);
 }
+
+// The scripted IUserInteractions: answers queued as DialogResults (consumed in
+// order), call counts and last arguments as the assertions' teeth. An empty
+// queue answers a default-constructed DialogResult (no, no all, no cancel) --
+// a deliberate trap: an unexpected question surfaces as a failed expectation,
+// not as a silently-tolerated dialog.
+//
+// Shared because the suites that drive Core's dialogs live in three files now;
+// a second copy would be a second answer to "what does a scripted yes mean".
+class FakeInteractions : public IUserInteractions {
+  public:
+    QQueue<DialogResult> replaceAnswers;
+    QList<QPair<QString, QString>> replaceArgs;
+    int replaceCalls = 0;
+    int confirmCalls = 0;
+    bool confirmAnswer = true;
+    int messageCalls = 0;
+    QString lastMessage;
+
+    bool showConfirmation(const QString &, const QString &) override {
+        ++confirmCalls;
+        return confirmAnswer;
+    }
+    DialogResult fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode, bool) override {
+        ++replaceCalls;
+        replaceArgs.append({src, dst});
+        return replaceAnswers.isEmpty() ? DialogResult{} : replaceAnswers.dequeue();
+    }
+    void showMessage(const QString &text) override {
+        ++messageCalls;
+        lastMessage = text;
+    }
+};
 
 // The scancode the platform's own table pairs with a key name — looked up, not
 // hardcoded, so a sweep survives table edits and stays honest about the
