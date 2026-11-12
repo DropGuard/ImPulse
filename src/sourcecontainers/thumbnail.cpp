@@ -1,9 +1,9 @@
 #include "thumbnail.h"
 
-Thumbnail::Thumbnail(QString _name, QString _info, int _size, std::shared_ptr<QPixmap> _pixmap)
-    : mName(_name), mInfo(_info), mPixmap(_pixmap), mSize(_size) {
-    if(_pixmap)
-        mHasAlphaChannel = _pixmap->hasAlphaChannel();
+Thumbnail::Thumbnail(QString _name, QString _info, int _size, std::shared_ptr<QImage> _image)
+    : mName(_name), mInfo(_info), mImage(_image), mSize(_size) {
+    if(_image)
+        mHasAlphaChannel = _image->hasAlphaChannel();
 }
 
 const QString &Thumbnail::name() {
@@ -22,6 +22,6 @@ bool Thumbnail::hasAlphaChannel() {
     return mHasAlphaChannel;
 }
 
-std::shared_ptr<QPixmap> Thumbnail::pixmap() {
-    return mPixmap;
+std::shared_ptr<QImage> Thumbnail::image() {
+    return mImage;
 }

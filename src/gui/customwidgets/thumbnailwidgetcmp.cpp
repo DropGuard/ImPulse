@@ -93,6 +93,10 @@ QSizeF ThumbnailWidgetCmp::effectiveSizeHint(Qt::SizeHint which, const QSizeF &c
 void ThumbnailWidgetCmp::setThumbnail(std::shared_ptr<Thumbnail> _thumbnail) {
     if(_thumbnail) {
         thumbnail = _thumbnail;
+        if(thumbnail && thumbnail->image())
+            displayPixmap = QPixmap::fromImage(*thumbnail->image());
+        else
+            displayPixmap = QPixmap();
         isLoaded = true;
         updateThumbnailDrawPosition();
         setupTextLayout();
@@ -131,7 +135,7 @@ void ThumbnailWidgetCmp::updateBackgroundRect() {
         bgRect.setBottom(height() - marginY);
         bgRect.setLeft(marginX);
         bgRect.setRight(width() - marginX);
-        if(!thumbnail || !thumbnail->pixmap())
+        if(!thumbnail || !displayPixmap)
             bgRect.setTop(drawRectCentered.top() - padding);
         else // ensure we get equal padding on the top & sides
             bgRect.setTop(qMax(drawRectCentered.top() - drawRectCentered.left() + marginX, marginY));
@@ -199,7 +203,7 @@ void ThumbnailWidgetCmp::paint(QPainter *painter, const QStyleOptionGraphicsItem
             ImageLib::recolor(loadingIcon, settings->colorScheme().folderview_hc2);
         drawIcon(painter, &loadingIcon);
     } else {
-        if(thumbnail->pixmap().get()->width() == 0) { // invalid thumb
+        if(displayPixmap.get()->width() == 0) { // invalid thumb
             QPixmap errorIcon(*shrRes->getPixmap(ShrIcon::SHR_ICON_ERROR, dpr));
             if(isHighlighted())
                 ImageLib::recolor(errorIcon, settings->colorScheme().accent);
@@ -207,7 +211,7 @@ void ThumbnailWidgetCmp::paint(QPainter *painter, const QStyleOptionGraphicsItem
                 ImageLib::recolor(errorIcon, settings->colorScheme().folderview_hc2);
             drawIcon(painter, &errorIcon);
         } else {
-            drawThumbnail(painter, thumbnail->pixmap().get());
+            drawThumbnail(painter, &displayPixmap);
             if(isHovered())
                 drawHoverHighlight(painter);
         }
@@ -250,7 +254,7 @@ void ThumbnailWidgetCmp::drawHoverHighlight(QPainter *painter) {
     auto mode = painter->compositionMode();
     painter->setCompositionMode(QPainter::CompositionMode_Plus);
     painter->setOpacity(0.2f);
-    painter->drawPixmap(drawRectCentered, *thumbnail->pixmap());
+    painter->drawPixmap(drawRectCentered, displayPixmap);
     painter->setOpacity(op);
     painter->setCompositionMode(mode);
 }
@@ -375,9 +379,9 @@ void ThumbnailWidgetCmp::updateThumbnailDrawPosition() {
         QPoint topLeft;
         QSize pixmapSize; // dpr-adjusted size
         if(isLoaded)
-            pixmapSize = thumbnail->pixmap()->size() / qApp->devicePixelRatio();
+            pixmapSize = thumbnail->image()->size() / qApp->devicePixelRatio();
         else
-            pixmapSize = thumbnail->pixmap()->size().scaled(mThumbnailSize, mThumbnailSize, Qt::KeepAspectRatio);
+            pixmapSize = thumbnail->image()->size().scaled(mThumbnailSize, mThumbnailSize, Qt::KeepAspectRatio);
         bool verticalFit = (pixmapSize.height() >= pixmapSize.width());
         if(thumbStyle == THUMB_SIMPLE || thumbStyle == THUMB_COMPACT) {
             topLeft.setX((width() - pixmapSize.width()) / 2.0);

@@ -82,6 +82,9 @@ class ThumbnailWidgetCmp : public QGraphicsWidget {
     void updateThumbnailDrawPosition();
 
     std::shared_ptr<Thumbnail> thumbnail;
+    // the paint-device copy of the thumbnail's image: converted once per
+    // assignment, here on the GUI thread — the worker only ever makes QImage
+    QPixmap displayPixmap;
     bool highlighted, hovered, dropHovered;
     int mThumbnailSize, padding, marginX, marginY, labelSpacing, textHeight;
     QRectF bgRect, mBoundingRect;
