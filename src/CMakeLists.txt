@@ -75,8 +75,14 @@ target_link_libraries(qimgv_nongui PUBLIC
 # OPTION DEFINITIONS, LINKING (mirrored from the executable below: these are the
 # same translation units that used to be compiled as part of the qimgv target)
 if(EXIV2)
+    # PUBLIC, not PRIVATE: this macro is a property of "is Exiv2 available",
+    # and every consumer of qimgv_nongui that compiles a TU including exiv2
+    # headers needs the same answer. Declared once here, it reaches qimgv_gui,
+    # the executable and the test binaries by inheritance — a second
+    # `target_compile_definitions(... PRIVATE USE_EXIV2)` anywhere is a second
+    # source of truth that can disagree with this one.
     target_link_libraries(qimgv_nongui PUBLIC PkgConfig::Exiv2)
-    target_compile_definitions(qimgv_nongui PRIVATE USE_EXIV2)
+    target_compile_definitions(qimgv_nongui PUBLIC USE_EXIV2)
 endif()
 if(KDE_SUPPORT)
     target_link_libraries(qimgv_nongui PUBLIC KF6::WindowSystem)
@@ -103,9 +109,6 @@ target_sources(qimgv_gui PRIVATE
     gui/cropcontroller.cpp
 )
 target_link_libraries(qimgv_gui PUBLIC qimgv_nongui qimgv_sanitizers Qt6::OpenGLWidgets)
-if(EXIV2)
-    target_compile_definitions(qimgv_gui PRIVATE USE_EXIV2)
-endif()
 if(KDE_SUPPORT)
     target_compile_definitions(qimgv_gui PRIVATE USE_KDE_BLUR)
 endif()
@@ -136,7 +139,6 @@ target_include_directories(qimgv PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../engine/q
 # OPTION DEFINITIONS, LINKING
 if(EXIV2)
     target_link_libraries(qimgv PRIVATE PkgConfig::Exiv2)
-    target_compile_definitions(qimgv PRIVATE USE_EXIV2)
 endif()
 if(KDE_SUPPORT)
     target_link_libraries(qimgv PRIVATE KF6::WindowSystem)
