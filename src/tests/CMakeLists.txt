@@ -67,6 +67,18 @@ target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
 set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 
+# The core_nav family, split by subject (the same widget-tree link as CORE_NAV):
+# crop, the grid widget, the shortcut scopes, the floating-layer keyboard, the
+# presenter over its scripted view, the edit/save contract, the slideshow, and
+# the clipboard/drag-drop legs. One subject per suite, so a crop change runs
+# crop tests and not the world.
+foreach(suite crop_tests grid_tests shortcut_scope_tests overlay_keys_tests presenter_tests edit_save_tests slideshow_tests clipboard_tests)
+    add_executable(${suite} ${suite}.cpp)
+    target_link_libraries(${suite} PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
+    add_test(NAME ${suite} COMMAND ${suite})
+    set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+endforeach()
+
 # Core's file operations: copy, move, rename, delete and trash driven through
 # scripted dialogs. Same object libraries as CORE_NAV, but no engine listing is
 # read, so it runs as its own binary with its own fixture domain.
