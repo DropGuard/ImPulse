@@ -67,6 +67,29 @@ TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[(bugprone-[a-z0
 CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
 SKIP = ('/3rdparty/', '_autogen/', '/corrosion/')
 
+# Known tool failures, tracked like the baseline and for the same reason: an
+# exempted TU is documented, reviewed data, not a silent hole. The format is
+# <tool> <path> <reason>, and the file is REQUIRED to exist once a crash is
+# exempted — a stale entry that no longer matches anything fails the gate, so
+# the list cannot quietly outlive the bug.
+EXEMPT = os.path.join(ROOT, 'scripts', 'lint-exempt.txt')
+
+def read_exemptions():
+    """{(tool, relpath): reason} — empty when the file is absent."""
+    out = {}
+    try:
+        lines = open(EXEMPT).read().splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = line.split(None, 2)
+        if len(parts) == 3:
+            out[(parts[0], parts[1])] = parts[2]
+    return out
+
 def entries():
     db = os.path.join(BUILD, 'compile_commands.json')
     if not os.path.exists(db):
@@ -82,7 +105,7 @@ def instrument_versions(srcs):
     # version first and its own ("clazy version 1.17") on the third line, so a
     # first-line slice would miss exactly the tool whose counts proved unstable.
     tools = sorted({e['command'].split()[0] for e in srcs}) + ['clazy-standalone', 'clang-tidy', 'cppcheck']
-    return [[t, run([t, '--version'], ROOT).strip()] for t in tools]
+    return [[t, run_status([t, '--version'], ROOT)[0].strip()] for t in tools]
 
 def fingerprint(srcs):
     # The baseline counts are only meaningful for the instrument state that
@@ -97,9 +120,70 @@ def fingerprint(srcs):
                          sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
-def run(cmd, cwd):
-    p = subprocess.run(cmd, shell=isinstance(cmd, str), cwd=cwd, capture_output=True, text=True)
-    return p.stdout + p.stderr
+def run_status(cmd, cwd, timeout=1800):
+    """Output AND exit status.
+
+    The status is not decoration. A tool that crashed produced no verdicts, and
+    once only the text is kept, "crashed" and "found nothing" are the same
+    string-shaped value. Matching the tools' crash wording cannot fix that: the
+    wording is theirs, it changes between versions, and the first attempt at
+    this check shipped two markers that never fire (`stack dump:` is really
+    `Stack dump:`) and one that was missing entirely. An exit status is
+    structural — 134 is SIGABRT whatever the tool decides to print.
+
+    Timeout is the same argument for the third failure mode: a tool that hangs
+    is not a tool that found nothing, and without a bound the gate waits
+    forever instead of naming the file.
+    """
+    try:
+        p = subprocess.run(cmd, shell=isinstance(cmd, str), cwd=cwd,
+                           capture_output=True, text=True, timeout=timeout)
+        # subprocess reports a signalled child as the negated signal number
+        # (-6 for SIGABRT). The shell's 128+n convention is what a reader
+        # expects in a log, and it keeps every nonzero status in one range.
+        status = 128 - p.returncode if p.returncode < 0 else p.returncode
+        return p.stdout + p.stderr, status
+    except subprocess.TimeoutExpired as e:
+        blob = (e.stdout or b'') + (e.stderr or b'')
+        if isinstance(blob, bytes):
+            blob = blob.decode('utf-8', 'replace')
+        return blob, TIMEOUT_STATUS
+
+# A status no compiler or checker uses for "I ran and finished". 0 is success,
+# 1 is "ran, reported problems", and 2 is gcc's "ran, bad invocation" — all
+# three mean the tool got to the end of its work.
+FINISHED_STATUSES = {0, 1, 2}
+# The status rides in the cached text on this line so a warm run keeps the
+# verdict "this TU never finished". Annotating the cache rather than widening
+# its format keeps every existing .out file readable.
+STATUS_PREFIX = '@@status '
+
+def status_of(out):
+    """The recorded exit status of a cached run, or 0 when the line is absent."""
+    for line in out.splitlines():
+        if line.startswith(STATUS_PREFIX):
+            try:
+                return int(line[len(STATUS_PREFIX):])
+            except ValueError:
+                return 0
+    return 0
+TIMEOUT_STATUS = 124  # coreutils timeout(1)'s convention, so logs read familiarly
+
+def unfinished(status):
+    """True when the tool did not finish, i.e. its output is not a verdict."""
+    return status not in FINISHED_STATUSES
+
+# The one line that explains an unfinished run, for the report. Purely
+# presentational: the DECISION is the exit status, this only says which of the
+# tool's own lines to quote beside it.
+def summarize(out):
+    for line in out.splitlines():
+        if 'Assertion `' in line or 'fatal error' in line or 'PLEASE submit' in line:
+            return line.strip()
+    for line in out.splitlines():
+        if line.strip() and not line.startswith(STATUS_PREFIX):
+            return line.strip()
+    return 'no output'
 
 def sha(text):
     return hashlib.sha256(text.encode()).hexdigest()[:16]
@@ -183,6 +267,7 @@ def syntax_command(e):
 
 def gcc_counts(srcs, versions, memo):
     found = collections.defaultdict(set)
+    crashes = []
     if not NOCACHE:
         os.makedirs(os.path.join(CACHE, 'deps'), exist_ok=True)
     def one(e):
@@ -193,14 +278,14 @@ def gcc_counts(srcs, versions, memo):
         hit = out is not None
         if not hit:
             if NOCACHE:
-                out = run(cmd, e['directory'])
+                out, status = run_status(cmd, e['directory'])
             else:
                 # -MD writes the include graph as a side effect of the pass we
                 # already pay for. Via a temp path: if gcc dies before writing
                 # it, nothing is promoted and nothing is cached — a crash
                 # output must never be replayed as a verdict.
                 tmp = depfile_path(e) + '.tmp'
-                out = run(cmd + f' -MD -MF {tmp}', e['directory'])
+                out, status = run_status(cmd + f' -MD -MF {tmp}', e['directory'])
                 try:
                     os.replace(tmp, depfile_path(e))
                 except OSError:
@@ -210,8 +295,11 @@ def gcc_counts(srcs, versions, memo):
                 # removed includes, so the pre-run key is not the one this
                 # output belongs to
                 key = tu_key(e, 'gcc', cmd, version, read_deps(e), memo)
+                out = f'{STATUS_PREFIX}{status}\n' + out
                 cache_write('gcc', key, out)
         parse_gcc(out, found)
+        if unfinished(status_of(out)):
+            crashes.append((e['file'], status_of(out), summarize(out)))
         return (hit, key)
     def parse_gcc(out, found):
         for line in out.splitlines():
@@ -225,10 +313,11 @@ def gcc_counts(srcs, versions, memo):
         cache_gc('deps', {sha(e['file']) for e in srcs}, '.d')
         print(f'cache: gcc {sum(h for h, _ in results)} hits, '
               f'{sum(not h for h, _ in results)} misses')
-    return found
+    return found, crashes
 
 def clazy_counts(srcs, version, memo):
     found = collections.defaultdict(set)
+    crashes = []  # (path, first crash line): TUs that produced no verdict at all
     def one(e):
         # the include graph is the gcc pass's depfile — same TU, same db
         # command, so the graph is identical and needs no re-derivation
@@ -236,12 +325,17 @@ def clazy_counts(srcs, version, memo):
         out = cache_read('clazy', key)
         hit = out is not None
         if not hit:
-            out = run(['clazy-standalone', '-p', BUILD, e['file']], ROOT)
+            out, status = run_status(['clazy-standalone', '-p', BUILD, e['file']], ROOT)
+            # The status is cached with the output: a crashed TU stays visible
+            # on a warm run instead of becoming a silent zero once cached.
+            out = f'{STATUS_PREFIX}{status}\n' + out
             cache_write('clazy', key, out)
         for line in out.splitlines():
             m = CLAZY.match(line)
             if m:
                 found[m.group(3)].add((m.group(1), m.group(2)))
+        if unfinished(status_of(out)):
+            crashes.append((e['file'], status_of(out), summarize(out)))
         return (hit, key)
     # 8, not nproc: clazy is clang-tidy and each TU pays for the AST twice
     # (~411 MiB peak RSS). Measured on 133 TUs: 4 workers 114s, 8 workers 64s,
@@ -253,10 +347,11 @@ def clazy_counts(srcs, version, memo):
         cache_gc('clazy', {k for _, k in results if k}, '.out')
         print(f'cache: clazy {sum(h for h, _ in results)} hits, '
               f'{sum(not h for h, _ in results)} misses')
-    return found
+    return found, crashes
 
 def clang_tidy_counts(srcs, version, memo):
     found = collections.defaultdict(set)
+    crashes = []
     def one(e):
         # the checks selection is part of the verdict, so it rides in the key
         key = None if NOCACHE else tu_key(e, 'clang-tidy', e['command'] + ' ' + TIDY_CHECKS,
@@ -264,7 +359,8 @@ def clang_tidy_counts(srcs, version, memo):
         out = cache_read('clang-tidy', key)
         hit = out is not None
         if not hit:
-            out = run(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
+            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
+            out = f'{STATUS_PREFIX}{status}\n' + out
             cache_write('clang-tidy', key, out)
         for line in out.splitlines():
             m = TIDY.match(line)
@@ -275,6 +371,8 @@ def clang_tidy_counts(srcs, version, memo):
                 if m.group(3) == 'bugprone-unchecked-optional-access' and '/tests/' in m.group(1):
                     continue
                 found[m.group(3)].add((m.group(1), m.group(2)))
+        if unfinished(status_of(out)):
+            crashes.append((e['file'], status_of(out), summarize(out)))
         return (hit, key)
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
         results = list(ex.map(one, srcs))
@@ -282,7 +380,7 @@ def clang_tidy_counts(srcs, version, memo):
         cache_gc('clang-tidy', {k for _, k in results if k}, '.out')
         print(f'cache: clang-tidy {sum(h for h, _ in results)} hits, '
               f'{sum(not h for h, _ in results)} misses')
-    return found
+    return found, crashes
 
 def cppcheck_counts():
     found = collections.defaultdict(set)
@@ -317,7 +415,12 @@ def cppcheck_counts():
            '--suppress=missingIncludeSystem',
            '--enable=warning,performance,portability', '--inline-suppr']
     cwd = os.path.abspath(BUILD)
-    out = run(cmd, cwd)
+    out, status = run_status(cmd, cwd)
+    # cppcheck scans the whole tree in one process, so an unfinished run has no
+    # per-file attribution; the coverage assertion below is what names the
+    # damage. This is the coarser first question: did it get to the end at all?
+    if unfinished(status):
+        sys.exit(f'cppcheck exited {status} — its findings are untrustworthy ({summarize(out)})')
 
     # coverage: every TU the compile db offers (after the same SKIP filter the
     # other tools apply) must appear in cppcheck's Checking lines, normalized
@@ -358,13 +461,15 @@ def main():
     fp = fingerprint(srcs)
     print(f'{len(srcs)} translation units, build dir {BUILD}, instrument {fp}')
     memo = {}
-    gcc = gcc_counts(srcs, versions, memo)
+    gcc, gcc_crashes = gcc_counts(srcs, versions, memo)
     gated = {k: v for k, v in gcc.items() if k in GATED}
     report_only = {k: v for k, v in gcc.items() if k not in GATED}
     now = {}
     now.update({('gcc', k): v for k, v in show('gcc, report-only families', report_only).items()})
-    now.update({('clazy', k): v for k, v in show('clazy', clazy_counts(srcs, versions['clazy-standalone'], memo)).items()})
-    now.update({('clang-tidy', k): v for k, v in show('clang-tidy', clang_tidy_counts(srcs, versions['clang-tidy'], memo)).items()})
+    clazy_found, clazy_crashes = clazy_counts(srcs, versions['clazy-standalone'], memo)
+    tidy_found, tidy_crashes = clang_tidy_counts(srcs, versions['clang-tidy'], memo)
+    now.update({('clazy', k): v for k, v in show('clazy', clazy_found).items()})
+    now.update({('clang-tidy', k): v for k, v in show('clang-tidy', tidy_found).items()})
     now.update({('cppcheck', k): v for k, v in show('cppcheck', cppcheck_counts()).items()})
     print('\ngcc, families the build fails on:')
     for check in sorted(GATED):
@@ -384,6 +489,31 @@ def main():
                 base[(tool, check)] = int(count)
 
     problems = []
+    # A crashed tool produced no verdicts for that TU, so its counts are a
+    # silence, not a pass. Reported before the count comparison: a crash
+    # explains why a family may have shrunk, and a shrunk number is otherwise
+    # reported as STALE with no hint that the measurement never happened.
+    exemptions = read_exemptions()
+    seen_exemptions = set()
+    for tool, crash_list in (('gcc', gcc_crashes), ('clazy', clazy_crashes),
+                             ('clang-tidy', tidy_crashes)):
+        for path, status, first in sorted(crash_list):
+            rel = os.path.relpath(path, ROOT)
+            if (tool, rel) in exemptions:
+                # Documented and reviewed: the reason lives in
+                # scripts/lint-exempt.txt beside the bug it belongs to. Still
+                # printed, because "checked nothing here" must stay visible.
+                seen_exemptions.add((tool, rel))
+                print(f'exempt  {tool}: {rel} produced no verdict — {exemptions[(tool, rel)]}')
+                continue
+            problems.append(f'UNFINISHED {tool}: {rel} exited {status}, '
+                            f'so it produced no verdict — {first}')
+    # an exemption that no longer describes reality: the tool recovered, the TU
+    # left the tree, or the check was removed. Either way the line is stale and
+    # hides nothing any more, so it fails rather than lingering.
+    for key in sorted(set(exemptions) - seen_exemptions):
+        problems.append(f'EXEMPT-STALE {key[0]}: {key[1]} is listed in lint-exempt.txt '
+                        f'but did not fail — delete the line')
     for key, n in sorted(now.items()):
         if key[0] == 'gcc-gated':
             if n:
