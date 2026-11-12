@@ -1,8 +1,14 @@
 #include "fileoperations.h"
 
+#include "utils/stuff.h"
+
 #include <QCoreApplication>
 #include <QImage>
 #include <QSaveFile>
+
+#ifdef USE_EXIV2
+#include <exiv2/exiv2.hpp>
+#endif
 
 #include <atomic>
 #include <cstdio> // ::rename — the atomic step in rename()
@@ -370,6 +376,68 @@ static bool writeImageTo(const QImage &image, const QString &destPath, int jpegQ
     return out.commit();
 }
 
-bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality) {
-    return writeImageTo(image, destPath, jpegQuality);
+bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality,
+                                    const QString &metadataSource) {
+    if(!writeImageTo(image, destPath, jpegQuality))
+        return false;
+    // Pixels first, metadata second, and the order is load-bearing: Qt's
+    // writers emit no EXIF/XMP/IPTC at all, so the file is complete but bare at
+    // this point, and Exiv2 edits it in place afterwards. Doing it the other
+    // way round is impossible — QImage::save truncates the destination.
+    //
+    // A failure here does NOT fail the save. The pixels are on disk and the
+    // user's edit is not lost; reporting failure would send them looking for a
+    // problem with a file that opens fine. It is logged instead.
+    if(!metadataSource.isEmpty() && QFileInfo::exists(metadataSource)) {
+        // Orientation is reset because the caller has already rotated the
+        // pixels: carrying the old value would make every viewer rotate them a
+        // second time.
+        if(!carryMetadata(metadataSource, destPath, /*resetOrientation=*/true))
+            qDebug() << "[FileOperations] no metadata carried from" << metadataSource << "to" << destPath;
+    }
+    return true;
+}
+
+// Copy EXIF, XMP and IPTC as whole blocks. All three, because they are
+// independent: EXIF holds the camera and GPS, XMP holds ratings and tags (what
+// Lightroom and darktable write), IPTC holds keywords and captions. Carrying
+// only EXIF would move a third of the metadata and call it preserved.
+//
+// Whole blocks rather than a tag whitelist: deleting individual tags leaves
+// dangling IFD pointers behind (drop GPSLatitude and Exif.Image.GPSTag still
+// points at an empty GPS IFD — measured on a real fixture), and a whitelist
+// drops more than it keeps. The only tag that must change is Orientation.
+bool FileOperations::carryMetadata(const QString &source, const QString &dest, bool resetOrientation) {
+#ifdef USE_EXIV2
+    try {
+        const std::unique_ptr<Exiv2::Image> from = Exiv2::ImageFactory::open(toStdString(source));
+        from->readMetadata();
+        if(from->exifData().empty() && from->xmpData().empty() && from->iptcData().empty())
+            return false;
+
+        const std::unique_ptr<Exiv2::Image> to = Exiv2::ImageFactory::open(toStdString(dest));
+        to->readMetadata();
+        to->setExifData(from->exifData());
+        to->setXmpData(from->xmpData());
+        to->setIptcData(from->iptcData());
+        if(resetOrientation) {
+            Exiv2::ExifData &exif = to->exifData();
+            auto it = exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"));
+            if(it != exif.end())
+                it->setValue("1"); // normal: the pixels already carry the rotation
+        }
+        to->writeMetadata();
+        return true;
+    } catch(const Exiv2::Error &e) {
+        // an unsupported format, a read-only file, or a block Exiv2 cannot
+        // encode: the pixels are saved, so this is a note, not a failure
+        qDebug() << "[FileOperations] metadata carry failed:" << e.what();
+        return false;
+    }
+#else
+    Q_UNUSED(source)
+    Q_UNUSED(dest)
+    Q_UNUSED(resetOrientation)
+    return false;
+#endif
 }

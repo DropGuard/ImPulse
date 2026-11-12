@@ -51,6 +51,8 @@ add_executable(engine_stack_tests
     fileops_tests.cpp
     image_ops_tests.cpp
     infra_tests.cpp)
+# USE_EXIV2 arrives with qimgv_nongui's PUBLIC compile definitions: one answer
+# to "is Exiv2 available" for every target, instead of each restating it.
 target_link_libraries(engine_stack_tests PRIVATE Qt6::Test qimgv_nongui)
 add_test(NAME ENGINE_STACK COMMAND engine_stack_tests)
 set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}")

@@ -97,7 +97,13 @@ bool ImageStatic::save(QString destPath, int jpegQuality) {
     // FileOperations::saveWithBackup now, shared with the clipboard import:
     // two copies of that sequence had already diverged once.
     const bool wasEdited = isEdited();
-    const bool success = FileOperations::saveWithBackup(*(wasEdited ? imageEdited : image), destPath, jpegQuality);
+    // The source is where the metadata comes from, and it is deliberately the
+    // ORIGINAL path even when saving elsewhere: an edit changes pixels, not
+    // provenance, so a Save As copy keeps the camera and GPS the file was shot
+    // with. An edit that never happened has nothing to carry.
+    const QString metadataSource = wasEdited ? mPath : QString();
+    const bool success =
+        FileOperations::saveWithBackup(*(wasEdited ? imageEdited : image), destPath, jpegQuality, metadataSource);
     // An edit is consumed by a write that actually happened. Swapping and
     // discarding before consulting `success` threw the user's unsaved edit away
     // on every failed save, and left the in-memory image claiming it was saved.
