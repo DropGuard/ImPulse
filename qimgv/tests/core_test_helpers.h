@@ -23,6 +23,7 @@
 #include "sharedresources.h"
 #include "utils/actions.h"
 #include "gui/iuserinteractions.h"
+#include "gui/ioverlayhost.h"
 #include "utils/inputmap.h"
 
 namespace coretest {
@@ -156,5 +157,67 @@ inline QMap<QString, int> widgetClasses() {
         counts[QString::fromUtf8(w->metaObject()->className())]++;
     return counts;
 }
+
+// A scripted IOverlayHost: counts the calls and keeps the last arguments, so a
+// test can watch where Core's messages land without owning the widget tree.
+// The overlay->Core signal legs stay live -- a test emits them on the fake to
+// drive Core exactly the way the real overlays do (saveRequested is the save
+// prompt's save button, renameRequested is the rename overlay's confirm).
+class FakeOverlayHost : public IOverlayHost {
+  public:
+    int messageCalls = 0;
+    QString lastMessage;
+    int successCalls = 0;
+    QString lastSuccess;
+    int errorCalls = 0;
+    QString lastError;
+    int saveOverlayShows = 0;
+    int saveOverlayHides = 0;
+    int copyMenuTriggers = 0;
+    int moveMenuTriggers = 0;
+    int renameRequests = 0;
+    QString lastRenameCurrent;
+
+    void showMessage(const QString &text, int duration = 1500) override {
+        Q_UNUSED(duration)
+        messageCalls++;
+        lastMessage = text;
+    }
+    void showMessageSuccess(const QString &text) override {
+        successCalls++;
+        lastSuccess = text;
+    }
+    void showWarning(const QString &text) override {
+        lastMessage = text;
+    }
+    void showError(const QString &text) override {
+        errorCalls++;
+        lastError = text;
+    }
+    void showMessageDirectory(const QString &dirName) override {
+        lastMessage = dirName;
+    }
+    void setExifInfo(const QMap<QString, QString> &exifInfo) override {
+        Q_UNUSED(exifInfo)
+    }
+    void toggleRenameOverlay(const QString &currentName) override {
+        renameRequests++;
+        lastRenameCurrent = currentName;
+    }
+    void showSaveOverlay() override {
+        saveOverlayShows++;
+    }
+    void hideSaveOverlay() override {
+        saveOverlayHides++;
+    }
+    void triggerCopyOverlay() override {
+        copyMenuTriggers++;
+    }
+    void triggerMoveOverlay() override {
+        moveMenuTriggers++;
+    }
+    void toggleImageInfoOverlay() override {
+    }
+};
 
 } // namespace coretest

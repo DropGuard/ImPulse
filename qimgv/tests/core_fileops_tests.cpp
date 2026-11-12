@@ -435,7 +435,10 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         const QString longFile = QDir(alpha).filePath(longName);
         writeImage(longFile);
 
-        Core core;
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
         coretest::FakeInteractions fake;
         fake.confirmAnswer = true;
         core.setUserInteractions(&fake);
@@ -450,19 +453,11 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         core.moveToTrash();
 
         QVERIFY2(QFileInfo::exists(longFile), "the refused file vanished anyway");
-        auto *floating = core.mainWindow()->findChild<FloatingMessage *>();
-        QVERIFY2(floating, "no floating message widget exists after a batch removal");
-        auto *label = floating->findChild<QLabel *>("textLabel");
-        QVERIFY2(label, "the floating message carries no text label");
+        QVERIFY2(overlayFake.errorCalls > 0, "the failure report never reached the injected host");
         static const QRegularExpression bothHalves(QStringLiteral("\\d+ files, \\d+ failed"));
-        QVERIFY2(bothHalves.match(label->text()).hasMatch(),
-                 qPrintable(QStringLiteral("batch report lost a half: \"") + label->text() + "\""));
+        QVERIFY2(bothHalves.match(overlayFake.lastError).hasMatch(),
+                 qPrintable(QStringLiteral("batch report lost a half: \"") + overlayFake.lastError + "\""));
     }
-
-    // The other half of the same report: a batch where nothing failed keeps
-    // the success styling and the bare count — the repair must not turn every
-    // batch into an error. Needs a working trash, so it skips where the
-    // fileops suite's probe skips too.
 
     // The other half of the same report: a batch where nothing failed keeps
     // the success styling and the bare count — the repair must not turn every
@@ -481,7 +476,10 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         writeImage(QDir(dir).filePath("a.png"));
         writeImage(QDir(dir).filePath("b.png"));
 
-        Core core;
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
         coretest::FakeInteractions fake;
         fake.confirmAnswer = true;
         core.setUserInteractions(&fake);
@@ -497,12 +495,40 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 
         QVERIFY(!QFileInfo::exists(QDir(dir).filePath("a.png")));
         QVERIFY(!QFileInfo::exists(QDir(dir).filePath("b.png")));
-        auto *floating = core.mainWindow()->findChild<FloatingMessage *>();
-        QVERIFY2(floating, "no floating message widget exists after a batch removal");
-        auto *label = floating->findChild<QLabel *>("textLabel");
-        QVERIFY2(label, "the floating message carries no text label");
-        QVERIFY2(label->text().contains(QStringLiteral("2 files")) && !label->text().contains(QStringLiteral("failed")),
-                 qPrintable(QStringLiteral("all-success batch reported: \"") + label->text() + "\""));
+        QVERIFY2(overlayFake.successCalls > 0, "the success report never reached the injected host");
+        QVERIFY2(overlayFake.lastSuccess.contains(QStringLiteral("2 files")) &&
+                     !overlayFake.lastSuccess.contains(QStringLiteral("failed")),
+                 qPrintable(QStringLiteral("all-success batch reported: \"") + overlayFake.lastSuccess + "\""));
+    }
+
+    // The other leg of the interface, driven the other way: the fake emits
+    // saveRequested — the save prompt's button, relayed — and Core saves the
+    // edited image in place. No widget, no prompt, just the contract.
+    void saveRequestTravelingTheInjectedHostWritesTheEdit() {
+        const QString dir = uniqueDir("ioverlay");
+        const QString img = QDir(dir).filePath("a.png");
+        writeImage(img);
+
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
+        QVERIFY(core.loadPath(img));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        // an in-memory crop: the disk still carries the full-size file (a
+        // uniform-color fixture would make flipH byte-identical, so the edit
+        // must be one a file diff can see)
+        core.crop(QRect(0, 0, 6, 8));
+        QCOMPARE(QImage(img).size(), QSize(8, 8));
+        // the edit itself lit the prompt (the edited-state nudge); the leg
+        // under test is measured from a clean slate
+        overlayFake.saveOverlayShows = 0;
+        overlayFake.saveOverlayHides = 0;
+
+        emit overlayFake.saveRequested();
+        QTRY_COMPARE_WITH_TIMEOUT(QImage(img).size(), QSize(6, 8), 10000);
+        QCOMPARE(overlayFake.saveOverlayShows, 0); // the request leg saves; it never opens the prompt
     }
 
     void renameCurrentSelectionForcesAfterScriptedConfirmation() {

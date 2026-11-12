@@ -8,6 +8,7 @@
 #include <QTest>
 #include <QTemporaryDir>
 #include <QCoreApplication>
+
 #include <QImage>
 #include <QColor>
 
