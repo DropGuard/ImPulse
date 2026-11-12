@@ -39,6 +39,7 @@
 #include "utils/filelog.h"
 #include "utils/imagefactory.h"
 #include "utils/randomizer.h"
+#include "core_test_helpers.h"
 #include "testhelpers.h"
 #include "qimgv_engine.h"
 
@@ -50,6 +51,30 @@ class EngineStackFixture {
         // process deletes directories the other is still watching
         : fixtureBase(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/qimgv-engine-stack-test/pid" +
                       QString::number(QCoreApplication::applicationPid()) + "/" + domain) {
+        // Initialization lives in the constructor, not in an init() every suite
+        // has to remember to call. Eleven classes inherited this fixture and each
+        // opened its initTestCase with a bare `init();` -- a call that can be
+        // omitted, and whose omission leaves a suite running against half a
+        // fixture. That is the same failure shape as the AppSingletons change:
+        // the hazard is "a line someone can forget", and the cure is to make
+        // there be no such line.
+        //
+        // Upstream registers these two metatypes; a probe says the suite passes
+        // without them (a pointer-to-member connection carries its argument types
+        // from the declaration, so registration is only load-bearing for a
+        // payload that must live in a QVariant). Kept because removing someone
+        // else's safety net on an unfinished theory is not a win.
+        qRegisterMetaType<std::shared_ptr<Image>>("std::shared_ptr<Image>");
+        qRegisterMetaType<ScalerRequest>("ScalerRequest");
+        // no removeRecursively here: the engine keeps inotify watches on these
+        // paths for the life of the process, and deleting a watched directory out
+        // from under it is how a later listing dies with EBADF. main() sweeps
+        // this process's own tree, before any fixture has opened anything.
+        //
+        // Recorded rather than QVERIFY'd: this runs while the enclosing suite is
+        // still being constructed, where QTest has no result to attach a failure
+        // to. resetFixture() reports it, where every test goes through.
+        fixtureReady = QDir().mkpath(fixtureBase);
     }
 
     void makeFile(const QString &name) {
@@ -60,6 +85,16 @@ class EngineStackFixture {
     // paths for the whole process, so a watched dir must never be deleted and
     // recreated behind its back
     void resetFixture() {
+        // The constructor records whether the fixture root could be created;
+        // this is where that becomes a test failure. It lives here rather than
+        // in a separate assertReady() the suites call from initTestCase because
+        // this is the entry point every fixture-using test already goes through:
+        // a test cannot use the fixture without passing the check, so there is
+        // no pair of lines that can drift apart. The failure it names -- an
+        // uncreatable /tmp root -- would otherwise surface far away, as whatever
+        // write happened to fail first.
+        QVERIFY2(fixtureReady, qPrintable(QStringLiteral("cannot create the fixture root: ") + fixtureBase));
+        QVERIFY(home.path() != nullptr);
         ++slotSeq;
         fixtureDir = fixtureBase + QString("/slot%1").arg(slotSeq);
         QVERIFY(QDir().mkpath(fixtureDir));
@@ -229,30 +264,13 @@ class EngineStackFixture {
         QVERIFY2(agrees, qPrintable(diff));
     }
 
-    void init() {
-        QVERIFY(home.path() != nullptr);
-        // IsolatedHome already redirected HOME and the config identity
-        QVERIFY(Settings::getInstance() != nullptr);
-        // Upstream registers these two, and a probe says the suite passes without
-        // them: in Qt 6 a pointer-to-member connection carries its argument types
-        // from the declaration, so qRegisterMetaType is only load-bearing for a
-        // payload that has to live in a QVariant (string-based SIGNAL/SLOT connect,
-        // or QVariant conversion). Kept because removing someone else's safety net
-        // on an unfinished theory is not a win — the point is not to add more.
-        qRegisterMetaType<std::shared_ptr<Image>>("std::shared_ptr<Image>");
-        qRegisterMetaType<ScalerRequest>("ScalerRequest");
-        // no removeRecursively here: the engine keeps inotify watches on these
-        // paths for the life of the process, and deleting a watched directory out
-        // from under it is how a later listing dies with EBADF. main() sweeps
-        // this process's own tree, before any fixture has opened anything.
-        QVERIFY(QDir().mkpath(fixtureBase));
-    }
-
   protected:
     IsolatedHome home;
+    coretest::AppSingletons singletons;
     QString fixtureBase;
     QString fixtureDir;
     int slotSeq = 0;
+    bool fixtureReady = false;
 };
 
 // qExec stops a class with "Function not found" when asked for a test function it

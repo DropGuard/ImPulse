@@ -16,7 +16,6 @@ class TestDecode : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     void jpegTwoTierDecodesScaledThenUpgradesToFull() {

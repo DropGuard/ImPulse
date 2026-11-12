@@ -65,6 +65,15 @@ target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
 set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 
+# The widget surfaces: overlays, panels, the grid's keyboard and drag, the
+# settings dialog. Same object libraries, but nothing here builds a Core — this
+# suite exists so the checks that only need a widget do not pay for an engine,
+# a watcher and an async listing, and so a failure names the surface.
+add_executable(gui_widget_tests gui_widget_tests.cpp)
+target_link_libraries(gui_widget_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
+add_test(NAME GUI_WIDGETS COMMAND gui_widget_tests)
+set_tests_properties(GUI_WIDGETS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+
 # executable architecture rules (ArchUnit-style): gui isolation, FFI caller
 # allowlist, rust internal seal
 add_test(NAME ARCH_RULES

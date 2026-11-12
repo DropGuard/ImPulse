@@ -182,6 +182,7 @@ class Core : public QObject {
     // decision lives in loadFileIndex() and is only observable through the
     // model's cache, which is deliberately not part of Core's public API.
     friend class TestCoreNav;
+    friend class TestGuiWidgets; // the wallpaper-command pin, moved to the widget suite
 
     // the one Thumbnailer in the process, shared by both presenters (rule R9).
     // Declared after pool_ and before the presenters, so destruction runs

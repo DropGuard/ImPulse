@@ -10,7 +10,6 @@ class TestWireFormat : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // model.rs::write_listing is the only producer and EngineBridge::parseListing
