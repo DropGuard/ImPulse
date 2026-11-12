@@ -1397,21 +1397,26 @@ class TestCoreNav : public QObject {
 
     void loadFailureOfUnviewedFileStaysSilent() {
         writeImage(QDir(base).filePath("keep.png"));
-        Core core;
-        coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        // the load-failure message rides the overlay interface now — the
+        // dialog layer asks questions, it does not announce
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
         QVERIFY(core.loadPath(QDir(base).filePath("keep.png")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("keep.png"), 10000);
-        int before = fake.messageCalls;
+        // the constructor's version/first-run message already landed here —
+        // baseline it, the way the old FakeInteractions test did
+        int before = overlayFake.messageCalls;
 
         // a failure for a file the user never opened stays silent
         emit core.directoryModel()->loadFailed(QDir(base).filePath("never-seen.png"));
-        QCOMPARE(fake.messageCalls, before);
+        QCOMPARE(overlayFake.messageCalls, before);
 
         // the on-screen file's own failure announces itself and closes the view
         emit core.directoryModel()->loadFailed(QDir(base).filePath("keep.png"));
-        QCOMPARE(fake.messageCalls, before + 1);
-        QVERIFY(fake.lastMessage.contains(QStringLiteral("Load failed")));
+        QCOMPARE(overlayFake.messageCalls, before + 1);
+        QVERIFY(overlayFake.lastMessage.contains(QStringLiteral("Load failed")));
     }
 
     void draggingAnUndecodedEntryStillOffersTheFile() {

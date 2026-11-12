@@ -420,9 +420,6 @@ ThumbnailStripProxy *MW::getThumbnailPanel() {
 }
 
 // todo: this is crap
-void MW::showMessage(const QString &text) {
-    overlayHost->showMessage(text);
-}
 
 bool MW::showConfirmation(const QString &title, const QString &msg) {
     return dialogHost->showConfirmation(title, msg);

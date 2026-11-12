@@ -45,10 +45,9 @@ Core::Core(const Deps &deps)
       // app always sized it. The unique_ptr is declared before the reference so
       // the member it points at outlives the reference's users.
       ownedPool(deps.pool ? nullptr : std::make_unique<WorkerPool>(workerPoolThreadCount())),
-      pool(deps.pool ? *deps.pool : *ownedPool),
-      mBridge(deps.bridge ? *deps.bridge : EngineBridge::instance()), folderEndAction(FOLDER_END_NO_ACTION), loopSlideshow(false),
-      thumbnailer(pool, mBridge), thumbPanelPresenter(thumbnailer),
-      folderViewPresenter(thumbnailer) {
+      pool(deps.pool ? *deps.pool : *ownedPool), mBridge(deps.bridge ? *deps.bridge : EngineBridge::instance()),
+      folderEndAction(FOLDER_END_NO_ACTION), loopSlideshow(false), thumbnailer(pool, mBridge),
+      thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
     loadTranslation();
     initGui();
     // the main window owns the dialogs, so it is the production provider of the
@@ -1675,7 +1674,7 @@ void Core::onLoadFailed(const QString &path) {
         qDebug() << "Load failed (not on screen):" << path;
         return;
     }
-    ui_->showMessage(tr("Load failed: ") + path);
+    overlays_->showMessage(tr("Load failed: ") + path);
     mw->closeImage();
 }
 
