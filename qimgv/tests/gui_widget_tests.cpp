@@ -23,6 +23,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSettings>
+#include <QEventLoop>
 #include <QTemporaryDir>
 
 #include <algorithm>
@@ -340,7 +341,6 @@ class TestGuiWidgets : public QObject {
         grid.resize(300, 300);
         grid.populate(2);
         grid.show();
-        QTest::qWait(50); // let the flow layout position the two cells
         QSignalSpy spy(&grid, &FolderGridView::draggedOver);
         QVERIFY(spy.isValid());
 
@@ -366,7 +366,6 @@ class TestGuiWidgets : public QObject {
         grid.resize(300, 300);
         grid.populate(2);
         grid.show();
-        QTest::qWait(50);
         QSignalSpy spy(&grid, &FolderGridView::draggedOver);
         QVERIFY(spy.isValid());
 
@@ -390,7 +389,6 @@ class TestGuiWidgets : public QObject {
         grid.resize(300, 300);
         grid.populate(2);
         grid.show();
-        QTest::qWait(50);
         QSignalSpy spy(&grid, &FolderGridView::droppedInto);
         QVERIFY(spy.isValid());
 
@@ -408,7 +406,6 @@ class TestGuiWidgets : public QObject {
         grid.resize(300, 300);
         grid.populate(2);
         grid.show();
-        QTest::qWait(50);
         QSignalSpy spy(&grid, &FolderGridView::droppedInto);
         QVERIFY(spy.isValid());
 
@@ -813,9 +810,14 @@ class TestGuiWidgets : public QObject {
         proxyOutlivesItsContainer<FullscreenInfoOverlayProxy>();
         proxyOutlivesItsContainer<FloatingMessageProxy>();
         proxyOutlivesItsContainer<VideoControlsProxyWrapper>();
-        QTest::qWait(100); // any deferred deletion must have landed
-        // nothing outlives the container it was made in: the tree reclaimed all
-        // five overlays with their containers, and no proxy stashed a widget
+        // Overlays removed with deleteLater land only after the loop runs. A
+        // fixed 100 ms was the old answer; this waits for the count itself, so a
+        // deletion that never happens fails here instead of being outrun by a
+        // slow machine. The round cap keeps it from hanging if the count is
+        // stuck above the baseline for some other reason -- the QCOMPARE below
+        // then reports the difference.
+        for(int i = 0; i < 100 && QApplication::allWidgets().size() != baseline; ++i)
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
         QCOMPARE(QApplication::allWidgets().size(), baseline);
     }
 

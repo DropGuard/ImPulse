@@ -282,7 +282,9 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QVERIFY(errored.isValid());
         sm->addScript("true-bin", Script("/bin/true", true));
         sm->runScript("true-bin", nullptr);
-        QTest::qWait(300); // runScript blocks inside; this only catches late errors
+        // runScript blocks internally, so nothing is pending: drain rather than
+        // sleep, and the assertion means "the queue had nothing in it"
+        coretest::drainEvents();
         QCOMPARE(errored.count(), 0);
         sm->removeScript("true-bin");
     }
@@ -1081,7 +1083,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         Scaler scaler(&cache, pool);
         int delivered = 0;
         QPixmap result;
-        QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap pix, ScalerRequest) {
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap pix, ScalerRequest) {
             result = pix;
             ++delivered;
         });
@@ -1137,7 +1139,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         int delivered = 0;
         QSize gotSize;
         QString gotPath;
-        QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap pix, ScalerRequest req) {
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap pix, ScalerRequest req) {
             ++delivered;
             gotSize = pix.size();
             gotPath = req.path;
@@ -1151,8 +1153,9 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QCOMPARE(gotSize, QSize(48, 24)); // the last request, not the first
         QCOMPARE(gotPath, fixtureDir + "/b.png");
         // the middle request (40x20) must never have been scaled and delivered:
-        // every hand-off is synchronous above, so nothing can arrive later
-        QTest::qWait(300);
+        // every hand-off is synchronous above, so nothing can arrive later:
+        // drain the queue and require it stayed empty
+        coretest::drainEvents();
         QCOMPARE(delivered, 1);
     }
 
@@ -1177,7 +1180,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         WorkerPool pool(2);
         Scaler scaler(&cache, pool);
         int delivered = 0;
-        QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap, ScalerRequest) {
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap, ScalerRequest) {
             ++delivered;
         });
 
@@ -1214,7 +1217,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
             WorkerPool pool(2);
             Scaler scaler(&cache, pool);
             int delivered = 0;
-            QObject::connect(&scaler, &Scaler::scalingFinished, [&](QPixmap, ScalerRequest) {
+            QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap, ScalerRequest) {
                 ++delivered;
             });
             scaler.requestScaled(
@@ -1223,8 +1226,8 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         }
 
         // the result travels through a queued hop, which copies the request into
-        // a posted event; give that a chance to settle before blaming a holder
-        QTest::qWait(100);
+        // a posted event; drain that queue before blaming a holder
+        coretest::drainEvents();
         QVERIFY2(image.use_count() == 1, "a destroyed Scaler still holds its last request, and the image inside it");
     }
 
@@ -1298,7 +1301,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         // a duplicate collapses instead of double-dispatching
         thumb.getThumbnailAsync(fixtureDir + "/img1.jpg", 32, false, false);
         QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 2, 10000);
-        QTest::qWait(200);
+        coretest::drainEvents();
         QCOMPARE(ready.count(), 2);
 
         // the clear happens before the event loop drains anything, so the

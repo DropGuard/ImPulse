@@ -1,5 +1,8 @@
 #include "engine_stack_fixture.h"
 #include "utils/stuff.h"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef USE_EXIV2
@@ -483,8 +486,13 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         // copy: a forced overwrite preserves the source's modification time
         QFileInfo destInfo(fixtureDir + "/destdir/renamed.png");
         QDateTime before = destInfo.lastModified();
-        QTest::qWait(1100); // mtime granularity: the new mtime must differ
+        // The source's mtime must differ from the destination's for the "preserves
+        // the source's time" assertion to mean anything. Sleeping 1100 ms bought
+        // that with wall-clock time; setting it says it directly, cannot be
+        // shortened by a coarse clock, and costs nothing.
         QVERIFY(writeBigImage(fixtureDir + "/newer.png", "png", QSize(8, 8)));
+        const struct timespec stamp[2] = {{0, UTIME_OMIT}, {before.toSecsSinceEpoch() - 60, 0}};
+        QVERIFY(::utimensat(AT_FDCWD, (fixtureDir + "/newer.png").toLocal8Bit().constData(), stamp, 0) == 0);
         FileOperations::copyFileTo(fixtureDir + "/newer.png", fixtureDir + "/destdir", true, result);
         QCOMPARE(result, FileOpResult::SUCCESS);
         QFileInfo overwritten(fixtureDir + "/destdir/renamed.png");

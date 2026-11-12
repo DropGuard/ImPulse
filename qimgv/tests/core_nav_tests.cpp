@@ -49,6 +49,7 @@
 #include "gui/dialogs/settingsdialog.h"
 #include "gui/contextmenu.h"
 #include "themestore.h"
+#include "core_test_helpers.h"
 #include "testhelpers.h"
 #include "gui/customwidgets/floatingwidget.h"
 #include "gui/customwidgets/floatingwidgetcontainer.h"
@@ -681,18 +682,18 @@ class TestCoreNav : public QObject {
         QVERIFY(viewer);
         core.mw->resize(1600, 900);
         core.mw->show();
-        QTest::qWait(300);
+        coretest::drainEvents();
         core.mw->fitOriginal();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
         viewer->zoomIn();
         viewer->zoomIn();
         viewer->scrollLeft();
-        QTest::qWait(600);
+        coretest::drainEvents();
         float scaleBefore = viewer->currentScale();
         QRect rectBefore = viewer->imageRect();
         core.mw->crop()->trigger();
         QVERIFY(core.mw->crop()->isCropPanelActive());
-        QTest::qWait(300);
+        coretest::drainEvents();
         QVERIFY(qFuzzyCompare(viewer->currentScale(), scaleBefore));
         QCOMPARE(static_cast<int>(viewer->fitMode()), static_cast<int>(FIT_FREE));
         QCOMPARE(viewer->imageRect(), rectBefore);
@@ -1226,7 +1227,11 @@ class TestCoreNav : public QObject {
         remote->setUrls({QUrl(QStringLiteral("https://example.com/notlocal.png"))});
         QApplication::clipboard()->setMimeData(remote);
         core.openFromClipboard();
-        QTest::qWait(200);
+        // "nothing happens" is checked after the queue is drained, not after an
+        // arbitrary 200 ms: a sleep would pass for the wrong reason on a fast
+        // machine and fail on a slow one, and neither says anything about the
+        // behavior
+        coretest::drainEvents();
         QCOMPARE(core.currentFilePath(), target);
 
         // 3. text only: no urls, no image, no action
@@ -1234,7 +1239,11 @@ class TestCoreNav : public QObject {
         textOnly->setText(QStringLiteral("just a sentence"));
         QApplication::clipboard()->setMimeData(textOnly);
         core.openFromClipboard();
-        QTest::qWait(200);
+        // "nothing happens" is checked after the queue is drained, not after an
+        // arbitrary 200 ms: a sleep would pass for the wrong reason on a fast
+        // machine and fail on a slow one, and neither says anything about the
+        // behavior
+        coretest::drainEvents();
         QCOMPARE(core.currentFilePath(), target);
         QVERIFY(!before.isEmpty());
     }
