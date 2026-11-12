@@ -47,6 +47,8 @@ add_executable(engine_stack_tests
     settings_tests.cpp
     filelog_tests.cpp
     machinery_tests.cpp
+    thumbnail_store_tests.cpp
+    thumbnailer_tests.cpp
     workerpool_tests.cpp
     fileops_tests.cpp
     image_ops_tests.cpp

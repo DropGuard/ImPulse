@@ -17,6 +17,8 @@ int runDecodeTests(int argc, char **argv);
 int runSettingsTableTests(int argc, char **argv);
 int runFileLogTests(int argc, char **argv);
 int runMachineryTests(int argc, char **argv);
+int runThumbnailStoreTests(int argc, char **argv);
+int runThumbnailerTests(int argc, char **argv);
 int runWorkerPoolTests(int argc, char **argv);
 int runFileOpsTests(int argc, char **argv);
 int runImageOpsTests(int argc, char **argv);
@@ -39,9 +41,9 @@ int main(int argc, char **argv) {
             QDir(base + "/" + stale).removeRecursively();
     int failures = 0;
     int (*const runs[])(int, char **) = {
-        runListingTests,       runWireFormatTests, runFolderBoundaryTests, runDecodeTests,
-        runSettingsTableTests, runFileLogTests,    runMachineryTests,      runWorkerPoolTests,
-        runFileOpsTests,       runImageOpsTests,   runInfraTests,
+        runListingTests, runWireFormatTests, runFolderBoundaryTests, runDecodeTests,      runSettingsTableTests,
+        runFileLogTests, runMachineryTests,  runThumbnailStoreTests, runThumbnailerTests, runWorkerPoolTests,
+        runFileOpsTests, runImageOpsTests,   runInfraTests,
     };
     // One process per class. Not for parallelism and not primarily for crash
     // isolation: QtTest starts a WatchDog QThread per class and joins it at
