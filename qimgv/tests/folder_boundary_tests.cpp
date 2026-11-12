@@ -10,7 +10,6 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // "After reaching the end of a folder" is a setting with three values, so what

@@ -18,7 +18,6 @@ class TestWorkerPool : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     void persistentWorkersSurviveSubmitAndDrainWaves();

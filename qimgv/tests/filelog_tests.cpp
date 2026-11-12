@@ -9,7 +9,6 @@ class TestFileLog : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // install() is thin glue verified by every session's first log lines; the

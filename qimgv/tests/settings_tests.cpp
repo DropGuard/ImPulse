@@ -13,7 +13,6 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     // Every row of settings_table.h is walked, so a new setting inherits this

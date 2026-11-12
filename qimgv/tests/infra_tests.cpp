@@ -10,7 +10,6 @@ class TestInfra : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     void bridgeInstancesAreIsolated() {

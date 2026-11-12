@@ -24,7 +24,6 @@ class TestFileOps : public QObject, protected EngineStackFixture {
 
   private slots:
     void initTestCase() {
-        init();
     }
 
     void copyFileToCopiesContentKeepsSourceAndRestoresTimestamps();
