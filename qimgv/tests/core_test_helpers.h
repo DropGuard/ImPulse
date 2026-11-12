@@ -24,12 +24,14 @@
 #include "utils/actions.h"
 #include "gui/iuserinteractions.h"
 #include "gui/ioverlayhost.h"
+#include "gui/icoreview.h"
 #include "gui/folderview/foldergridview.h"
 #include "gui/panels/mainpanel/thumbnailstripproxy.h"
 #include "shortcutbuilder.h"
 #include "utils/inputmap.h"
 #include <QPainter>
 #include "gui/ioverlayhost.h"
+#include "gui/icoreview.h"
 #include "utils/inputmap.h"
 
 namespace coretest {
@@ -238,6 +240,66 @@ inline QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
     const QPointF center = widgets.at(index)->mapToScene(widgets.at(index)->boundingRect().center());
     return grid.mapFromScene(center);
 }
+
+// A recording ICoreView for headless Core tests: counts the display sink
+// calls and keeps the last arguments. The mode entries are counted, not
+// stored — the mode itself is Core's state, readable there.
+class RecordingView : public ICoreView {
+  public:
+    int showImageCalls = 0;
+    QSize lastImageSize;
+    int showAnimationCalls = 0;
+    int showVideoCalls = 0;
+    int closeImageCalls = 0;
+    int folderEntries = 0;
+    int documentEntries = 0;
+    int loopPlaybackWrites = 0;
+    bool lastLoopPlayback = false;
+
+    void showImage(std::unique_ptr<QPixmap> pixmap) override {
+        showImageCalls++;
+        lastImageSize = pixmap ? pixmap->size() : QSize();
+    }
+    void showAnimation(const std::shared_ptr<QMovie> &movie) override {
+        Q_UNUSED(movie)
+        showAnimationCalls++;
+    }
+    void showVideo(const QString &file) override {
+        Q_UNUSED(file)
+        showVideoCalls++;
+    }
+    void closeImage() override {
+        closeImageCalls++;
+    }
+    void repaintView() override {
+    }
+    void setUpdatesEnabled(bool enabled) override {
+        Q_UNUSED(enabled)
+    }
+    void showWindowDefault() override {
+    }
+    bool isWindowVisible() override {
+        return true;
+    }
+    void toggleFullscreenInfoBar() override {
+    }
+    void onSortingChanged(SortingMode mode) override {
+        Q_UNUSED(mode)
+    }
+    void onScalingFinished(std::unique_ptr<QPixmap> scaled) override {
+        Q_UNUSED(scaled)
+    }
+    void enableFolderView() override {
+        folderEntries++;
+    }
+    void enableDocumentView() override {
+        documentEntries++;
+    }
+    void setLoopPlayback(bool mode) override {
+        loopPlaybackWrites++;
+        lastLoopPlayback = mode;
+    }
+};
 
 // A file's bytes, with a test failure (not a silent empty array) when it cannot
 // be read.
