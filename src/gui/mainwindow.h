@@ -137,7 +137,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions {
     // the slots unchanged.
     void enableFolderView();
     void enableDocumentView();
-    void showMessage(const QString &text) override;
     void close();
     void fitWindow();
     void fitWidth();
