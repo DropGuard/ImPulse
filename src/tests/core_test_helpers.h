@@ -13,6 +13,7 @@
 #include <QKeyEvent>
 #include <QMap>
 #include <QString>
+#include <QEventLoop>
 #include <QWidget>
 
 #include "components/actionmanager/actionmanager.h"
@@ -67,6 +68,20 @@ class AppSingletons {
     AppSingletons(const AppSingletons &) = delete;
     AppSingletons &operator=(const AppSingletons &) = delete;
 };
+
+// Deliver everything already queued, then stop. This is the honest form of
+// "give the event loop a chance", as opposed to a fixed qWait: it does not
+// assert that some amount of wall-clock time was enough, and it cannot pass
+// early just because the machine was fast. What it does NOT do is wait for
+// something that has not been queued yet -- a wait for a future event is a
+// QTRY_* on a condition, not a sleep.
+inline void drainEvents(int rounds = 3) {
+    // three rounds, because a handler that queues another event needs a second
+    // pass to see it; past that the queue is either empty or waiting on
+    // something this helper cannot see
+    for(int i = 0; i < rounds; ++i)
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+}
 
 // The scancode the platform's own table pairs with a key name — looked up, not
 // hardcoded, so a sweep survives table edits and stays honest about the
