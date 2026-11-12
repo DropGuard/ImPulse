@@ -94,6 +94,51 @@ with tempfile.TemporaryDirectory() as tmp:
     check(hits(shadow, 'clazy') == (1, 1), 'shadowing new header must invalidate the including TU (clazy)')
     check(hits(shadow, 'clang-tidy') == (1, 1), 'shadowing new header must invalidate the including TU (clang-tidy)')
 
+    # ---------------------------------------------------------------------
+    # An UNFINISHED tool must fail the gate by name, not read as "no findings".
+    #
+    # This is the invariant the crash check exists for, pinned without the real
+    # clazy bug and without any of the tools' wording: a stand-in binary exits
+    # 134 (SIGABRT, the shell's 128+6) for exactly one TU. The exit status is
+    # the signal; text matching was tried first and shipped two dead markers
+    # (`stack dump:` is really `Stack dump:`), which is why this test asserts on
+    # the status alone.
+    #
+    # The other half is that the run must be CACHED with its status: a crash
+    # that only shows on a cold run turns into a silent zero the moment the
+    # output is reused, and the gate would go green on the second invocation.
+    fake = os.path.join(tmp, 'fake-clazy')
+    write(fake, '#!/bin/sh\n'
+                '# the instrument fingerprint runs every tool with --version first\n'
+                'case "$*" in\n'
+                '  *--version*) echo "clazy version 1.17"; exit 0 ;;\n'
+                '  *b.cpp*) echo "Assertion `x == 1` failed." >&2; exit 134 ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n')
+    os.chmod(fake, 0o755)
+    env = dict(os.environ)
+    env['PATH'] = tmp + os.pathsep + env.get('PATH', '')
+    os.rename(fake, os.path.join(tmp, 'clazy-standalone'))
+
+    def lint_env(build, *args):
+        return subprocess.run([sys.executable, LINT, build, *args],
+                              capture_output=True, text=True, env=env)
+
+    # --no-cache so the stand-in is actually invoked, and the same tree the
+    # cache tests above used (a.cpp, b.cpp, h.h)
+    crash_cold = lint_env(tmp, '--gate', '--no-cache')
+    check(crash_cold.returncode != 0, 'an aborted TU must fail the run')
+    check('UNFINISHED clazy' in crash_cold.stdout,
+          f'the crash must be reported by tool name, got:\n{crash_cold.stdout}')
+    check('b.cpp' in crash_cold.stdout,
+          f'the crash must name the TU, got:\n{crash_cold.stdout}')
+
+    # and the status must survive the cache: run warm, still reported
+    lint_env(tmp, '--gate')
+    crash_warm = lint_env(tmp, '--gate')
+    check('UNFINISHED clazy' in crash_warm.stdout,
+          f'a cached crash must not become a silent zero, got:\n{crash_warm.stdout}')
+
 if failures:
     print('\n'.join(f'FAIL: {f}' for f in failures))
     sys.exit(1)
