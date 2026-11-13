@@ -9,7 +9,7 @@
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
 #include <QtTest/qtestcase.h>
-#include <QApplication>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -549,8 +549,13 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         writeImage(img);
 
         coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
         Core::Deps deps;
+        deps.headless = true;
+        coretest::FakeInteractions fake;
+        deps.ui = &fake;
         deps.overlays = &overlayFake;
+        deps.view = &view;
         Core core(deps);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -734,8 +739,10 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 };
 
 int main(int argc, char **argv) {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    QApplication app(argc, argv);
+    // QCoreApplication: the tested paths touch no widget, pixmap, movie frame
+    // or clipboard — the settings stylesheet loader guards on QApplication
+    // presence, so the singleton construction is font-wall free too
+    QCoreApplication app(argc, argv);
     // Its own binary, not a second class in core_nav's: a shared binary needs a
     // slot router that inspects the class in the parent, and any fixture the
     // router constructs would be inherited by every forked child -- the
