@@ -39,11 +39,4 @@ class ICoreView {
     // projections Core pushes after mutations
     virtual void onSortingChanged(SortingMode mode) = 0;
     virtual void onScalingFinished(std::unique_ptr<const QImage> scaled) = 0;
-
-    // enterMode's two legs (MW's own names)
-    virtual void enableFolderView() = 0;
-    virtual void enableDocumentView() = 0;
-
-    // the slideshow's loop state, relayed to the viewer
-    virtual void setLoopPlayback(bool mode) = 0;
 };

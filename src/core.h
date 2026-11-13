@@ -114,12 +114,12 @@ struct State {
     // scalar state lives in QProperties: bindable storage for the pull-style
     // views (P2 of the unidirectional-flow refactor), plain operator= writes
     QProperty<bool> hasActiveImage{false};
-    // the view mode is Core's decision, recorded here; the window follows it
-    // through enterMode's imperative legs. NOT a QProperty binding: the
-    // loadPath folder branch runs the view dance even on a same-mode load
-    // (hiding a live rename overlay), and a same-value write would dedup that
-    // cleanup away — the dance is load-coupled, not mode-coupled
-    ViewMode viewMode = MODE_DOCUMENT;
+    // the view mode is Core's decision, recorded here; the window subscribes
+    // and runs the view dance on change. Every mode read in Core's decision
+    // points is a state read — the window is a subscriber, not the source of
+    // truth. The load-coupled surface cleanup (hiding the overlays for a
+    // newly loaded folder) lives at the load site, not in this transition.
+    QProperty<ViewMode> viewMode{MODE_DOCUMENT};
     // the GUI is waiting for the first ready frame: main defers showGui while
     // set, and onModelItemReady raises the window with the image already in it
     QProperty<bool> delayModel{false};

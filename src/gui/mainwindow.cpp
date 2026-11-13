@@ -72,6 +72,12 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
         folderView->setDirectoryPath(appState->directoryPath.value());
         refreshInfoViews();
     });
+    // the mode dance: the view switch and its surface cleanup, run by the
+    // window on the state's change. The slideshow loop relay rides its own
+    // binding above.
+    viewModeObserver = state->viewMode.addNotifier([this, state = appState] {
+        state->viewMode.value() == MODE_FOLDERVIEW ? enableFolderView() : enableDocumentView();
+    });
 }
 
 /*                                                             |--[ImageViewer]

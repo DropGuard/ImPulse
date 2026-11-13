@@ -251,10 +251,6 @@ class RecordingView : public ICoreView {
     int showAnimationCalls = 0;
     int showVideoCalls = 0;
     int closeImageCalls = 0;
-    int folderEntries = 0;
-    int documentEntries = 0;
-    int loopPlaybackWrites = 0;
-    bool lastLoopPlayback = false;
 
     void showImage(std::shared_ptr<const QImage> image) override {
         showImageCalls++;
@@ -288,16 +284,6 @@ class RecordingView : public ICoreView {
     }
     void onScalingFinished(std::unique_ptr<const QImage> scaled) override {
         Q_UNUSED(scaled)
-    }
-    void enableFolderView() override {
-        folderEntries++;
-    }
-    void enableDocumentView() override {
-        documentEntries++;
-    }
-    void setLoopPlayback(bool mode) override {
-        loopPlaybackWrites++;
-        lastLoopPlayback = mode;
     }
 };
 
