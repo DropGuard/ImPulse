@@ -101,6 +101,10 @@ endif()
 add_library(qimgv_gui OBJECT)
 target_sources(qimgv_gui PRIVATE
     core.cpp
+    core_navigation.cpp
+    core_fileops.cpp
+    core_editing.cpp
+    core_clipboard.cpp
     proxystyle.cpp
     resources.qrc
     gui/windowshell.cpp
