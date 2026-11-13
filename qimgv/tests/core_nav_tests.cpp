@@ -655,6 +655,94 @@ class TestCoreNav : public QObject {
         QVERIFY(actionManager->invokeAction(QStringLiteral("gridOpen")));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(dir).filePath("b.png"), 10000);
     }
+
+    // #467's silent half: a batch reported only its successes. Qt's moveToTrash
+    // refuses a name whose trash target (files/ prefix + name) exceeds
+    // NAME_MAX, and that refusal used to vanish — "Moved to trash: 1 files"
+    // for a two-file selection. The report must carry both numbers, and each
+    // refusal also leaves its path and decoded reason in the session log. The
+    // exact split is a property of the trash topology (a mount with no trash
+    // at all fails every member), so the pin is the format, not the counts.
+
+    // #467's silent half: a batch reported only its successes. Qt's moveToTrash
+    // refuses a name whose trash target (files/ prefix + name) exceeds
+    // NAME_MAX, and that refusal used to vanish — "Moved to trash: 1 files"
+    // for a two-file selection. The report must carry both numbers, and each
+    // refusal also leaves its path and decoded reason in the session log. The
+    // exact split is a property of the trash topology (a mount with no trash
+    // at all fails every member), so the pin is the format, not the counts.
+    void batchTrashReportsHowManyFailed() {
+        // 250 'l' + ".png" fits the source directory (254 <= NAME_MAX) but
+        // cannot fit any real trash: even HOME=/ gives a 26-char files/ prefix.
+        const QString longName = QString(250, QLatin1Char('l')) + QStringLiteral(".png");
+        const QString longFile = QDir(alpha).filePath(longName);
+        writeImage(longFile);
+
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
+        coretest::FakeInteractions fake;
+        fake.confirmAnswer = true;
+        core.setUserInteractions(&fake);
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        core.enableFolderView();
+        core.mainWindow()->getFolderView()->select(QList<int>{0, 1});
+        QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 2,
+                                  "precondition broken: the folder view holds no two-file selection", 10000);
+
+        core.moveToTrash();
+
+        QVERIFY2(QFileInfo::exists(longFile), "the refused file vanished anyway");
+        QVERIFY2(overlayFake.errorCalls > 0, "the failure report never reached the injected host");
+        static const QRegularExpression bothHalves(QStringLiteral("\\d+ files, \\d+ failed"));
+        QVERIFY2(bothHalves.match(overlayFake.lastError).hasMatch(),
+                 qPrintable(QStringLiteral("batch report lost a half: \"") + overlayFake.lastError + "\""));
+    }
+
+    // The other half of the same report: a batch where nothing failed keeps
+    // the success styling and the bare count — the repair must not turn every
+    // batch into an error. Needs a working trash, so it skips where the
+    // fileops suite's probe skips too.
+    void batchTrashAllSuccessStillReportsTheCount() {
+        const QString dir = uniqueDir("trashok");
+        const QString probe = QDir(dir).filePath("trash-probe.txt");
+        QVERIFY(QFile(probe).open(QIODevice::WriteOnly));
+        FileOpResult probeResult;
+        FileOperations::moveToTrash(probe, probeResult);
+        if(probeResult != FileOpResult::SUCCESS)
+            QSKIP(
+                "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)");
+
+        writeImage(QDir(dir).filePath("a.png"));
+        writeImage(QDir(dir).filePath("b.png"));
+
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
+        coretest::FakeInteractions fake;
+        fake.confirmAnswer = true;
+        core.setUserInteractions(&fake);
+        QVERIFY(core.loadPath(QDir(dir).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        core.enableFolderView();
+        core.mainWindow()->getFolderView()->select(QList<int>{0, 1});
+        QTRY_VERIFY2_WITH_TIMEOUT(core.currentSelection().count() == 2,
+                                  "precondition broken: the folder view holds no two-file selection", 10000);
+
+        core.moveToTrash();
+
+        QVERIFY(!QFileInfo::exists(QDir(dir).filePath("a.png")));
+        QVERIFY(!QFileInfo::exists(QDir(dir).filePath("b.png")));
+        QVERIFY2(overlayFake.successCalls > 0, "the success report never reached the injected host");
+        QVERIFY2(overlayFake.lastSuccess.contains(QStringLiteral("2 files")) &&
+                     !overlayFake.lastSuccess.contains(QStringLiteral("failed")),
+                 qPrintable(QStringLiteral("all-success batch reported: \"") + overlayFake.lastSuccess + "\""));
+    }
 };
 
 int main(int argc, char **argv) {
