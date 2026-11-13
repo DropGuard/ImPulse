@@ -59,7 +59,10 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     infoObserver = state->currentInfo.addNotifier([this] {
         refreshInfoViews();
     });
-    slideshowObserver = state->slideshow.addNotifier([this] {
+    slideshowObserver = state->slideshow.addNotifier([this, state = appState] {
+        // the slideshow loop is a pure function of the state: slides advance
+        // by timer, normal viewing loops. The relay rides the state binding.
+        emit setLoopPlayback(!state->slideshow.value());
         refreshInfoViews();
     });
     shuffleObserver = state->shuffle.addNotifier([this] {
