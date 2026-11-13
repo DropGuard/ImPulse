@@ -100,9 +100,9 @@ void Scaler::onTaskFinish(std::shared_ptr<const QImage> scaled, const ScalerRequ
 void Scaler::slotForwardScaledResult(std::shared_ptr<const QImage> image, const ScalerRequest &req) {
     if(!image)
         return;
-    // QPixmap is implicitly shared, so the consumer can take it by value and the
-    // question of who deletes it disappears with the pointer
-    emit scalingFinished(QPixmap::fromImage(*image), req);
+    // QImage crosses the signal boundary — implicitly shared, and the paint-
+    // device conversion is the view's job, on the GUI thread
+    emit scalingFinished(image, req);
 }
 
 void Scaler::startRequest(const ScalerRequest &req) {

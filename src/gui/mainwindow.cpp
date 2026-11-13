@@ -191,9 +191,10 @@ void MW::closeImage() {
 
 // todo: fix flicker somehow
 // ideally it should change img & resize in one go
-void MW::showImage(std::unique_ptr<QPixmap> pixmap) {
+void MW::showImage(std::shared_ptr<const QImage> image) {
     if(settings->autoResizeWindow())
-        windowShell->preShowResize(pixmap->size());
+        windowShell->preShowResize(image->size());
+    auto pixmap = std::make_unique<QPixmap>(QPixmap::fromImage(*image));
     viewerWidget->showImage(std::move(pixmap));
     cropController->updateCropPanelData();
 }
@@ -308,8 +309,9 @@ void MW::setFilter(ScalingFilter filter) {
     viewer()->setScalingFilter(filter);
 }
 
-void MW::onScalingFinished(std::unique_ptr<QPixmap> scaled) {
-    viewerWidget->onScalingFinished(std::move(scaled));
+void MW::onScalingFinished(std::unique_ptr<const QImage> scaled) {
+    // the paint-device conversion happens here, on the GUI thread
+    viewerWidget->onScalingFinished(std::make_unique<QPixmap>(QPixmap::fromImage(*scaled)));
 }
 
 //#############################################################

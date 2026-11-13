@@ -10,7 +10,7 @@
 // interface is Core's needs, and the window happens to be one implementation.
 
 #include <QMovie>
-#include <QPixmap>
+#include <QImage>
 #include <QString>
 #include <memory>
 
@@ -20,8 +20,11 @@ class ICoreView {
   public:
     virtual ~ICoreView() = default;
 
-    // the display sink: guiSetImage's three branches and its teardown
-    virtual void showImage(std::unique_ptr<QPixmap> pixmap) = 0;
+    // the display sink: guiSetImage's three branches and its teardown.
+    // Images travel as QImage — the paint-device conversion happens in the
+    // implementation, on the GUI thread, so the model layer and the headless
+    // tests never construct a QPixmap.
+    virtual void showImage(std::shared_ptr<const QImage> image) = 0;
     virtual void showAnimation(const std::shared_ptr<QMovie> &movie) = 0;
     virtual void showVideo(const QString &file) = 0;
     virtual void closeImage() = 0;
@@ -35,7 +38,7 @@ class ICoreView {
 
     // projections Core pushes after mutations
     virtual void onSortingChanged(SortingMode mode) = 0;
-    virtual void onScalingFinished(std::unique_ptr<QPixmap> scaled) = 0;
+    virtual void onScalingFinished(std::unique_ptr<const QImage> scaled) = 0;
 
     // enterMode's two legs (MW's own names)
     virtual void enableFolderView() = 0;

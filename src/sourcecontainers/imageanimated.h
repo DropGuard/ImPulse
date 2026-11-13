@@ -9,7 +9,6 @@ class ImageAnimated : public Image {
     ImageAnimated(std::unique_ptr<DocumentInfo> _info);
     ~ImageAnimated() override;
 
-    std::unique_ptr<QPixmap> getPixmap() override;
     std::shared_ptr<const QImage> getImage() override;
     std::shared_ptr<QMovie> getMovie();
     int height() override;

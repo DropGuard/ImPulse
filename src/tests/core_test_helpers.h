@@ -256,9 +256,9 @@ class RecordingView : public ICoreView {
     int loopPlaybackWrites = 0;
     bool lastLoopPlayback = false;
 
-    void showImage(std::unique_ptr<QPixmap> pixmap) override {
+    void showImage(std::shared_ptr<const QImage> image) override {
         showImageCalls++;
-        lastImageSize = pixmap ? pixmap->size() : QSize();
+        lastImageSize = image ? image->size() : QSize();
     }
     void showAnimation(const std::shared_ptr<QMovie> &movie) override {
         Q_UNUSED(movie)
@@ -286,7 +286,7 @@ class RecordingView : public ICoreView {
     void onSortingChanged(SortingMode mode) override {
         Q_UNUSED(mode)
     }
-    void onScalingFinished(std::unique_ptr<QPixmap> scaled) override {
+    void onScalingFinished(std::unique_ptr<const QImage> scaled) override {
         Q_UNUSED(scaled)
     }
     void enableFolderView() override {
