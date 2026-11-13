@@ -51,6 +51,7 @@ add_library(qimgv_nongui OBJECT)
 target_sources(qimgv_nongui PRIVATE
     appversion.cpp
     settings.cpp
+    settings_theme.cpp
     sharedresources.cpp
     shortcutbuilder.cpp
     themestore.cpp
