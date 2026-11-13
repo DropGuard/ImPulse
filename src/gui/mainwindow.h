@@ -89,6 +89,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     QPropertyNotifier slideshowObserver;
     QPropertyNotifier shuffleObserver;
     QPropertyNotifier directoryObserver;
+    QPropertyNotifier viewModeObserver;
     // the keymap's inspect scope follows the viewer's fit mode
     QPropertyNotifier fitModeObserver;
     WindowShell *windowShell = nullptr;
@@ -117,6 +118,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
 
     // bool focusNextPrevChild(bool);
   signals:
+    void setLoopPlayback(bool);
     void fullscreenStateChanged(bool);
     void copyUrlsRequested(QList<QString>, QString);
     void moveUrlsRequested(QList<QString>, QString);
@@ -127,7 +129,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     void scalingRequested(QSize, ScalingFilter);
     void droppedIn(const QMimeData *, QObject *);
     void draggedOut();
-    void setLoopPlayback(bool) override;
     void playbackFinished();
 
   public slots:
@@ -136,8 +137,8 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     // These were 17 declared signals relay-connected to the same-named viewer
     // signals — plumbing with no body of its own; ActionManager connects to
     // the slots unchanged.
-    void enableFolderView() override;
-    void enableDocumentView() override;
+    void enableFolderView();
+    void enableDocumentView();
     void close();
     void fitWindow();
     void fitWidth();

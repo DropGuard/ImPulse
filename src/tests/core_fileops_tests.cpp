@@ -603,8 +603,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         QVERIFY2(overlayFake.errorCalls > 0, "the failed copy never reached the injected host");
 
         core.enableFolderView();
-        QCOMPARE(view.folderEntries, 1);   // the folder leg fired exactly once
-        QCOMPARE(view.documentEntries, 1); // loadPath's entry stands; no new document push
+        QCOMPARE(core.viewState().viewMode.value(), MODE_FOLDERVIEW); // the state is the truth
     }
 
     void renameCurrentSelectionForcesAfterScriptedConfirmation() {
