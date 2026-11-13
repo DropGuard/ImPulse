@@ -14,7 +14,7 @@ class Scaler : public QObject {
     ~Scaler() override;
 
   signals:
-    void scalingFinished(QPixmap result, const ScalerRequest &request);
+    void scalingFinished(std::shared_ptr<const QImage> result, const ScalerRequest &request);
     void acceptScalingResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
   public slots:

@@ -116,12 +116,6 @@ bool ImageStatic::save(QString destPath, int jpegQuality) {
     return success;
 }
 
-std::unique_ptr<QPixmap> ImageStatic::getPixmap() {
-    std::unique_ptr<QPixmap> pix(new QPixmap());
-    isEdited() ? pix->convertFromImage(*imageEdited) : pix->convertFromImage(*image, Qt::NoFormatConversion);
-    return pix;
-}
-
 std::shared_ptr<const QImage> ImageStatic::getSourceImage() {
     return image;
 }

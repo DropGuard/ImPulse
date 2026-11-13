@@ -20,7 +20,6 @@ class ImageStatic : public Image {
     }
     ~ImageStatic() override;
 
-    std::unique_ptr<QPixmap> getPixmap() override;
     std::shared_ptr<const QImage> getSourceImage();
     std::shared_ptr<const QImage> getImage() override;
 

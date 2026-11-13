@@ -428,7 +428,7 @@ class Core : public QObject {
     void onLoadFailed(const QString &path);
     void close();
     void scalingRequest(QSize, ScalingFilter);
-    void onScalingFinished(QPixmap scaled, const ScalerRequest &req);
+    void onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
     void copyPathsTo(const QList<QString> &paths, const QString &destDirectory);
     FileOpResult removeFile(const QString &fileName, bool trash);
     void onFileRemoved(const QString &filePath, int index);

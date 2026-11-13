@@ -44,8 +44,8 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
   public:
     explicit MW(State *state, QWidget *parent = nullptr);
     ~MW() override;
-    void onScalingFinished(std::unique_ptr<QPixmap> scaled) override;
-    void showImage(std::unique_ptr<QPixmap> pixmap) override;
+    void onScalingFinished(std::unique_ptr<const QImage> scaled) override;
+    void showImage(std::shared_ptr<const QImage> image) override;
     void showAnimation(const std::shared_ptr<QMovie> &movie) override;
     void showVideo(const QString &file) override;
 

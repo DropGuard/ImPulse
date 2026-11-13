@@ -527,14 +527,15 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         WorkerPool pool(2);
         Scaler scaler(&cache, pool);
         int delivered = 0;
-        QPixmap result;
-        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap pix, ScalerRequest) {
-            result = pix;
-            ++delivered;
-        });
+        std::shared_ptr<const QImage> result;
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler,
+                         [&](std::shared_ptr<const QImage> pix, ScalerRequest) {
+                             result = pix;
+                             ++delivered;
+                         });
         scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
         QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 10000);
-        QCOMPARE(result.size(), QSize(32, 32));
+        QCOMPARE(result->size(), QSize(32, 32));
     }
 
     // The equality relation Scaler::startRequest guards its buffer with, pinned
@@ -590,11 +591,12 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         int delivered = 0;
         QSize gotSize;
         QString gotPath;
-        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap pix, ScalerRequest req) {
-            ++delivered;
-            gotSize = pix.size();
-            gotPath = req.path;
-        });
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler,
+                         [&](std::shared_ptr<const QImage> pix, ScalerRequest req) {
+                             ++delivered;
+                             gotSize = pix->size();
+                             gotPath = req.path;
+                         });
 
         scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
         scaler.requestScaled(ScalerRequest(b, QSize(40, 20), fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
@@ -631,7 +633,7 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         WorkerPool pool(2);
         Scaler scaler(&cache, pool);
         int delivered = 0;
-        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap, ScalerRequest) {
+        QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](std::shared_ptr<const QImage>, ScalerRequest) {
             ++delivered;
         });
 
@@ -677,9 +679,10 @@ class TestMachinery : public QObject, protected EngineStackFixture {
             WorkerPool pool(2);
             Scaler scaler(&cache, pool);
             int delivered = 0;
-            QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](QPixmap, ScalerRequest) {
-                ++delivered;
-            });
+            QObject::connect(&scaler, &Scaler::scalingFinished, &scaler,
+                             [&](std::shared_ptr<const QImage>, ScalerRequest) {
+                                 ++delivered;
+                             });
             scaler.requestScaled(
                 ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
             QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 10000);

@@ -71,7 +71,7 @@ class TestEditSave : public QObject {
 
         auto edited = std::dynamic_pointer_cast<ImageStatic>(core.directoryModel()->getImage(img));
         QVERIFY2(edited && edited->isEdited(), "flipH left no edited image in memory");
-        const QImage shown = edited->getPixmap()->toImage();
+        const QImage shown = *edited->getImage();
         QCOMPARE(shown.size(), QSize(16, 8));
         QCOMPARE(shown.pixelColor(0, 0), QColor(Qt::blue)); // mirrored: blue moved left
         QCOMPARE(shown.pixelColor(15, 0), QColor(Qt::red));
