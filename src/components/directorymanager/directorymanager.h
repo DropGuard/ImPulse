@@ -56,7 +56,7 @@ class DirectoryManager : public QObject {
     // mode is the caller listing's own sort mode: the answer has to follow the
     // order the user is looking at, not the persisted setting (a manager can be
     // resorted at runtime without the setting moving)
-    static QString adjacentDirectory(const QString &dirPath, bool forward, SortingMode mode);
+    QString adjacentDirectory(const QString &dirPath, bool forward, SortingMode mode);
     // Arms `action` to run once the listing for dirPath lands (mirror
     // rebuilt, counts fresh). One engine session only: a newer openDir
     // supersedes the queue, an open failure drops its own entry, and
@@ -163,6 +163,9 @@ class DirectoryManager : public QObject {
     static std::filesystem::file_time_type fileTimeFromMs(qint64 ms);
 
     void readSettings();
+    // synced from the settings in readSettings(); the three scan/filter sites
+    // read this member instead of reaching for the global
+    bool mShowHiddenFiles = false;
     SortingMode mSortingMode;
 
     // Directories only ever order by name: the engine's comparator lands on

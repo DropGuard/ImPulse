@@ -107,6 +107,10 @@ QDateTime DirectoryModel::lastModified(const QString &filePath) const {
 
 // -----------------------------------------------------------------------------
 
+QString DirectoryModel::adjacentDirectory(const QString &dirPath, bool forward) {
+    return dirManager.adjacentDirectory(dirPath, forward, sortingMode());
+}
+
 void DirectoryModel::setSortingMode(SortingMode mode) {
     dirManager.setSortingMode(mode);
 }

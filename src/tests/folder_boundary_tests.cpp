@@ -68,6 +68,7 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
     }
 
     void adjacentActionEntersTheNextFolderInParentOrder() {
+        DirectoryManager dm{EngineBridge::instance()};
         // The promise the setting makes: at the last image of alpha you go to beta.
         // adjacentDirectory() is what Core calls, so this covers the resolution
         // itself — routed through the async listing it returns empty here and the
@@ -76,6 +77,7 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
         QVERIFY(QDir(fixtureDir).mkdir("alpha"));
         QVERIFY(QDir(fixtureDir).mkdir("beta"));
         QVERIFY(QDir(fixtureDir).mkdir("zeta"));
+        QVERIFY(QDir(fixtureDir).mkdir(".hidden")); // sorts first: proves the skip
 
         const QString alpha = fixtureDir + "/alpha";
         const QString beta = fixtureDir + "/beta";
@@ -83,14 +85,17 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
         const QString zeta = fixtureDir + "/zeta";
 
         // natural name order: alpha, beta, subdir, zeta
-        QCOMPARE(DirectoryManager::adjacentDirectory(alpha, true, SORT_NAME), beta);
-        QCOMPARE(DirectoryManager::adjacentDirectory(beta, true, SORT_NAME), sub);
-        QCOMPARE(DirectoryManager::adjacentDirectory(sub, true, SORT_NAME), zeta);
-        QCOMPARE(DirectoryManager::adjacentDirectory(zeta, false, SORT_NAME), sub);
-        QCOMPARE(DirectoryManager::adjacentDirectory(alpha, false, SORT_NAME), QString());
+        // the dot dir sorts before alpha and is filtered by the flag: forward
+        // from alpha reaches beta, backward from alpha finds nothing
+        QCOMPARE(dm.adjacentDirectory(alpha, true, SORT_NAME), beta);
+        QCOMPARE(dm.adjacentDirectory(alpha, false, SORT_NAME), QString());
+        QCOMPARE(dm.adjacentDirectory(beta, true, SORT_NAME), sub);
+        QCOMPARE(dm.adjacentDirectory(sub, true, SORT_NAME), zeta);
+        QCOMPARE(dm.adjacentDirectory(zeta, false, SORT_NAME), sub);
+        QCOMPARE(dm.adjacentDirectory(alpha, false, SORT_NAME), QString());
         // the last folder has nowhere to go — that is what makes Core show its
         // end-of-folder message instead of jumping
-        QCOMPARE(DirectoryManager::adjacentDirectory(zeta, true, SORT_NAME), QString());
+        QCOMPARE(dm.adjacentDirectory(zeta, true, SORT_NAME), QString());
     }
 
     void folderBoundaryLookupKeepsWatchingTheCurrentFolder() {
@@ -107,7 +112,7 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
         QVERIFY(decision.outcome == FolderEnd::Outcome::EnterAdjacentFolder);
         // the transition this keypress would take: nowhere — subdir is the only and
         // therefore the last folder here
-        QVERIFY(DirectoryManager::adjacentDirectory(fixtureDir + "/subdir", true, SORT_NAME).isEmpty());
+        QVERIFY(dm.adjacentDirectory(fixtureDir + "/subdir", true, SORT_NAME).isEmpty());
 
         QSignalSpy added(&dm, &DirectoryManager::fileAdded);
         makeFile("after-boundary.jpg");
@@ -153,7 +158,7 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
             QString cur = dm.dirPathAt(0);
             while(!cur.isEmpty() && walked.size() <= names.size()) {
                 walked << cur;
-                cur = DirectoryManager::adjacentDirectory(cur, true, mode);
+                cur = dm.adjacentDirectory(cur, true, mode);
             }
 
             const QStringList &want = (mode == SORT_NAME_DESC) ? reversed : names;
@@ -191,7 +196,7 @@ class TestFolderBoundary : public QObject, protected EngineStackFixture {
                                   QStringLiteral("zulu")};
         QCOMPARE(rows, want);
         // navigation walks the same order
-        QCOMPARE(DirectoryManager::adjacentDirectory(fixtureDir + "/mike", true, SORT_TIME), fixtureDir + "/subdir");
+        QCOMPARE(dm.adjacentDirectory(fixtureDir + "/mike", true, SORT_TIME), fixtureDir + "/subdir");
     }
 
     void settlePredicateTracksTheReplyInsteadOfTheRequest() {
