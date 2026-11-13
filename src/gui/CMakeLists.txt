@@ -36,6 +36,7 @@ target_sources(qimgv_gui PRIVATE
     dialogs/resizedialog.cpp
     dialogs/scripteditordialog.cpp
     dialogs/settingsdialog.cpp
+    dialogs/settingsdialog_editors.cpp
     dialogs/shortcutcreatordialog.cpp
     dialogs/printdialog.cpp
 
