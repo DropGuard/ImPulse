@@ -425,6 +425,12 @@ bool FileOperations::carryMetadata(const QString &source, const QString &dest, b
             auto it = exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"));
             if(it != exif.end())
                 it->setValue("1"); // normal: the pixels already carry the rotation
+            // the XMP twin: Lightroom-class tools sync tiff:Orientation into the
+            // XMP block, and a stale one would double-rotate in XMP-respecting
+            // viewers too. Absent = end = no touch, same as the EXIF reset
+            auto xmpOrientation = to->xmpData().findKey(Exiv2::XmpKey("Xmp.tiff.Orientation"));
+            if(xmpOrientation != to->xmpData().end())
+                xmpOrientation->setValue("1");
         }
         to->writeMetadata();
         return true;

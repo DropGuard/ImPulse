@@ -650,6 +650,7 @@ class TestImageOps : public QObject, protected EngineStackFixture {
             exif["Exif.Photo.DateTimeOriginal"] = "2024:05:01 10:00:00";
             exif["Exif.GPSInfo.GPSLatitude"] = "31/1 11/1 60/1";
             meta->xmpData()["Xmp.dc.subject"] = "holiday";
+            meta->xmpData()["Xmp.tiff.Orientation"] = 6; // the XMP twin of the EXIF tag
             meta->iptcData()["Iptc.Application2.Keywords"] = "beach";
             meta->writeMetadata();
         }
@@ -672,6 +673,14 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         QVERIFY(exif.findKey(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude")) != exif.end());
         QVERIFY(!check->xmpData().empty());
         QVERIFY(!check->iptcData().empty());
+        // the XMP twin of the orientation tag resets with the EXIF one, while
+        // the rest of the XMP block carries intact
+        auto xmpOrientation = check->xmpData().findKey(Exiv2::XmpKey("Xmp.tiff.Orientation"));
+        QVERIFY2(xmpOrientation != check->xmpData().end(), "the saved XMP dropped the tiff:Orientation outright");
+        QCOMPARE(QString::fromStdString(xmpOrientation->value().toString()), QStringLiteral("1"));
+        auto subject = check->xmpData().findKey(Exiv2::XmpKey("Xmp.dc.subject"));
+        QVERIFY2(subject != check->xmpData().end(), "the saved XMP lost the dc.subject it carried");
+        QCOMPARE(QString::fromStdString(subject->value().toString()), QStringLiteral("holiday"));
 
         // and the orientation is reset: the pixels already carry the rotation,
         // so a carried "rotate 90 CW" would make every viewer rotate them again
