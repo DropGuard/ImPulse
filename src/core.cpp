@@ -1584,7 +1584,7 @@ void Core::nextDirectory() {
     if(model->directoryPath().isEmpty() || state.viewMode != MODE_DOCUMENT)
         return;
     stopSlideshow();
-    QString next = DirectoryManager::adjacentDirectory(model->directoryPath(), true, model->sortingMode());
+    QString next = model->adjacentDirectory(model->directoryPath(), true);
     if(next.isEmpty()) {
         return;
     }
@@ -1602,7 +1602,7 @@ void Core::nextDirectory() {
 void Core::prevDirectory(bool selectLast) {
     if(model->directoryPath().isEmpty() || state.viewMode != MODE_DOCUMENT)
         return;
-    QString prev = DirectoryManager::adjacentDirectory(model->directoryPath(), false, model->sortingMode());
+    QString prev = model->adjacentDirectory(model->directoryPath(), false);
     if(prev.isEmpty()) {
         return;
     }

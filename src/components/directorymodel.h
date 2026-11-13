@@ -62,6 +62,7 @@ class DirectoryModel : public QObject {
     void updateImage(const QString &filePath, std::shared_ptr<Image> img);
 
     void setSortingMode(SortingMode mode);
+    QString adjacentDirectory(const QString &dirPath, bool forward);
     SortingMode sortingMode() const;
 
     QString directoryPath() const;

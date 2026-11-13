@@ -32,6 +32,7 @@ DirectoryManager::DirectoryManager(EngineBridge &bridge) : mBridge(bridge), mSor
 
 void DirectoryManager::readSettings() {
     regex.setPattern(settings->supportedFormatsRegex());
+    mShowHiddenFiles = settings->showHiddenFiles();
 }
 
 bool DirectoryManager::setDirectory(const QString &dirPath) {
@@ -49,7 +50,7 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     // vectors keep serving the previous directory until then. A *refused* request
     // is not asynchronous though: nothing will ever arrive, so it has to fail
     // here rather than leave the caller staring at a silently empty folder.
-    if(!mBridge.openDir(dirPath, engineSortMode(mSortingMode), settings->showHiddenFiles())) {
+    if(!mBridge.openDir(dirPath, engineSortMode(mSortingMode), mShowHiddenFiles)) {
         qWarning() << "[DirectoryManager] engine refused" << dirPath << (qimgv_last_error() ? qimgv_last_error() : "");
         return false;
     }
@@ -80,7 +81,7 @@ QString DirectoryManager::adjacentDirectory(const QString &dirPath, bool forward
         if(!entry.is_directory())
             continue;
         QString name = QString::fromStdString(entry.path().filename().generic_string());
-        if(!settings->showHiddenFiles() && name.startsWith(QLatin1Char('.')))
+        if(!mShowHiddenFiles && name.startsWith(QLatin1Char('.')))
             continue;
         paths.append(QString::fromStdString(entry.path().generic_string()));
     }
@@ -358,7 +359,7 @@ void DirectoryManager::scheduleRescan() {
         rescanTimer->setInterval(150);
         connect(rescanTimer, &QTimer::timeout, this, [this]() {
             if(!mResyncing && !mDirectoryPath.isEmpty())
-                mBridge.openDir(mDirectoryPath, engineSortMode(mSortingMode), settings->showHiddenFiles());
+                mBridge.openDir(mDirectoryPath, engineSortMode(mSortingMode), mShowHiddenFiles);
         });
     }
     rescanTimer->start();
