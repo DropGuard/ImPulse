@@ -291,6 +291,10 @@ QString Settings::tmpDir() {
 //------------------------------------------------------------------------------
 // this here is temporarily, will be moved to some sort of theme manager class
 void Settings::loadStylesheet() {
+    // the stylesheet styles widgets — a QCoreApplication run (headless test
+    // suites) has none to style, and the font metrics below need QGuiApplication
+    if(qobject_cast<QApplication *>(qApp) == nullptr)
+        return;
     // stylesheet template file
     QFile file(":/res/styles/style-template.qss");
     if(file.open(QFile::ReadOnly)) {
