@@ -385,7 +385,6 @@ void Core::toggleSlideshow() {
 void Core::startSlideshow() {
     if(!state.slideshow) {
         state.slideshow = true;
-        view_->setLoopPlayback(false);
         enableDocumentView();
         startSlideshowTimer();
         updateInfoString();
@@ -395,7 +394,6 @@ void Core::startSlideshow() {
 void Core::stopSlideshow() {
     if(state.slideshow) {
         state.slideshow = false;
-        view_->setLoopPlayback(true);
         slideshowTimer.stop();
         updateInfoString();
     }
@@ -522,9 +520,10 @@ void Core::reloadImage(const QString &filePath) {
     model->reload(filePath);
 }
 
-// the mode is Core's decision, recorded in state; the window follows. The
-// mode reads across Core's decision points are state reads — the window is a
-// subscriber, not the source of truth.
+// the mode is Core's decision, recorded in state; the window follows through
+// the imperative legs. The legs stay imperative (not state-bound) because the
+// loadPath folder branch dances even on a same-mode load — hiding a live
+// rename overlay — and a same-value state write would dedup that cleanup.
 void Core::enterMode(ViewMode mode) {
     state.viewMode = mode;
     (mode == MODE_FOLDERVIEW) ? view_->enableFolderView() : view_->enableDocumentView();
