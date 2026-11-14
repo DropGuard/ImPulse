@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QMap>
+#include <QSet>
 #include <QDebug>
 #include <QStringList>
 #include "utils/actions.h"
@@ -38,6 +39,20 @@ enum class ShortcutScope {
                // freshest intent, fresher than a mode armed earlier
 };
 
+// A floating surface that does not own a key yields it to the action system —
+// that is the overlay idiom, and it is what keeps zoom, fullscreen and the
+// save chords alive while a panel is open. The exception is the class of
+// actions that change WHICH FILE is being acted on: a copy-target menu whose
+// Page Down swapped the image no longer says which file it copies, and a
+// crop whose Page Down swapped the image has already thrown the selection
+// away (CropOverlay::onImageChanged clears it).
+//
+// The distinction is by action, not by key: bindings are user-editable, and a
+// key that changed meaning as the user remapped it would silently reopen the
+// hole. The list is intentionally static — it is a property of what each
+// action does, not of the state the app is in.
+bool isSubjectChangingAction(const QString &actionName);
+
 class ActionManager : public QObject {
     Q_OBJECT
   public:
@@ -56,6 +71,10 @@ class ActionManager : public QObject {
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
     QString actionForShortcut(const QString &keys);
+    // A floating surface's yield test, in one place so the four of them cannot
+    // drift: "does this event name a subject-changing action?" — true means the
+    // surface must consume the event instead of forwarding it.
+    bool eventIsSubjectChanging(QInputEvent *event);
     const QString shortcutForAction(const QString &action);
     const QList<QString> shortcutsForAction(const QString &action);
     QStringList actionList();

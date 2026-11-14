@@ -42,6 +42,11 @@ class CopyOverlay : public OverlayWidget, public IPendingSurface {
 
   protected:
     void keyPressEvent(QKeyEvent *event) override;
+    // clicking anywhere but the menu dismisses it — the same answer Esc gives,
+    // and the same click-outside rule RenameOverlay already follows. Without
+    // it the only way out was the close button or a key, and a click on the
+    // image behind looked like it was being ignored.
+    void mousePressEvent(QMouseEvent *event) override;
 
     bool focusNextPrevChild(bool) override;
   private slots:

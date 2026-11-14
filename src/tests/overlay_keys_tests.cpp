@@ -158,6 +158,100 @@ class TestOverlayKeys : public QObject {
         QVERIFY(!saveOverlay->isVisible()); // discard also dismisses the surface
     }
 
+    // A floating surface that yields an unowned key to the action system is
+    // following the overlay idiom — and it is right to: zoom and fullscreen
+    // must keep working while a panel is open. The one class it must NOT yield
+    // is the actions that change WHICH FILE is being acted on. A copy menu
+    // whose Right arrow swapped the image no longer says which file it copies;
+    // a crop whose Right arrow swapped the image has already lost the
+    // selection (onImageChanged clears it). Pinned per surface, with the
+    // display keys as the control: they must still pass through.
+    void surfacesConsumeTheWalkButStillYieldDisplayKeys() {
+        const QString dir = uniqueDir("subjectkeys");
+        const QString a = QDir(dir).filePath("a.png");
+        const QString b = QDir(dir).filePath("b.png");
+        writeImage(a);
+        writeImage(b);
+        Core core;
+        QVERIFY(core.loadPath(a));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        QCOMPARE(core.currentFilePath(), a);
+
+        auto press = [](QWidget *w, Qt::Key key, const char *keyName, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+            QKeyEvent ev(QEvent::KeyPress, key, mods, coretest::scanCodeFor(QLatin1String(keyName)), 0u, 0u);
+            QApplication::sendEvent(w, &ev);
+        };
+
+        // The observation is at ActionManager's own signal: the registry lock
+        // (hasPendingSurface) would also stop the walk one layer up, so the
+        // file path alone cannot tell whether THIS guard fired. The signal
+        // fires if and only if the surface yielded the event.
+        QSignalSpy nextImage(actionManager, &ActionManager::nextImage);
+        QSignalSpy fullscreen(actionManager, &ActionManager::toggleFullscreen);
+
+        // --- the copy menu: Right must not be yielded at all
+        core.mainWindow()->overlays()->triggerCopyOverlay();
+        auto *copyOverlay = core.mainWindow()->findChild<CopyOverlay *>();
+        QVERIFY(copyOverlay && copyOverlay->isVisible());
+        press(copyOverlay, Qt::Key_Right, "Right");
+        QCOMPARE(nextImage.count(), 0); // consumed: never reached the action system
+        QVERIFY(copyOverlay->isVisible());
+        // ...while a display key still is (F toggles fullscreen)
+        press(copyOverlay, Qt::Key_F, "F");
+        QCOMPARE(fullscreen.count(), 1);
+        QKeyEvent closeCopy(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+        QApplication::sendEvent(copyOverlay, &closeCopy);
+
+        // --- the save prompt: Right must not walk either, Ctrl+S still works
+        settings->setShowSaveOverlay(true);
+        core.mainWindow()->overlays()->showSaveOverlay();
+        auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
+        QVERIFY(saveOverlay && saveOverlay->isVisible());
+        QObject::disconnect(actionManager, &ActionManager::saveAs, nullptr, nullptr);
+        QSignalSpy saveAction(actionManager, &ActionManager::save);
+        press(saveOverlay, Qt::Key_Right, "Right");
+        QCOMPARE(nextImage.count(), 0);
+        QVERIFY(saveOverlay->isVisible());
+        press(saveOverlay, Qt::Key_S, "S", Qt::ControlModifier);
+        QCOMPARE(saveAction.count(), 1); // the chord still gets through
+        QVERIFY(!saveOverlay->isVisible());
+
+        // --- the crop surface: Right must not walk, and the selection survives
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
+        auto *cropOverlay = core.mainWindow()->findChild<CropOverlay *>();
+        QVERIFY(cropOverlay);
+        // the selection is private; its broadcast is not. selectAll emits it
+        // synchronously, and a walk would clear it through onImageChanged.
+        QSignalSpy selection(cropOverlay, &CropOverlay::selectionChanged);
+        cropOverlay->selectAll();
+        QCOMPARE(selection.count(), 1);
+        press(cropOverlay, Qt::Key_Right, "Right");
+        QCOMPARE(nextImage.count(), 0); // consumed: never reached the action system
+        QCOMPARE(selection.count(), 1); // and the frame was not cleared
+        QCOMPARE(core.directoryModel()->getImage(a)->size(), QSize(8, 8));
+    }
+
+    // The list itself: what counts as "changes which file is being acted on".
+    // Checked by name, not by key, because bindings are user-editable and a
+    // remapped key must not silently reopen the hole.
+    void subjectChangingActionListIsWhatItClaims() {
+        QVERIFY(isSubjectChangingAction(QStringLiteral("nextImage")));
+        QVERIFY(isSubjectChangingAction(QStringLiteral("prevImage")));
+        QVERIFY(isSubjectChangingAction(QStringLiteral("nextDirectory")));
+        QVERIFY(isSubjectChangingAction(QStringLiteral("folderView")));
+        QVERIFY(isSubjectChangingAction(QStringLiteral("toggleSlideshow")));
+        QVERIFY(isSubjectChangingAction(QStringLiteral("moveToTrash")));
+        // the display keys are deliberately NOT in it — they are what the
+        // overlay idiom exists to keep working
+        QVERIFY(!isSubjectChangingAction(QStringLiteral("toggleFullscreen")));
+        QVERIFY(!isSubjectChangingAction(QStringLiteral("zoomIn")));
+        QVERIFY(!isSubjectChangingAction(QStringLiteral("fitWindow")));
+        QVERIFY(!isSubjectChangingAction(QStringLiteral("save")));
+        QVERIFY(!isSubjectChangingAction(QStringLiteral("saveAs")));
+        QVERIFY(!isSubjectChangingAction(QString()));
+    }
+
     void loadFailureOfUnviewedFileStaysSilent() {
         writeImage(QDir(base).filePath("keep.png"));
         // the load-failure message rides the overlay interface now — the

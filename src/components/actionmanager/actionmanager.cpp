@@ -193,8 +193,48 @@ void ActionManager::saveShortcuts() {
     settings->saveShortcuts(shortcuts);
 }
 //------------------------------------------------------------------------------
+bool isSubjectChangingAction(const QString &actionName) {
+    // everything whose effect is "the file under the user's attention is now a
+    // different one". A floating surface that yields these to the action system
+    // stops being able to say what it is acting on.
+    static const QSet<QString> subjectChanging = {
+        // the walk
+        QStringLiteral("nextImage"),
+        QStringLiteral("prevImage"),
+        QStringLiteral("nextDirectory"),
+        QStringLiteral("prevDirectory"),
+        QStringLiteral("jumpToFirst"),
+        QStringLiteral("jumpToLast"),
+        QStringLiteral("goUp"),
+        // the view the image lives in
+        QStringLiteral("folderView"),
+        QStringLiteral("documentView"),
+        QStringLiteral("toggleFolderView"),
+        // the automatic walk
+        QStringLiteral("toggleSlideshow"),
+        QStringLiteral("toggleShuffle"),
+        // the file itself
+        QStringLiteral("moveToTrash"),
+        QStringLiteral("removeFile"),
+        // and the way out
+        QStringLiteral("closeFullScreenOrExit"),
+        QStringLiteral("exit"),
+    };
+    return subjectChanging.contains(actionName);
+}
+//------------------------------------------------------------------------------
 QString ActionManager::actionForShortcut(const QString &keys) {
     return shortcuts[keys];
+}
+//------------------------------------------------------------------------------
+bool ActionManager::eventIsSubjectChanging(QInputEvent *event) {
+    const QString shortcut = ShortcutBuilder::fromEvent(event);
+    if(shortcut.isEmpty())
+        return false;
+    // const lookup: actionForShortcut's operator[] would insert an empty entry
+    // for every new key pressed in a surface — a slow leak in a long session
+    const auto it = shortcuts.constFind(shortcut);
+    return it != shortcuts.constEnd() && isSubjectChangingAction(*it);
 }
 
 // returns first shortcut that is found

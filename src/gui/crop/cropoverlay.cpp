@@ -589,6 +589,10 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
     }
     if(event->matches(QKeySequence::SelectAll)) {
         selectAll();
+    } else if(actionManager->eventIsSubjectChanging(event)) {
+        // a different image clears the selection (onImageChanged), so yielding
+        // the walk here would discard the crop the user is framing. Consumed.
+        return;
     } else {
         actionManager->processEvent(event);
     }
