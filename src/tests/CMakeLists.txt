@@ -81,7 +81,8 @@ set(CPP_TEST_TARGETS
     engine_contract_tests engine_stack_tests
     core_nav_tests core_fileops_tests gui_widget_tests
     crop_tests grid_tests shortcut_scope_tests overlay_keys_tests
-    presenter_tests edit_save_tests slideshow_tests clipboard_tests)
+    presenter_tests edit_save_tests slideshow_tests clipboard_tests
+    dispatch_probe_tests)
 
 add_custom_target(check
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -j4
@@ -131,6 +132,15 @@ set_tests_properties(GUI_WIDGETS PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 30
 add_test(NAME ARCH_RULES
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/architecture_rules.py)
 set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300)
+
+# Dispatch probes: QShortcutMap behavior pinned against the offscreen platform
+# with local QShortcuts only — no Core, no ActionManager, so it links neither
+# object library and is green on both sides of the keyboard migration. A red
+# probe means a migration plan assumption is wrong, not a regression.
+add_executable(dispatch_probe_tests dispatch_probe_tests.cpp)
+target_link_libraries(dispatch_probe_tests PRIVATE Qt6::Test Qt6::Widgets)
+add_test(NAME DISPATCH_PROBE COMMAND dispatch_probe_tests)
+set_tests_properties(DISPATCH_PROBE PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # lint cache contract: cold==warm, header fan-out, include shadowing. Skips
 # (77) where the lint tools are not installed — the gate itself needs them,
