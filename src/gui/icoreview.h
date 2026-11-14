@@ -33,7 +33,6 @@ class ICoreView {
 
     // window lifecycle bits Core drives
     virtual void showWindowDefault() = 0;
-    virtual bool isWindowVisible() = 0;
     virtual void toggleFullscreenInfoBar() = 0;
 
     // the slideshow loop request: slides advance by timer, normal viewing

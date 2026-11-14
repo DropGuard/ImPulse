@@ -165,5 +165,4 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     void repaintView() override;
     void setUpdatesEnabled(bool enabled) override;
     void showWindowDefault() override;
-    bool isWindowVisible() override;
 };

@@ -293,10 +293,6 @@ void MW::showWindowDefault() {
     shell()->showDefault();
 }
 
-bool MW::isWindowVisible() {
-    return isVisible();
-}
-
 void MW::toggleScalingFilter() {
     ScalingFilter configuredFilter = settings->scalingFilter();
     if(viewerWidget->scalingFilter() == configuredFilter) {

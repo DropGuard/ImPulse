@@ -449,6 +449,11 @@ void ImageViewerV2::hide() {
 }
 
 void ImageViewerV2::requestScaling() {
+    // the emitter owns its timing: while hidden (cold open, folder view) the
+    // request is suppressed at the source — the visible resize/show paths
+    // re-request with fresh parameters when the surface is ready
+    if(!isVisible())
+        return;
     if(!pixmap || pixmapItem.scale() == 1.0f || (!smoothUpscaling && pixmapItem.scale() >= 1.0f) || movie)
         return;
     if(scaleTimer->isActive())
@@ -675,6 +680,10 @@ void ImageViewerV2::showEvent(QShowEvent *event) {
     QGraphicsView::showEvent(event);
     // ensure we are properly resized
     qApp->processEvents();
+    // the window-ready moment: whatever scaling was suppressed while hidden
+    // is re-requested here with fresh parameters — this is "ready, then act"
+    if(pixmap)
+        requestScaling();
     // reapply fitmode to fix viewport position; the saved viewport follows
     // so a show in the middle of an inspection does not re-center
     if(imageFitMode.value() == FIT_ORIGINAL) {
