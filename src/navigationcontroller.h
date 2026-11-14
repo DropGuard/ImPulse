@@ -30,6 +30,10 @@ class INavigationHost {
     virtual void guiSetImage(std::shared_ptr<Image> img) = 0;
     virtual void updateInfoString() = 0;
     virtual void showGui() = 0;
+    // the view mode changed: the coordinator owns what follows from it (the
+    // window dance, the keymap scope). Navigation writes the state; it does
+    // not own its consumers.
+    virtual void onViewModeChanged(ViewMode mode) = 0;
 };
 
 class NavigationController : public QObject {
@@ -77,14 +81,6 @@ class NavigationController : public QObject {
     // that would destroy the work (the next tick's unloadExcept), so it is the
     // party that explains itself.
     void refuseEdit() const;
-
-    // The refusal for a verb whose result would not be VISIBLE in the current
-    // view. resize is the one today: a thumbnail grid cannot show a change in
-    // pixel dimensions, so performing it there would rewrite the file behind
-    // a surface that never confirmed anything. Lives here rather than at each
-    // call site because the question is about view state, and there are two
-    // entry points (the dialog and the resizeRequested relay).
-    bool refuseIfNotDocument(const QString &reason);
 
   public slots:
     bool loadPath(const QString &path);

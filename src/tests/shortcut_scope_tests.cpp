@@ -66,16 +66,18 @@ class TestShortcutScope : public QObject {
         QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
         QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
 
-        // armed: the inspect layer answers Left, the global table stands down
-        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        // armed: the document view's inspect variant answers Left
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("scrollLeft"));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
         QCOMPARE(scroll.count(), 1);
         QCOMPARE(next.count(), 0);
 
-        // disarmed, the same key falls through to the global table
+        // disarmed, the same key is the document view's own walk
         core.mainWindow()->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_WINDOW, 5000);
         QSignalSpy prev(actionManager->action("prevImage"), &QAction::triggered);
-        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("prevImage"));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
         QCOMPARE(prev.count(), 1);
         QCOMPARE(scroll.count(), 1);
     }
@@ -107,13 +109,15 @@ class TestShortcutScope : public QObject {
         QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
 
         // armed: left pans, it never flips images
-        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("scrollLeft"));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
         QCOMPARE(core.currentFilePath(), QDir(base).filePath("insB.png"));
 
         // back in a browse mode the same key navigates again
         core.mainWindow()->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
-        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("prevImage"));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("insA.png"), 10000);
     }
 
@@ -262,23 +266,19 @@ class TestShortcutScope : public QObject {
         auto *grid = proxy->findChild<FolderGridView *>();
         QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
 
-        QAction *next = actionManager->action("nextImage");
-
-        // focus out first: the grid takes focus the moment it is materialized
-        // (show() calls setFocus), so the slot starts from the de-claimed
-        // reality and walks both directions explicitly
+        // The document view owns Right/PgDown/PgUp now, and the grid owns the
+        // same keys while it holds focus. The resolution follows focus, not a
+        // central de-claim: the grid's table is asked first.
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
-        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("Right")))); // the global table re-claims
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
 
-        // focus in: the grid claims Right/PgDown/PgUp, the global table yields them
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
-        QVERIFY(!next->shortcuts().contains(QKeySequence(QStringLiteral("Right"))));
-        QVERIFY(!next->shortcuts().contains(QKeySequence(QStringLiteral("PgDown"))));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)), QStringLiteral("gridPageDown"));
 
-        // focus out: the global table re-claims everything
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
-        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("Right"))));
-        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("PgDown"))));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)), QStringLiteral("nextImage"));
     }
 
     // The armed inspect layer replaces the global claims for its keys and
@@ -289,20 +289,15 @@ class TestShortcutScope : public QObject {
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
-        QAction *prev = actionManager->action("prevImage");
-        QAction *scroll = actionManager->action("scrollLeft");
-        QVERIFY(prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
-        QVERIFY(!scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("prevImage"));
 
         core.mainWindow()->fitOriginal(); // arms the inspect scope through the real observer
         QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_ORIGINAL, 5000);
-        QVERIFY(!prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
-        QVERIFY(scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("scrollLeft"));
 
         core.mainWindow()->fitWindow(); // disarms
         QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_WINDOW, 5000);
-        QVERIFY(prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
-        QVERIFY(!scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("prevImage"));
     }
 
     // The end-to-end leg the migration stands on: a window-delivered key fires
@@ -357,10 +352,12 @@ class TestShortcutScope : public QObject {
         // predates the binding — pin both halves, plus the lookup itself
         QVERIFY(inputMap->keys().value(112) == "PgUp");
         QVERIFY(inputMap->keys().value(117) == "PgDown");
-        QVERIFY(actionManager->actionForShortcut("PgUp") == "prevImage");
-        QVERIFY(actionManager->actionForShortcut("PgDown") == "nextImage");
-        QVERIFY(actionManager->invokeAction(actionManager->actionForShortcut("PgDown")));
-        QVERIFY(actionManager->invokeAction(actionManager->actionForShortcut("PgUp")));
+        // PgUp/PgDown are the document view's binding — the token lookup has
+        // to reach that table, not only the global one
+        QVERIFY(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageUp)) == "prevImage");
+        QVERIFY(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)) == "nextImage");
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown))));
+        QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageUp))));
         QVERIFY(actionManager->actionForShortcut("F13").isEmpty());
     }
 
@@ -375,12 +372,13 @@ class TestShortcutScope : public QObject {
         const int globalBefore = actionManager->allShortcuts().size();
         const int gridBefore = gridSnapshot.size();
         const int inspectBefore = actionManager->allInspectShortcuts().size();
+        const int docBefore = actionManager->allDocShortcuts().size();
 
         SettingsDialog dialog;
         dialog.readSettings();
         auto *table = dialog.findChild<QTableWidget *>(QStringLiteral("shortcutsTableWidget"));
         QVERIFY2(table, "the shortcuts table did not materialize");
-        int headers = 0, global = 0, grid = 0, inspect = 0;
+        int headers = 0, global = 0, grid = 0, inspect = 0, document = 0;
         for(int r = 0; r < table->rowCount(); r++) {
             QTableWidgetItem *item = table->item(r, 0);
             const QString tag = item ? item->data(Qt::UserRole).toString() : QString();
@@ -390,12 +388,15 @@ class TestShortcutScope : public QObject {
                 global++;
             else if(tag == QLatin1String("grid"))
                 grid++;
+            else if(tag == QLatin1String("document"))
+                document++;
             else if(tag == QLatin1String("inspect"))
                 inspect++;
         }
-        QCOMPARE(headers, 3);
+        QCOMPARE(headers, 4); // global, document, folder view, inspect
         QCOMPARE(global, globalBefore);
         QCOMPARE(grid, gridBefore);
+        QCOMPARE(document, docBefore);
         QCOMPARE(inspect, inspectBefore);
 
         // an injected row in the grid section saves into the grid table only
@@ -410,6 +411,7 @@ class TestShortcutScope : public QObject {
 
         QCOMPARE(actionManager->allShortcuts().size(), globalBefore);
         QCOMPARE(actionManager->allInspectShortcuts().size(), inspectBefore);
+        QCOMPARE(actionManager->allDocShortcuts().size(), docBefore);
         QCOMPARE(actionManager->allGridShortcuts().size(), gridBefore + 1);
         QCOMPARE(actionManager->allGridShortcuts().value(QStringLiteral("F7")), QStringLiteral("gridSelectLast"));
 

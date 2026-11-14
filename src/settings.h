@@ -166,35 +166,6 @@ class Settings : public QObject {
     // this change removes.
     static void retirePrivateThumbnailStores(const QString &cacheRoot);
 
-    // Importing a qimgv configuration, on the user's explicit request. This is
-    // NOT automatic: qimgv and this fork shared the identity "qimgv/qimgv"
-    // until 2026.11, so the directory is equally likely to be an upstream
-    // installation — reading it without being asked would act on another
-    // application's files.
-    //
-    // The outcome is one value, not a set of flags to be re-derived by the
-    // caller: "imported something", "everything was already here", "there was
-    // nothing to import", "it failed" are mutually exclusive answers, and the
-    // dialog only has to pick a message.
-    enum class ImportOutcome {
-        NoSource,   // no qimgv.conf at the source
-        Imported,   // at least one file landed (some may also have been skipped)
-        AllSkipped, // the source had files, but every one already exists here
-        Failed,     // copying was attempted and could not be completed
-    };
-    struct ImportReport {
-        ImportOutcome outcome = ImportOutcome::NoSource;
-        QStringList copied;  // file names that landed
-        QStringList skipped; // file names that already existed here
-        QString detail;      // source/destination path for the failure, when there is one
-    };
-    // The candidate directory, resolved the way QSettings would for the shared
-    // legacy identity. Exposed for the dialog's "would this work" text.
-    static QString qimgvConfigDir();
-    // Explicit paths so the import is testable without QSettings' process-wide
-    // per-file state. Copies, never moves: upstream must keep working.
-    static ImportReport importQimgvConfig(const QString &sourceDir, const QString &destinationDir);
-
     int thumbnailerThreadCount();
     void setThumbnailerThreadCount(int count);
     bool smoothUpscaling();

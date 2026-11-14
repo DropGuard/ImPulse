@@ -158,7 +158,7 @@ void NavigationController::onModelLoaded() {
 
 void NavigationController::onDirectoryViewFileActivated(const QString &filePath) {
     // we aren`t using async load so it won't flicker with empty view
-    state->viewMode = MODE_DOCUMENT;
+    enterMode(MODE_DOCUMENT);
     loadPath(filePath);
 }
 
@@ -168,6 +168,7 @@ void NavigationController::onDirectoryViewFileActivated(const QString &filePath)
 // transition.
 void NavigationController::enterMode(ViewMode mode) {
     state->viewMode = mode;
+    host_->onViewModeChanged(mode);
 }
 
 void NavigationController::enableFolderView() {
@@ -293,17 +294,6 @@ void NavigationController::refuseEdit() const {
     overlays_->showMessage(tr("Stop the slideshow before editing."));
 }
 
-bool NavigationController::refuseIfNotDocument(const QString &reason) {
-    const InteractionState current = interactionState();
-    if(current == InteractionState::Document)
-        return false;
-    // a running clock is the more actionable refusal (one keystroke away),
-    // so it outranks the caller's reason even when the caller would have
-    // given a good one for folder view
-    overlays_->showMessage(current == InteractionState::Slideshow ? tr("Stop the slideshow before editing.") : reason);
-    return true;
-}
-
 void NavigationController::sortByName() {
     auto mode = SortingMode::SORT_NAME;
     if(model->sortingMode() == mode)
@@ -389,7 +379,7 @@ bool NavigationController::loadPathInternal(const QString &path) {
         });
         return true;
     } else {
-        state->viewMode = MODE_FOLDERVIEW;
+        enterMode(MODE_FOLDERVIEW);
         return true;
     }
 }
