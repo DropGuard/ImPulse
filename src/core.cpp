@@ -178,13 +178,6 @@ void Core::initComponents() {
 }
 
 void Core::connectComponents() {
-    connect(&thumbPanelPresenter, &DirectoryPresenter::fileActivated, nav_,
-            &NavigationController::onDirectoryViewFileActivated);
-    connect(&thumbPanelPresenter, &DirectoryPresenter::dirActivated, nav_, &NavigationController::loadPath);
-
-    connect(&folderViewPresenter, &DirectoryPresenter::fileActivated, nav_,
-            &NavigationController::onDirectoryViewFileActivated);
-    connect(&folderViewPresenter, &DirectoryPresenter::dirActivated, nav_, &NavigationController::loadPath);
 
     connect(&folderViewPresenter, &DirectoryPresenter::draggedOut, this,
             qOverload<const QList<QString> &>(&Core::onDraggedOut));
@@ -202,16 +195,6 @@ void Core::connectComponents() {
     connect(overlays_, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
 
     connect(model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
-
-    connect(model.get(), &DirectoryModel::fileAdded, nav_, &NavigationController::onFileAdded);
-    connect(model.get(), &DirectoryModel::fileRemoved, nav_, &NavigationController::onFileRemoved);
-    connect(model.get(), &DirectoryModel::divergenceDetected, nav_, &NavigationController::onDivergenceDetected);
-    connect(model.get(), &DirectoryModel::fileRenamed, nav_, &NavigationController::onFileRenamed);
-    connect(model.get(), &DirectoryModel::loaded, nav_, &NavigationController::onModelLoaded);
-    connect(model.get(), &DirectoryModel::imageReady, nav_, &NavigationController::onModelItemReady);
-    connect(model.get(), &DirectoryModel::imageUpdated, nav_, &NavigationController::onModelItemUpdated);
-    connect(model.get(), &DirectoryModel::sortingChanged, nav_, &NavigationController::onModelSortingChanged);
-    connect(model.get(), &DirectoryModel::loadFailed, nav_, &NavigationController::onLoadFailed);
 
     if(mw)
         connectWindowComponents();
