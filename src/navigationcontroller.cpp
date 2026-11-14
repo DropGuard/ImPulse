@@ -54,10 +54,31 @@ NavigationController::NavigationController(State *stateArg, INavigationHost *hos
     // the clock's tick is this controller's own pulse — wired here, where
     // the timer lives, not in the coordinator
     connect(&slideshowTimer, &QTimer::timeout, this, &NavigationController::nextImageSlideshow);
+    // the presenter reactions, likewise owned here: the presenters arrive as
+    // constructor collaborators, so their connects live with the controller —
+    // a standalone construction is fully live without coordinator-side wiring
+    connect(&thumbPanelPresenter, &DirectoryPresenter::fileActivated, this,
+            &NavigationController::onDirectoryViewFileActivated);
+    connect(&thumbPanelPresenter, &DirectoryPresenter::dirActivated, this, &NavigationController::loadPath);
+    connect(&folderViewPresenter, &DirectoryPresenter::fileActivated, this,
+            &NavigationController::onDirectoryViewFileActivated);
+    connect(&folderViewPresenter, &DirectoryPresenter::dirActivated, this, &NavigationController::loadPath);
 }
 
 void NavigationController::attachModel(DirectoryModel *m) {
     model = m;
+    // the model reactions, owned by the controller that serves them: with
+    // this attachment the controller is fully live — no coordinator-side
+    // wiring is needed for anything navigation reacts to
+    connect(model, &DirectoryModel::loaded, this, &NavigationController::onModelLoaded);
+    connect(model, &DirectoryModel::imageReady, this, &NavigationController::onModelItemReady);
+    connect(model, &DirectoryModel::imageUpdated, this, &NavigationController::onModelItemUpdated);
+    connect(model, &DirectoryModel::sortingChanged, this, &NavigationController::onModelSortingChanged);
+    connect(model, &DirectoryModel::loadFailed, this, &NavigationController::onLoadFailed);
+    connect(model, &DirectoryModel::fileAdded, this, &NavigationController::onFileAdded);
+    connect(model, &DirectoryModel::fileRemoved, this, &NavigationController::onFileRemoved);
+    connect(model, &DirectoryModel::fileRenamed, this, &NavigationController::onFileRenamed);
+    connect(model, &DirectoryModel::divergenceDetected, this, &NavigationController::onDivergenceDetected);
     if(state->shuffle)
         syncRandomizer();
 }

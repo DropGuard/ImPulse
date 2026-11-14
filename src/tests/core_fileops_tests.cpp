@@ -30,6 +30,27 @@
 #include "testhelpers.h"
 #include "utils/fileoperations.h"
 
+// The coordinator kernel, recorded: NavigationController's calls into
+// guiSetImage / updateInfoString / showGui are the INavigationHost contract —
+// a real Core forwards the first into the window's display sink; this fake
+// keeps counts, which is what makes those calls assertable without a window.
+class RecordingNavHost : public INavigationHost {
+  public:
+    int guiSetImageCalls = 0;
+    int updateInfoStringCalls = 0;
+    int showGuiCalls = 0;
+    void guiSetImage(std::shared_ptr<Image> img) override {
+        Q_UNUSED(img)
+        ++guiSetImageCalls;
+    }
+    void updateInfoString() override {
+        ++updateInfoStringCalls;
+    }
+    void showGui() override {
+        ++showGuiCalls;
+    }
+};
+
 class TestCoreFileOps : public QObject, protected EngineStackFixture {
     Q_OBJECT
   public:
@@ -762,6 +783,54 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         // divergence must not re-announce (the model dedups per path+mtime)
         QVERIFY(QMetaObject::invokeMethod(core.directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
         QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
+    }
+
+    // The NavigationController pilot's payoff pin: the controller constructs,
+    // attaches and walks WITHOUT Core — no crop seam, no DialogHost, no ui_
+    // fake, no window tree. The kernel contract lands on the recording host,
+    // which is the first time guiSetImage/updateInfoString/showGui are
+    // assertable independently of the window. The engine stack below is the
+    // same shape Core's constructor builds, minus everything that is not
+    // navigation's.
+    void navigationControllerConstructsAndWalksStandalone() {
+        WorkerPool pool(2);
+        EngineBridge &bridge = EngineBridge::instance();
+        Thumbnailer thumbnailer(pool, bridge);
+        DirectoryPresenter thumbPresenter(thumbnailer);
+        DirectoryPresenter folderPresenter(thumbnailer);
+
+        State state;
+        coretest::RecordingView view;
+        coretest::FakeOverlayHost overlays;
+        RecordingNavHost host;
+
+        NavigationController nav(&state, &host, &view, &overlays, thumbPresenter, folderPresenter);
+        DirectoryModel model(pool, bridge);
+        nav.attachModel(&model);
+
+        const QString dir = uniqueDir("navstandalone");
+        const QString a = QDir(dir).filePath("a.png");
+        const QString b = QDir(dir).filePath("b.png");
+        writeImage(a);
+        writeImage(b);
+
+        QVERIFY(nav.loadPath(a));
+        QTRY_COMPARE_WITH_TIMEOUT(state.currentFilePath.value(), a, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(host.guiSetImageCalls >= 1, 10000);
+        QVERIFY(host.updateInfoStringCalls >= 1);
+        // State's default delayModel IS the cold-open handshake: the first
+        // ready item raises the GUI — the controller honoring the state, not
+        // a load event of its own. Exactly once: the handshake consumes it.
+        QCOMPARE(host.showGuiCalls, 1);
+
+        nav.nextImage();
+        QTRY_COMPARE_WITH_TIMEOUT(state.currentFilePath.value(), b, 10000);
+        QCOMPARE(host.showGuiCalls, 1); // the handshake is spent; later items do not re-raise
+
+        nav.startSlideshow();
+        QVERIFY(nav.slideshowClock().isActive());
+        nav.stopSlideshow();
+        QVERIFY(!nav.slideshowClock().isActive());
     }
 
     // The staleness guard on scaling results, pinned at the seam Core owns:
