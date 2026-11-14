@@ -61,11 +61,11 @@ void CropController::showCropPanel() {
     }
 }
 
-bool CropController::isCropPanelActive() const {
+bool CropController::isActive() const {
     return activeSidePanel == SIDEPANEL_CROP;
 }
 
-void CropController::trigger() {
+void CropController::toggle() {
     if(activeSidePanel != SIDEPANEL_CROP)
         showCropPanel();
     else

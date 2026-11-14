@@ -7,6 +7,7 @@
 
 #include <QObject>
 
+#include "gui/icropsurface.h"
 #include "gui/mainwindow.h"
 
 class ViewerWidget;
@@ -15,13 +16,13 @@ class DocumentWidget;
 class CropPanel;
 class CropOverlay;
 
-class CropController : public QObject {
+class CropController : public QObject, public ICropSurface {
     Q_OBJECT
   public:
     explicit CropController(MW *window, ViewerWidget *viewer, SidePanel *sidePanel, DocumentWidget *docWidget);
 
-    bool isCropPanelActive() const;
-    void trigger();
+    bool isActive() const override;
+    void toggle() override;
     void showCropPanel();
     void hideCropPanel();
     // viewer geometry changed (resize / fit / new image) while cropping
@@ -31,8 +32,11 @@ class CropController : public QObject {
     void setupCropPanel();
 
   signals:
-    void cropRequested(QRect);
-    void cropAndSaveRequested(QRect);
+    // the ICropSurface intent legs, realized as signals (the interface
+    // declares them as plain methods; this is the override that makes the
+    // realization)
+    void cropRequested(QRect rect) override;
+    void cropAndSaveRequested(QRect rect) override;
 
   private slots:
     // arms cropJustApplied, then relays: the panel-data nudge that follows

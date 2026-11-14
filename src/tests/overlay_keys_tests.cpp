@@ -81,12 +81,12 @@ class TestOverlayKeys : public QObject {
         QVERIFY(!saveOverlay->isVisible());
 
         // crop surface: Esc = cancel the selection and leave crop
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
         auto *cropOverlay = core.mainWindow()->findChild<CropOverlay *>();
         QVERIFY(cropOverlay);
         QApplication::sendEvent(cropOverlay, &esc);
-        QTRY_COMPARE_WITH_TIMEOUT(!core.mainWindow()->crop()->isCropPanelActive(), true, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(!core.mainWindow()->crop()->isActive(), true, 5000);
     }
 
     // The save prompt keeps the disk off the bare keys: Save and Save as are

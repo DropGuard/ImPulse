@@ -63,8 +63,8 @@ class TestCrop : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
         float scaleBefore = viewer->currentScale();
 
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
         QCOMPARE(viewer->fitMode(), FIT_ORIGINAL);
         QVERIFY2(qAbs(viewer->currentScale() - scaleBefore) < 0.001f, "the zoom must survive crop entry");
     }
@@ -94,8 +94,8 @@ class TestCrop : public QObject {
         coretest::drainEvents();
         float scaleBefore = viewer->currentScale();
         QRect rectBefore = viewer->imageRect();
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
         coretest::drainEvents();
         QVERIFY(qFuzzyCompare(viewer->currentScale(), scaleBefore));
         QCOMPARE(static_cast<int>(viewer->fitMode()), static_cast<int>(FIT_FREE));
@@ -117,8 +117,8 @@ class TestCrop : public QObject {
         QVERIFY(viewer);
         core.mainWindow()->fitOriginal();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_ORIGINAL, 5000);
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
         auto *overlay = core.mainWindow()->findChild<CropOverlay *>();
         QVERIFY(overlay);
         overlay->selectAll();
@@ -135,14 +135,14 @@ class TestCrop : public QObject {
         viewer->scrollLeft();
         // scrollSmooth animates through a QTimeLine — poll until it moves
         QTRY_VERIFY_WITH_TIMEOUT(viewer->imageRect() != rectBefore, 2000);
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isActive());
 
         // fit remains blocked while framing — a fit would reset the very
         // view the user is framing in
         float scale = viewer->currentScale();
         viewer->fitWindow();
         QVERIFY(qAbs(viewer->currentScale() - scale) < 0.001f);
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isActive());
 
         // leaving crop releases the policy: the fit keys work again — the
         // mode semantics were never vetoed, only deferred while the overlay
@@ -152,8 +152,8 @@ class TestCrop : public QObject {
         // forbids — prevImage in a one-file directory legitimately no-ops.
         // The arrows' navigation is pinned in
         // fitOriginalPersistsAndArrowsStayInInspectMode.)
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(!core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(!core.mainWindow()->crop()->isActive());
         viewer->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
     }
@@ -162,10 +162,10 @@ class TestCrop : public QObject {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
         QVERIFY(core.loadPath(QDir(base).filePath("crop.png")));
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(!core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(!core.mainWindow()->crop()->isActive());
     }
 
     void cropPanelConnectionsDeliver() {

@@ -78,7 +78,6 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     DocumentWidget *docWidget = nullptr;
     FolderViewProxy *folderView = nullptr;
     CentralWidget *centralWidget = nullptr;
-    ActiveSidePanel activeSidePanel;
     SidePanel *sidePanel;
     FullscreenInfoOverlayProxy *infoBarFullscreen;
     InfoBarProxy *infoBarWindowed = nullptr;

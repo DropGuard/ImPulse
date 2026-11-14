@@ -13,7 +13,7 @@
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
 #include "gui/dialoghost.h"
-#include "gui/cropcontroller.h"
+#include "gui/icropsurface.h"
 
 #include <QThread>
 #include <QDrag>
@@ -37,12 +37,12 @@ void Core::rotateRight() {
 }
 
 void Core::toggleCropPanel() {
-    if(!mw)
-        return; // crop is a surface over the window; headless has none
+    if(!crop_)
+        return; // headless without a crop fake: nothing to toggle
     if(model->isEmpty())
         return;
-    if(mw->crop()->isCropPanelActive() || state.hasActiveImage)
-        mw->crop()->trigger();
+    if(crop_->isActive() || state.hasActiveImage)
+        crop_->toggle();
 }
 
 void Core::requestSavePath() {

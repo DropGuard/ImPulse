@@ -58,6 +58,7 @@ Core::Core(const Deps &deps)
         view_ = deps.view;
         ownedDialogs = std::make_unique<DialogHost>(nullptr, nullptr);
         dialogs_ = ownedDialogs.get();
+        crop_ = deps.crop; // optional: only crop-flow tests provide one
     } else {
         initGui();
         // the main window owns the dialogs and the interaction interface, so it
@@ -67,6 +68,7 @@ Core::Core(const Deps &deps)
         view_ = deps.view ? deps.view : mw;
         overlays_ = deps.overlays ? deps.overlays : mw->overlays();
         dialogs_ = mw->dialogs();
+        crop_ = deps.crop ? deps.crop : mw->crop();
     }
     // the slideshow loop is a pure function of the state: slides advance by
     // timer, normal viewing loops. The relay rides the state binding and goes

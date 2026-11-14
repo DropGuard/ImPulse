@@ -17,6 +17,7 @@
 #include "components/workerpool/workerpool.h"
 #include "gui/iuserinteractions.h"
 #include "gui/icoreview.h"
+#include "gui/icropsurface.h"
 #include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
@@ -170,6 +171,9 @@ class Core : public QObject {
         // null -> the window itself (production). The display sink, the mode
         // legs, and the visibility query.
         ICoreView *view = nullptr;
+        // optional: only tests exercising crop flows need to provide one —
+        // toggleCropPanel guards on it, everything else never touches it
+        ICropSurface *crop = nullptr;
     };
 
     // The no-argument form is the production assembly. Kept as a separate
@@ -302,6 +306,9 @@ class Core : public QObject {
     // where Core's display sink and mode legs go: the window in production, a
     // recording stub in a headless test. Not owned.
     ICoreView *view_ = nullptr;
+    // the crop surface: the window's controller in production, a scripted
+    // fake in tests that exercise crop flows. Optional — null headless.
+    ICropSurface *crop_ = nullptr;
     // the dialog host: the window's in production, a parent-less one in a
     // headless test. Borrow/own — the window owns its own.
     DialogHost *dialogs_ = nullptr;
