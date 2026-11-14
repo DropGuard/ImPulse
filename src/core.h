@@ -18,6 +18,7 @@
 #include "gui/iuserinteractions.h"
 #include "gui/icoreview.h"
 #include "gui/icropsurface.h"
+#include "navigationcontroller.h"
 #include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
@@ -141,7 +142,7 @@ enum MimeDataTarget {
     TARGET_DROP
 };
 
-class Core : public QObject {
+class Core : public QObject, public INavigationHost {
     Q_OBJECT
   public:
     // What Core is built from. Every field defaults to the production choice, so
@@ -182,7 +183,7 @@ class Core : public QObject {
     Core();
     explicit Core(const Deps &deps);
     ~Core() override;
-    void showGui();
+    void showGui() override;
     // the file on screen; the state Core owns and every navigation decision reads
     QString currentFilePath() const;
     bool firstFramePending() const;
@@ -242,7 +243,7 @@ class Core : public QObject {
     // Whether the slideshow loops. Read-only: the behavior under test is the
     // slideshow reacting to the setting, not a caller flipping it directly.
     bool slideshowLoops() const {
-        return loopSlideshow;
+        return nav_->slideshowLoops();
     }
     // The paths currently selected, in view order. Public because every command
     // that acts on "the selection" is public and this is how a caller confirms
@@ -260,12 +261,18 @@ class Core : public QObject {
     // armed" is the observable half of "a slideshow is running"; stopping it is
     // the behavior under test, not something a caller may do directly.
     const QTimer &slideshowClock() const {
-        return slideshowTimer;
+        return nav_->slideshowClock();
     }
 
   public slots:
-    void updateInfoString();
-    bool loadPath(QString);
+    void updateInfoString() override;
+    // the navigation commands forward to the owning controller — the slots
+    // remain Core's public verbs: the keystroke path lands here via the
+    // core.cpp wiring, and the tests drive them exactly the way a key press
+    // does
+    bool loadPath(const QString &path) {
+        return nav_->loadPath(path);
+    }
 
   private:
     QElapsedTimer t;
@@ -321,8 +328,12 @@ class Core : public QObject {
     IOverlayHost *overlays_ = nullptr;
 
     State state;
-    FolderEndAction folderEndAction;
-    bool loopSlideshow;
+
+    // the navigation object: owns the slideshow clock, the shuffle randomizer
+    // and the folder-end policy; writes the navigation slice of State
+    // (see navigationcontroller.h). QObject-child of Core — destroyed by the
+    // tree, so member order does not matter here.
+    NavigationController *nav_ = nullptr;
 
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
@@ -345,22 +356,12 @@ class Core : public QObject {
     DirectoryPresenter thumbPanelPresenter, folderViewPresenter;
 
     void rotateByDegrees(int degrees);
-    void enterMode(ViewMode mode);
-    void reset();
-    bool setDirectory(const QString &path);
 
     QTranslator *translator = nullptr;
 
-    Randomizer randomizer;
-    void syncRandomizer();
-
     void attachModel(DirectoryModel *_model);
     QString selectedPath();
-    void guiSetImage(std::shared_ptr<Image> img);
-    QTimer slideshowTimer;
-
-    void startSlideshowTimer();
-
+    void guiSetImage(std::shared_ptr<Image> img) override;
     bool saveFile(const QString &filePath, const QString &newPath);
     bool saveFile(const QString &filePath);
 
@@ -392,15 +393,33 @@ class Core : public QObject {
     void interactiveCopy(const QList<QString> &paths, const QString &destDirectory);
     void interactiveMove(const QList<QString> &paths, const QString &destDirectory);
     // the two adjacent-folder commands; the bool is "land on the last file"
-    void prevDirectory(bool selectLast);
-    void prevDirectory();
-    void startSlideshow();
-    void stopSlideshow();
-    void nextImage();
-    void prevImage();
-    void nextImageSlideshow();
-    void jumpToFirst();
-    void jumpToLast();
+    void prevDirectory(bool selectLast) {
+        nav_->prevDirectory(selectLast);
+    }
+    void prevDirectory() {
+        nav_->prevDirectory();
+    }
+    void startSlideshow() {
+        nav_->startSlideshow();
+    }
+    void stopSlideshow() {
+        nav_->stopSlideshow();
+    }
+    void nextImage() {
+        nav_->nextImage();
+    }
+    void prevImage() {
+        nav_->prevImage();
+    }
+    void nextImageSlideshow() {
+        nav_->nextImageSlideshow();
+    }
+    void jumpToFirst() {
+        nav_->jumpToFirst();
+    }
+    void jumpToLast() {
+        nav_->jumpToLast();
+    }
     void rotateLeft();
     void rotateRight();
     void flipH();
@@ -414,11 +433,21 @@ class Core : public QObject {
     void moveToTrash();
     void copyFileClipboard();
     void openFromClipboard();
-    void toggleShuffle();
-    void enableFolderView();
-    void toggleFolderView();
-    void toggleSlideshow();
-    void nextDirectory();
+    void toggleShuffle() {
+        nav_->toggleShuffle();
+    }
+    void enableFolderView() {
+        nav_->enableFolderView();
+    }
+    void toggleFolderView() {
+        nav_->toggleFolderView();
+    }
+    void toggleSlideshow() {
+        nav_->toggleSlideshow();
+    }
+    void nextDirectory() {
+        nav_->nextDirectory();
+    }
     // The drag-and-drop entry points a real gesture uses: a drop from outside
     // the app, what a drag out of it produces, and the paths for it.
     void onDropIn(const QMimeData *mimeData, QObject *source);
@@ -437,42 +466,32 @@ class Core : public QObject {
 
   private slots:
     void readSettings();
-    void onModelItemReady(std::shared_ptr<Image>, const QString &, bool scaled);
-    void onModelItemUpdated(const QString &fileName);
-    void onModelSortingChanged(SortingMode mode);
-    void onLoadFailed(const QString &path);
     void close();
     void scalingRequest(QSize, ScalingFilter);
     void onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
     void copyPathsTo(const QList<QString> &paths, const QString &destDirectory);
     FileOpResult removeFile(const QString &fileName, bool trash);
-    void onFileRemoved(const QString &filePath, int index);
-    void onFileAdded(const QString &filePath);
-    void onDivergenceDetected(const QString &filePath);
-    void onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
     void showResizeDialog();
     void toggleFullscreenInfoBar();
     void runScript(const QString &);
     void reloadImage();
     void reloadImage(const QString &fileName);
     void copyPathClipboard();
-    void sortBy(SortingMode mode);
-    void sortByName();
-    void sortByTime();
-    void sortBySize();
+    void sortByName() {
+        nav_->sortByName();
+    }
+    void sortByTime() {
+        nav_->sortByTime();
+    }
+    void sortBySize() {
+        nav_->sortBySize();
+    }
     void showRenameDialog();
     void onDraggedOut(); // the action's no-argument form; the paths form is public
-    void onModelLoaded();
     void outputError(const FileOpResult &error) const;
     void reportBatchRemoval(const QString &doneVerb, int total, int successCount) const;
     void showOpenDialog();
     void showInDirectory();
     void quickCopyToFixedDirectory();
-    void onDirectoryViewFileActivated(const QString &filePath);
-    bool loadFileIndex(int index, bool async, bool preload);
-    void enableDocumentView();
-    void onPlaybackFinished();
-    void setFoldersDisplay(bool mode);
-    void loadParentDir();
     void print();
 };
