@@ -431,6 +431,35 @@ class TestCoreNav : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(core.mainWindow()->findChild<CropPanel *>(), 10000);
     }
 
+    // The scaling timing contract: requests are suppressed while the window
+    // is hidden (cold open), and the show itself triggers the fresh pass —
+    // "window ready, then act" — instead of leaking a visibility query into
+    // Core.
+    void scalingWaitsForTheWindowThenActs() {
+        QString dir = QDir(base).filePath("scalingtiming");
+        QVERIFY(QDir().mkpath(dir));
+        // a large image: at fit-window it is DOWNSCALED (scale < 1) — the one
+        // shape requestScaling actually serves; an 8x8 fixture would sit at
+        // scale 1.0 and legitimately request nothing
+        const QString path = QDir(dir).filePath("s.png");
+        QImage big(2000, 1200, QImage::Format_RGB32);
+        big.fill(Qt::darkCyan);
+        QVERIFY(big.save(path, "PNG"));
+
+        Core core;
+        QVERIFY(core.loadPath(path));
+        QVERIFY(!core.mainWindow()->isVisible()); // hidden at load: the frame has not arrived
+        auto *viewer = core.mainWindow()->viewer();
+        QSignalSpy requests(viewer, &ViewerWidget::scalingRequested);
+        QVERIFY(requests.isValid());
+
+        // the frame arrives (the QTRY pumps the loop): the handshake raises
+        // the window, and the show itself triggers the fresh scaling pass
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), path, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(core.mainWindow()->isVisible(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(requests.count() >= 1, 10000); // ready → act
+    }
+
     void gotoAdjacentAtFolderEndEntersNextFolder() {
         settings->setFolderEndAction(FOLDER_END_GOTO_ADJACENT);
         QVERIFY(settings->folderEndAction() == FOLDER_END_GOTO_ADJACENT);

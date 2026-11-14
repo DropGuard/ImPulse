@@ -151,8 +151,7 @@ void Core::readSettings() {
 void Core::showGui() {
     if(!mw)
         return; // headless Core has nothing to show
-    if(!view_->isWindowVisible())
-        view_->showWindowDefault();
+    view_->showWindowDefault();
     // the heavy-UI trigger is the window's own first show (shownOnce, wired
     // in the MW constructor) — the processEvents + 50 ms guess this used to
     // run is gone, along with the TODO that called it unreliable
@@ -475,8 +474,9 @@ void Core::print() {
 }
 
 void Core::scalingRequest(QSize size, ScalingFilter filter) {
-    // filter out an unnecessary scale request at statup
-    if(view_->isWindowVisible() && state.hasActiveImage) {
+    // visibility is the emitter's own timing now (requestScaling suppresses
+    // while hidden and re-requests on show); what remains here is the state check
+    if(state.hasActiveImage) {
         std::shared_ptr<Image> forScale = model->getImage(state.currentFilePath);
         if(forScale) {
             model->scaler->requestScaled(

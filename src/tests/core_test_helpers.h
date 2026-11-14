@@ -286,9 +286,6 @@ class RecordingView : public ICoreView {
     }
     void showWindowDefault() override {
     }
-    bool isWindowVisible() override {
-        return true;
-    }
     void toggleFullscreenInfoBar() override {
     }
     void setLoopPlayback(bool loop) override {
