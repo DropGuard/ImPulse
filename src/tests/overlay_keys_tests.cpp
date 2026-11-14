@@ -208,11 +208,12 @@ int main(int argc, char **argv) {
            name != "initTestCase" && name != "cleanupTestCase" && name != "init" && name != "cleanup")
             testSlots << QString::fromUtf8(name);
     }
-    int failures = 0;
+    int failures = 0, consecutiveAbnormal = 0;
     for(const QString &slot : std::as_const(testSlots)) {
         fflush(nullptr); // fork would duplicate whatever is buffered in stdout
         pid_t pid = fork();
         if(pid == 0) {
+            coretest::setChildCoreLimit();
             QByteArray nameBytes = slot.toUtf8();
             char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
             TestOverlayKeys t; // this child's own fixture, its own temp tree and settings
@@ -227,6 +228,12 @@ int main(int argc, char **argv) {
             fprintf(stderr, "overlay_keys_tests: slot '%s' exited abnormally (exit=%d, sig=%d)\n",
                     slot.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
                     WIFSIGNALED(status) ? WTERMSIG(status) : -1);
+        // the crash-burst guard: three consecutive abnormal slots mean a
+        // fixture-wide failure — the remaining slots carry no new evidence,
+        // and each was streaming a full core through systemd-coredump
+        consecutiveAbnormal = (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : consecutiveAbnormal + 1;
+        if(consecutiveAbnormal == 3)
+            break;
         failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
     }
     return failures;
