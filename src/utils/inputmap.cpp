@@ -276,10 +276,10 @@ void InputMap::initKeyMap() {
     keyMap.insert(91, ".");
 
     // special
-    keyMap.insert(151, "Wake Up"); // "Fn" key on thinkpad
-    keyMap.insert(94, "<");        // near left shift (iso layout)
-    keyMap.insert(166, "PgBack");
-    keyMap.insert(167, "PgForward");
+    keyMap.insert(151, "WakeUp"); // "Fn" key on thinkpad
+    keyMap.insert(94, "<");       // near left shift (iso layout)
+    keyMap.insert(166, "Back");
+    keyMap.insert(167, "Forward");
 #endif
 }
 

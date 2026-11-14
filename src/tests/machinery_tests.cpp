@@ -416,6 +416,28 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QCOMPARE(ShortcutBuilder::fromEvent(&dbl), QStringLiteral("LMB_DoubleClick"));
     }
 
+    // The keyboard dispatch is QShortcutMap's, and the projection can only
+    // claim tokens QKeySequence::fromString understands — a name outside Qt's
+    // table would sit in the keymap editor, render on a binding, and do
+    // nothing. This sweep keeps the vocabulary inside Qt's: every keyboard
+    // name the platform's scancode table can produce must parse.
+    void everyInputMapNameIsQtParseable() {
+        inputMap = InputMap::getInstance();
+        const QMap<quint32, QString> keyTable = inputMap->keys();
+        QVERIFY2(keyTable.size() > 50, "the scancode table came back nearly empty, the sweep proves nothing");
+
+        QStringList unparseable;
+        for(auto it = keyTable.constBegin(); it != keyTable.constEnd(); ++it) {
+            const QString &name = it.value();
+            if(QKeySequence::fromString(name).count() == 0)
+                unparseable << name;
+        }
+        QVERIFY2(unparseable.isEmpty(),
+                 qPrintable(QStringLiteral("InputMap names outside Qt's vocabulary (") +
+                            QString::number(keyTable.size()) + QStringLiteral(" names checked):\n  ") +
+                            unparseable.join(QStringLiteral("\n  "))));
+    }
+
     // ImageAnimated had no coverage at all: the QMovie-based loader and the
     // direct frame decode behind getImage() now run against a real two-frame
     // GIF.

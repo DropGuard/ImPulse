@@ -308,7 +308,6 @@ else:
 # exactly how the up-arrow fit-width easter egg stayed invisible for years:
 # it intercepted keys before the action system, in a door no reader suspected.
 ALLOWED_KEY_DOORS = {
-    'gui/mainwindow.cpp',                    # the terminal funnel
     'gui/contextmenu.cpp',                   # popup: item navigation, no forwarding
     'gui/folderview/foldergridview.cpp',     # widget-standard grid navigation
     'gui/customwidgets/thumbnailview.cpp',   # shift state for range selection

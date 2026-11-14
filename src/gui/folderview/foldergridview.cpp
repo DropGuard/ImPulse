@@ -334,18 +334,11 @@ bool FolderGridView::focusNextPrevChild(bool) {
 
 void FolderGridView::keyPressEvent(QKeyEvent *event) {
     ThumbnailView::keyPressEvent(event); // shift state for range selection
+    // the grid's bindings ride its QShortcuts (WidgetWithChildrenShortcut),
+    // armed by the focus-driven de-claim — they fire before this handler
+    // exists to see them. What still arrives is unclaimed: consumed, so a
+    // key nobody bound never wanders off into the widget chain.
     event->accept();
-    // the grid's own scope: the same key means something else in the
-    // document view, so the event resolves against the grid's table first
-    // (upstream #365 — the hardcoded switch this replaces was the
-    // "configurable later" that never came; its defaults now live in
-    // ActionManager's gridDefaults, user-rebindable).
-    //
-    // Projected grid keys fire through the grid's QShortcuts before this
-    // handler runs at all; what still arrives here is the manual funnel's
-    // jurisdiction — pointer events aside, the tokens Qt cannot project
-    // ("Wake Up" and friends) plus anything the projection declined.
-    actionManager->processEvent(event, ShortcutScope::FolderGrid);
 }
 
 void FolderGridView::focusInEvent(QFocusEvent *event) {
