@@ -260,7 +260,16 @@ void NavigationController::onFileRenamed(const QString &filePath, const QString 
 // (the rename follow, the external-change reload) bypass the gate — they are
 // self-healing, not user intent.
 bool NavigationController::navigationDenied() {
-    if(overlays_->hasPendingSurface()) {
+    // pending work has two homes: interactive surfaces (the registry), and
+    // the current image's uncommitted edits — the save prompt may be
+    // settings-off, but the work exists regardless of its rendering
+    const bool pending = overlays_->hasPendingSurface() || [&] {
+        if(!model)
+            return false;
+        auto img = model->getImage(state->currentFilePath);
+        return img && img->isEdited();
+    }();
+    if(pending) {
         overlays_->showMessage(tr("Commit or discard your changes first."));
         return true;
     }

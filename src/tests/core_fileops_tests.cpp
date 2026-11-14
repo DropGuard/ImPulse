@@ -822,6 +822,18 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         overlayFake.pendingSurfaces = false;
         QVERIFY(core.loadPath(b)); // resolved: the walk is open again
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), b, 10000);
+
+        // the STATE-held leg: an uncommitted edit locks navigation even with
+        // no visible surface (the save prompt may be settings-off — the work
+        // exists regardless of its rendering). discard resolves it.
+        QVERIFY(core.loadPath(b)); // settle on b
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), b, 10000);
+        core.flipH();
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->getImage(b)->isEdited(), 10000);
+        QVERIFY(!core.loadPath(b)); // the walk away is denied: the edit is uncommitted
+        QCOMPARE(core.currentFilePath(), b);
+        core.discardEdits();
+        QVERIFY(core.loadPath(b)); // resolved by discard
     }
 
     // The NavigationController pilot's payoff pin: the controller constructs,
