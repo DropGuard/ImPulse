@@ -482,7 +482,7 @@ void Core::onLoadFailed(const QString &path) {
         return;
     }
     overlays_->showMessage(tr("Load failed: ") + path);
-    mw->closeImage();
+    view_->closeImage(); // the seam, not the window: headless Core lands here too
 }
 
 void Core::onModelItemReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
