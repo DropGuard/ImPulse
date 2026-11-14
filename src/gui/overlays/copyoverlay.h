@@ -41,6 +41,7 @@ class CopyOverlay : public OverlayWidget, public IPendingSurface {
     void moveRequested(QString);
 
   protected:
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     // clicking anywhere but the menu dismisses it — the same answer Esc gives,
     // and the same click-outside rule RenameOverlay already follows. Without

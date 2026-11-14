@@ -176,6 +176,18 @@ inline QKeyEvent keyPressFor(Qt::Key key, const QString &keyName, Qt::KeyboardMo
     return QKeyEvent(QEvent::KeyPress, key, modifiers, scanCodeFor(keyName), 0u, 0u, QString(), false, 0);
 }
 
+// Window-path delivery: the only route that traverses QShortcutMap. The
+// widget-level sendEvent/notify routes bypass shortcut dispatch entirely
+// (dispatch_probe_tests pins which is which), so any leg that asserts "the
+// map fired the action" must go through the target's window handle. One call
+// is one press+release pair.
+inline void deliverWindowKey(QWidget *target, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    QWindow *win = target->window()->windowHandle();
+    QVERIFY2(win != nullptr, "the target has no window handle — was it shown?");
+    QTest::keyClick(win, key, modifiers);
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+}
+
 // ---- grid/test helpers shared by the widget-facing suites ----
 
 // a scoped TestableFolderGridView for suites that drive the grid directly

@@ -339,8 +339,23 @@ void FolderGridView::keyPressEvent(QKeyEvent *event) {
     // document view, so the event resolves against the grid's table first
     // (upstream #365 — the hardcoded switch this replaces was the
     // "configurable later" that never came; its defaults now live in
-    // ActionManager's gridDefaults, user-rebindable)
+    // ActionManager's gridDefaults, user-rebindable).
+    //
+    // Projected grid keys fire through the grid's QShortcuts before this
+    // handler runs at all; what still arrives here is the manual funnel's
+    // jurisdiction — pointer events aside, the tokens Qt cannot project
+    // ("Wake Up" and friends) plus anything the projection declined.
     actionManager->processEvent(event, ShortcutScope::FolderGrid);
+}
+
+void FolderGridView::focusInEvent(QFocusEvent *event) {
+    actionManager->setGridActive(true);
+    QGraphicsView::focusInEvent(event);
+}
+
+void FolderGridView::focusOutEvent(QFocusEvent *event) {
+    actionManager->setGridActive(false);
+    ThumbnailView::focusOutEvent(event);
 }
 
 void FolderGridView::wheelEvent(QWheelEvent *event) {

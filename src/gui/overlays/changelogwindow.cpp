@@ -1,6 +1,9 @@
 #include "changelogwindow.h"
 #include "ui_changelogwindow.h"
 
+#include "components/actionmanager/actionmanager.h"
+#include "shortcutbuilder.h"
+
 ChangelogWindow::ChangelogWindow(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::ChangelogWindow) {
     ui->setupUi(this);
     hide();
@@ -37,6 +40,22 @@ void ChangelogWindow::wheelEvent(QWheelEvent *event) {
     event->accept();
 }
 
+// The close button holds focus while this window is up, so the ShortcutOverride
+// for Esc arrives there, not at the window — the filter claims it back. Without
+// it, Esc would fire closeFullScreenOrExit behind a what's-new popup.
+bool ChangelogWindow::event(QEvent *event) {
+    return OverlayWidget::event(event);
+}
+
+bool ChangelogWindow::eventFilter(QObject *watched, QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride) {
+        auto *ke = static_cast<QKeyEvent *>(event);
+        if(QKeySequence(ke->key() | ke->modifiers()) == QKeySequence(QStringLiteral("Esc")))
+            event->accept();
+    }
+    return OverlayWidget::eventFilter(watched, event);
+}
+
 void ChangelogWindow::keyPressEvent(QKeyEvent *event) {
     quint32 nativeScanCode = event->nativeScanCode();
     QString key = actionManager->keyForNativeScancode(nativeScanCode);
@@ -48,6 +67,9 @@ void ChangelogWindow::keyPressEvent(QKeyEvent *event) {
 
 void ChangelogWindow::show() {
     OverlayWidget::show();
+    // the veto filter rides the buttons: they are what holds focus here
+    ui->closeButton->installEventFilter(this);
+    ui->shutUpButton->installEventFilter(this);
     ui->closeButton->setFocus();
 }
 

@@ -21,6 +21,7 @@ class SaveConfirmOverlay : public OverlayWidget, public IPendingSurface {
     ~SaveConfirmOverlay() override;
 
   protected:
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
   signals:

@@ -1,5 +1,7 @@
 #include "styledcombobox.h"
 
+#include "components/actionmanager/actionmanager.h"
+
 StyledComboBox::StyledComboBox(QWidget *parent) : QComboBox(parent), hiResPixmap(false) {
     dpr = this->devicePixelRatioF();
     // `settings` outlives every widget, so the connection has to be bound to
@@ -40,6 +42,16 @@ void StyledComboBox::paintEvent(QPaintEvent *e) {
         pos = QPointF(width() - downArrow.width() - 8, (height() - downArrow.height()) / 2);
     }
     p.drawPixmap(pos, downArrow);
+}
+
+// The input-routing combo gives up every key with ignore() and lets the
+// parent chain answer (in the crop panel that ends at the crop workflow).
+// For that contract to survive QShortcutMap, every override must be claimed —
+// an unclaimed key would fire its global action and never reach the chain.
+bool StyledComboBox::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride)
+        event->accept();
+    return QComboBox::event(event);
 }
 
 void StyledComboBox::keyPressEvent(QKeyEvent *event) {

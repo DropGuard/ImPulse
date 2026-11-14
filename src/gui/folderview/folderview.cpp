@@ -6,6 +6,9 @@
 FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), ui(new Ui::FolderView) {
     ui->setupUi(this);
 
+    // the grid scope's QShortcuts ride this surface and live and die with it
+    actionManager->attachGridSurface(ui->thumbnailGrid);
+
     // ------- filesystem view --------
     QString style = "font: %1pt;";
     style = style.arg(QApplication::font().pointSize());

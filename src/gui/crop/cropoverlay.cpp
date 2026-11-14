@@ -563,6 +563,33 @@ void CropOverlay::onSelectionOutsideChange(QRect selection) {
 }
 
 //------------------------------------------------------------------------------
+// The save chord is dual-purpose here: with a pending selection it commits
+// the crop and then saves, in that order — an order only this surface can
+// guarantee, so with a selection the chord is vetoed out of QShortcutMap and
+// sequenced by keyPressEvent below. Without a selection the chord rides the
+// map like everywhere else. The walk keys stay vetoed for the same reason
+// they are vetoed at every floating surface.
+bool CropOverlay::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride) {
+        auto *ke = static_cast<QKeyEvent *>(event);
+        const QKeySequence pressed(ke->key() | ke->modifiers());
+        bool saveChord = false;
+        for(const QString &token : actionManager->shortcutsForAction(QStringLiteral("save"))) {
+            // the same token->sequence expansion the projection uses; "Enter"
+            // claims both Returns
+            if(token == QStringLiteral("Enter")) {
+                saveChord |= pressed == QKeySequence(QStringLiteral("Return"));
+                saveChord |= pressed == QKeySequence(QStringLiteral("Enter"));
+            } else {
+                saveChord |= pressed == QKeySequence::fromString(token);
+            }
+        }
+        if(actionManager->keyNamesSubjectChangingAction(ke) || (saveChord && hasSelection()))
+            event->accept();
+    }
+    return FloatingWidget::event(event);
+}
+
 void CropOverlay::keyPressEvent(QKeyEvent *event) {
     event->accept();
     // the save chords imply committing the pending crop: "save" while a

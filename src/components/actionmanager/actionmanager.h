@@ -13,6 +13,9 @@
 #include "components/scriptmanager/scriptmanager.h"
 #include "settings.h"
 
+class QWidget;
+class QShortcut;
+
 enum ActionType {
     ACTION_INVALID,
     ACTION_NORMAL,
@@ -75,6 +78,15 @@ class ActionManager : public QObject {
     // drift: "does this event name a subject-changing action?" — true means the
     // surface must consume the event instead of forwarding it.
     bool eventIsSubjectChanging(QInputEvent *event);
+    // The ShortcutOverride-era form of the same question. An override event
+    // carries the LOGICAL key only — nativeScanCode is 0 by construction, so
+    // the scancode-token scan above cannot see it. This one keys on the
+    // projected sequence instead: true means the key names a subject-changing
+    // action in the effective projection (grid de-claims and the armed inspect
+    // layer respected), and the surface must claim the override back.
+    bool keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const;
+    // which action (if any) the sequence claims in the effective projection
+    QString actionForKeySequence(const QKeySequence &seq) const;
     const QString shortcutForAction(const QString &action);
     const QList<QString> shortcutsForAction(const QString &action);
     QStringList actionList();
@@ -130,6 +142,28 @@ class ActionManager : public QObject {
             qFatal("connectAction: '%s' is not a registered action", qPrintable(name));
         QObject::connect(a, &QAction::triggered, receiver, slot);
     }
+    // ---- the keyboard projection ----------------------------------------
+    //
+    // The string tables stay the source of truth; QShortcutMap becomes the
+    // dispatcher. Keyboard-representable tokens are projected onto the
+    // registered QActions (setShortcuts, ApplicationShortcut), so a bound key
+    // fires before it ever reaches a widget's keyPressEvent. Pointer tokens
+    // (wheel, mouse buttons, double-click) keep the manual funnel — no
+    // QKeySequence can represent them.
+    //
+    // Two empirical Qt facts the projection is built around (pinned in
+    // dispatch_probe_tests): an action's shortcuts are INERT until the action
+    // is added to a widget (attachWindowSurface), and two live claims of one
+    // key are ambiguous with NEITHER firing (no context precedence). The
+    // scopes therefore de-claim instead of layering: while the grid holds
+    // focus its keys are removed from the global projection, and while the
+    // inspect mode is armed its entries replace the global ones. The grid's
+    // own bindings ride QShortcuts parented to the grid surface
+    // (WidgetWithChildrenShortcut), active exactly while the subtree holds
+    // focus.
+    void attachWindowSurface(QWidget *surface); // the actions become live on this window
+    void attachGridSurface(QWidget *surface);   // the grid scope's QShortcuts (null detaches)
+    void setGridActive(bool active);            // the grid surface gained/lost keyboard focus
   public slots:
     bool invokeAction(const QString &actionName);
 
@@ -139,7 +173,18 @@ class ActionManager : public QObject {
     // name. R12 reads this list against core.cpp's connectAction calls.
     QAction *addAction(const QString &name);
     void initActions();
-    QMap<QString, QAction *> mActions;          // <name, trigger token>
+    QMap<QString, QAction *> mActions; // <name, trigger token>
+
+    // the keyboard projection's state and its one apply-everything entry
+    // point, called from every table mutation
+    QWidget *windowSurface = nullptr;   // where the QActions are registered
+    QWidget *gridSurface = nullptr;     // where the grid scope's QShortcuts live
+    QList<QShortcut *> gridProjections; // rebuilt whenever the grid table moves
+    bool gridActive = false;            // the grid surface holds keyboard focus
+    void applyKeyboardProjection();
+    void reproject();            // global table (de-claimed) + inspect layer -> setShortcuts
+    void rebuildGridShortcuts(); // grid table -> QShortcuts on the grid surface
+
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
     // the inspect scope's layer: only the deltas live here (fit original /
     // free zoom pan with the arrows instead of changing images)

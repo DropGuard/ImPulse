@@ -154,10 +154,23 @@ fn rapid_open_dir_keeps_only_latest() {
     wait_for(&engine, |st| {
         st.dir() == Some(dir_b.path()) && st.file_count() == 3
     });
-    // drain whatever events accumulated; none may reference dir_a's listing
+    // drain whatever events accumulated. The engine's contract is per-session:
+    // every DirListed carries its own epoch so the mirror can drop stale
+    // sessions, and nothing here can promise that dir_a's scan did not finish
+    // before the dir_b command was picked off the command channel — a
+    // one-entry directory usually does. What is pinned: the current session's
+    // event names dir_b, and a stale one can only name dir_a.
     while let Some(ev) = engine.try_event() {
-        if let Event::DirListed { dir, .. } = ev {
-            assert_eq!(dir, dir_b.path());
+        if let Event::DirListed { dir, epoch } = ev {
+            if epoch == engine.epoch() {
+                assert_eq!(dir, dir_b.path());
+            } else {
+                assert_eq!(
+                    dir,
+                    dir_a.path(),
+                    "a stale session's listing may only be dir_a's"
+                );
+            }
         }
     }
 }

@@ -155,6 +155,21 @@ class TestOverlayKeys : public QObject {
         press(Qt::Key_Escape, "Esc");
         QCOMPARE(discard.count(), 1);
         QVERIFY(!saveOverlay->isVisible()); // discard also dismisses the surface
+
+        // the QShortcutMap leg: with the surface focused, a window-delivered
+        // Ctrl+S fires the save action through the map — the sendEvent legs
+        // above ride the manual funnel instead, which the door keeps for the
+        // keys only it can arbitrate
+        core.mainWindow()->overlays()->showSaveOverlay();
+        QVERIFY(saveOverlay->isVisible());
+        saveOverlay->setFocus();
+        QVERIFY(QApplication::focusWidget() == saveOverlay);
+        core.mainWindow()->show();
+        QVERIFY(QTest::qWaitForWindowExposed(core.mainWindow()));
+        QSignalSpy mapSave(actionManager->action("save"), &QAction::triggered);
+        coretest::deliverWindowKey(saveOverlay, Qt::Key_S, Qt::ControlModifier);
+        QCOMPARE(mapSave.count(), 1); // through the map, no veto: the chord is the prompt's own answer
+        QVERIFY(!saveOverlay->isVisible());
     }
 
     // A floating surface that yields an unowned key to the action system is

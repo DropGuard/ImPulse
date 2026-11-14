@@ -3,6 +3,8 @@
 
 #include <QStyle>
 
+#include "components/actionmanager/actionmanager.h"
+
 ContextMenu::ContextMenu(QWidget *parent) : QWidget(parent), ui(new Ui::ContextMenu) {
     ui->setupUi(this);
     setWindowFlags(Qt::Popup);
@@ -245,6 +247,18 @@ void ContextMenu::paintEvent(QPaintEvent *event) {
     opt.initFrom(this);
     QPainter p(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+}
+
+// A popup owns its keyboard: while this menu is up, no application shortcut
+// may fire behind it ("F used to toggle fullscreen with the menu up" — the
+// old keyPressEvent comment). Qt delivers ShortcutOverride to the focused
+// widget before the map fires anything; claiming every override keeps the
+// navigation keys and Esc local, exactly what the swallow-everything handler
+// below always did.
+bool ContextMenu::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride)
+        event->accept();
+    return QWidget::event(event);
 }
 
 void ContextMenu::keyPressEvent(QKeyEvent *event) {

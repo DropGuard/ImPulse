@@ -276,6 +276,10 @@ void Core::initActions() {
 // method — its tests call the slots directly. The connectAction calls stay
 // in core.cpp because R12 reads this file's text for the connected list.
 void Core::connectWindowActions() {
+    // the projection's registration surface: a QAction's shortcuts are inert
+    // until added to a widget (dispatch_probe_tests), so the whole registry
+    // goes live on the main window here
+    actionManager->attachWindowSurface(mw);
     actionManager->connectAction("fitWindow", mw->viewer(), &ViewerWidget::fitWindow);
     actionManager->connectAction("fitWidth", mw->viewer(), &ViewerWidget::fitWidth);
     actionManager->connectAction("fitNormal", mw->viewer(), &ViewerWidget::fitOriginal);

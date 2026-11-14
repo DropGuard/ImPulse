@@ -1,6 +1,9 @@
 #include "copyoverlay.h"
 #include "ui_copyoverlay.h"
 
+#include "components/actionmanager/actionmanager.h"
+#include "shortcutbuilder.h"
+
 CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::CopyOverlay) {
     ui->setupUi(this);
     hide();
@@ -154,6 +157,21 @@ void CopyOverlay::createDefaultPaths() {
 bool CopyOverlay::focusNextPrevChild(bool next) {
     Q_UNUSED(next)
     return false;
+}
+
+// Same veto law as the save prompt, plus the digit keys: 1-9 are this
+// surface's per-destination hotkeys, and the global table binds 1/2/3 to the
+// fit modes — without the veto a digit would refit the view instead of
+// addressing a copy target.
+bool CopyOverlay::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride) {
+        auto *ke = static_cast<QKeyEvent *>(event);
+        const bool digit = ke->key() >= Qt::Key_1 && ke->key() <= Qt::Key_9 &&
+                           (ke->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier;
+        if(actionManager->keyNamesSubjectChangingAction(ke) || digit)
+            event->accept();
+    }
+    return OverlayWidget::event(event);
 }
 
 void CopyOverlay::keyPressEvent(QKeyEvent *event) {

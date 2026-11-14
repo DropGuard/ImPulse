@@ -34,6 +34,24 @@ SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent)
 // bare Enter is no answer at all: it must not overwrite in place, and it
 // must not abandon the edits either — before it was captured it used to
 // fall through to the folder-view toggle behind the prompt.
+// The keyboard dispatch is QShortcutMap's now: a projected key fires before
+// this surface ever sees it. What still arrives is decided here — the walk,
+// the view switch and the way out (eventIsSubjectChanging) are vetoed back to
+// local delivery, because a Page Down would leave "save or discard?" pointing
+// at a file nobody is deciding about. The save chords are NOT vetoed: Ctrl+S
+// reaches the save action straight through the map, exactly as the buttons'
+// hint text promises.
+bool SaveConfirmOverlay::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride) {
+        auto *ke = static_cast<QKeyEvent *>(event);
+        if(actionManager->keyNamesSubjectChangingAction(ke)) {
+            event->accept();
+            return true; // the claim dies if the base re-ignores the override
+        }
+    }
+    return OverlayWidget::event(event);
+}
+
 void SaveConfirmOverlay::keyPressEvent(QKeyEvent *event) {
     event->accept();
     if(event->key() == Qt::Key_Escape) {
