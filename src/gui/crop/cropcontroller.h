@@ -35,7 +35,9 @@ class CropController : public QObject, public ICropSurface {
   signals:
     // the ICropSurface intent legs, realized as signals (the interface
     // declares them as plain methods; this is the override that makes the
-    // realization)
+    // realization). Both rects are in IMAGE pixel coordinates — the frame the
+    // editor applies ImageLib::cropped against; the surface owns the
+    // scene/device conversions and hands the editor pure geometry.
     void cropRequested(QRect rect) override;
     void cropAndSaveRequested(QRect rect) override;
 
