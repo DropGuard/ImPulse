@@ -14,6 +14,9 @@
 // enforcement: the build would happily moc a hundred classes collected here.
 #pragma once
 
+#include <sys/resource.h>
+#include <sys/time.h>
+
 #include <QtTest/QTest>
 #include <QApplication>
 #include <QByteArray>
@@ -44,6 +47,33 @@
 #include "utils/inputmap.h"
 
 namespace coretest {
+
+// ---- the crash-burst guard ---------------------------------------------------
+//
+// The fork harness streams a FULL core through systemd-coredump for every
+// abnormally-exiting child — the nav_-null incident crash-looped ~80 slots,
+// each writing its whole memory image (ProcessSizeMax defaults to 32G), and
+// that write-through was most of the suite's 512-871 s. Two guards:
+//
+// setChildCoreLimit(): each slot child caps its own RLIMIT_CORE — the burst's
+// write-through is bounded, and the notes-first core layout keeps backtraces
+// intact under truncation. QIMGV_TEST_CORE_UNLIMITED removes the cap when a
+// fresh crash needs the full image.
+//
+// The parent-side burst counter lives in each main's loop: three consecutive
+// abnormal slots abort the rest — a fixture-wide failure carries no new
+// evidence per slot, and twenty identical reds carry less than three.
+
+inline void setChildCoreLimit() {
+    if(qEnvironmentVariableIsSet("QIMGV_TEST_CORE_UNLIMITED"))
+        return; // chasing fresh evidence: the full image is the evidence
+    rlimit rl{};
+    if(getrlimit(RLIMIT_CORE, &rl) != 0)
+        return;                     // best-effort: the guard never breaks a working harness
+    const rlim_t cap = 64ULL << 20; // stacks + notes + some heap
+    rl.rlim_cur = (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < cap) ? rl.rlim_max : cap;
+    setrlimit(RLIMIT_CORE, &rl);
+}
 
 // The process-wide singletons a GUI suite needs, initialized by construction.
 //

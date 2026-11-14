@@ -1,6 +1,8 @@
 // One binary, one class per domain: see engine_stack_fixture.h for what
 // the classes share. Order here is the order QTest reports them in.
 #include <QTest>
+
+#include "core_test_helpers.h"
 #include <QGuiApplication>
 #include <QStandardPaths>
 #include <QGuiApplication>
@@ -39,7 +41,7 @@ int main(int argc, char **argv) {
     for(const QString &stale : orphans)
         if(!QFile::exists(QStringLiteral("/proc/%1").arg(stale.mid(3))))
             QDir(base + "/" + stale).removeRecursively();
-    int failures = 0;
+    int failures = 0, consecutiveAbnormal = 0;
     int (*const runs[])(int, char **) = {
         runListingTests, runWireFormatTests, runFolderBoundaryTests, runDecodeTests,      runSettingsTableTests,
         runFileLogTests, runMachineryTests,  runThumbnailStoreTests, runThumbnailerTests, runWorkerPoolTests,
@@ -57,11 +59,19 @@ int main(int argc, char **argv) {
     for(auto run : runs) {
         fflush(nullptr); // fork would duplicate whatever is buffered in stdout
         pid_t pid = fork();
-        if(pid == 0)
+        if(pid == 0) {
+            coretest::setChildCoreLimit();
             return run(argc, argv) != 0 ? 1 : 0;
+        }
         int status = 0;
         while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
         }
+        // the crash-burst guard: three consecutive abnormal slots mean a
+        // fixture-wide failure — the remaining slots carry no new evidence,
+        // and each was streaming a full core through systemd-coredump
+        consecutiveAbnormal = (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : consecutiveAbnormal + 1;
+        if(consecutiveAbnormal == 3)
+            break;
         failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
     }
     return failures;
