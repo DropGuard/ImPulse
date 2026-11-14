@@ -425,6 +425,10 @@ class TestCoreNav : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(!core.firstFramePending(), 10000);
         QVERIFY(core.mainWindow()->isVisible());
         QCOMPARE(core.currentFilePath(), files.at(0));
+        // the heavy panels arrive with the window's own first show (shownOnce,
+        // not a timer): crop panel existence is the probe — it is built in
+        // setupFullUi and nowhere else
+        QTRY_VERIFY_WITH_TIMEOUT(core.mainWindow()->findChild<CropPanel *>(), 10000);
     }
 
     void gotoAdjacentAtFolderEndEntersNextFolder() {
