@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include "cache/cache.h"
 #include "directorymanager/directorymanager.h"
@@ -86,6 +87,12 @@ class DirectoryModel : public QObject {
     void fileRemoved(const QString &filePath, int index);
     void fileAdded(const QString &filePath);
     void fileModified(const QString &filePath);
+    void divergenceDetected(const QString &filePath);
+    // EDGE events. fileModified fires when this model observed a real change
+    // (reload, or a mirror report for an entry it holds nothing about);
+    // divergenceDetected fires once per (path, disk mtime) when the disk
+    // moved under an entry holding uncommitted edits. The dedup lives here
+    // because the mtime comparison lives here.
     void fileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
     void dirRemoved(const QString &dirPath, int index);
     void dirAdded(const QString &dirPath);
@@ -101,6 +108,12 @@ class DirectoryModel : public QObject {
     Loader loader;
     QSet<QString> mScaledCache; // paths whose cached image is tier-1 (scaled)
     Cache cache;
+
+    // the disk mtime the last divergence announcement was made for, per path:
+    // one external save surfaces as several wire/mirror cycles, and each must
+    // not re-announce. Keyed by path and overwritten per divergence — bounded
+    // by the listing, stale entries are harmless (mtimes only move forward).
+    QHash<QString, QDateTime> announcedDivergences;
 
   private slots:
     void onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled);

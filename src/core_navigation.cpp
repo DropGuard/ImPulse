@@ -181,27 +181,14 @@ void Core::onFileRenamed(const QString &filePath, const QString &newPath, int ol
     updateInfoString();
 }
 
-// The model follows the disk for unedited entries (mtime compare + reload;
-// the repaint arrives via itemUpdated). What only Core can add: the current
-// image holds uncommitted edits while the disk moved under it — say so. The
-// edited state wins, and an explicit reload picks the disk content up; a
-// self-save is silent because Image::save refreshes the recorded mtime.
-void Core::onFileModified(const QString &filePath) {
-    if(filePath != state.currentFilePath)
-        return;
-    auto img = model->getImage(filePath);
-    if(!img || !img->isEdited())
-        return;
-    // the question is disk-vs-recorded, stat directly: the manager's meta is
-    // a mirror that can lag the very event that just arrived
-    const QDateTime disk = QFileInfo(filePath).lastModified();
-    if(disk == img->lastModified())
-        return;
-    if(filePath == divergenceAnnouncedFor && disk == divergenceAnnouncedAt)
-        return; // the same divergence, already announced
-    divergenceAnnouncedFor = filePath;
-    divergenceAnnouncedAt = disk;
-    overlays_->showMessage(tr("File changed on disk — your edits are kept in memory."));
+// The model edge-detects — its slot owns the mtime comparison and the
+// per-(path, disk-mtime) dedup, and hands Core one divergenceDetected per
+// real divergence. Core only carries the human-facing half, for the file on
+// screen; a self-save never reaches this (Image::save refreshes the recorded
+// mtime, so the model sees no edge at all).
+void Core::onDivergenceDetected(const QString &filePath) {
+    if(filePath == state.currentFilePath)
+        overlays_->showMessage(tr("File changed on disk — your edits are kept in memory."));
 }
 
 void Core::sortByName() {

@@ -233,21 +233,30 @@ void DirectoryModel::onFileAdded(const QString &filePath) {
 
 void DirectoryModel::onFileModified(const QString &filePath) {
     QDateTime modTime = lastModified(filePath);
-    if(modTime.isValid()) {
-        auto img = cache.get(filePath);
-        if(img) {
-            // check if file on disk is different
-            if(modTime != img->lastModified()) {
-                // an edited image IS uncommitted work: the disk does not write
-                // over memory, exactly as bare keys do not write over disk.
-                // reload() would cache.remove() the user's edits away; the
-                // divergence is announced instead (Core, current file only).
-                if(!img->isEdited())
-                    reload(filePath);
-            }
-        }
+    if(!modTime.isValid())
+        return;
+    auto img = cache.get(filePath);
+    if(!img) {
+        // nothing cached to compare against: the mirror saw it, pass it on
         emit fileModified(filePath);
+        return;
     }
+    if(modTime == img->lastModified())
+        return; // a re-report of a state the entry already reflects — no edge
+    // an edited image IS uncommitted work: the disk does not write over
+    // memory, exactly as bare keys do not write over disk. reload() would
+    // cache.remove() the user's edits away; the divergence is announced as
+    // its own edge, once per (path, disk mtime).
+    if(img->isEdited()) {
+        if(announcedDivergences.value(filePath) != modTime) {
+            announcedDivergences.insert(filePath, modTime);
+            emit divergenceDetected(filePath);
+        }
+        return;
+    }
+    reload(filePath);
+    announcedDivergences.remove(filePath); // any divergence is resolved
+    emit fileModified(filePath);
 }
 
 void DirectoryModel::onFileRemoved(const QString &filePath, int index) {
