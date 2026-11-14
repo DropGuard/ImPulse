@@ -317,6 +317,12 @@ class Core : public QObject {
     FolderEndAction folderEndAction;
     bool loopSlideshow;
 
+    // the (path, disk-mtime) the on-disk divergence was last announced for:
+    // one external save surfaces as several watcher events, and each must not
+    // re-announce the same divergence
+    QString divergenceAnnouncedFor;
+    QDateTime divergenceAnnouncedAt;
+
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
     // production, the recording stub in a headless test. Declared after
