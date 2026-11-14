@@ -49,9 +49,10 @@ Core::Core(const Deps &deps)
       thumbnailer(pool, mBridge), thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
     loadTranslation();
     if(deps.headless) {
-        // no window tree at all: the three seams are the whole surface, and a
-        // missing one would surface as a null deref on first use — assert it
-        Q_ASSERT(deps.ui && deps.overlays && deps.view);
+        // no window tree at all: the three seams are the whole surface. Their
+        // completeness is guarded by the seam census at the end of this
+        // constructor — deliberately not by an assert, which compiles out in
+        // the Release build.
         ui_ = deps.ui;
         overlays_ = deps.overlays;
         view_ = deps.view;
@@ -72,6 +73,14 @@ Core::Core(const Deps &deps)
     // the navigation object: both branches have set the seams it drives, so
     // it is constructed here, once — the listing arrives later, via attachModel
     nav_ = new NavigationController(&state, this, view_, overlays_, thumbPanelPresenter, folderViewPresenter, this);
+    // the seam census — deliberately NOT Q_ASSERT, which compiles out of the
+    // Release build this tree ships. A seam wired in one construction branch
+    // only (nav_, in its day) must stay loud in every build shape, and the
+    // message must say which seam set to inspect. crop_ is the documented
+    // optional (crop-flow tests provide it); everything else is mandatory.
+    if(!ui_ || !view_ || !overlays_ || !dialogs_ || !nav_)
+        qFatal("Core construction left a seam null (the census checks ui_, view_, overlays_, dialogs_, nav_) — "
+               "every seam must be wired in both construction branches");
     // the slideshow loop is a pure function of the state: slides advance by
     // timer, normal viewing loops. The relay rides the state binding and goes
     // through the view seam — the window's notifier keeps only the info
