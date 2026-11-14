@@ -68,7 +68,12 @@ class TestClipboard : public QObject {
     // Core::openFromClipboard is 84 lines that gcov had never entered. The URL
     // branch is the whole of it that needs no dialog (the image branch stops at
     // MW::getSaveFileName), and the offscreen platform does provide a working
-    // clipboard. Each of the three ways in is pinned: a local file url opens it,
+    // clipboard.
+    //
+    // (Suite note: this whole suite stays on QApplication-under-offscreen on
+    // purpose — two of its tests have the platform clipboard as their very
+    // subject, and QClipboard needs a QGuiApplication. The suite builds no
+    // widgets; the app type is the platform minimum, not a window dependency.) Each of the three ways in is pinned: a local file url opens it,
     // a non-local url is refused with the current file untouched, and a
     // text-only clipboard does nothing at all.
     void clipboardUrlOpensThatFileAndOtherFormsAreRefused() {

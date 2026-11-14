@@ -48,6 +48,9 @@ class TestShortcutScope : public QObject {
     // folder view was opened — the stale-arm case), then the armed inspect
     // layer, then the global table. Each layer is heard through its own
     // signal, so the assertion is on what FIRED, not on what returned. The
+    // arming runs through the real MW observer and the viewer's fit state, and
+    // one test renders the settings dialog — window subjects, hence this suite
+    // stays on QApplication-under-offscreen rather than going headless. The
     // grid binding is injected through the public API and swept away after —
     // the singleton is process-wide and every later test inherits whatever
     // this leaves.
