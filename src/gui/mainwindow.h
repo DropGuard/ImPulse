@@ -64,6 +64,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     CropController *crop();
 
   private:
+    bool shownOnceFired = false;
     // the parent tree owns every widget; these observe. See the rule comment
     // at mainpanel.cpp ("The pointer here only observes"), generalized here.
     ViewerWidget *viewerWidget = nullptr;
@@ -115,12 +116,17 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     void wheelEvent(QWheelEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
     // bool focusNextPrevChild(bool);
   signals:
     // implements ICoreView::setLoopPlayback — Core's relay feeds this seam,
     // and the connection below hands it to viewerWidget
     void setLoopPlayback(bool) override;
+    // fired exactly once, from the first show: the trigger for the heavy
+    // panel assembly (setupFullUi) — the real event, not a timer guessing at
+    // "is it on screen yet"
+    void shownOnce();
     void fullscreenStateChanged(bool);
     void copyUrlsRequested(QList<QString>, QString);
     void moveUrlsRequested(QList<QString>, QString);

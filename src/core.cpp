@@ -142,10 +142,9 @@ void Core::showGui() {
         return; // headless Core has nothing to show
     if(!view_->isWindowVisible())
         view_->showWindowDefault();
-    // TODO: this is unreliable.
-    // how to make it wait until a window is shown?
-    qApp->processEvents();
-    QTimer::singleShot(50, mw, SLOT(setupFullUi()));
+    // the heavy-UI trigger is the window's own first show (shownOnce, wired
+    // in the MW constructor) — the processEvents + 50 ms guess this used to
+    // run is gone, along with the TODO that called it unreliable
 }
 
 // create MainWindow and all widgets

@@ -116,6 +116,19 @@ void MW::setupUi() {
     connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
     connect(this, &MW::setLoopPlayback, viewerWidget, &ViewerWidget::setLoopPlayback);
+    // the heavy panels ride the window's own first show; queued, so the setup
+    // runs after the show and layout pass have completed
+    connect(this, &MW::shownOnce, this, &MW::setupFullUi, Qt::QueuedConnection);
+}
+
+// The heavy-UI trigger: fired exactly once, from the first show. The flag
+// keeps it at one fire even though setupFullUi is idempotent by its guards.
+void MW::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    if(!shownOnceFired) {
+        shownOnceFired = true;
+        emit shownOnce();
+    }
 }
 
 void MW::setupFullUi() {

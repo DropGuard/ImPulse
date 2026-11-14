@@ -88,9 +88,10 @@ class TestShortcutScope : public QObject {
     }
 
     // the crop action wiring is live from initActions, but the crop panel is
-    // built in setupFullUi — which Core schedules 50ms after showGui. showCropPanel
-    // used to dereference the not-yet-created cropPanel/sidePanel pair in that
-    // window (a guaranteed SIGSEGV on an early trigger).
+    // built in setupFullUi — which runs on the window's own first show
+    // (MW::shownOnce). showCropPanel used to dereference the not-yet-created
+    // cropPanel/sidePanel pair before that (a guaranteed SIGSEGV on an early
+    // trigger).
     // mode = intent. Fit original declares "I am inspecting this image": the
     // mode persists across image switches, and while it holds, the arrow keys
     // pan (the keymap's inspect layer overrides the base bindings) — the
