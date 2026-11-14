@@ -319,6 +319,9 @@ pub unsafe extern "C" fn qimgv_engine_new(
     }
 }
 
+/// Destroys the engine and joins its threads. NULL is tolerated and does
+/// /// nothing. A panic inside is contained and reported via qimgv_last_error()
+/// /// rather than unwinding across the boundary.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_free(engine: *mut QimgvEngine) {
     if engine.is_null() {
@@ -329,6 +332,8 @@ pub unsafe extern "C" fn qimgv_engine_free(engine: *mut QimgvEngine) {
     }
 }
 
+/// The engine crate's semantic version, as a static NUL-terminated string
+/// /// valid for the program's lifetime.
 #[unsafe(no_mangle)]
 pub extern "C" fn qimgv_engine_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr().cast()
@@ -346,6 +351,10 @@ pub extern "C" fn qimgv_last_error() -> *const c_char {
 
 // --- commands ---------------------------------------------------------------
 
+/// Scans `path` and makes it the current directory. `sort_mode`: QIMGV_SORT_*
+/// /// applied atomically with the scan, or -1 to keep the current sort.
+/// /// `epoch_out` (nullable) receives the session epoch — events with a smaller
+/// /// epoch belong to older sessions and must be dropped.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_open_dir(
     engine: *mut QimgvEngine,
@@ -385,6 +394,8 @@ pub unsafe extern "C" fn qimgv_engine_open_dir(
     }
 }
 
+/// Re-sorts the current listing by QIMGV_SORT_*; an out-of-range mode is
+/// /// QIMGV_ERR_BAD_SORT.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_set_sort(engine: *mut QimgvEngine, mode: c_int) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
@@ -408,6 +419,8 @@ pub unsafe extern "C" fn qimgv_engine_set_sort(engine: *mut QimgvEngine, mode: c
     }
 }
 
+/// Toggles hidden-entry visibility (nonzero = show); the listing rescans when
+/// /// this changes anything.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_set_show_hidden(
     engine: *mut QimgvEngine,
@@ -458,6 +471,7 @@ fn count(engine: *mut QimgvEngine, dirs: bool) -> c_int {
     }
 }
 
+/// The current file count, or -1 on a null engine or a panic.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_file_count(engine: *mut QimgvEngine) -> c_int {
     count(engine, false)
@@ -524,6 +538,10 @@ fn entry_at(
     }
 }
 
+/// Entry `index` (0-based) of the file listing: fills `out` (handle/size/
+/// /// mtime/is_dir) and copies the name and path into the caller's buffers —
+/// /// NUL-terminated; a too-small buffer fails with QIMGV_ERR_TRUNCATED (never
+/// /// silently truncated). Out of range = QIMGV_ERR_EMPTY.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_file_entry_at(
     engine: *mut QimgvEngine,
@@ -539,6 +557,8 @@ pub unsafe extern "C" fn qimgv_engine_file_entry_at(
     )
 }
 
+/// Entry `index` (0-based) of the directory listing; same buffer contract as
+/// /// qimgv_engine_file_entry_at.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_dir_entry_at(
     engine: *mut QimgvEngine,
@@ -592,6 +612,8 @@ fn neighbor(engine: *mut QimgvEngine, handle: u64, dirs: bool, next: bool, out: 
     }
 }
 
+/// The next file after `handle`: writes the neighbor handle to `out`. At either
+/// /// end = QIMGV_ERR_EMPTY; an unknown handle = QIMGV_ERR_INVALID.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_next_file(
     engine: *mut QimgvEngine,
@@ -600,6 +622,7 @@ pub unsafe extern "C" fn qimgv_engine_next_file(
 ) -> c_int {
     neighbor(engine, handle, false, true, out)
 }
+/// The previous file before `handle`; same contract as qimgv_engine_next_file.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_prev_file(
     engine: *mut QimgvEngine,
@@ -608,6 +631,7 @@ pub unsafe extern "C" fn qimgv_engine_prev_file(
 ) -> c_int {
     neighbor(engine, handle, false, false, out)
 }
+/// The next directory after `handle`; same contract as qimgv_engine_next_file.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_next_dir(
     engine: *mut QimgvEngine,
@@ -616,6 +640,7 @@ pub unsafe extern "C" fn qimgv_engine_next_dir(
 ) -> c_int {
     neighbor(engine, handle, true, true, out)
 }
+/// The previous directory before `handle`; same contract as qimgv_engine_next_file.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_prev_dir(
     engine: *mut QimgvEngine,
@@ -627,6 +652,9 @@ pub unsafe extern "C" fn qimgv_engine_prev_dir(
 
 // --- thumbnail scheduling -----------------------------------------------------
 
+/// Schedules a thumbnail decode. `replace_batch` nonzero clears all pending-
+/// /// not-yet-dispatched requests first — the caller sends it on the FIRST
+/// /// request of a fresh viewport batch, so an older batch dies structurally.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_thumb_request(
     engine: *mut QimgvEngine,
@@ -663,6 +691,8 @@ pub unsafe extern "C" fn qimgv_engine_thumb_request(
     }
 }
 
+/// Reports the app-side completion (or failure) of one THUMB_NEXT grant —
+/// /// frees its in-flight slot.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_thumb_done(
     engine: *mut QimgvEngine,
@@ -694,6 +724,7 @@ pub unsafe extern "C" fn qimgv_engine_thumb_done(
     }
 }
 
+/// Drops every pending thumbnail request.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
@@ -713,6 +744,7 @@ pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c
     }
 }
 
+/// Caps the thumbnails in flight.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_thumb_config(
     engine: *mut QimgvEngine,

@@ -172,6 +172,7 @@ QIMGV_PIN("qimgv_probe_result.orientation", offsetof(qimgv_probe_result, orienta
 QIMGV_PIN("qimgv_probe_result.width", offsetof(qimgv_probe_result, width) == 12);
 QIMGV_PIN("qimgv_probe_result.height", offsetof(qimgv_probe_result, height) == 16);
 
+/* The engine crate version, static. */
 const char *qimgv_engine_version(void);
 const char *qimgv_last_error(void);
 
@@ -180,6 +181,7 @@ const char *qimgv_last_error(void);
 qimgv_engine *qimgv_engine_new(qimgv_notify_fn notify, void *user,
                                int scan_threads,
                                const char *formats_extensions_utf8);
+/* Destroys the engine; NULL tolerated. Panics are contained (see qimgv_last_error). */
 void qimgv_engine_free(qimgv_engine *engine);
 
 /* Commands — return QIMGV_OK when accepted (asynchronous; results arrive as
@@ -196,24 +198,32 @@ int qimgv_engine_open_dir(qimgv_engine *engine, const char *path_utf8, int sort_
 int qimgv_engine_supports_watching(void);
 int qimgv_engine_include_path(qimgv_engine *engine, const char *path_utf8);
 int qimgv_engine_stop_watch(qimgv_engine *engine);
+/* Re-sorts by QIMGV_SORT_*; bad mode = QIMGV_ERR_BAD_SORT. */
 int qimgv_engine_set_sort(qimgv_engine *engine, int mode);
+/* Nonzero = show hidden; rescans when it changes anything. */
 int qimgv_engine_set_show_hidden(qimgv_engine *engine, int show);
 
 /* State reads — synchronous. count() returns -1 on error. */
 int qimgv_engine_file_count(qimgv_engine *engine);
+/* Current directory count, -1 on null engine or panic. */
 int qimgv_engine_dir_count(qimgv_engine *engine);
+/* Entry index (0-based): fills out, copies name/path NUL-terminated (QIMGV_ERR_TRUNCATED if a buffer is too small); out of range = QIMGV_ERR_EMPTY. */
 int qimgv_engine_file_entry_at(qimgv_engine *engine, int index,
                                qimgv_entry_meta *out,
                                char *name_buf, size_t name_cap,
                                char *path_buf, size_t path_cap);
+/* Directory entry index; same contract as qimgv_engine_file_entry_at. */
 int qimgv_engine_dir_entry_at(qimgv_engine *engine, int index,
                               qimgv_entry_meta *out,
                               char *name_buf, size_t name_cap,
                               char *path_buf, size_t path_cap);
 /* Handle navigation: QIMGV_OK on success, QIMGV_ERR_EMPTY at either end. */
 int qimgv_engine_next_file(qimgv_engine *engine, uint64_t handle, uint64_t *out);
+/* The file before handle: writes it to out; at an end = QIMGV_ERR_EMPTY, unknown handle = QIMGV_ERR_INVALID. */
 int qimgv_engine_prev_file(qimgv_engine *engine, uint64_t handle, uint64_t *out);
+/* The directory after handle; same contract as qimgv_engine_prev_file. */
 int qimgv_engine_next_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
+/* The directory before handle; same contract as qimgv_engine_prev_file. */
 int qimgv_engine_prev_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
 
 /* Returns 1 if an event was written, 0 if none pending, otherwise a POSITIVE
@@ -275,7 +285,9 @@ int qimgv_engine_thumb_request(qimgv_engine *engine, const char *path_utf8,
                                uint32_t size, int crop, int replace_batch);
 int qimgv_engine_thumb_done(qimgv_engine *engine, const char *path_utf8,
                             uint32_t size, int crop);
+/* Drops all pending thumbnail requests. */
 int qimgv_engine_thumb_clear(qimgv_engine *engine);
+/* Caps thumbnails in flight. */
 int qimgv_engine_thumb_config(qimgv_engine *engine, uint32_t max_in_flight);
 
 /* Pure function — thread-safe, does not touch the engine instance. One file
