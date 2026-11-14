@@ -41,6 +41,12 @@ void Core::toggleCropPanel() {
         return; // headless without a crop fake: nothing to toggle
     if(model->isEmpty())
         return;
+    // the surface is an interaction with the one image on screen, and its
+    // panel refuses folder view itself (CropController::showCropPanel) — but
+    // that refusal is silent, and a running clock would also move the image
+    // out from under a selection in progress. This says why, once, for both.
+    if(nav_->refuseIfNotDocument(tr("Cropping needs an image on screen.")))
+        return;
     if(crop_->isActive() || state.hasActiveImage)
         crop_->toggle();
 }
@@ -60,6 +66,11 @@ void Core::requestSavePath() {
 void Core::showResizeDialog() {
     if(model->isEmpty())
         return;
+    // the gate is here as well as in resize(): the dialog is modal but exec()
+    // blocks only input, never the slideshow clock — a tick would fire behind
+    // it and the edit would land on an image the user is no longer looking at
+    if(nav_->refuseIfNotDocument(tr("Resizing needs the image on screen.")))
+        return;
     auto img = model->getImage(selectedPath());
     if(img)
         dialogs_->showResizeDialog(img->size());
@@ -76,6 +87,20 @@ void Core::edit_template(
     Args &&...as) {
     if(model->isEmpty())
         return;
+    // the edit contract is a property of the interaction state, not of this
+    // call: a slideshow has no single image to edit — the clock moves on by
+    // itself and the next tick's unloadExcept would discard whatever we wrote.
+    // Checking the state (not "is the timer running") is what makes the rule
+    // survive a future change to how the clock is stored.
+    switch(nav_->interactionState()) {
+    case NavigationController::InteractionState::Slideshow:
+        // refused BEFORE the save confirmation: asking "save the change?"
+        // about an edit we are about to refuse would be a lie
+        nav_->refuseEdit();
+        return;
+    case NavigationController::InteractionState::FolderView:
+    case NavigationController::InteractionState::Document: break;
+    }
     if(save && !ui_->showConfirmation(action, tr("Perform action \"") + action + "\"? \n\n" +
                                                   tr("Changes will be saved immediately.")))
         return;
@@ -111,6 +136,13 @@ void Core::rotateByDegrees(int degrees) {
 }
 
 void Core::resize(QSize size) {
+    // the second entry point (DialogHost::resizeRequested connects straight
+    // here, bypassing showResizeDialog): the command must stand on its own.
+    // In folder view the result is invisible — a thumbnail cannot show a
+    // change in pixel dimensions — and edit_template would then keep an
+    // in-memory edit that the next unloadExcept discards.
+    if(nav_->refuseIfNotDocument(tr("Resizing needs the image on screen.")))
+        return;
     edit_template(false, tr("Resize"), {ImageLib::scaled}, size, QI_FILTER_BILINEAR);
 }
 

@@ -208,6 +208,52 @@ class TestSlideshow : public QObject {
         QVERIFY2(!core.viewState().slideshow, "the second toggle did not stop the slideshow");
         QVERIFY(!core.slideshowClock().isActive());
     }
+
+    // The slideshow and editing are mutually exclusive states. startSlideshow
+    // already refuses to start over an uncommitted edit (navigationDenied's
+    // state leg); this is the closing half — a running clock refuses the edit,
+    // because the next tick's unloadExcept would discard it. The refusal
+    // speaks: the clock's owner is the party that would destroy the work.
+    void editingIsRefusedWhileTheSlideshowRuns() {
+        const QStringList files = slideshowFiles("show6");
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        QVERIFY(core.loadPath(files.at(0)));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto img = core.directoryModel()->getImage(core.currentFilePath());
+        QVERIFY(img);
+        QVERIFY(!img->isEdited());
+
+        core.startSlideshow();
+        QVERIFY(core.viewState().slideshow);
+        const int messagesBefore = overlayFake.messageCalls;
+
+        core.flipH();
+        QVERIFY2(!img->isEdited(), "the edit landed while the slideshow was running");
+        QCOMPARE(overlayFake.messageCalls, messagesBefore + 1);
+        QVERIFY2(overlayFake.lastMessage.contains(QStringLiteral("Stop the slideshow")),
+                 qPrintable(QStringLiteral("unexpected refusal text: ") + overlayFake.lastMessage));
+        QVERIFY(core.viewState().slideshow);           // the clock is untouched
+        QCOMPARE(core.currentFilePath(), files.at(0)); // and nothing moved
+
+        // the refusal is the state's, not flipH's: another edit verb goes
+        // through the same gate
+        core.rotateRight();
+        QCOMPARE(overlayFake.messageCalls, messagesBefore + 2);
+        QVERIFY(!img->isEdited());
+
+        // stopping the slideshow is the whole resolution — nothing else
+        core.stopSlideshow();
+        core.flipH();
+        QVERIFY2(img->isEdited(), "the edit stayed refused after the clock stopped");
+    }
 };
 
 int main(int argc, char **argv) {
