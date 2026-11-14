@@ -62,28 +62,6 @@ class FakePresenterView : public QObject, public IDirectoryView {
     void droppedInto(const QMimeData *, QObject *, int) override;
 };
 
-// A scripted crop surface: the ICropSurface implementation without the
-// widget tree — the same shape CropController gives production minus the
-// panel/overlay. Records toggles, and the intent legs are real signals so a
-// test can wire them to Core's edit legs exactly the way connectComponents
-// wires the real controller.
-class FakeCropSurface : public QObject, public ICropSurface {
-    Q_OBJECT
-  public:
-    int toggleCalls = 0;
-    bool active = false;
-    void toggle() override {
-        ++toggleCalls;
-        active = !active;
-    }
-    bool isActive() const override {
-        return active;
-    }
-  signals:
-    void cropRequested(QRect rect) override;
-    void cropAndSaveRequested(QRect rect) override;
-};
-
 class TestEditSave : public QObject {
     Q_OBJECT
 
@@ -326,7 +304,7 @@ class TestEditSave : public QObject {
         coretest::FakeInteractions fake;
         coretest::FakeOverlayHost overlayFake;
         coretest::RecordingView view;
-        FakeCropSurface crop;
+        coretest::FakeCropSurface crop;
         Core::Deps deps;
         deps.headless = true;
         deps.ui = &fake;
@@ -349,7 +327,7 @@ class TestEditSave : public QObject {
         // the intent leg: the surface's crop lands in Core's edit pipeline.
         // The fixture is 16x8; cropping to the left half leaves 8x8 in memory.
         core.toggleCropPanel();
-        QObject::connect(&crop, &FakeCropSurface::cropRequested, &core, &Core::crop);
+        QObject::connect(&crop, &coretest::FakeCropSurface::cropRequested, &core, &Core::crop);
         emit crop.cropRequested(QRect(0, 0, 8, 8));
         QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(8, 8), 10000);
         QVERIFY(core.directoryModel()->getImage(img)->isEdited()); // in-memory: document mode never asks
