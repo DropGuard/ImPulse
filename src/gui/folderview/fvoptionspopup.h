@@ -23,6 +23,7 @@ class FVOptionsPopup : public QWidget {
 
   protected:
     void paintEvent(QPaintEvent *event) override;
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 

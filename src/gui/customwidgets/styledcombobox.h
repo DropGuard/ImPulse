@@ -14,6 +14,7 @@ class StyledComboBox : public QComboBox {
 
   protected:
     void paintEvent(QPaintEvent *e) override;
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
   private:

@@ -220,6 +220,122 @@ class TestShortcutScope : public QObject {
         scriptManager->removeScript(QStringLiteral("qtest-ping"));
     }
 
+    // The projection: every keyboard token in the global table must appear on
+    // its action's shortcut list, because QShortcutMap dispatches from those
+    // lists, not from the tables. Pointer tokens never project (no QKeySequence
+    // can hold a wheel direction or a mouse button). "Enter" is the one token
+    // that claims two sequences — Qt reads the main-row Enter as Return and
+    // keeps Enter for the keypad, and both scancodes resolve to the same token.
+    void defaultKeymapProjectsOntoTheRegistry() {
+        const QMap<QString, QString> table = actionManager->allShortcuts();
+        QVERIFY2(!table.isEmpty(), "the global table came back empty, the sweep proves nothing");
+        for(auto it = table.constBegin(); it != table.constEnd(); ++it) {
+            const QString &token = it.key();
+            const bool pointer =
+                (token == QStringLiteral("WheelUp") || token == QStringLiteral("WheelDown") ||
+                 token == QStringLiteral("LMB") || token == QStringLiteral("RMB") ||
+                 token == QStringLiteral("MiddleButton") || token == QStringLiteral("XButton1") ||
+                 token == QStringLiteral("XButton2") || token.endsWith(QStringLiteral("_DoubleClick")));
+            QAction *a = actionManager->action(it.value());
+            QVERIFY2(a != nullptr, qPrintable(QStringLiteral("table names an unregistered action: ") + it.value()));
+            if(pointer)
+                continue;
+            if(token == QStringLiteral("Enter")) {
+                QVERIFY2(a->shortcuts().contains(QKeySequence(QStringLiteral("Return"))),
+                         qPrintable(QStringLiteral("Enter did not project as Return for ") + it.value()));
+                QVERIFY2(a->shortcuts().contains(QKeySequence(QStringLiteral("Enter"))),
+                         qPrintable(QStringLiteral("Enter did not project as keypad Enter for ") + it.value()));
+                continue;
+            }
+            QKeySequence seq = QKeySequence::fromString(token);
+            QVERIFY2(seq.count() > 0, qPrintable(QStringLiteral("default token not Qt-parseable: ") + token));
+            QVERIFY2(a->shortcuts().contains(seq),
+                     qPrintable(QStringLiteral("token never projected onto its action: ") + token +
+                                QStringLiteral(" -> ") + it.value()));
+        }
+    }
+
+    // The scopes de-claim instead of layering — two live claims of one key are
+    // ambiguous with NEITHER firing (dispatch_probe_tests), so while the grid
+    // holds focus its keys must be OFF the global projection, and back on the
+    // moment focus leaves. The grid's own claims ride its QShortcuts.
+    void gridFocusDecLaimsTheGridsKeysFromTheGlobalTable() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *proxy = core.mainWindow()->getFolderView();
+        proxy->init(); // materializes the real FolderView (and its grid)
+        auto *grid = proxy->findChild<FolderGridView *>();
+        QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
+
+        QAction *next = actionManager->action("nextImage");
+
+        // focus out first: the grid takes focus the moment it is materialized
+        // (show() calls setFocus), so the slot starts from the de-claimed
+        // reality and walks both directions explicitly
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("Right")))); // the global table re-claims
+
+        // focus in: the grid claims Right/PgDown/PgUp, the global table yields them
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+        QVERIFY(!next->shortcuts().contains(QKeySequence(QStringLiteral("Right"))));
+        QVERIFY(!next->shortcuts().contains(QKeySequence(QStringLiteral("PgDown"))));
+
+        // focus out: the global table re-claims everything
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("Right"))));
+        QVERIFY(next->shortcuts().contains(QKeySequence(QStringLiteral("PgDown"))));
+    }
+
+    // The armed inspect layer replaces the global claims for its keys and
+    // gives them back on disarm — the projection's answer to "fit original
+    // pans with the arrows instead of changing images".
+    void armedInspectSwapsTheProjection() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        QAction *prev = actionManager->action("prevImage");
+        QAction *scroll = actionManager->action("scrollLeft");
+        QVERIFY(prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QVERIFY(!scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+
+        core.mainWindow()->fitOriginal(); // arms the inspect scope through the real observer
+        QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_ORIGINAL, 5000);
+        QVERIFY(!prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QVERIFY(scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+
+        core.mainWindow()->fitWindow(); // disarms
+        QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_WINDOW, 5000);
+        QVERIFY(prev->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+        QVERIFY(!scroll->shortcuts().contains(QKeySequence(QStringLiteral("Left"))));
+    }
+
+    // The end-to-end leg the migration stands on: a window-delivered key fires
+    // the projected action through QShortcutMap. sendEvent-based legs bypass
+    // the map entirely (they exercise the doors and the manual funnel), so
+    // this is the one slot that proves the projection is live and registered.
+    void windowDeliveryFiresTheProjectedAction() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *mw = core.mainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        mw->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(mw));
+
+        QSignalSpy fullscreen(actionManager->action("toggleFullscreen"), &QAction::triggered);
+        QSignalSpy save(actionManager->action("save"), &QAction::triggered);
+        QVERIFY(fullscreen.isValid() && save.isValid());
+
+        coretest::deliverWindowKey(mw, Qt::Key_F);
+        QCOMPARE(fullscreen.count(), 1); // F: the projected binding fired through the map
+
+        coretest::deliverWindowKey(mw, Qt::Key_S, Qt::ControlModifier);
+        QCOMPARE(save.count(), 1); // Ctrl+S: the chord reached its action too
+    }
+
     // the inspect scope carries user overrides: while armed, an override
     // replaces the inspect default for that key — the armed chain reads the
     // layer, not the seed defaults. The table is snapshotted and restored;

@@ -1,5 +1,7 @@
 #include "treeviewcustom.h"
 
+#include "components/actionmanager/actionmanager.h"
+
 TreeViewCustom::TreeViewCustom(QWidget *parent) : QTreeView(parent) {
     setAcceptDrops(true);
     setDropIndicatorShown(true);
@@ -69,6 +71,16 @@ void TreeViewCustom::updateScrollbarStyle() {
         " } QScrollBar::handle:vertical:hover { background-color: " + hover + " }");
 
     overlayScrollbar.setVisible((this->verticalScrollBar()->maximum()));
+}
+
+// The places tree owns its keyboard: today's handler delegates everything to
+// QTreeView, which consumes navigation and keyboard-search keys without ever
+// forwarding them — so no application shortcut may fire behind the tree
+// either. Claim every override; the handler below keeps delegating.
+bool TreeViewCustom::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride)
+        event->accept();
+    return QTreeView::event(event);
 }
 
 void TreeViewCustom::keyPressEvent(QKeyEvent *event) {

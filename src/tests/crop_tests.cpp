@@ -377,6 +377,28 @@ class TestCrop : public QObject {
         QSignalSpy emptyActivation(&emptyGrid, &FolderGridView::itemActivated);
         coretest::pressGridKey(emptyGrid, "Enter", Qt::Key_Return);
         QCOMPARE(emptyActivation.count(), 0);
+
+        // the QShortcutMap leg, kept last so the door pins above see the
+        // selection state they built: with the grid surface attached, a
+        // window-delivered key fires the grid's projected QShortcut before
+        // any keyPressEvent exists to forward it — and the de-claimed global
+        // table stays out of the way (no ambiguity, no stray nextImage)
+        grid.select(0);
+        actionManager->attachGridSurface(&grid);
+        grid.activateWindow();
+        QVERIFY(QTest::qWaitForWindowExposed(&grid));
+        grid.setFocus();
+        QVERIFY(grid.hasFocus());
+        QVERIFY(QApplication::focusWidget() != nullptr);
+        QSignalSpy nextImageGlobal(actionManager->action("nextImage"), &QAction::triggered);
+        QSignalSpy mapActivated(&grid, &FolderGridView::itemActivated);
+        const int before = coretest::lastSelection(grid);
+        coretest::deliverWindowKey(&grid, Qt::Key_Right);
+        QCOMPARE(coretest::lastSelection(grid), before + 1); // via the grid's QShortcut
+        QCOMPARE(nextImageGlobal.count(), 0);                // the de-claimed global binding stood down
+        coretest::deliverWindowKey(&grid, Qt::Key_Return);
+        QCOMPARE(mapActivated.count(), 1); // Enter claims both Returns
+        actionManager->attachGridSurface(nullptr);
     }
 };
 

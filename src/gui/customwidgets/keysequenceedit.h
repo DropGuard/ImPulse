@@ -11,6 +11,7 @@ class KeySequenceEdit : public QPushButton {
     void setText(const QString &text);
 
   protected:
+    bool event(QEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;

@@ -1,6 +1,7 @@
 #include "keysequenceedit.h"
 
 KeySequenceEdit::KeySequenceEdit(QWidget *parent) : QPushButton(parent), mSequence("") {
+    setFocusPolicy(Qt::StrongFocus); // the capture device must be focusable on every style
     QPushButton::setText(tr("[Enter sequence]"));
 }
 
@@ -11,6 +12,16 @@ const QString &KeySequenceEdit::sequence() {
 void KeySequenceEdit::setText(const QString &text) {
     mSequence = text;
     QPushButton::setText(mSequence);
+}
+
+// The capture device: it must see every raw key, including the ones the
+// global table binds (F, Ctrl+S, ...). Claiming every ShortcutOverride
+// delivers them here instead of to QShortcutMap. StrongFocus, because the
+// style-derived default for a QPushButton can be NoFocus.
+bool KeySequenceEdit::event(QEvent *e) {
+    if(e->type() == QEvent::ShortcutOverride)
+        e->accept();
+    return QPushButton::event(e);
 }
 
 void KeySequenceEdit::keyPressEvent(QKeyEvent *e) {

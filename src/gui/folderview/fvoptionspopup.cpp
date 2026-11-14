@@ -1,6 +1,8 @@
 #include "fvoptionspopup.h"
 #include "ui_fvoptionspopup.h"
 
+#include "components/actionmanager/actionmanager.h"
+
 FVOptionsPopup::FVOptionsPopup(QWidget *parent) : QWidget(parent), ui(new Ui::FVOptionsPopup) {
     ui->setupUi(this);
 
@@ -67,6 +69,14 @@ void FVOptionsPopup::paintEvent(QPaintEvent *event) {
     opt.initFrom(this);
     QPainter p(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+}
+
+// Popup contract, same as ContextMenu: claim every ShortcutOverride so the
+// application shortcuts cannot fire behind the popup.
+bool FVOptionsPopup::event(QEvent *event) {
+    if(event->type() == QEvent::ShortcutOverride)
+        event->accept();
+    return QWidget::event(event);
 }
 
 void FVOptionsPopup::keyPressEvent(QKeyEvent *event) {

@@ -14,7 +14,9 @@ class SpinBoxInputFix : public QSpinBox {
 
   private:
     QStringList allowedKeys;
+    QSet<Qt::Key> allowedLogicalKeys;
 
   protected:
+    bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 };

@@ -1,6 +1,20 @@
 #include "actionmanager.h"
 
+#include <QShortcut>
+#include <QWidget>
+
 ActionManager *actionManager = nullptr;
+
+namespace {
+// tokens QKeySequence cannot represent: the pointer vocabulary stays on the
+// manual funnel, and a table entry carrying one is display-only
+bool isPointerToken(const QString &token) {
+    return token == QStringLiteral("WheelUp") || token == QStringLiteral("WheelDown") ||
+           token == QStringLiteral("LMB") || token == QStringLiteral("RMB") ||
+           token == QStringLiteral("MiddleButton") || token == QStringLiteral("XButton1") ||
+           token == QStringLiteral("XButton2") || token.endsWith(QStringLiteral("_DoubleClick"));
+}
+} // namespace
 
 ActionManager::ActionManager(QObject *parent) : QObject(parent) {
 }
@@ -19,6 +33,7 @@ ActionManager *ActionManager::getInstance() {
         // object's own maps instead of reaching for the global that names it
         actionManager->initDefaults();
         actionManager->initShortcuts();
+        actionManager->applyKeyboardProjection();
     }
     return actionManager;
 }
@@ -116,8 +131,129 @@ QAction *ActionManager::addAction(const QString &name) {
         qFatal("addAction: '%s' is already registered", qPrintable(name));
     auto *a = new QAction(this);
     a->setObjectName(name);
+    // every projected shortcut is application-wide: the actions live on
+    // ActionManager, not in any window's subtree, so a WindowShortcut context
+    // could never resolve
+    a->setShortcutContext(Qt::ApplicationShortcut);
     mActions.insert(name, a);
     return a;
+}
+//------------------------------------------------------------------------------
+// The keyboard projection. attachWindowSurface/attachGridSurface/setGridActive
+// and every table mutation funnel through applyKeyboardProjection: the tables
+// are re-read and the Qt-side claims (QAction shortcut lists, grid QShortcuts)
+// are rebuilt to match.
+void ActionManager::attachWindowSurface(QWidget *surface) {
+    // a QAction's shortcuts are inert until the action is added to a widget
+    // (pinned in dispatch_probe_tests) — the window is that widget
+    if(windowSurface == surface)
+        return;
+    windowSurface = surface;
+    if(!windowSurface)
+        return;
+    for(QAction *a : std::as_const(mActions))
+        windowSurface->addAction(a);
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+void ActionManager::attachGridSurface(QWidget *surface) {
+    if(gridSurface == surface)
+        return;
+    gridSurface = surface;
+    if(gridSurface) {
+        // the surface dies with the window it belongs to; its QShortcuts are
+        // its children, so the projections die with it and the stale pointer
+        // is cleaned up here rather than in a destructor nobody owns
+        connect(gridSurface, &QObject::destroyed, this, [this]() {
+            gridSurface = nullptr;
+            gridProjections.clear();
+            if(gridActive) {
+                gridActive = false;
+            }
+            applyKeyboardProjection();
+        });
+    }
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+void ActionManager::setGridActive(bool active) {
+    if(gridActive == active)
+        return;
+    gridActive = active;
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+void ActionManager::applyKeyboardProjection() {
+    rebuildGridShortcuts();
+    reproject();
+}
+//------------------------------------------------------------------------------
+// one keyboard token -> its QKeySequence claims. "Enter" is the one InputMap
+// name that does not map 1:1: Qt reads the main-row Enter as Return and keeps
+// Enter for the keypad, and both scancodes resolve to the same token today —
+// so the token claims both sequences.
+static QList<QKeySequence> sequencesForToken(const QString &token) {
+    if(token == QStringLiteral("Enter"))
+        return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
+    QKeySequence seq = QKeySequence::fromString(token);
+    if(seq.count() == 0)
+        return {}; // not a Qt name (Linux "Wake Up"/"PgBack"/"PgForward", macOS
+                   // enum names): display-only, the manual funnel still answers it
+    return {seq};
+}
+//------------------------------------------------------------------------------
+void ActionManager::reproject() {
+    // the keys the grid claims while it holds focus come off the global table
+    // — two live claims of one key would be ambiguous with NEITHER firing
+    // (dispatch_probe_tests), so the scopes de-claim instead of layering
+    QSet<QString> gridClaims;
+    if(gridActive && gridSurface) {
+        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it)
+            if(!isPointerToken(it.key()))
+                gridClaims.insert(it.key());
+    }
+    // the armed inspect layer replaces the global claims for its keys, except
+    // where the focused grid outranks it
+    QMap<QString, QString> inspectLayer;
+    if(inspectMode) {
+        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+            if(!isPointerToken(it.key()) && !gridClaims.contains(it.key()))
+                inspectLayer.insert(it.key(), it.value());
+    }
+    // per-action shortcut lists over the effective global table
+    QMap<QString, QList<QKeySequence>> projected;
+    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
+        if(isPointerToken(it.key()) || gridClaims.contains(it.key()) || inspectLayer.contains(it.key()))
+            continue;
+        projected[it.value()].append(sequencesForToken(it.key()));
+    }
+    for(auto it = inspectLayer.constBegin(); it != inspectLayer.constEnd(); ++it)
+        projected[it.value()].append(sequencesForToken(it.key()));
+    // every registered action gets its projected list — an action with no
+    // keyboard claim gets an empty one, clearing stale sequences
+    for(auto it = mActions.constBegin(); it != mActions.constEnd(); ++it)
+        it.value()->setShortcuts(projected.value(it.key()));
+}
+//------------------------------------------------------------------------------
+void ActionManager::rebuildGridShortcuts() {
+    qDeleteAll(gridProjections);
+    gridProjections.clear();
+    if(!gridSurface)
+        return;
+    for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it) {
+        if(isPointerToken(it.key()))
+            continue; // pointer tokens never ride QShortcutMap
+        const QList<QKeySequence> seqs = sequencesForToken(it.key());
+        for(const QKeySequence &seq : seqs) {
+            auto *sc = new QShortcut(seq, gridSurface);
+            sc->setContext(Qt::WidgetWithChildrenShortcut);
+            const QString actionName = it.value();
+            connect(sc, &QShortcut::activated, this, [this, actionName]() {
+                invokeAction(actionName);
+            });
+            gridProjections.append(sc);
+        }
+    }
 }
 //------------------------------------------------------------------------------
 void ActionManager::initDefaults() {
@@ -241,11 +377,13 @@ void ActionManager::addShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
     if(type != ActionType::ACTION_INVALID) {
         shortcuts.insert(keys, action);
+        applyKeyboardProjection();
     }
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeShortcut(const QString &keys) {
     shortcuts.remove(keys);
+    applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
 QStringList ActionManager::actionList() {
@@ -262,6 +400,7 @@ const QMap<QString, QString> &ActionManager::allShortcuts() {
 //------------------------------------------------------------------------------
 void ActionManager::removeAllShortcuts() {
     shortcuts.clear();
+    applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
 // Removes all shortcuts for specified action. Slow (reverse map lookup).
@@ -275,6 +414,7 @@ void ActionManager::removeAllShortcuts(const QString &actionName) {
         else
             ++i;
     }
+    applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
 QString ActionManager::keyForNativeScancode(quint32 scanCode) {
@@ -288,10 +428,12 @@ void ActionManager::resetDefaults() {
     shortcuts = defaults;
     inspectShortcuts = inspectDefaults;
     gridShortcuts = gridDefaults;
+    applyKeyboardProjection();
 }
 
 void ActionManager::setInspectMode(bool inspect) {
     inspectMode = inspect;
+    applyKeyboardProjection(); // the armed layer swaps the projected claims
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -333,6 +475,41 @@ QString ActionManager::actionForShortcut(const QString &keys) {
     return shortcuts[keys];
 }
 //------------------------------------------------------------------------------
+// which action the sequence claims in the effective projection: the global
+// table minus the focused grid's claims, plus the armed inspect layer. The
+// same de-claim law reproject() applies to the Qt-side shortcut lists — the
+// veto predicates must answer against what the map will actually fire.
+QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
+    QSet<QString> gridClaims;
+    if(gridActive && gridSurface) {
+        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it)
+            if(!isPointerToken(it.key()))
+                gridClaims.insert(it.key());
+    }
+    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
+        if(isPointerToken(it.key()) || gridClaims.contains(it.key()))
+            continue;
+        if(sequencesForToken(it.key()).contains(seq))
+            return it.value();
+    }
+    if(inspectMode) {
+        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it) {
+            if(isPointerToken(it.key()) || gridClaims.contains(it.key()))
+                continue;
+            if(sequencesForToken(it.key()).contains(seq))
+                return it.value();
+        }
+    }
+    return QString();
+}
+
+bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const {
+    const QKeySequence seq(overrideEvent->key() | overrideEvent->modifiers());
+    if(seq.count() == 0)
+        return false;
+    return isSubjectChangingAction(actionForKeySequence(seq));
+}
+
 bool ActionManager::eventIsSubjectChanging(QInputEvent *event) {
     const QString shortcut = ShortcutBuilder::fromEvent(event);
     if(shortcut.isEmpty())
@@ -436,6 +613,7 @@ void ActionManager::addGridShortcut(const QString &keys, const QString &action) 
     ActionType type = validateAction(action);
     if(type != ActionType::ACTION_INVALID) {
         gridShortcuts.insert(keys, action);
+        applyKeyboardProjection();
     }
 }
 
@@ -445,6 +623,7 @@ const QMap<QString, QString> &ActionManager::allGridShortcuts() {
 
 void ActionManager::removeAllGridShortcuts() {
     gridShortcuts.clear();
+    applyKeyboardProjection();
 }
 
 // Removes all grid shortcuts for specified action. Slow (reverse map lookup).
@@ -458,6 +637,7 @@ void ActionManager::removeAllGridShortcuts(const QString &actionName) {
         else
             ++i;
     }
+    applyKeyboardProjection();
 }
 
 void ActionManager::saveGridShortcuts() {
@@ -468,6 +648,7 @@ void ActionManager::addInspectShortcut(const QString &keys, const QString &actio
     ActionType type = validateAction(action);
     if(type != ActionType::ACTION_INVALID) {
         inspectShortcuts.insert(keys, action);
+        applyKeyboardProjection();
     }
 }
 
@@ -477,6 +658,7 @@ const QMap<QString, QString> &ActionManager::allInspectShortcuts() {
 
 void ActionManager::removeAllInspectShortcuts() {
     inspectShortcuts.clear();
+    applyKeyboardProjection();
 }
 
 // Removes all inspect shortcuts for specified action. Slow (reverse map lookup).
@@ -490,6 +672,7 @@ void ActionManager::removeAllInspectShortcuts(const QString &actionName) {
         else
             ++i;
     }
+    applyKeyboardProjection();
 }
 
 void ActionManager::saveInspectShortcuts() {

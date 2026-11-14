@@ -67,6 +67,11 @@ class FolderGridView : public ThumbnailView {
     void keyPressEvent(QKeyEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    // the grid scope is armed exactly while the grid holds keyboard focus:
+    // focusIn/focusOut drive the projection's de-claim of the grid's keys
+    // from the global table
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;

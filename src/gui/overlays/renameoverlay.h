@@ -34,6 +34,7 @@ class RenameOverlay : public OverlayWidget, public IPendingSurface {
     void renameRequested(QString name);
 
   protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void recalculateGeometry() override;
@@ -47,5 +48,6 @@ class RenameOverlay : public OverlayWidget, public IPendingSurface {
     bool backdrop = false;
     QString origName;
     QList<QString> keyFilter;
+    QList<QKeySequence> keyFilterSequences;
     void selectName();
 };
