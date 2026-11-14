@@ -8,7 +8,7 @@
 #include <QSet>
 #include <QDebug>
 #include <QStringList>
-#include "utils/actions.h"
+#include <QAction>
 #include "shortcutbuilder.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "settings.h"
@@ -97,11 +97,49 @@ class ActionManager : public QObject {
     void removeAllInspectShortcuts();
     void removeAllInspectShortcuts(const QString &actionName);
     void saveInspectShortcuts();
+    // ---- the registry ----------------------------------------------------
+    //
+    // Every action is a QAction owned by this object's parent tree: the
+    // standard Qt shape for what the hand-declared signal block used to be.
+    // The registry's actions are stateless trigger tokens — trigger() fires
+    // triggered() into whatever Core connected, and that is the whole
+    // contract. QAction's stateful face (checkable, checked, enabled) is
+    // deliberately unused: state lives with its owners (WindowShell,
+    // ViewerWidget, NavigationController), and mirroring it here is how
+    // state-sync hell starts — two truths, written into each other. If a UI
+    // element ever needs to reflect state, the QAction becomes that state's
+    // single source of truth, one owner, one direction, never two.
+    //
+    // name -> token. nullptr for an unknown name; dispatch only consults
+    // this after validateAction, so the production paths never dereference
+    // a miss. The tokens are also why every process that constructs this
+    // singleton needs a live QApplication, not a bare QCoreApplication:
+    // Qt's QAction constructor resolves its private-class factory through
+    // QGuiApplicationPrivate::self, which a QCoreApplication leaves null —
+    // the first registration would segfault there.
+    QAction *action(const QString &name) const;
+    // Registration lives in actionmanager.cpp (initActions), connection in
+    // core.cpp — two files that must agree, and a name that reaches here
+    // without a registration is a typo the compiler cannot see. The qFatal
+    // is the census-in-ctor precedent, Release surviving: every windowed
+    // suite's Core construction exercises every one of these connects.
+    template <typename Receiver, typename Func>
+    void connectAction(const QString &name, const Receiver *receiver, Func slot) {
+        QAction *a = action(name);
+        if(!a)
+            qFatal("connectAction: '%s' is not a registered action", qPrintable(name));
+        QObject::connect(a, &QAction::triggered, receiver, slot);
+    }
   public slots:
     bool invokeAction(const QString &actionName);
 
   private:
     explicit ActionManager(QObject *parent = nullptr);
+    // the registry's single registration point: one parented QAction per
+    // name. R12 reads this list against core.cpp's connectAction calls.
+    QAction *addAction(const QString &name);
+    void initActions();
+    QMap<QString, QAction *> mActions;          // <name, trigger token>
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
     // the inspect scope's layer: only the deltas live here (fit original /
     // free zoom pan with the arrows instead of changing images)
@@ -113,7 +151,6 @@ class ActionManager : public QObject {
 
     void initDefaults();
     void initShortcuts();
-    QString modifierKeys(QEvent *event);
     void validateShortcuts(QMap<QString, QString> &map);
     void readShortcuts();
     void readGridShortcuts();
@@ -122,89 +159,11 @@ class ActionManager : public QObject {
     ActionType validateAction(const QString &actionName);
 
   signals:
-    void open();
-    void save();
-    void saveAs();
-    void openSettings();
-    void crop();
-    void setWallpaper();
-    void nextImage();
-    void prevImage();
-    void fitWindow();
-    void fitWidth();
-    void fitNormal();
-    void flipH();
-    void flipV();
-    void nextFitMode();
-    void toggleFitMode();
-    void toggleFullscreen();
-    void scrollUp();
-    void scrollDown();
-    void scrollLeft();
-    void scrollRight();
-    void zoomIn();
-    void zoomOut();
-    void zoomInCursor();
-    void zoomOutCursor();
-    void resize();
-    void rotateLeft();
-    void rotateRight();
-    void exit();
-    void removeFile();
-    void copyFile();
-    void moveFile();
-    void closeFullScreenOrExit();
-    void jumpToFirst();
-    void jumpToLast();
-    void folderView();
-    void documentView();
+    // the one carrier the registry keeps: script actions are dynamic (any
+    // "s:<name>" a user can bind), so there is no QAction to trigger for
+    // them — invokeAction strips the prefix and fires this instead. R12
+    // documents it as the expected connected-but-unregistered exception.
     void runScript(const QString &);
-    void pauseVideo();
-    void seekVideoForward();
-    void seekVideoBackward();
-    void frameStep();
-    void frameStepBack();
-    void toggleFolderView();
-    void moveToTrash();
-    void reloadImage();
-    void copyFileClipboard();
-    void copyPathClipboard();
-    void renameFile();
-    void contextMenu();
-    void toggleTransparencyGrid();
-    void sortByName();
-    void sortByTime();
-    void sortBySize();
-    void toggleImageInfo();
-    void toggleShuffle();
-    void toggleScalingFilter();
-    void showInDirectory();
-    void quickCopy();
-    void toggleMute();
-    void volumeUp();
-    void volumeDown();
-    void toggleSlideshow();
-    void discardEdits();
-    void goUp();
-    void nextDirectory();
-    void prevDirectory();
-    void lockZoom();
-    void lockView();
-    void print();
-    void toggleFullscreenInfoBar();
-    void pasteFile();
-    // the folder grid's scope actions: the navigation the grid used to
-    // hardcode in its keyPressEvent (upstream #365)
-    void gridSelectNext();
-    void gridSelectPrev();
-    void gridSelectAbove();
-    void gridSelectBelow();
-    void gridPageUp();
-    void gridPageDown();
-    void gridSelectFirst();
-    void gridSelectLast();
-    void gridSelectAll();
-    void gridOpen();
 };
 
 extern ActionManager *actionManager;

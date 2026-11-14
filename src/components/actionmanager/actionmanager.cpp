@@ -10,12 +10,114 @@ ActionManager::~ActionManager() = default;
 ActionManager *ActionManager::getInstance() {
     if(!actionManager) {
         actionManager = new ActionManager();
+        // the registry first: initShortcuts' config read validates every
+        // stored entry against it, so it must exist before the first
+        // validateAction — the ordering main.cpp used to buy by
+        // constructing appActions ahead of this singleton
+        actionManager->initActions();
         // the two initializers are instance members now: they fill this
         // object's own maps instead of reaching for the global that names it
         actionManager->initDefaults();
         actionManager->initShortcuts();
     }
     return actionManager;
+}
+//------------------------------------------------------------------------------
+// The registry, written out: one stateless QAction per name, in the order the
+// old Actions registry kept them. A name here without a connectAction in
+// core.cpp is an action the keymap can bind and invoke that does nothing —
+// exactly the silence R12 reads these two lists against each other for.
+void ActionManager::initActions() {
+    addAction("nextImage");
+    addAction("prevImage");
+    addAction("toggleFullscreen");
+    addAction("fitWindow");
+    addAction("fitWidth");
+    addAction("fitNormal");
+    addAction("nextFitMode");
+    addAction("toggleFitMode");
+    addAction("resize");
+    addAction("rotateRight");
+    addAction("rotateLeft");
+    addAction("scrollUp");
+    addAction("scrollDown");
+    addAction("scrollLeft");
+    addAction("scrollRight");
+    addAction("zoomIn");
+    addAction("zoomOut");
+    addAction("zoomInCursor");
+    addAction("zoomOutCursor");
+    addAction("open");
+    addAction("save");
+    addAction("saveAs");
+    addAction("setWallpaper");
+    addAction("crop");
+    addAction("removeFile");
+    addAction("copyFile");
+    addAction("moveFile");
+    addAction("jumpToFirst");
+    addAction("jumpToLast");
+    addAction("openSettings");
+    addAction("closeFullScreenOrExit");
+    addAction("exit");
+    addAction("flipH");
+    addAction("flipV");
+    addAction("folderView");
+    addAction("pauseVideo");
+    addAction("frameStep");
+    addAction("frameStepBack");
+    addAction("documentView");
+    addAction("toggleFolderView");
+    addAction("moveToTrash");
+    addAction("reloadImage");
+    addAction("copyFileClipboard");
+    addAction("copyPathClipboard");
+    addAction("renameFile");
+    addAction("contextMenu");
+    addAction("toggleTransparencyGrid");
+    addAction("sortByName");
+    addAction("sortByTime");
+    addAction("sortBySize");
+    addAction("toggleImageInfo");
+    addAction("toggleShuffle");
+    addAction("toggleScalingFilter");
+    addAction("toggleMute");
+    addAction("volumeUp");
+    addAction("volumeDown");
+    addAction("toggleSlideshow");
+    addAction("showInDirectory");
+    addAction("quickCopy");
+    addAction("goUp");
+    addAction("discardEdits");
+    addAction("nextDirectory");
+    addAction("prevDirectory");
+    addAction("seekVideoForward");
+    addAction("seekVideoBackward");
+    addAction("lockZoom");
+    addAction("lockView");
+    addAction("print");
+    addAction("toggleFullscreenInfoBar");
+    addAction("pasteFile");
+    // the folder grid's scope actions — the fork's own line
+    addAction("gridSelectNext");
+    addAction("gridSelectPrev");
+    addAction("gridSelectAbove");
+    addAction("gridSelectBelow");
+    addAction("gridPageUp");
+    addAction("gridPageDown");
+    addAction("gridSelectFirst");
+    addAction("gridSelectLast");
+    addAction("gridSelectAll");
+    addAction("gridOpen");
+}
+
+QAction *ActionManager::addAction(const QString &name) {
+    if(mActions.contains(name))
+        qFatal("addAction: '%s' is already registered", qPrintable(name));
+    auto *a = new QAction(this);
+    a->setObjectName(name);
+    mActions.insert(name, a);
+    return a;
 }
 //------------------------------------------------------------------------------
 void ActionManager::initDefaults() {
@@ -147,7 +249,11 @@ void ActionManager::removeShortcut(const QString &keys) {
 }
 //------------------------------------------------------------------------------
 QStringList ActionManager::actionList() {
-    return appActions->getList();
+    return mActions.keys();
+}
+
+QAction *ActionManager::action(const QString &name) const {
+    return mActions.value(name, nullptr);
 }
 //------------------------------------------------------------------------------
 const QMap<QString, QString> &ActionManager::allShortcuts() {
@@ -250,7 +356,10 @@ const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
 bool ActionManager::invokeAction(const QString &actionName) {
     ActionType type = validateAction(actionName);
     if(type == ActionType::ACTION_NORMAL) {
-        QMetaObject::invokeMethod(this, actionName.toLatin1().constData(), Qt::DirectConnection);
+        // validateAction just proved the lookup succeeds; trigger() on a
+        // stateless token is the whole dispatch — the same one-way fire the
+        // invokeMethod-by-name dance used to perform
+        mActions.value(actionName)->trigger();
         return true;
     } else if(type == ActionType::ACTION_SCRIPT) {
         QString scriptName = actionName;
@@ -293,7 +402,7 @@ void ActionManager::validateShortcuts(QMap<QString, QString> &map) {
 }
 //------------------------------------------------------------------------------
 inline ActionType ActionManager::validateAction(const QString &actionName) {
-    if(appActions->getMap().contains(actionName))
+    if(mActions.contains(actionName))
         return ActionType::ACTION_NORMAL;
     if(actionName.startsWith("s:")) {
         QString scriptName = actionName;

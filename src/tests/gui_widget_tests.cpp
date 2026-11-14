@@ -58,7 +58,6 @@
 #include "gui/viewers/imageviewerv2.h"
 #include "settings.h"
 #include "testhelpers.h"
-#include "utils/actions.h"
 #include "utils/fileoperations.h"
 
 // FloatingWidget::setContainerSize is protected; a pin reaches it the way the

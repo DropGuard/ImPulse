@@ -333,17 +333,38 @@ for path, rel in sources():
         failures.append(f"R11 unauthorized key door: {rel} (add to ALLOWED_KEY_DOORS only after review)")
 
 # Rule 12: every registered action must be connected. invokeAction resolves
-# ACTION_NORMAL by emitting the signal of the same name — a registration
-# without a connect is an action that shows in the keymap, is invokable, and
-# does absolutely nothing. The reverse (connected but unregistered) is
-# runScript, the dynamic carrier for script actions, and is expected.
-actions_text = text_of(os.path.join(SRC, 'utils', 'actions.cpp'))
-registered_actions = set(re.findall(r'mActions\.insert\("([^"]+)"', actions_text))
-connected_actions = set(re.findall(r'&ActionManager::(\w+),', text_of(os.path.join(SRC, 'core.cpp'))))
+# ACTION_NORMAL by triggering the registered QAction — a registration without
+# a connectAction is an action that shows in the keymap, is invokable, and
+# does absolutely nothing. Registration lives in actionmanager.cpp
+# (initActions/addAction), connection in core.cpp (connectAction); the two
+# files must agree in both directions. A connectAction naming an unknown
+# action is also caught at runtime by the qFatal in connectAction; this scan
+# reports it earlier and by name. runScript is a plain signal carrier for the
+# dynamic script actions (no QAction exists for "s:<name>"), connects by the
+# signal idiom instead of connectAction, and is expected here.
+am_text = text_of(os.path.join(SRC, 'components', 'actionmanager', 'actionmanager.cpp'))
+registered_actions = set(re.findall(r'addAction\("([^"]+)"', am_text))
+connected_actions = set(re.findall(r'connectAction\("([^"]+)"', text_of(os.path.join(SRC, 'core.cpp'))))
 for name in sorted(registered_actions - connected_actions):
-    failures.append(f"R12 registered action is never connected: {name} — add the ActionManager "
-                    "connect in core.cpp or remove the registration")
+    failures.append(f"R12 registered action is never connected: {name} — add the connectAction "
+                    "in core.cpp or remove the registration")
+for name in sorted(connected_actions - registered_actions):
+    failures.append(f"R12 connectAction names an unregistered action: {name} — fix the name or "
+                    "register it in ActionManager::initActions")
 scanned['R12'] = scanned.get('R12', 0) + 1
+
+# Rule 12b: the hardcoded default keymaps must name registered actions.
+# validateShortcuts validates only the config entries, never the defaults —
+# a typo in initDefaults was a binding the settings table shows and that
+# does nothing, silently. This partially restores the compile-time check the
+# old &ActionManager::signal connects gave for free.
+init_defaults = re.search(r'void ActionManager::initDefaults\(\) \{(.*?)\n\}', am_text, re.S)
+if init_defaults:
+    default_actions = {m[1] for m in re.findall(r'\.insert\((.*),\s*"([^"]+)"\)', init_defaults.group(1))}
+    for name in sorted(default_actions - registered_actions):
+        failures.append(f"R12b default keymap names an unregistered action: {name} — fix the "
+                        "name in ActionManager::initDefaults")
+scanned['R12b'] = scanned.get('R12b', 0) + 1
 
 if failures:
     print("architecture violations:")

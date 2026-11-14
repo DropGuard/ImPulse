@@ -13,7 +13,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
 class TestShortcutScope : public QObject {
@@ -63,8 +62,8 @@ class TestShortcutScope : public QObject {
         core.mainWindow()->fitOriginal(); // arms the inspect scope through the real observer
         QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_ORIGINAL, 5000);
 
-        QSignalSpy next(actionManager, &ActionManager::nextImage);
-        QSignalSpy scroll(actionManager, &ActionManager::scrollLeft);
+        QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
+        QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
 
         // caller-declared grid scope wins over the armed inspect layer
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left"), ShortcutScope::FolderGrid));
@@ -79,7 +78,7 @@ class TestShortcutScope : public QObject {
         // disarmed, the same key falls through to the global table
         core.mainWindow()->fitWindow();
         QTRY_COMPARE_WITH_TIMEOUT(core.mainWindow()->viewer()->fitMode(), FIT_WINDOW, 5000);
-        QSignalSpy prev(actionManager, &ActionManager::prevImage);
+        QSignalSpy prev(actionManager->action("prevImage"), &QAction::triggered);
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QCOMPARE(prev.count(), 1);
         QCOMPARE(scroll.count(), 1);
@@ -157,39 +156,47 @@ class TestShortcutScope : public QObject {
             actionManager->addShortcut(it.key(), it.value());
     }
 
-    // ActionManager dispatches by name: an action lives in the Actions registry
-    // and is fired as a metaobject method on ActionManager itself. Two lists
-    // that have to agree, and the disagreement is silent — invokeMethod on a
-    // missing method warns and returns, so the only symptom a user gets is
-    // "this button does nothing". Walk every registered name and require a
-    // matching method on the manager, which covers all of them at once instead
-    // of one button per test.
-    void everyRegisteredActionIsInvokableOnActionManager() {
-        const QList<QString> names = appActions->getList();
+    // ActionManager dispatches by name: invokeAction validates the name and
+    // triggers the registered QAction. Two lists have to agree — the
+    // registration in initActions and the connectAction calls in core.cpp —
+    // and the disagreement is silent: a trigger into an action nobody
+    // connected just does nothing, so the only symptom a user gets is "this
+    // button does nothing". Walk every registered name and require the
+    // QAction to exist, carry its own name, and be a stateless token (the
+    // checkable/enabled face is contractually unused — see actionmanager.h).
+    // Structural assertions only: triggering each name here is safe while
+    // this suite connects no Core, but the day one is, the sweep would fire
+    // real handlers (exit closes the process) — the behavioral leg lives in
+    // invokeActionReportsAndReachesForEveryKindOfName below.
+    void everyRegisteredActionIsATriggerableQAction() {
+        const QList<QString> names = actionManager->actionList();
         QVERIFY2(!names.isEmpty(), "the action registry came back empty, the sweep proves nothing");
         // the size is printed even on success: a sweep over an empty or
         // accidentally tiny registry is green for the wrong reason
-        qDebug() << "[action sweep] checking" << names.size() << "registered actions against"
-                 << actionManager->metaObject()->methodCount() << "methods";
+        qDebug() << "[action sweep] checking" << names.size() << "registered actions";
 
-        QStringList missing;
+        QStringList broken;
         for(const QString &name : names) {
-            const QByteArray signature = (name + QStringLiteral("()")).toLatin1();
-            if(actionManager->metaObject()->indexOfMethod(QMetaObject::normalizedSignature(signature.constData())) < 0)
-                missing << name;
+            const QAction *a = actionManager->action(name);
+            if(!a)
+                broken << name + QStringLiteral(": no QAction behind the name");
+            else if(a->objectName() != name)
+                broken << name + QStringLiteral(": objectName is ") + a->objectName();
+            else if(a->isCheckable())
+                broken << name + QStringLiteral(": registry actions are stateless tokens, not checkable");
         }
-        QVERIFY2(missing.isEmpty(),
-                 qPrintable(QStringLiteral("registered with no method to invoke (") + QString::number(names.size()) +
-                            QStringLiteral(" actions checked):\n  ") + missing.join(QStringLiteral("\n  "))));
+        QVERIFY2(broken.isEmpty(),
+                 qPrintable(QStringLiteral("registry inconsistency (") + QString::number(names.size()) +
+                            QStringLiteral(" actions checked):\n  ") + broken.join(QStringLiteral("\n  "))));
     }
 
     // invokeAction itself: it had never been entered despite eight production
     // call sites (context menu, action buttons, folder grid, viewer, exit).
-    // A registered name has to report success AND reach its signal; an unknown
-    // name has to report failure; a "s:" name with no script behind it has to
-    // report failure rather than pretend.
+    // A registered name has to report success AND reach its QAction; an
+    // unknown name has to report failure; a "s:" name with no script behind
+    // it has to report failure rather than pretend.
     void invokeActionReportsAndReachesForEveryKindOfName() {
-        QSignalSpy nextImage(actionManager, &ActionManager::nextImage);
+        QSignalSpy nextImage(actionManager->action("nextImage"), &QAction::triggered);
         QSignalSpy runScript(actionManager, &ActionManager::runScript);
         QVERIFY(nextImage.isValid() && runScript.isValid());
 
@@ -221,8 +228,8 @@ class TestShortcutScope : public QObject {
         const QMap<QString, QString> inspectSnapshot = actionManager->allInspectShortcuts();
         actionManager->addInspectShortcut(QStringLiteral("Left"), QStringLiteral("nextImage"));
 
-        QSignalSpy next(actionManager, &ActionManager::nextImage);
-        QSignalSpy scroll(actionManager, &ActionManager::scrollLeft);
+        QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
+        QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
         actionManager->setInspectMode(true);
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QCOMPARE(next.count(), 1);

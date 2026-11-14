@@ -12,7 +12,6 @@
 #include "settings.h"
 #include "components/actionmanager/actionmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "utils/cmdoptionsrunner.h"
 #include "sharedresources.h"
 #include "proxystyle.h"
@@ -104,7 +103,6 @@ int main(int argc, char *argv[]) {
     FileLog::install(Settings::resolveCacheDir() + "/logs");
     // globals
     inputMap = InputMap::getInstance();
-    appActions = Actions::getInstance();
     settings = Settings::getInstance();
     // Migration, not a property of being constructed. It used to live in the
     // Settings constructor, which made every `new Settings()` — tests included —

@@ -13,7 +13,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
 class TestClipboard : public QObject {

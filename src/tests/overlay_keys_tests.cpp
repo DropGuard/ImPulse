@@ -13,7 +13,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
 #include "gui/overlayhost.h"
@@ -127,10 +126,10 @@ class TestOverlayKeys : public QObject {
         // ends at Core::requestSavePath, whose file dialog would block this
         // headless run forever, so its Core leg is disconnected and the
         // assertion is on the action emission itself
-        QObject::disconnect(actionManager, &ActionManager::saveAs, nullptr, nullptr);
-        QSignalSpy saveAction(actionManager, &ActionManager::save);
-        QSignalSpy saveAsAction(actionManager, &ActionManager::saveAs);
-        QSignalSpy folderViewAction(actionManager, &ActionManager::folderView);
+        QObject::disconnect(actionManager->action("saveAs"), &QAction::triggered, nullptr, nullptr);
+        QSignalSpy saveAction(actionManager->action("save"), &QAction::triggered);
+        QSignalSpy saveAsAction(actionManager->action("saveAs"), &QAction::triggered);
+        QSignalSpy folderViewAction(actionManager->action("folderView"), &QAction::triggered);
 
         auto press = [&](Qt::Key key, const char *keyName, Qt::KeyboardModifiers mods = Qt::NoModifier) {
             QKeyEvent ev(QEvent::KeyPress, key, mods, coretest::scanCodeFor(QLatin1String(keyName)), 0u, 0u);
@@ -186,8 +185,8 @@ class TestOverlayKeys : public QObject {
         // (hasPendingSurface) would also stop the walk one layer up, so the
         // file path alone cannot tell whether THIS guard fired. The signal
         // fires if and only if the surface yielded the event.
-        QSignalSpy nextImage(actionManager, &ActionManager::nextImage);
-        QSignalSpy fullscreen(actionManager, &ActionManager::toggleFullscreen);
+        QSignalSpy nextImage(actionManager->action("nextImage"), &QAction::triggered);
+        QSignalSpy fullscreen(actionManager->action("toggleFullscreen"), &QAction::triggered);
 
         // --- the copy menu: Right must not be yielded at all
         core.mainWindow()->overlays()->triggerCopyOverlay();
@@ -207,8 +206,8 @@ class TestOverlayKeys : public QObject {
         core.mainWindow()->overlays()->showSaveOverlay();
         auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
         QVERIFY(saveOverlay && saveOverlay->isVisible());
-        QObject::disconnect(actionManager, &ActionManager::saveAs, nullptr, nullptr);
-        QSignalSpy saveAction(actionManager, &ActionManager::save);
+        QObject::disconnect(actionManager->action("saveAs"), &QAction::triggered, nullptr, nullptr);
+        QSignalSpy saveAction(actionManager->action("save"), &QAction::triggered);
         press(saveOverlay, Qt::Key_Right, "Right");
         QCOMPARE(nextImage.count(), 0);
         QVERIFY(saveOverlay->isVisible());
