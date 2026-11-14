@@ -46,8 +46,7 @@ Core::Core(const Deps &deps)
       // the member it points at outlives the reference's users.
       ownedPool(deps.pool ? nullptr : std::make_unique<WorkerPool>(workerPoolThreadCount())),
       pool(deps.pool ? *deps.pool : *ownedPool), mBridge(deps.bridge ? *deps.bridge : EngineBridge::instance()),
-      folderEndAction(FOLDER_END_NO_ACTION), loopSlideshow(false), thumbnailer(pool, mBridge),
-      thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
+      thumbnailer(pool, mBridge), thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
     loadTranslation();
     if(deps.headless) {
         // no window tree at all: the three seams are the whole surface, and a
@@ -70,6 +69,9 @@ Core::Core(const Deps &deps)
         dialogs_ = mw->dialogs();
         crop_ = deps.crop ? deps.crop : mw->crop();
     }
+    // the navigation object: both branches have set the seams it drives, so
+    // it is constructed here, once — the listing arrives later, via attachModel
+    nav_ = new NavigationController(&state, this, view_, overlays_, thumbPanelPresenter, folderViewPresenter, this);
     // the slideshow loop is a pure function of the state: slides advance by
     // timer, normal viewing loops. The relay rides the state binding and goes
     // through the view seam — the window's notifier keeps only the info
@@ -82,7 +84,6 @@ Core::Core(const Deps &deps)
     connectComponents();
     initActions();
     readSettings();
-    slideshowTimer.setSingleShot(true);
     connect(settings, &Settings::settingsChanged, this, &Core::readSettings);
 
     QVersionNumber lastVersion = settings->lastVersion();
@@ -129,14 +130,13 @@ void Core::readSettings() {
     // drains it. What remains here is the running job, so a thumbnail callback
     // cannot land mid-repopulation.
     pool.waitForOwner(PoolOwner::Thumbnailer);
-    loopSlideshow = settings->loopSlideshow();
-    folderEndAction = settings->folderEndAction();
-    slideshowTimer.setInterval(settings->slideshowInterval());
+    nav_->applySlideshowSettings(settings->slideshowInterval(), settings->loopSlideshow());
+    nav_->setFolderEndAction(settings->folderEndAction());
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
     if(folderViewPresenter.showDirs() != showDirs)
         folderViewPresenter.setShowDirs(showDirs);
     if(state.shuffle)
-        syncRandomizer();
+        nav_->syncRandomizer();
 }
 
 void Core::showGui() {
@@ -161,8 +161,7 @@ void Core::attachModel(DirectoryModel *_model) {
     folderViewPresenter.setModel(model);
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
     folderViewPresenter.setShowDirs(showDirs);
-    if(state.shuffle)
-        syncRandomizer();
+    nav_->attachModel(_model);
 }
 
 void Core::initComponents() {
@@ -170,11 +169,13 @@ void Core::initComponents() {
 }
 
 void Core::connectComponents() {
-    connect(&thumbPanelPresenter, &DirectoryPresenter::fileActivated, this, &Core::onDirectoryViewFileActivated);
-    connect(&thumbPanelPresenter, &DirectoryPresenter::dirActivated, this, &Core::loadPath);
+    connect(&thumbPanelPresenter, &DirectoryPresenter::fileActivated, nav_,
+            &NavigationController::onDirectoryViewFileActivated);
+    connect(&thumbPanelPresenter, &DirectoryPresenter::dirActivated, nav_, &NavigationController::loadPath);
 
-    connect(&folderViewPresenter, &DirectoryPresenter::fileActivated, this, &Core::onDirectoryViewFileActivated);
-    connect(&folderViewPresenter, &DirectoryPresenter::dirActivated, this, &Core::loadPath);
+    connect(&folderViewPresenter, &DirectoryPresenter::fileActivated, nav_,
+            &NavigationController::onDirectoryViewFileActivated);
+    connect(&folderViewPresenter, &DirectoryPresenter::dirActivated, nav_, &NavigationController::loadPath);
 
     connect(&folderViewPresenter, &DirectoryPresenter::draggedOut, this,
             qOverload<const QList<QString> &>(&Core::onDraggedOut));
@@ -193,17 +194,16 @@ void Core::connectComponents() {
 
     connect(model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
 
-    connect(model.get(), &DirectoryModel::fileAdded, this, &Core::onFileAdded);
-    connect(model.get(), &DirectoryModel::fileRemoved, this, &Core::onFileRemoved);
-    connect(model.get(), &DirectoryModel::divergenceDetected, this, &Core::onDivergenceDetected);
-    connect(model.get(), &DirectoryModel::fileRenamed, this, &Core::onFileRenamed);
-    connect(model.get(), &DirectoryModel::loaded, this, &Core::onModelLoaded);
-    connect(model.get(), &DirectoryModel::imageReady, this, &Core::onModelItemReady);
-    connect(model.get(), &DirectoryModel::imageUpdated, this, &Core::onModelItemUpdated);
-    connect(model.get(), &DirectoryModel::sortingChanged, this, &Core::onModelSortingChanged);
-    connect(model.get(), &DirectoryModel::loadFailed, this, &Core::onLoadFailed);
+    connect(model.get(), &DirectoryModel::fileAdded, nav_, &NavigationController::onFileAdded);
+    connect(model.get(), &DirectoryModel::fileRemoved, nav_, &NavigationController::onFileRemoved);
+    connect(model.get(), &DirectoryModel::divergenceDetected, nav_, &NavigationController::onDivergenceDetected);
+    connect(model.get(), &DirectoryModel::fileRenamed, nav_, &NavigationController::onFileRenamed);
+    connect(model.get(), &DirectoryModel::loaded, nav_, &NavigationController::onModelLoaded);
+    connect(model.get(), &DirectoryModel::imageReady, nav_, &NavigationController::onModelItemReady);
+    connect(model.get(), &DirectoryModel::imageUpdated, nav_, &NavigationController::onModelItemUpdated);
+    connect(model.get(), &DirectoryModel::sortingChanged, nav_, &NavigationController::onModelSortingChanged);
+    connect(model.get(), &DirectoryModel::loadFailed, nav_, &NavigationController::onLoadFailed);
 
-    connect(&slideshowTimer, &QTimer::timeout, this, &Core::nextImageSlideshow);
     if(mw)
         connectWindowComponents();
 }
@@ -215,14 +215,14 @@ void Core::connectWindowComponents() {
     connect(mw, &MW::droppedIn, this, &Core::onDropIn);
     connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
     connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
-    connect(mw, &MW::sortingSelected, this, &Core::sortBy);
-    connect(mw, &MW::showFoldersChanged, this, &Core::setFoldersDisplay);
+    connect(mw, &MW::sortingSelected, nav_, &NavigationController::sortBy);
+    connect(mw, &MW::showFoldersChanged, nav_, &NavigationController::setFoldersDisplay);
     connect(mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
-    connect(mw, &MW::playbackFinished, this, &Core::onPlaybackFinished);
+    connect(mw, &MW::playbackFinished, nav_, &NavigationController::onPlaybackFinished);
     connect(mw, &MW::scalingRequested, this, &Core::scalingRequest);
     thumbPanelPresenter.setView(mw->getThumbnailPanel());
     folderViewPresenter.setView(mw->getFolderView());
-    connect(mw->dialogs(), &DialogHost::opened, this, &Core::loadPath);
+    connect(mw->dialogs(), &DialogHost::opened, nav_, &NavigationController::loadPath);
     connect(mw->crop(), &CropController::cropRequested, this, &Core::crop);
     connect(mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
     connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
@@ -230,8 +230,8 @@ void Core::connectWindowComponents() {
 }
 
 void Core::initActions() {
-    connect(actionManager, &ActionManager::nextImage, this, &Core::nextImage);
-    connect(actionManager, &ActionManager::prevImage, this, &Core::prevImage);
+    connect(actionManager, &ActionManager::nextImage, nav_, &NavigationController::nextImage);
+    connect(actionManager, &ActionManager::prevImage, nav_, &NavigationController::prevImage);
     connect(actionManager, &ActionManager::resize, this, &Core::showResizeDialog);
     connect(actionManager, &ActionManager::flipH, this, &Core::flipH);
     connect(actionManager, &ActionManager::flipV, this, &Core::flipV);
@@ -248,27 +248,27 @@ void Core::initActions() {
     connect(actionManager, &ActionManager::copyFile, overlays_, &IOverlayHost::triggerCopyOverlay);
     connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
     connect(actionManager, &ActionManager::moveFile, overlays_, &IOverlayHost::triggerMoveOverlay);
-    connect(actionManager, &ActionManager::jumpToFirst, this, &Core::jumpToFirst);
-    connect(actionManager, &ActionManager::jumpToLast, this, &Core::jumpToLast);
+    connect(actionManager, &ActionManager::jumpToFirst, nav_, &NavigationController::jumpToFirst);
+    connect(actionManager, &ActionManager::jumpToLast, nav_, &NavigationController::jumpToLast);
     connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
-    connect(actionManager, &ActionManager::folderView, this, &Core::enableFolderView);
-    connect(actionManager, &ActionManager::documentView, this, &Core::enableDocumentView);
-    connect(actionManager, &ActionManager::toggleFolderView, this, &Core::toggleFolderView);
+    connect(actionManager, &ActionManager::folderView, nav_, &NavigationController::enableFolderView);
+    connect(actionManager, &ActionManager::documentView, nav_, &NavigationController::enableDocumentView);
+    connect(actionManager, &ActionManager::toggleFolderView, nav_, &NavigationController::toggleFolderView);
     connect(actionManager, &ActionManager::reloadImage, this, qOverload<>(&Core::reloadImage));
     connect(actionManager, &ActionManager::copyFileClipboard, this, &Core::copyFileClipboard);
     connect(actionManager, &ActionManager::copyPathClipboard, this, &Core::copyPathClipboard);
     connect(actionManager, &ActionManager::renameFile, this, &Core::showRenameDialog);
-    connect(actionManager, &ActionManager::sortByName, this, &Core::sortByName);
-    connect(actionManager, &ActionManager::sortByTime, this, &Core::sortByTime);
-    connect(actionManager, &ActionManager::sortBySize, this, &Core::sortBySize);
+    connect(actionManager, &ActionManager::sortByName, nav_, &NavigationController::sortByName);
+    connect(actionManager, &ActionManager::sortByTime, nav_, &NavigationController::sortByTime);
+    connect(actionManager, &ActionManager::sortBySize, nav_, &NavigationController::sortBySize);
     connect(actionManager, &ActionManager::toggleImageInfo, overlays_, &IOverlayHost::toggleImageInfoOverlay);
-    connect(actionManager, &ActionManager::toggleShuffle, this, &Core::toggleShuffle);
+    connect(actionManager, &ActionManager::toggleShuffle, nav_, &NavigationController::toggleShuffle);
     connect(actionManager, &ActionManager::showInDirectory, this, &Core::showInDirectory);
-    connect(actionManager, &ActionManager::toggleSlideshow, this, &Core::toggleSlideshow);
-    connect(actionManager, &ActionManager::goUp, this, &Core::loadParentDir);
+    connect(actionManager, &ActionManager::toggleSlideshow, nav_, &NavigationController::toggleSlideshow);
+    connect(actionManager, &ActionManager::goUp, nav_, &NavigationController::loadParentDir);
     connect(actionManager, &ActionManager::discardEdits, this, &Core::discardEdits);
-    connect(actionManager, &ActionManager::nextDirectory, this, &Core::nextDirectory);
-    connect(actionManager, &ActionManager::prevDirectory, this, qOverload<>(&Core::prevDirectory));
+    connect(actionManager, &ActionManager::nextDirectory, nav_, &NavigationController::nextDirectory);
+    connect(actionManager, &ActionManager::prevDirectory, nav_, qOverload<>(&NavigationController::prevDirectory));
     connect(actionManager, &ActionManager::print, this, &Core::print);
     connect(actionManager, &ActionManager::toggleFullscreenInfoBar, this, &Core::toggleFullscreenInfoBar);
     connect(actionManager, &ActionManager::pasteFile, this, &Core::openFromClipboard);
@@ -513,15 +513,6 @@ void Core::onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerR
 }
 
 // reset state; clear cache; etc
-void Core::reset() {
-    state.hasActiveImage = false;
-    state.currentFilePath = "";
-    if(state.pendingListedToken) {
-        model->cancelListed(state.pendingListedToken);
-        state.pendingListedToken = 0;
-    }
-    model->setDirectory("");
-}
 
 QString Core::currentFilePath() const {
     return state.currentFilePath;
