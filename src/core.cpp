@@ -493,9 +493,19 @@ void Core::scalingRequest(QSize size, ScalingFilter filter) {
 
 // TODO: don't use connect? otherwise there is no point using unique_ptr
 void Core::onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req) {
-    // the viewer takes a unique_ptr, so hand it one from a value instead of
-    // passing a naked QPixmap* and hoping somebody deletes it
-    if(state.hasActiveImage /* TODO: a better fix > */ && req.path == state.currentFilePath) {
+    // Staleness is owned layer by layer, and each predicate here names its
+    // own: existence — nothing is handed to a closed viewer; identity — a
+    // result for any path but the one on screen is void (a switch cancels
+    // the flight). The rest is deliberately NOT re-checked here: the scaler
+    // serializes (one flight, newest-wins buffer), so ordering is never the
+    // problem; zoom supersession belongs to the viewer, whose setScaledPixmap
+    // drops any frame whose size no longer matches live zoom state — the only
+    // guard able to compare against it. The old TODO asked for "a better fix";
+    // the better fix turned out to already exist one layer down.
+    //
+    // The viewer takes a unique_ptr, so hand it one from a value instead of
+    // passing a naked QPixmap* and hoping somebody deletes it.
+    if(state.hasActiveImage && req.path == state.currentFilePath) {
         view_->onScalingFinished(std::make_unique<const QImage>(*scaled));
     }
 }
