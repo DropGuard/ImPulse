@@ -785,6 +785,45 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
     }
 
+    // The pending-work lock: while any registered surface holds unfinished
+    // work, folder entry and navigation are denied with feedback; resolving
+    // unlocks. The fake's pendingSurfaces is the test-set stand-in for the
+    // OverlayHost registry.
+    void pendingSurfacesLockFolderEntryAndNavigation() {
+        const QString dir = uniqueDir("pendinglock");
+        const QString a = QDir(dir).filePath("a.png");
+        const QString b = QDir(dir).filePath("b.png");
+        writeImage(a);
+        writeImage(b);
+
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        const int messageBaseline = overlayFake.messageCalls;
+        QVERIFY(core.loadPath(a));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), a, 10000);
+
+        overlayFake.pendingSurfaces = true;
+
+        QVERIFY(!core.loadPath(b)); // denied, target untouched
+        QCOMPARE(core.currentFilePath(), a);
+        core.enableFolderView(); // denied: folder stays out of reach
+        QCOMPARE(core.viewState().viewMode.value(), MODE_DOCUMENT);
+        core.nextImage(); // denied
+        QCOMPARE(core.currentFilePath(), a);
+        QCOMPARE(overlayFake.messageCalls, messageBaseline + 3); // one message per denial
+
+        overlayFake.pendingSurfaces = false;
+        QVERIFY(core.loadPath(b)); // resolved: the walk is open again
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), b, 10000);
+    }
+
     // The NavigationController pilot's payoff pin: the controller constructs,
     // attaches and walks WITHOUT Core — no crop seam, no DialogHost, no ui_
     // fake, no window tree. The kernel contract lands on the recording host,

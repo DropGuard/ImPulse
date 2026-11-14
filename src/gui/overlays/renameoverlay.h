@@ -6,6 +6,7 @@
 #include <QTimer>
 
 #include "gui/customwidgets/overlaywidget.h"
+#include "gui/ipendingsurface.h"
 #include "components/actionmanager/actionmanager.h"
 #include "settings.h"
 
@@ -13,10 +14,14 @@ namespace Ui {
 class RenameOverlay;
 }
 
-class RenameOverlay : public OverlayWidget {
+class RenameOverlay : public OverlayWidget, public IPendingSurface {
     Q_OBJECT
 
   public:
+    // IPendingSurface: this surface holds unfinished work while visible
+    bool isPending() const override {
+        return isVisible();
+    }
     explicit RenameOverlay(FloatingWidgetContainer *parent);
     ~RenameOverlay() override;
 

@@ -23,12 +23,14 @@ OverlayHost::~OverlayHost() {
 
 void OverlayHost::setupCopyOverlay() {
     copyOverlay = new CopyOverlay(viewer);
+    pendingSurfaces.append(copyOverlay);
     connect(copyOverlay, &CopyOverlay::copyRequested, this, &OverlayHost::copyRequested);
     connect(copyOverlay, &CopyOverlay::moveRequested, this, &OverlayHost::moveRequested);
 }
 
 void OverlayHost::setupSaveOverlay() {
     saveOverlay = new SaveConfirmOverlay(viewer);
+    pendingSurfaces.append(saveOverlay);
     connect(saveOverlay, &SaveConfirmOverlay::saveClicked, this, &OverlayHost::saveRequested);
     connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &OverlayHost::saveAsClicked);
     connect(saveOverlay, &SaveConfirmOverlay::discardClicked, this, &OverlayHost::discardEditsRequested);
@@ -36,6 +38,7 @@ void OverlayHost::setupSaveOverlay() {
 
 void OverlayHost::setupRenameOverlay() {
     renameOverlay = new RenameOverlay(container);
+    pendingSurfaces.append(renameOverlay);
     renameOverlay->setName(QString());
     connect(renameOverlay, &RenameOverlay::renameRequested, this, &OverlayHost::renameRequested);
 }
@@ -143,6 +146,17 @@ void OverlayHost::updateControlsOverlay() {
 
 void OverlayHost::hideControlsOverlay() {
     controlsOverlay->hide();
+}
+
+bool OverlayHost::hasPendingSurface() const {
+    for(const IPendingSurface *surface : pendingSurfaces)
+        if(surface->isPending())
+            return true;
+    return false;
+}
+
+void OverlayHost::addPendingSurface(IPendingSurface *surface) {
+    pendingSurfaces.append(surface);
 }
 
 void OverlayHost::hideTransientOverlays() {

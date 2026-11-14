@@ -115,6 +115,8 @@ void NavigationController::toggleSlideshow() {
 }
 
 void NavigationController::startSlideshow() {
+    if(navigationDenied())
+        return;
     if(!state->slideshow) {
         state->slideshow = true;
         enableDocumentView();
@@ -169,6 +171,8 @@ void NavigationController::enterMode(ViewMode mode) {
 }
 
 void NavigationController::enableFolderView() {
+    if(navigationDenied())
+        return;
     if(state->viewMode.value() == MODE_FOLDERVIEW)
         return;
     stopSlideshow();
@@ -176,6 +180,8 @@ void NavigationController::enableFolderView() {
 }
 
 void NavigationController::enableDocumentView() {
+    if(navigationDenied())
+        return;
     if(state->viewMode.value() == MODE_DOCUMENT)
         return;
     enterMode(MODE_DOCUMENT);
@@ -240,7 +246,7 @@ void NavigationController::onFileAdded(const QString &filePath) {
 void NavigationController::onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex) {
     Q_UNUSED(oldIndex)
     if(state->currentFilePath == filePath)
-        loadPath(newPath);
+        loadPathInternal(newPath);
     host_->updateInfoString();
 }
 
@@ -249,6 +255,18 @@ void NavigationController::onFileRenamed(const QString &filePath, const QString 
 // real divergence. Core only carries the human-facing half, for the file on
 // screen; a self-save never reaches this (Image::save refreshes the recorded
 // mtime, so the model sees no edge at all).
+// the pending-work lock: any registered surface holding unfinished work
+// denies user-facing navigation with feedback. Internal convergence paths
+// (the rename follow, the external-change reload) bypass the gate — they are
+// self-healing, not user intent.
+bool NavigationController::navigationDenied() {
+    if(overlays_->hasPendingSurface()) {
+        overlays_->showMessage(tr("Commit or discard your changes first."));
+        return true;
+    }
+    return false;
+}
+
 void NavigationController::onDivergenceDetected(const QString &filePath) {
     if(filePath == state->currentFilePath)
         overlays_->showMessage(tr("File changed on disk — your edits are kept in memory."));
@@ -276,6 +294,12 @@ void NavigationController::sortBySize() {
 }
 
 bool NavigationController::loadPath(const QString &path) {
+    if(navigationDenied())
+        return false;
+    return loadPathInternal(path);
+}
+
+bool NavigationController::loadPathInternal(const QString &path) {
     if(path.isEmpty())
         return false;
     QString target = path;
@@ -386,6 +410,8 @@ bool NavigationController::loadFileIndex(int index, bool async, bool preload) {
 }
 
 void NavigationController::loadParentDir() {
+    if(navigationDenied())
+        return;
     if(model->directoryPath().isEmpty() || state->viewMode.value() != MODE_FOLDERVIEW)
         return;
     stopSlideshow();
@@ -397,6 +423,8 @@ void NavigationController::loadParentDir() {
 }
 
 void NavigationController::nextDirectory() {
+    if(navigationDenied())
+        return;
     if(model->directoryPath().isEmpty() || state->viewMode.value() != MODE_DOCUMENT)
         return;
     stopSlideshow();
@@ -416,6 +444,8 @@ void NavigationController::nextDirectory() {
 }
 
 void NavigationController::prevDirectory(bool selectLast) {
+    if(navigationDenied())
+        return;
     if(model->directoryPath().isEmpty() || state->viewMode.value() != MODE_DOCUMENT)
         return;
     QString prev = model->adjacentDirectory(model->directoryPath(), false);
@@ -432,10 +462,14 @@ void NavigationController::prevDirectory(bool selectLast) {
 }
 
 void NavigationController::prevDirectory() {
+    if(navigationDenied())
+        return;
     prevDirectory(false);
 }
 
 void NavigationController::nextImage() {
+    if(navigationDenied())
+        return;
     if(state->viewMode.value() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
@@ -455,6 +489,8 @@ void NavigationController::nextImage() {
 }
 
 void NavigationController::prevImage() {
+    if(navigationDenied())
+        return;
     if(state->viewMode.value() == MODE_FOLDERVIEW || (model->isEmpty() && folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
@@ -475,6 +511,8 @@ void NavigationController::prevImage() {
 }
 
 void NavigationController::nextImageSlideshow() {
+    if(overlays_->hasPendingSurface())
+        return; // the clock tick is not user intent — denied silently
     if(model->isEmpty() || state->viewMode.value() == MODE_FOLDERVIEW)
         return;
     if(state->shuffle) {
@@ -509,6 +547,8 @@ void NavigationController::startSlideshowTimer() {
 }
 
 void NavigationController::jumpToFirst() {
+    if(navigationDenied())
+        return;
     if(model->isEmpty())
         return;
     stopSlideshow();
@@ -516,6 +556,8 @@ void NavigationController::jumpToFirst() {
 }
 
 void NavigationController::jumpToLast() {
+    if(navigationDenied())
+        return;
     if(model->isEmpty())
         return;
     stopSlideshow();

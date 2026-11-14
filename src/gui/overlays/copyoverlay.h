@@ -5,6 +5,7 @@
 #include <QLineEdit>
 #include <QKeyEvent>
 #include "gui/customwidgets/overlaywidget.h"
+#include "gui/ipendingsurface.h"
 #include "gui/customwidgets/pathselectormenuitem.h"
 #include "settings.h"
 #include "components/actionmanager/actionmanager.h"
@@ -18,9 +19,13 @@ namespace Ui {
 class CopyOverlay;
 }
 
-class CopyOverlay : public OverlayWidget {
+class CopyOverlay : public OverlayWidget, public IPendingSurface {
     Q_OBJECT
   public:
+    // IPendingSurface: this surface holds unfinished work while visible
+    bool isPending() const override {
+        return isVisible();
+    }
     CopyOverlay(FloatingWidgetContainer *parent);
     ~CopyOverlay() override;
     void saveSettings();

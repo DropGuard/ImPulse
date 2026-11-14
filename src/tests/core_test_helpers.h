@@ -351,6 +351,7 @@ inline QMap<QString, int> widgetClasses() {
 // prompt's save button, renameRequested is the rename overlay's confirm).
 class FakeOverlayHost : public IOverlayHost {
   public:
+    bool pendingSurfaces = false; // the lock's condition, test-set
     int messageCalls = 0;
     QString lastMessage;
     int successCalls = 0;
@@ -403,6 +404,9 @@ class FakeOverlayHost : public IOverlayHost {
         moveMenuTriggers++;
     }
     void toggleImageInfoOverlay() override {
+    }
+    bool hasPendingSurface() const override {
+        return pendingSurfaces;
     }
 };
 

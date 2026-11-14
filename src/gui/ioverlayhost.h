@@ -38,6 +38,8 @@ class IOverlayHost : public QObject {
     virtual void triggerCopyOverlay() = 0;
     virtual void triggerMoveOverlay() = 0;
     virtual void toggleImageInfoOverlay() = 0;
+    // the pending-work lock's condition, answered by the host's registry
+    virtual bool hasPendingSurface() const = 0;
 
   signals:
     void copyRequested(QString path);
