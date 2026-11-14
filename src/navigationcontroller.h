@@ -95,6 +95,8 @@ class NavigationController : public QObject {
     void enterMode(ViewMode mode);
     bool loadFileIndex(int index, bool async, bool preload);
     void startSlideshowTimer();
+    bool navigationDenied();
+    bool loadPathInternal(const QString &path);
 
   private:
     // the navigation slice of State this controller writes: currentFilePath,

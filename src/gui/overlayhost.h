@@ -10,6 +10,7 @@
 #include <QObject>
 
 #include "gui/ioverlayhost.h"
+#include "gui/ipendingsurface.h"
 
 #include "gui/overlays/floatingmessageproxy.h"
 #include "gui/overlays/imageinfooverlayproxy.h"
@@ -45,6 +46,10 @@ class OverlayHost : public IOverlayHost {
     void hideControlsOverlay();
     // view switches hide every transient surface
     void hideTransientOverlays();
+    // the pending-work lock's condition: any registered surface holding
+    // unfinished work
+    bool hasPendingSurface() const override;
+    void addPendingSurface(IPendingSurface *surface);
     // the projection re-derives the rename target on every state write
     void setRenameOverlayName(const QString &name);
     void saveCopySettings();
@@ -65,6 +70,11 @@ class OverlayHost : public IOverlayHost {
     // QObject widgets: the parent tree owns them, these pointers observe
     CopyOverlay *copyOverlay = nullptr;
     SaveConfirmOverlay *saveOverlay = nullptr;
+
+    // the pending-surface registry: blocking by birth (every setup registers),
+    // passive surfaces opt out by simply not joining. The lock's condition is
+    // this registry, never a checklist at the gate.
+    QList<IPendingSurface *> pendingSurfaces;
     RenameOverlay *renameOverlay = nullptr;
     ControlsOverlay *controlsOverlay = nullptr;
 };

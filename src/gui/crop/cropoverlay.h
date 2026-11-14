@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui/customwidgets/floatingwidget.h"
+#include "gui/ipendingsurface.h"
 #include <QDebug>
 #include <QPainter>
 #include <QPaintEvent>
@@ -23,9 +24,13 @@ enum CursorAction {
 
 class ViewerWidget;
 
-class CropOverlay : public FloatingWidget {
+class CropOverlay : public FloatingWidget, public IPendingSurface {
     Q_OBJECT
   public:
+    // IPendingSurface: the crop surface holds unfinished work while visible
+    bool isPending() const override {
+        return isVisible();
+    }
     // the overlay pulls its geometry live from the viewer (image rect,
     // scale, source size) — it stores nothing that the viewer owns, so a
     // zoom or image change mid-crop can never leave it stale
