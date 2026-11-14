@@ -19,7 +19,8 @@ class CropOverlay;
 class CropController : public QObject, public ICropSurface {
     Q_OBJECT
   public:
-    explicit CropController(MW *window, ViewerWidget *viewer, SidePanel *sidePanel, DocumentWidget *docWidget);
+    explicit CropController(MW *window, const State *state, ViewerWidget *viewer, SidePanel *sidePanel,
+                            DocumentWidget *docWidget);
 
     bool isActive() const override;
     void toggle() override;
@@ -47,6 +48,9 @@ class CropController : public QObject, public ICropSurface {
 
   private:
     MW *window;
+    // the one truth for the view-mode gate: the window's centralWidget keeps
+    // only a projection of it
+    const State *state;
     ViewerWidget *viewer;
     SidePanel *sidePanel;
     DocumentWidget *docWidget;

@@ -34,7 +34,7 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
         actionManager->setInspectMode(mode == FIT_ORIGINAL || mode == FIT_FREE);
     });
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
-    cropController = new CropController(this, viewerWidget, sidePanel, docWidget);
+    cropController = new CropController(this, state, viewerWidget, sidePanel, docWidget);
     dialogHost = new DialogHost(this, docWidget);
     connect(viewerWidget, &ViewerWidget::showScriptSettings, dialogHost, &DialogHost::showScriptSettings);
 
