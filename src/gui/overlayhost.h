@@ -49,7 +49,6 @@ class OverlayHost : public IOverlayHost {
     // the pending-work lock's condition: any registered surface holding
     // unfinished work
     bool hasPendingSurface() const override;
-    void addPendingSurface(IPendingSurface *surface);
     // the projection re-derives the rename target on every state write
     void setRenameOverlayName(const QString &name);
     void saveCopySettings();

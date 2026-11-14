@@ -29,8 +29,10 @@ void OverlayHost::setupCopyOverlay() {
 }
 
 void OverlayHost::setupSaveOverlay() {
+    // not a pending surface: this prompt IS the projection of an uncommitted
+    // edit (Core shows it from isEdited()), and that state is already the
+    // lock's condition. Registering it would answer the same question twice.
     saveOverlay = new SaveConfirmOverlay(viewer);
-    pendingSurfaces.append(saveOverlay);
     connect(saveOverlay, &SaveConfirmOverlay::saveClicked, this, &OverlayHost::saveRequested);
     connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &OverlayHost::saveAsClicked);
     connect(saveOverlay, &SaveConfirmOverlay::discardClicked, this, &OverlayHost::discardEditsRequested);
@@ -153,10 +155,6 @@ bool OverlayHost::hasPendingSurface() const {
         if(surface->isPending())
             return true;
     return false;
-}
-
-void OverlayHost::addPendingSurface(IPendingSurface *surface) {
-    pendingSurfaces.append(surface);
 }
 
 void OverlayHost::hideTransientOverlays() {
