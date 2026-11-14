@@ -42,6 +42,12 @@ void SaveConfirmOverlay::keyPressEvent(QKeyEvent *event) {
     }
     if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
         return;
+    // the buttons' chords (Ctrl+S / Ctrl+Shift+S) and the display keys are
+    // meant to keep working through this surface; the walk is not — a new
+    // image would leave "save or discard?" pointing at a file the user is no
+    // longer deciding about
+    if(actionManager->eventIsSubjectChanging(event))
+        return;
     actionManager->processEvent(event);
 }
 

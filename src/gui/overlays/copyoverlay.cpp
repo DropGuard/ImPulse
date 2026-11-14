@@ -169,8 +169,24 @@ void CopyOverlay::keyPressEvent(QKeyEvent *event) {
     if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
         return;
     QString key = actionManager->keyForNativeScancode(event->nativeScanCode());
-    if(shortcuts.contains(key))
+    if(shortcuts.contains(key)) {
         requestFileOperation(pathWidgets.at(shortcuts[key])->directory());
-    else
-        actionManager->processEvent(event);
+        return;
+    }
+    // the menu names a target for a specific file: walking to another image
+    // while it is open would leave the user unable to say which file they are
+    // copying. Those keys are consumed, not yielded; zoom/fullscreen still are.
+    if(actionManager->eventIsSubjectChanging(event))
+        return;
+    actionManager->processEvent(event);
+}
+
+// Clicking outside the menu is the same answer as Esc: dismiss without
+// copying. widgetAt tells us whether the click actually landed on this
+// widget — a click on a path item is inside it (the item handles it), a
+// click on the image behind is not.
+void CopyOverlay::mousePressEvent(QMouseEvent *event) {
+    event->accept();
+    if(qApp->widgetAt(mapToGlobal(event->pos())) == this)
+        hide();
 }

@@ -207,6 +207,10 @@ void CropPanel::keyPressEvent(QKeyEvent *event) {
     }
     if(event->matches(QKeySequence::SelectAll)) {
         emit selectAll();
+    } else if(actionManager->eventIsSubjectChanging(event)) {
+        // same rule as the overlay: the walk would move the image out from
+        // under the frame being edited. Zoom fine-tuning still yields.
+        return;
     } else {
         // the overlay's idiom: keys the surface does not own stay live in
         // the action system (zoom fine-tuning is the point of Framing)
