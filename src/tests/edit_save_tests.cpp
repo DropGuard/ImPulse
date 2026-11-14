@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <utility>
 #include <QSignalSpy>
-#include <QApplication>
+#include <QCoreApplication>
 
 #include "core_test_helpers.h"
 #include "testhelpers.h"
@@ -15,6 +15,52 @@
 #include "utils/inputmap.h"
 #include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
+
+// A presenter view without a widget. DirectoryPresenter::setView is a template
+// duck-type seam (IDirectoryView is not a QObject, so the five signal connects
+// need a concrete type); this is the concrete type a headless suite hands it —
+// the same shape FolderViewProxy gives production, minus the widget. The
+// selection is staged by the test, exactly what the grid holds in production.
+class FakePresenterView : public QObject, public IDirectoryView {
+    Q_OBJECT
+  public:
+    QList<int> stagedSelection;
+    void populate(int) override {
+    }
+    void setThumbnail(int, std::shared_ptr<Thumbnail>) override {
+    }
+    void select(QList<int> sel) override {
+        stagedSelection = sel;
+    }
+    void select(int index) override {
+        stagedSelection = QList<int>{index};
+    }
+    void focusOn(int) override {
+    }
+    void focusOnSelection() override {
+    }
+    QList<int> selection() override {
+        return stagedSelection;
+    }
+    void setDirectoryPath(QString) override {
+    }
+    void insertItem(int) override {
+    }
+    void removeItem(int) override {
+    }
+    void reloadItem(int) override {
+    }
+    void renameItem(int, int, const QString &) override {
+    }
+    void setDragHover(int) override {
+    }
+  signals:
+    void itemActivated(int) override;
+    void thumbnailsRequested(QList<int>, int, bool, bool) override;
+    void draggedOut() override;
+    void draggedOver(int) override;
+    void droppedInto(const QMimeData *, QObject *, int) override;
+};
 
 class TestEditSave : public QObject {
     Q_OBJECT
@@ -56,9 +102,15 @@ class TestEditSave : public QObject {
         const QString img = dir + QStringLiteral("/half.png");
         coretest::writeRectImage(img);
 
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(img), 10000);
@@ -84,7 +136,7 @@ class TestEditSave : public QObject {
         // the folder view is where an edit hits the disk, so the question has
         // to come first — and a declined question must mean nothing was written
         core.enableFolderView();
-        QCOMPARE(core.mainWindow()->currentViewMode(), MODE_FOLDERVIEW);
+        QCOMPARE(core.viewState().viewMode.value(), MODE_FOLDERVIEW);
         fake.confirmAnswer = false;
         core.flipH();
         QCOMPARE(fake.confirmCalls, 1);
@@ -97,9 +149,17 @@ class TestEditSave : public QObject {
         coretest::writeRectImage(img);
         const QByteArray diskBefore = coretest::contentOf(img);
 
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        FakePresenterView presenterView;
+        core.folderPresenter().setView(&presenterView);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -117,9 +177,15 @@ class TestEditSave : public QObject {
     }
 
     void editingInDocumentModeEditsInMemoryWithoutConfirmation() {
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -135,14 +201,23 @@ class TestEditSave : public QObject {
     }
 
     void editingInFolderViewSavesAfterScriptedConfirmation() {
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
+        FakePresenterView presenterView;
+        core.folderPresenter().setView(&presenterView);
         QVERIFY(core.loadPath(img));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         core.toggleFolderView();
+        core.folderPresenter().selectAndFocus(img); // the edit targets the selection, stated not ambient
 
         core.rotateLeft();
 
@@ -151,10 +226,16 @@ class TestEditSave : public QObject {
     }
 
     void editingDeclinedInFolderViewLeavesTheDiskAlone() {
-        Core core;
         coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         fake.confirmAnswer = false;
-        core.setUserInteractions(&fake);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -168,9 +249,15 @@ class TestEditSave : public QObject {
     }
 
     void resizeEditsTheLoadedImage() {
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -183,9 +270,15 @@ class TestEditSave : public QObject {
     }
 
     void discardEditsRestoresTheOnDiskImage() {
-        Core core;
         coretest::FakeInteractions fake;
-        core.setUserInteractions(&fake);
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -206,7 +299,15 @@ class TestEditSave : public QObject {
     // serves — it exists exactly as long as that mime data does, and the
     // autoremove takes it away with it.
     void theEditedImageExportGetsAUniqueTempFileOwnedByItsMime() {
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         const QString img = QDir(alpha).filePath("rect.png");
         coretest::writeRectImage(img);
         QVERIFY(core.loadPath(img));
@@ -233,8 +334,9 @@ class TestEditSave : public QObject {
 };
 
 int main(int argc, char **argv) {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    QApplication app(argc, argv);
+    // QCoreApplication: the tested paths touch no widget — the save contract is
+    // pinned through FakeInteractions, the mode through Core's own state
+    QCoreApplication app(argc, argv);
     // One process per test function — the same rationale as engine_stack_main's
     // fork per class, taken one level down: the suites decode images, which
     // makes QtGui spawn and clockjoin-join its own internal pooled threads, and
