@@ -253,6 +253,7 @@ class RecordingView : public ICoreView {
     int closeImageCalls = 0;
     int loopPlaybackRequests = 0;
     QList<bool> loopPlaybackValues;
+    int scalingResults = 0;
 
     void showImage(std::shared_ptr<const QImage> image) override {
         showImageCalls++;
@@ -290,6 +291,7 @@ class RecordingView : public ICoreView {
     }
     void onScalingFinished(std::unique_ptr<const QImage> scaled) override {
         Q_UNUSED(scaled)
+        scalingResults++;
     }
 };
 

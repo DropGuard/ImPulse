@@ -797,6 +797,42 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
     }
 
+    // The staleness guard on scaling results, pinned at the seam Core owns:
+    // a result for the file on screen is delivered, a result for any other
+    // path is dropped. Zoom supersession is the viewer's own guard
+    // (setScaledPixmap compares sizes), and the scaler serializes its flights
+    // — the layer ownership is documented at Core::onScalingFinished. Driven
+    // at the scaler's signal, the very one Core attaches to.
+    void scalingResultsAreDeliveredForTheCurrentPathOnly() {
+        const QString dir = uniqueDir("scaling");
+        const QString img = QDir(dir).filePath("target.png");
+        writeImage(img);
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        QVERIFY(core.loadPath(img));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), img, 10000);
+
+        auto image = core.directoryModel()->getImage(img);
+        QVERIFY(image);
+        const ScalerRequest req(image, QSize(16, 16), img, settings->scalingFilter(), settings->smoothUpscaling());
+        auto result = std::make_shared<const QImage>(16, 16, QImage::Format_RGB32);
+
+        QCOMPARE(view.scalingResults, 0);
+        emit core.directoryModel()->scaler->scalingFinished(result, req);
+        QCOMPARE(view.scalingResults, 1); // delivered: the path on screen
+
+        const ScalerRequest stale(req.image, req.size, dir + "/elsewhere.png", req.filter, req.smoothUpscaling);
+        emit core.directoryModel()->scaler->scalingFinished(result, stale);
+        QCOMPARE(view.scalingResults, 1); // dropped: a path nobody is looking at
+    }
+
     // ---- DirectoryPresenter lifecycle: the view is an injected observer, the
     // model connections are per-model, and disconnectView (until now a todo)
     // is what allows a presenter to outlive one view and bind another.
