@@ -48,6 +48,10 @@
 #include "gui/folderview/fvoptionspopup.h"
 #include "gui/overlays/clickzoneoverlay.h"
 #include "gui/crop/cropoverlay.h"
+#include "gui/crop/cropcontroller.h"
+#include "gui/overlays/copyoverlay.h"
+#include "gui/overlayhost.h"
+#include "gui/overlays/renameoverlay.h"
 #include "gui/overlays/floatingmessageproxy.h"
 #include "gui/overlays/imageinfooverlayproxy.h"
 #include "gui/overlays/saveconfirmoverlay.h"
@@ -219,6 +223,82 @@ class TestGuiWidgets : public QObject {
         }
         QVERIFY2(surplus.isEmpty(),
                  qPrintable(QStringLiteral("widgets outliving their parent: ") + surplus.join(", ")));
+    }
+
+    // The pending-surface registry's membership, checked against the REAL
+    // OverlayHost rather than a fake: only the two surfaces that hold typed-
+    // but-unsubmitted input belong in it. The save prompt is the projection
+    // of an uncommitted edit (Image::isEdited is the lock's condition already)
+    // and a crop selection that has not been applied changes nothing — both
+    // were answering a question someone else already answers.
+    //
+    // This is the pin the old registry lacked entirely: every prior test drove
+    // a fake's flag, so a surface that never registered looked identical to
+    // one that did.
+    void pendingRegistryHoldsOnlyTypedButUnsubmittedInput() {
+        const QString dir = uniqueDir("pendingmembers");
+        const QString img = QDir(dir).filePath("a.png");
+        QVERIFY(makeImageFile(img, QSize(8, 8)));
+        Core core;
+        QVERIFY(core.loadPath(img));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        auto *overlays = core.mainWindow()->overlays();
+        QVERIFY(overlays);
+
+        // nothing is open yet
+        QVERIFY(!overlays->hasPendingSurface());
+
+        // the save prompt: visible, but NOT a pending surface — it reports an
+        // edit the state leg already covers
+        settings->setShowSaveOverlay(true);
+        overlays->showSaveOverlay();
+        auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
+        QVERIFY(saveOverlay && saveOverlay->isVisible());
+        QVERIFY2(!overlays->hasPendingSurface(), "the save prompt registered as pending: it would answer the "
+                                                 "isEdited() question twice, and a stale entry would outlive the edit");
+        // the contract is structural, not just observed: these two surfaces
+        // must not even BE IPendingSurface — a registry entry can be removed,
+        // but an interface cast is what would let a future setup re-register
+        // them without touching this test
+        QVERIFY2(dynamic_cast<IPendingSurface *>(saveOverlay) == nullptr,
+                 "SaveConfirmOverlay still implements IPendingSurface");
+        overlays->hideSaveOverlay();
+
+        // the copy menu: typed-but-unsubmitted target — pending while open
+        overlays->triggerCopyOverlay();
+        auto *copyOverlay = core.mainWindow()->findChild<CopyOverlay *>();
+        QVERIFY(copyOverlay && copyOverlay->isVisible());
+        QVERIFY2(overlays->hasPendingSurface(), "the copy menu did not register: navigation would walk "
+                                                "away from a target the user has not chosen");
+        QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+        QApplication::sendEvent(copyOverlay, &esc);
+        QTRY_VERIFY(!copyOverlay->isVisible());
+        QVERIFY(!overlays->hasPendingSurface());
+
+        // the rename field: same class, same answer
+        overlays->toggleRenameOverlay(QStringLiteral("a.png"));
+        auto *renameOverlay = core.mainWindow()->findChild<RenameOverlay *>();
+        QVERIFY(renameOverlay && renameOverlay->isVisible());
+        QVERIFY2(overlays->hasPendingSurface(), "the rename field did not register: a half-typed name "
+                                                "would be dropped by a walk");
+        QApplication::sendEvent(renameOverlay, &esc);
+        QTRY_VERIFY(!renameOverlay->isVisible());
+        QVERIFY(!overlays->hasPendingSurface());
+
+        // the crop surface: pending only once the crop is APPLIED, and then
+        // through isEdited(), not through the registry
+        core.toggleCropPanel();
+        QVERIFY(core.mainWindow()->crop()->isActive());
+        QVERIFY2(!overlays->hasPendingSurface(), "the crop surface registered as pending: an unapplied "
+                                                 "selection loses nothing when the walk moves on");
+        auto *cropOverlay = core.mainWindow()->findChild<CropOverlay *>();
+        QVERIFY(cropOverlay);
+        cropOverlay->selectAll();
+        QVERIFY2(dynamic_cast<IPendingSurface *>(cropOverlay) == nullptr,
+                 "CropOverlay still implements IPendingSurface");
+        QVERIFY2(!overlays->hasPendingSurface(),
+                 "a selection alone changed the registry: nothing is applied yet, so nothing can be lost");
     }
 
     void dialogCheckboxBindingsAreSymmetric() {

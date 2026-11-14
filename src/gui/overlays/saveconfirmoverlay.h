@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gui/customwidgets/overlaywidget.h"
-#include "gui/ipendingsurface.h"
 #include "settings.h"
 #include <QPushButton>
 #include <QKeyEvent>
@@ -10,13 +9,9 @@ namespace Ui {
 class SaveConfirmOverlay;
 }
 
-class SaveConfirmOverlay : public OverlayWidget, public IPendingSurface {
+class SaveConfirmOverlay : public OverlayWidget {
     Q_OBJECT
   public:
-    // IPendingSurface: this surface holds unfinished work while visible
-    bool isPending() const override {
-        return isVisible();
-    }
     explicit SaveConfirmOverlay(FloatingWidgetContainer *parent = nullptr);
     ~SaveConfirmOverlay() override;
 
