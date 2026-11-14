@@ -22,30 +22,25 @@ enum ActionType {
     ACTION_SCRIPT
 };
 
-// Which surface a key event arrives at. A scope is a binding table layered
-// over the global one: the same physical key may mean different things per
-// surface (Right pages in the document view, moves the grid selection in the
-// folder view), and one flat table cannot hold both.
+// The keyboard law, least surprise by focus, in Qt's own vocabulary: a
+// projected key fires through QShortcutMap before any widget sees it; the
+// focused surface claims back (ShortcutOverride veto) the keys it must
+// arbitrate — its own workflow keys, and every subject-changing action,
+// because a walk that swaps the file under a floating surface destroys what
+// that surface is acting on. The manual funnel remains for the events
+// QShortcutMap cannot match: pointer tokens (wheel, mouse buttons,
+// double-click) and the table entries no QKeySequence can represent. Inside
+// that law every floating surface answers Esc the same way (close this
+// layer — the flavors differ, the outcome does not), and a disk write never
+// sits on a bare key: in-memory answers only, the save chords (Ctrl+S,
+// Ctrl+Shift+S) and clicks do the writing.
 //
-// The whole keyboard answers to one law, least surprise by focus, in Qt's
-// own vocabulary now: a projected key fires through QShortcutMap before any
-// widget sees it; the focused surface claims back (ShortcutOverride veto)
-// the keys it must arbitrate — its own workflow keys, and every
-// subject-changing action, because a walk that swaps the file under a
-// floating surface destroys what that surface is acting on. The manual
-// funnel remains for the events QShortcutMap cannot match: pointer tokens
-// (wheel, mouse buttons, double-click) and the table entries no QKeySequence
-// can represent. Inside that law every floating surface answers Esc the
-// same way (close this layer — the flavors differ, the outcome does not),
-// and a disk write never sits on a bare key: in-memory answers only, the
-// save chords (Ctrl+S, Ctrl+Shift+S) and clicks do the writing.
-enum class ShortcutScope {
-    None,      // no surface declared: the state-armed scopes and the global
-               // table decide
-    FolderGrid // the folder view's thumbnail grid holds focus; its bindings
-               // win for this event — the surface being typed at is the
-               // freshest intent, fresher than a mode armed earlier
-};
+// The binding tables still hold two scopes — the grid's and the armed
+// inspect layer's — because the same physical key means different things per
+// surface. What they no longer have is a caller-declared rank: the keyboard
+// does not travel through a resolve call that a caller annotates. A focused
+// surface ranks by claiming its keys back before dispatch, which is why the
+// projection de-claims them from the global table instead of layering.
 
 // A floating surface that does not own a key yields it to the action system —
 // that is the overlay idiom, and it is what keeps zoom, fullscreen and the
@@ -66,12 +61,18 @@ class ActionManager : public QObject {
   public:
     static ActionManager *getInstance();
     ~ActionManager() override;
-    bool processEvent(QInputEvent *, ShortcutScope scope = ShortcutScope::None);
+    bool processEvent(QInputEvent *);
     // the keymap's resolution primitive: shortcut string -> action dispatch,
-    // walking caller scope -> armed scopes -> global. Public so the input
+    // walking the armed inspect layer -> global. Public so the pointer
     // funnel's decision itself is testable (ShortcutBuilder's physical event
     // mapping is covered separately in machinery_tests).
-    bool invokeActionForShortcut(const QString &shortcut, ShortcutScope scope = ShortcutScope::None);
+    //
+    // There is no caller-scope parameter any more: the keyboard no longer
+    // comes through this path at all. A focused surface's keys are projected
+    // onto QShortcuts and claimed back with ShortcutOverride; what reaches
+    // here is a pointer token (wheel, buttons, double-click), which has no
+    // surface to rank.
+    bool invokeActionForShortcut(const QString &shortcut);
     // arms/disarms the inspect scope: while armed, the inspect layer's
     // bindings override the base ones — in fit original / free zoom the
     // arrow keys pan the canvas and never change images (mode = intent)
@@ -201,7 +202,7 @@ class ActionManager : public QObject {
     void readShortcuts();
     void readGridShortcuts();
     void readInspectShortcuts();
-    bool resolveShortcut(const QString &shortcut, ShortcutScope scope);
+    bool resolveShortcut(const QString &shortcut);
     ActionType validateAction(const QString &actionName);
 
   signals:

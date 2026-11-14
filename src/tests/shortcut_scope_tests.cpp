@@ -42,20 +42,21 @@ class TestShortcutScope : public QObject {
         writeImage(QDir(alpha).filePath("a.png"));
     }
 
-    // The scope chain's order is the contract: the surface the caller declares
-    // wins (a grid holding focus outranks an inspect mode armed before the
-    // folder view was opened — the stale-arm case), then the armed inspect
-    // layer, then the global table. Each layer is heard through its own
-    // signal, so the assertion is on what FIRED, not on what returned. The
-    // arming runs through the real MW observer and the viewer's fit state, and
-    // one test renders the settings dialog — window subjects, hence this suite
-    // stays on QApplication-under-offscreen rather than going headless. The
-    // grid binding is injected through the public API and swept away after —
-    // the singleton is process-wide and every later test inherits whatever
-    // this leaves.
-    void shortcutScopeChainResolvesCallerFirst() {
-        actionManager->addGridShortcut(QStringLiteral("Left"), QStringLiteral("nextImage"));
-
+    // The resolution order of the pointer funnel: the armed inspect layer, then
+    // the global table. What is deliberately NOT here any more is a
+    // caller-declared surface rank — the keyboard left this path entirely, and
+    // a focused surface ranks by claiming its keys back (QShortcuts plus
+    // ShortcutOverride) before dispatch ever reaches this code. That is pinned
+    // where it lives: gridFocusDecLaimsTheGridsKeysFromTheGlobalTable and
+    // windowDeliveryFiresTheProjectedAction.
+    //
+    // So this test now pins what the funnel still owns: the inspect layer
+    // overrides the global table for its keys, and disarm gives them back.
+    // Each layer is heard through its own signal, so the assertion is on what
+    // FIRED, not on what returned. The arming runs through the real MW
+    // observer and the viewer's fit state, hence this suite stays on
+    // QApplication-under-offscreen rather than going headless.
+    void pointerFunnelResolvesInspectThenGlobal() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -65,15 +66,10 @@ class TestShortcutScope : public QObject {
         QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
         QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
 
-        // caller-declared grid scope wins over the armed inspect layer
-        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left"), ShortcutScope::FolderGrid));
-        QCOMPARE(next.count(), 1);
-        QCOMPARE(scroll.count(), 0);
-
-        // the same key, no surface declared: the armed inspect layer answers
+        // armed: the inspect layer answers Left, the global table stands down
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QCOMPARE(scroll.count(), 1);
-        QCOMPARE(next.count(), 1);
+        QCOMPARE(next.count(), 0);
 
         // disarmed, the same key falls through to the global table
         core.mainWindow()->fitWindow();
@@ -82,8 +78,6 @@ class TestShortcutScope : public QObject {
         QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("Left")));
         QCOMPARE(prev.count(), 1);
         QCOMPARE(scroll.count(), 1);
-
-        actionManager->removeAllGridShortcuts();
     }
 
     // the crop action wiring is live from initActions, but the crop panel is

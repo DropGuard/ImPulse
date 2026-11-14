@@ -537,21 +537,24 @@ bool ActionManager::invokeAction(const QString &actionName) {
     return false;
 }
 //------------------------------------------------------------------------------
-bool ActionManager::invokeActionForShortcut(const QString &shortcut, ShortcutScope scope) {
+bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
     if(shortcut.isEmpty())
         return false;
-    return resolveShortcut(shortcut, scope);
+    return resolveShortcut(shortcut);
 }
 
-// one resolution order for every event: the surface the caller declares wins
-// (the surface being typed at is the freshest intent — a grid holding focus
-// outranks an inspect mode armed before the folder view was opened), then the
-// state-armed scopes (inspect: fit original / free zoom means "I am
-// inspecting this image", and the software does not get to decide the
-// inspection is over), then the global table.
-bool ActionManager::resolveShortcut(const QString &shortcut, ShortcutScope scope) {
-    if(scope == ShortcutScope::FolderGrid && gridShortcuts.contains(shortcut))
-        return invokeAction(gridShortcuts[shortcut]);
+// The resolution order for the events this path still owns — pointer tokens
+// only, since the keyboard is QShortcutMap's now: the armed inspect layer
+// (fit original / free zoom means "I am inspecting this image", and the
+// software does not get to decide the inspection is over), then the global
+// table.
+//
+// There is deliberately no caller-scope rank here any more. The grid's rank
+// was "the surface being typed at is the freshest intent", and a focused
+// surface now says that through its own QShortcuts plus a ShortcutOverride
+// claim — before this code is reached at all. Pointer events carry no focus
+// question: a wheel over the grid zooms the image, it does not page the grid.
+bool ActionManager::resolveShortcut(const QString &shortcut) {
     if(inspectMode && inspectShortcuts.contains(shortcut))
         return invokeAction(inspectShortcuts[shortcut]);
     if(shortcuts.contains(shortcut))
@@ -692,7 +695,7 @@ void ActionManager::saveInspectShortcuts() {
     settings->saveShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
 }
 //------------------------------------------------------------------------------
-bool ActionManager::processEvent(QInputEvent *event, ShortcutScope scope) {
-    return invokeActionForShortcut(ShortcutBuilder::fromEvent(event), scope);
+bool ActionManager::processEvent(QInputEvent *event) {
+    return invokeActionForShortcut(ShortcutBuilder::fromEvent(event));
 }
 //------------------------------------------------------------------------------
