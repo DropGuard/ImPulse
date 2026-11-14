@@ -4,6 +4,14 @@
 // Deliberately small, and the rule is strict: a helper used by exactly one
 // suite stays in that suite's file. A shared header that collects everything
 // becomes the dumping ground the core_nav split was meant to end.
+//
+// The suites are self-contained moc TUs ("#include x.moc at the tail — the
+// QTest idiom) for classes defined in their own .cpp. Classes living HERE are
+// moc'd because this header is listed in each suite target's sources — an
+// outlet that had to be wired deliberately (it was not, for years, which is
+// why a header Q_OBJECT once failed to link and was misread as an AUTOMOC
+// law). The one-suite rule above is a review convention, not a build
+// enforcement: the build would happily moc a hundred classes collected here.
 #pragma once
 
 #include <QtTest/QTest>
@@ -294,6 +302,25 @@ class RecordingView : public ICoreView {
         Q_UNUSED(scaled)
         scalingResults++;
     }
+};
+
+// A scripted crop surface: the ICropSurface implementation without the
+// widget tree. The intent legs are real signals.
+class FakeCropSurface : public QObject, public ICropSurface {
+    Q_OBJECT
+  public:
+    int toggleCalls = 0;
+    bool active = false;
+    void toggle() override {
+        ++toggleCalls;
+        active = !active;
+    }
+    bool isActive() const override {
+        return active;
+    }
+  signals:
+    void cropRequested(QRect rect) override;
+    void cropAndSaveRequested(QRect rect) override;
 };
 
 // A file's bytes, with a test failure (not a silent empty array) when it cannot

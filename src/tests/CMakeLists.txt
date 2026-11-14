@@ -62,7 +62,7 @@ set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 # Core-level navigation: links the widget tree too, so a real Core can be built
 # and driven under the offscreen platform. OBJECT libraries do not re-export each
 # other's objects, so both are listed — the same pair the executable links.
-add_executable(core_nav_tests core_nav_tests.cpp)
+add_executable(core_nav_tests core_nav_tests.cpp core_test_helpers.h)
 target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
 set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
@@ -103,7 +103,7 @@ endforeach()
 # the clipboard/drag-drop legs. One subject per suite, so a crop change runs
 # crop tests and not the world.
 foreach(suite crop_tests grid_tests shortcut_scope_tests overlay_keys_tests presenter_tests edit_save_tests slideshow_tests clipboard_tests)
-    add_executable(${suite} ${suite}.cpp)
+    add_executable(${suite} ${suite}.cpp core_test_helpers.h)
     target_link_libraries(${suite} PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
     add_test(NAME ${suite} COMMAND ${suite})
     set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}")
@@ -112,7 +112,7 @@ endforeach()
 # Core's file operations: copy, move, rename, delete and trash driven through
 # scripted dialogs. Same object libraries as CORE_NAV, but no engine listing is
 # read, so it runs as its own binary with its own fixture domain.
-add_executable(core_fileops_tests core_fileops_tests.cpp)
+add_executable(core_fileops_tests core_fileops_tests.cpp core_test_helpers.h)
 target_link_libraries(core_fileops_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_FILEOPS COMMAND core_fileops_tests)
 set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
@@ -121,7 +121,7 @@ set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 # settings dialog. Same object libraries, but nothing here builds a Core — this
 # suite exists so the checks that only need a widget do not pay for an engine,
 # a watcher and an async listing, and so a failure names the surface.
-add_executable(gui_widget_tests gui_widget_tests.cpp)
+add_executable(gui_widget_tests gui_widget_tests.cpp core_test_helpers.h)
 target_link_libraries(gui_widget_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME GUI_WIDGETS COMMAND gui_widget_tests)
 set_tests_properties(GUI_WIDGETS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
