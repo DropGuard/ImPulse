@@ -5,6 +5,10 @@
 //
 // It builds a real MainWindow under the offscreen platform and initializes the
 // same globals main.cpp does, because a half-wired app would prove nothing.
+// That is this suite's identity, not a migration debt: the end-to-end chain
+// (action -> window -> Core -> engine), the window-title projection, the crop
+// panel, the grid selection and the tree teardown are window subjects — they
+// stay here when other Core suites go headless.
 // Navigation is triggered by emitting ActionManager::nextImage() — the very
 // signal a bound key produces.
 
