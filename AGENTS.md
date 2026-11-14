@@ -141,6 +141,21 @@ baselines). What remains here is the part needing judgment.
    SettingsDialog .ui reference and declared a live class dead (caught before
    the deletion landed), and the same trap bit the census constructions. The
    class was renamed SettingsSidebar to bury the trap itself.
+11. **A suspicious failure gets the determinism test first.** Known flake
+    families (cargo lock, -j4 watcher latency) prime pattern-matching — the
+    nav_-null incident presented as 512-871 s suite hangs and was misread as
+    one for the better part of an hour. One standalone single-slot run with a
+    timeout settles it in a minute: reproducible means not a flake.
+12. **When a check goes red, read the full failure output before any
+    filter.** The grep pipe that shows only `Failed|tests passed` discarded
+    the slot-level evidence the harness had already written; the incident was
+    diagnosable from the first full log and unreadable from the filtered one.
+13. **Anchor edits to a constructor need a branch recon first.** The census
+    in Core's ctor (qFatal, Release-surviving) now mechanically checks every
+    seam in both branches — but it exists because an anchor anchored in the
+    headless branch alone shipped a null seam to every windowed suite, and
+    the crash site was the silent triple: Release NDEBUG, fork-lost output,
+    constructor-before-QTest.
 10. **A signal census that reads only .cpp/.h is not a census.** Designer
     `<connections>` blocks compile into `ui_*.h` under `*_autogen`, never into
     hand-written code, so a sweep for `&Class::signal` cannot see them: of the

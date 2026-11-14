@@ -30,7 +30,7 @@ target_include_directories(engine_contract_tests PRIVATE ${CMAKE_SOURCE_DIR}/eng
 set(TSAN_ENV "TSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/tsan-noise.supp:report_thread_leaks=0")
 
 add_test(NAME ENGINE_CONTRACT COMMAND engine_contract_tests)
-set_tests_properties(ENGINE_CONTRACT PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+set_tests_properties(ENGINE_CONTRACT PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # Engine stack integration: EngineBridge pump + DirectoryManager async wiring.
 # Links qimgv_nongui — the same objects the executable is built from — so a test
@@ -57,7 +57,7 @@ add_executable(engine_stack_tests
 # to "is Exiv2 available" for every target, instead of each restating it.
 target_link_libraries(engine_stack_tests PRIVATE Qt6::Test qimgv_nongui)
 add_test(NAME ENGINE_STACK COMMAND engine_stack_tests)
-set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # Core-level navigation: links the widget tree too, so a real Core can be built
 # and driven under the offscreen platform. OBJECT libraries do not re-export each
@@ -65,7 +65,7 @@ set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 add_executable(core_nav_tests core_nav_tests.cpp core_test_helpers.h)
 target_link_libraries(core_nav_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_NAV COMMAND core_nav_tests)
-set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+set_tests_properties(CORE_NAV PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # ---- the LLVM idiom: the tests are build targets, and the check targets fuse
 # the build in front of the run. A green suite on a stale binary is not
@@ -106,7 +106,7 @@ foreach(suite crop_tests grid_tests shortcut_scope_tests overlay_keys_tests pres
     add_executable(${suite} ${suite}.cpp core_test_helpers.h)
     target_link_libraries(${suite} PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
     add_test(NAME ${suite} COMMAND ${suite})
-    set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+    set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 endforeach()
 
 # Core's file operations: copy, move, rename, delete and trash driven through
@@ -115,7 +115,7 @@ endforeach()
 add_executable(core_fileops_tests core_fileops_tests.cpp core_test_helpers.h)
 target_link_libraries(core_fileops_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME CORE_FILEOPS COMMAND core_fileops_tests)
-set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # The widget surfaces: overlays, panels, the grid's keyboard and drag, the
 # settings dialog. Same object libraries, but nothing here builds a Core — this
@@ -124,17 +124,17 @@ set_tests_properties(CORE_FILEOPS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
 add_executable(gui_widget_tests gui_widget_tests.cpp core_test_helpers.h)
 target_link_libraries(gui_widget_tests PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
 add_test(NAME GUI_WIDGETS COMMAND gui_widget_tests)
-set_tests_properties(GUI_WIDGETS PROPERTIES ENVIRONMENT "${TSAN_ENV}")
+set_tests_properties(GUI_WIDGETS PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # executable architecture rules (ArchUnit-style): gui isolation, FFI caller
 # allowlist, rust internal seal
 add_test(NAME ARCH_RULES
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/architecture_rules.py)
-set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=")
+set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300)
 
 # lint cache contract: cold==warm, header fan-out, include shadowing. Skips
 # (77) where the lint tools are not installed — the gate itself needs them,
 # but a bare configure-and-test should not fail on their absence.
 add_test(NAME LINT_CACHE
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/lint_cache_test.py)
-set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77)
+set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)

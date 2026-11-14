@@ -72,10 +72,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         QString img = QDir(base).filePath("qc.png");
         writeImage(img);
         QVERIFY(core.loadPath(img));
@@ -103,10 +101,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake); // must be installed: see below
-        core.setUserInteractions(&fake);
+        Core core(deps); // must be installed: see below
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -143,11 +139,9 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
+        Core core(deps);
         fake.confirmAnswer = false; // the overwrite question is answered NO
-        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(file));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -172,10 +166,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString src = makeTxt(base, "f1.txt", "one");
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
@@ -195,10 +187,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString src = makeTxt(base, "f1.txt", "new");
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
@@ -220,10 +210,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -248,10 +236,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -276,10 +262,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -305,10 +289,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString destDir = QDir(base).filePath("dst");
         QVERIFY(QDir().mkpath(destDir));
         QList<QString> sources;
@@ -333,10 +315,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -359,10 +339,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -386,10 +364,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         const QString srcDir = QDir(base).filePath("sdir");
         QVERIFY(QDir().mkpath(srcDir));
         makeTxt(srcDir, "inner.txt", "inner");
@@ -468,10 +444,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         core.interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
 
         // dotted directory names survive the move whole
@@ -501,10 +475,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         const int before = core.directoryModel()->fileCount();
@@ -524,11 +496,9 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
+        Core core(deps);
         fake.confirmAnswer = false;
-        core.setUserInteractions(&fake);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         const int before = core.directoryModel()->fileCount();
@@ -619,10 +589,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
-        core.setUserInteractions(&fake);
+        Core core(deps);
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         // the collision the rename will hit: renamed.png already exists
@@ -668,9 +636,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
+        Core core(deps);
         QVERIFY(core.loadPath(from));
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->containsFile(from), 10000);
         QCOMPARE(core.directoryModel()->fileCount(), 2);
@@ -718,9 +685,8 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         deps.headless = true;
         deps.overlays = &overlayFake;
         deps.view = &view;
-        Core core(deps);
         deps.ui = &fake;
-        core.setUserInteractions(&fake);
+        Core core(deps);
         QVERIFY(core.loadPath(from));
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->containsFile(from), 10000);
         QCOMPARE(core.currentFilePath(), from);
