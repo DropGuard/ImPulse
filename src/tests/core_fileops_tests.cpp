@@ -770,10 +770,11 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
                                                                    // (and the flip below must not race it)
         QCOMPARE(overlayFake.messageCalls, messageBaseline);       // silent: nothing held
 
-        // (b) edited, driven at the model signal (the same one Core attaches
-        // to): flip first, rewrite the disk, then deliver the event directly.
-        // This pins the Core contract — announce the divergence, keep the
-        // edit, land no repaint — without betting on watcher latency.
+        // (b) edited, driven at the model slot itself (invoked by name): flip
+        // first, rewrite the disk, then hand the mirror event straight to the
+        // edge detector. This pins the whole contract — announce the
+        // divergence once, keep the edit, land no repaint — without betting
+        // on watcher latency.
         core.flipH();
         QVERIFY(core.directoryModel()->getImage(file)->isEdited());
         const int showCallsBefore = view.showImageCalls;
@@ -783,7 +784,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         // saves identically, and the mtime IS the change signal here
         QTest::qWait(150);
         QVERIFY(other.save(file, "png"));
-        emit core.directoryModel()->fileModified(file);
+        QVERIFY(QMetaObject::invokeMethod(core.directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
 
         QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
         QVERIFY(core.directoryModel()->getImage(file)->isEdited());
@@ -791,9 +792,9 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
                  QSize(20, 10));                        // the edited geometry, not the disk's 4x4
         QCOMPARE(view.showImageCalls, showCallsBefore); // no clobber repaint
 
-        // the watcher reports one save as several events: the same divergence
-        // must not re-announce (dedup keyed by path + disk mtime)
-        emit core.directoryModel()->fileModified(file);
+        // one external save surfaces as several wire/mirror cycles: the same
+        // divergence must not re-announce (the model dedups per path+mtime)
+        QVERIFY(QMetaObject::invokeMethod(core.directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
         QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
     }
 

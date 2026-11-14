@@ -193,7 +193,7 @@ void Core::connectComponents() {
 
     connect(model.get(), &DirectoryModel::fileAdded, this, &Core::onFileAdded);
     connect(model.get(), &DirectoryModel::fileRemoved, this, &Core::onFileRemoved);
-    connect(model.get(), &DirectoryModel::fileModified, this, &Core::onFileModified);
+    connect(model.get(), &DirectoryModel::divergenceDetected, this, &Core::onDivergenceDetected);
     connect(model.get(), &DirectoryModel::fileRenamed, this, &Core::onFileRenamed);
     connect(model.get(), &DirectoryModel::loaded, this, &Core::onModelLoaded);
     connect(model.get(), &DirectoryModel::imageReady, this, &Core::onModelItemReady);
