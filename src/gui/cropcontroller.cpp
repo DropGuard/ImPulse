@@ -1,14 +1,17 @@
 #include "gui/cropcontroller.h"
 
+// the complete State, for the view-mode gate
+#include "core.h"
+
 #include "gui/panels/croppanel/croppanel.h"
 #include "gui/overlays/cropoverlay.h"
 #include "gui/panels/sidepanel/sidepanel.h"
 #include "gui/viewers/viewerwidget.h"
 
-CropController::CropController(MW *windowArg, ViewerWidget *viewerArg, SidePanel *sidePanelArg,
+CropController::CropController(MW *windowArg, const State *stateArg, ViewerWidget *viewerArg, SidePanel *sidePanelArg,
                                DocumentWidget *docWidgetArg)
-    : QObject(windowArg), window(windowArg), viewer(viewerArg), sidePanel(sidePanelArg), docWidget(docWidgetArg),
-      activeSidePanel(SIDEPANEL_NONE) {
+    : QObject(windowArg), window(windowArg), state(stateArg), viewer(viewerArg), sidePanel(sidePanelArg),
+      docWidget(docWidgetArg), activeSidePanel(SIDEPANEL_NONE) {
 }
 
 void CropController::setupCropPanel() {
@@ -31,7 +34,7 @@ void CropController::onPanelCrop(QRect rect) {
 }
 
 void CropController::showCropPanel() {
-    if(window->currentViewMode() == MODE_FOLDERVIEW)
+    if(state->viewMode.value() == MODE_FOLDERVIEW)
         return;
 
     // the crop wiring is live from initActions, but the panel is built in
