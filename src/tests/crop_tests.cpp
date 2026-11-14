@@ -158,6 +158,30 @@ class TestCrop : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(viewer->fitMode(), FIT_WINDOW, 5000);
     }
 
+    // Enter is the crop's own key: with no selection it is consumed — it
+    // must not resolve as folder view (its global binding), with or without
+    // the pending-work lock. Owned keys do not pass through.
+    void cropOwnsEnterEvenWithoutSelection() {
+        QImage img(64, 32, QImage::Format_RGB32);
+        img.fill(Qt::red);
+        QVERIFY(img.save(QDir(base).filePath("enter.png"), "PNG"));
+        Core core;
+        QVERIFY(core.loadPath(QDir(base).filePath("enter.png")));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("enter.png"), 10000);
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
+        auto *overlay = core.mainWindow()->findChild<CropOverlay *>();
+        QVERIFY(overlay);
+
+        QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+        QApplication::sendEvent(overlay, &enter);
+
+        QVERIFY(core.mainWindow()->crop()->isActive());                                          // the surface stayed
+        QCOMPARE(core.viewState().viewMode.value(), MODE_DOCUMENT);                              // no folder switch
+        QCOMPARE(core.currentFilePath(), QDir(base).filePath("enter.png"));                      // no navigation
+        QVERIFY(!core.directoryModel()->getImage(QDir(base).filePath("enter.png"))->isEdited()); // nothing applied
+    }
+
     void cropPanelSurvivesAnEarlyTrigger() {
         writeImage(QDir(base).filePath("crop.png"));
         Core core;
