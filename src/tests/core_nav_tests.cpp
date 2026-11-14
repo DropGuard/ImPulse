@@ -17,11 +17,11 @@
 #include <QtTest/qtestcase.h>
 #include <QQueue>
 #include "gui/overlays/imageinfooverlayproxy.h"
-#include "gui/cropcontroller.h"
+#include "gui/crop/cropcontroller.h"
 #include "gui/overlayhost.h"
 #include "gui/overlays/copyoverlay.h"
 #include "gui/overlays/saveconfirmoverlay.h"
-#include "gui/overlays/cropoverlay.h"
+#include "gui/crop/cropoverlay.h"
 #include "gui/overlays/floatingmessageproxy.h"
 #include <utility>
 #include <QApplication>
@@ -59,8 +59,8 @@
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/dialogs/resizedialog.h"
 #include "gui/overlays/videocontrols.h"
-#include "gui/overlays/cropoverlay.h"
-#include "gui/panels/croppanel/croppanel.h"
+#include "gui/crop/cropoverlay.h"
+#include "gui/crop/croppanel.h"
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>

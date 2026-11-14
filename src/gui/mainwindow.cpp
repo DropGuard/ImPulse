@@ -3,7 +3,7 @@
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
 #include "gui/dialoghost.h"
-#include "gui/cropcontroller.h"
+#include "gui/crop/cropcontroller.h"
 
 MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appState(state), infoBarFullscreen(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);

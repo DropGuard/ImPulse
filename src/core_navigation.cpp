@@ -13,7 +13,7 @@
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
 #include "gui/dialoghost.h"
-#include "gui/cropcontroller.h"
+#include "gui/crop/cropcontroller.h"
 
 #include <QThread>
 #include <QDrag>
