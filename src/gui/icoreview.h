@@ -36,6 +36,12 @@ class ICoreView {
     virtual bool isWindowVisible() = 0;
     virtual void toggleFullscreenInfoBar() = 0;
 
+    // the slideshow loop request: slides advance by timer, normal viewing
+    // loops the video. A pure function of the slideshow state — Core relays
+    // it on every flip, so the player's loop follows the mode; MW implements
+    // this with its existing signal and feeds viewerWidget from it.
+    virtual void setLoopPlayback(bool loop) = 0;
+
     // projections Core pushes after mutations
     virtual void onSortingChanged(SortingMode mode) = 0;
     virtual void onScalingFinished(std::unique_ptr<const QImage> scaled) = 0;

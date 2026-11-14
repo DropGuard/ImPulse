@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <utility>
 #include <QSignalSpy>
-#include <QApplication>
+#include <QCoreApplication>
 
 #include "core_test_helpers.h"
 #include "testhelpers.h"
@@ -60,34 +60,49 @@ class TestSlideshow : public QObject {
 
     void slideshowLifecycleRequestsLoopPlaybackOffThenOn() {
         const QStringList files = slideshowFiles("show1");
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        QSignalSpy loop(core.mainWindow(), &MW::setLoopPlayback);
-        QVERIFY(loop.isValid());
+        // the loop request lands on the view seam; RecordingView keeps every value
 
         core.startSlideshow();
         QVERIFY(core.viewState().slideshow);
-        QCOMPARE(loop.count(), 1);
-        QCOMPARE(loop.at(0).at(0).toBool(), false);
+        QCOMPARE(view.loopPlaybackRequests, 1);
+        QCOMPARE(view.loopPlaybackValues.at(0), false);
 
         // a second start with the flag already set is the no-op it must be:
         // re-arming would emit a second request and re-enter enableDocumentView
         core.startSlideshow();
-        QCOMPARE(loop.count(), 1);
+        QCOMPARE(view.loopPlaybackRequests, 1);
 
         core.stopSlideshow();
         QVERIFY(!core.viewState().slideshow);
-        QCOMPARE(loop.count(), 2);
-        QCOMPARE(loop.at(1).at(0).toBool(), true);
+        QCOMPARE(view.loopPlaybackRequests, 2);
+        QCOMPARE(view.loopPlaybackValues.at(1), true);
 
         core.stopSlideshow();
-        QCOMPARE(loop.count(), 2);
+        QCOMPARE(view.loopPlaybackRequests, 2);
     }
 
     void slideshowAdvanceIsSequentialAndArmsTheTimer() {
         const QStringList files = slideshowFiles("show2");
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
@@ -107,7 +122,15 @@ class TestSlideshow : public QObject {
 
     void nonLoopingSlideshowStopsAtTheEndOfTheListing() {
         const QStringList files = slideshowFiles("show3");
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QVERIFY(!core.slideshowLoops());
@@ -134,7 +157,15 @@ class TestSlideshow : public QObject {
 
     void shuffleKeepsTheSlideshowCyclingPastTheEnd() {
         const QStringList files = slideshowFiles("show4");
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QVERIFY(!core.viewState().shuffle);
@@ -156,7 +187,15 @@ class TestSlideshow : public QObject {
 
     void toggleSlideshowStartsThenStops() {
         const QStringList files = slideshowFiles("show5");
-        Core core;
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QVERIFY(!core.viewState().slideshow);
@@ -172,8 +211,9 @@ class TestSlideshow : public QObject {
 };
 
 int main(int argc, char **argv) {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    QApplication app(argc, argv);
+    // QCoreApplication: the tested paths touch no widget, pixmap or clipboard;
+    // the loop request lands on the RecordingView seam, not on a window
+    QCoreApplication app(argc, argv);
     // One process per test function — the same rationale as engine_stack_main's
     // fork per class, taken one level down: the suites decode images, which
     // makes QtGui spawn and clockjoin-join its own internal pooled threads, and

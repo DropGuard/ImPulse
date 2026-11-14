@@ -251,6 +251,8 @@ class RecordingView : public ICoreView {
     int showAnimationCalls = 0;
     int showVideoCalls = 0;
     int closeImageCalls = 0;
+    int loopPlaybackRequests = 0;
+    QList<bool> loopPlaybackValues;
 
     void showImage(std::shared_ptr<const QImage> image) override {
         showImageCalls++;
@@ -278,6 +280,10 @@ class RecordingView : public ICoreView {
         return true;
     }
     void toggleFullscreenInfoBar() override {
+    }
+    void setLoopPlayback(bool loop) override {
+        loopPlaybackRequests++;
+        loopPlaybackValues << loop;
     }
     void onSortingChanged(SortingMode mode) override {
         Q_UNUSED(mode)
