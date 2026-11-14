@@ -273,6 +273,48 @@ class TestEditSave : public QObject {
         QCOMPARE(fake.confirmCalls, 0); // resize never asks
     }
 
+    // resize commits to MEMORY only (save=false), so it needs a surface that
+    // can show the result and a later Ctrl+S. A thumbnail grid shows neither:
+    // performing it there would leave an edit that the next unloadExcept
+    // discards, rewriting nothing while the user sees nothing. Refused, with a
+    // reason — the silent version of this was the bug.
+    void resizeIsRefusedWhereItsResultWouldBeInvisible() {
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        const QString img = QDir(alpha).filePath("rect.png");
+        coretest::writeRectImage(img);
+        QVERIFY(core.loadPath(img));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        const QSize before = core.directoryModel()->getImage(img)->size();
+        const int messagesBefore = overlayFake.messageCalls;
+
+        core.enableFolderView();
+        QCOMPARE(core.viewState().viewMode.value(), MODE_FOLDERVIEW);
+
+        // the command's own entry point: DialogHost::resizeRequested connects
+        // straight to it, bypassing the dialog
+        core.resize(QSize(4, 4));
+
+        QCOMPARE(overlayFake.messageCalls, messagesBefore + 1);
+        QVERIFY2(overlayFake.lastMessage.contains(QStringLiteral("Resizing")),
+                 qPrintable(QStringLiteral("unexpected refusal text: ") + overlayFake.lastMessage));
+        QCOMPARE(core.directoryModel()->getImage(img)->size(), before); // untouched
+        QVERIFY(!core.directoryModel()->getImage(img)->isEdited());
+
+        // and back in document view it works, so the refusal is the state's
+        core.toggleFolderView();
+        QCOMPARE(core.viewState().viewMode.value(), MODE_DOCUMENT);
+        core.resize(QSize(4, 4));
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(4, 4), 10000);
+    }
+
     void discardEditsRestoresTheOnDiskImage() {
         coretest::FakeInteractions fake;
         coretest::FakeOverlayHost overlayFake;

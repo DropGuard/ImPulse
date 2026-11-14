@@ -54,6 +54,38 @@ class NavigationController : public QObject {
     }
     void reset();
 
+    // The state the window is in, for the decisions that depend on it. Today
+    // it is a fold of two stored properties (viewMode, slideshow), and the
+    // fold is total because the transitions keep folderView+slideshow
+    // unreachable: startSlideshow enters document view, enableFolderView and
+    // the folder load path stop the clock first. Making the fold a name is
+    // what lets a caller branch on the STATE instead of probing a timer.
+    //
+    // It answers only "what is on screen", never "what may this command do":
+    // each command owns its own contract (crop needs one image on screen,
+    // resize needs the result to be VISIBLE, flip writes either way).
+    enum class InteractionState {
+        FolderView,
+        Document,
+        Slideshow
+    };
+    InteractionState interactionState() const;
+
+    // Says why an edit cannot proceed, for the states that refuse one. The
+    // decision is the caller's (`interactionState() == Slideshow`); this only
+    // speaks, so the reason lives in one place. The clock's owner is the party
+    // that would destroy the work (the next tick's unloadExcept), so it is the
+    // party that explains itself.
+    void refuseEdit() const;
+
+    // The refusal for a verb whose result would not be VISIBLE in the current
+    // view. resize is the one today: a thumbnail grid cannot show a change in
+    // pixel dimensions, so performing it there would rewrite the file behind
+    // a surface that never confirmed anything. Lives here rather than at each
+    // call site because the question is about view state, and there are two
+    // entry points (the dialog and the resizeRequested relay).
+    bool refuseIfNotDocument(const QString &reason);
+
   public slots:
     bool loadPath(const QString &path);
     bool setDirectory(const QString &path);

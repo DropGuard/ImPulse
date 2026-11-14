@@ -281,6 +281,29 @@ void NavigationController::onDivergenceDetected(const QString &filePath) {
         overlays_->showMessage(tr("File changed on disk — your edits are kept in memory."));
 }
 
+NavigationController::InteractionState NavigationController::interactionState() const {
+    // slideshow first: it implies document view (startSlideshow enters it), so
+    // the two can only be told apart by asking the clock
+    if(state->slideshow.value())
+        return InteractionState::Slideshow;
+    return state->viewMode.value() == MODE_FOLDERVIEW ? InteractionState::FolderView : InteractionState::Document;
+}
+
+void NavigationController::refuseEdit() const {
+    overlays_->showMessage(tr("Stop the slideshow before editing."));
+}
+
+bool NavigationController::refuseIfNotDocument(const QString &reason) {
+    const InteractionState current = interactionState();
+    if(current == InteractionState::Document)
+        return false;
+    // a running clock is the more actionable refusal (one keystroke away),
+    // so it outranks the caller's reason even when the caller would have
+    // given a good one for folder view
+    overlays_->showMessage(current == InteractionState::Slideshow ? tr("Stop the slideshow before editing.") : reason);
+    return true;
+}
+
 void NavigationController::sortByName() {
     auto mode = SortingMode::SORT_NAME;
     if(model->sortingMode() == mode)
