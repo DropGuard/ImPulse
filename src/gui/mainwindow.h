@@ -118,7 +118,9 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
 
     // bool focusNextPrevChild(bool);
   signals:
-    void setLoopPlayback(bool);
+    // implements ICoreView::setLoopPlayback — Core's relay feeds this seam,
+    // and the connection below hands it to viewerWidget
+    void setLoopPlayback(bool) override;
     void fullscreenStateChanged(bool);
     void copyUrlsRequested(QList<QString>, QString);
     void moveUrlsRequested(QList<QString>, QString);

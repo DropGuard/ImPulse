@@ -317,6 +317,12 @@ class Core : public QObject {
     FolderEndAction folderEndAction;
     bool loopSlideshow;
 
+    // the slideshow→player loop relay, bound once in the constructor: every
+    // slideshow flip reaches the view seam — the window's player in
+    // production, the recording stub in a headless test. Declared after
+    // State, so it dies before the state it watches.
+    QPropertyNotifier slideshowRelay;
+
     // components
     std::shared_ptr<DirectoryModel> model;
 

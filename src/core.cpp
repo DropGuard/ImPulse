@@ -68,6 +68,14 @@ Core::Core(const Deps &deps)
         overlays_ = deps.overlays ? deps.overlays : mw->overlays();
         dialogs_ = mw->dialogs();
     }
+    // the slideshow loop is a pure function of the state: slides advance by
+    // timer, normal viewing loops. The relay rides the state binding and goes
+    // through the view seam — the window's notifier keeps only the info
+    // projection, this one owns the player request, so a headless Core
+    // reaches the seam exactly the way production does.
+    slideshowRelay = state.slideshow.addNotifier([this] {
+        view_->setLoopPlayback(!state.slideshow.value());
+    });
     initComponents();
     connectComponents();
     initActions();
