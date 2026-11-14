@@ -32,7 +32,6 @@
 #include "components/scriptmanager/scriptmanager.h"
 #include "settings.h"
 #include "sharedresources.h"
-#include "utils/actions.h"
 #include "gui/iuserinteractions.h"
 #include "gui/ioverlayhost.h"
 #include "gui/icoreview.h"
@@ -104,7 +103,6 @@ class AppSingletons {
   public:
     AppSingletons() {
         inputMap = InputMap::getInstance();
-        appActions = Actions::getInstance();
         settings = Settings::getInstance();
         scriptManager = ScriptManager::getInstance();
         actionManager = ActionManager::getInstance();

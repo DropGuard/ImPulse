@@ -221,48 +221,51 @@ void Core::connectWindowComponents() {
 }
 
 void Core::initActions() {
-    connect(actionManager, &ActionManager::nextImage, nav_, &NavigationController::nextImage);
-    connect(actionManager, &ActionManager::prevImage, nav_, &NavigationController::prevImage);
-    connect(actionManager, &ActionManager::resize, this, &Core::showResizeDialog);
-    connect(actionManager, &ActionManager::flipH, this, &Core::flipH);
-    connect(actionManager, &ActionManager::flipV, this, &Core::flipV);
-    connect(actionManager, &ActionManager::rotateLeft, this, &Core::rotateLeft);
-    connect(actionManager, &ActionManager::rotateRight, this, &Core::rotateRight);
-    connect(actionManager, &ActionManager::crop, this, &Core::toggleCropPanel);
-    connect(actionManager, &ActionManager::setWallpaper, this, &Core::setWallpaper);
-    connect(actionManager, &ActionManager::open, this, &Core::showOpenDialog);
-    connect(actionManager, &ActionManager::save, this, &Core::saveCurrentFile);
-    connect(actionManager, &ActionManager::saveAs, this, &Core::requestSavePath);
-    connect(actionManager, &ActionManager::exit, this, &Core::close);
-    connect(actionManager, &ActionManager::removeFile, this, &Core::removePermanent);
-    connect(actionManager, &ActionManager::moveToTrash, this, &Core::moveToTrash);
-    connect(actionManager, &ActionManager::copyFile, overlays_, &IOverlayHost::triggerCopyOverlay);
-    connect(actionManager, &ActionManager::quickCopy, this, &Core::quickCopyToFixedDirectory);
-    connect(actionManager, &ActionManager::moveFile, overlays_, &IOverlayHost::triggerMoveOverlay);
-    connect(actionManager, &ActionManager::jumpToFirst, nav_, &NavigationController::jumpToFirst);
-    connect(actionManager, &ActionManager::jumpToLast, nav_, &NavigationController::jumpToLast);
+    actionManager->connectAction("nextImage", nav_, &NavigationController::nextImage);
+    actionManager->connectAction("prevImage", nav_, &NavigationController::prevImage);
+    actionManager->connectAction("resize", this, &Core::showResizeDialog);
+    actionManager->connectAction("flipH", this, &Core::flipH);
+    actionManager->connectAction("flipV", this, &Core::flipV);
+    actionManager->connectAction("rotateLeft", this, &Core::rotateLeft);
+    actionManager->connectAction("rotateRight", this, &Core::rotateRight);
+    actionManager->connectAction("crop", this, &Core::toggleCropPanel);
+    actionManager->connectAction("setWallpaper", this, &Core::setWallpaper);
+    actionManager->connectAction("open", this, &Core::showOpenDialog);
+    actionManager->connectAction("save", this, &Core::saveCurrentFile);
+    actionManager->connectAction("saveAs", this, &Core::requestSavePath);
+    actionManager->connectAction("exit", this, &Core::close);
+    actionManager->connectAction("removeFile", this, &Core::removePermanent);
+    actionManager->connectAction("moveToTrash", this, &Core::moveToTrash);
+    actionManager->connectAction("copyFile", overlays_, &IOverlayHost::triggerCopyOverlay);
+    actionManager->connectAction("quickCopy", this, &Core::quickCopyToFixedDirectory);
+    actionManager->connectAction("moveFile", overlays_, &IOverlayHost::triggerMoveOverlay);
+    actionManager->connectAction("jumpToFirst", nav_, &NavigationController::jumpToFirst);
+    actionManager->connectAction("jumpToLast", nav_, &NavigationController::jumpToLast);
+    // script actions are dynamic — no registered QAction exists for an
+    // "s:<name>" binding, so the runScript carrier signal stays a plain
+    // connect (R12's documented exception)
     connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
-    connect(actionManager, &ActionManager::folderView, nav_, &NavigationController::enableFolderView);
-    connect(actionManager, &ActionManager::documentView, nav_, &NavigationController::enableDocumentView);
-    connect(actionManager, &ActionManager::toggleFolderView, nav_, &NavigationController::toggleFolderView);
-    connect(actionManager, &ActionManager::reloadImage, this, qOverload<>(&Core::reloadImage));
-    connect(actionManager, &ActionManager::copyFileClipboard, this, &Core::copyFileClipboard);
-    connect(actionManager, &ActionManager::copyPathClipboard, this, &Core::copyPathClipboard);
-    connect(actionManager, &ActionManager::renameFile, this, &Core::showRenameDialog);
-    connect(actionManager, &ActionManager::sortByName, nav_, &NavigationController::sortByName);
-    connect(actionManager, &ActionManager::sortByTime, nav_, &NavigationController::sortByTime);
-    connect(actionManager, &ActionManager::sortBySize, nav_, &NavigationController::sortBySize);
-    connect(actionManager, &ActionManager::toggleImageInfo, overlays_, &IOverlayHost::toggleImageInfoOverlay);
-    connect(actionManager, &ActionManager::toggleShuffle, nav_, &NavigationController::toggleShuffle);
-    connect(actionManager, &ActionManager::showInDirectory, this, &Core::showInDirectory);
-    connect(actionManager, &ActionManager::toggleSlideshow, nav_, &NavigationController::toggleSlideshow);
-    connect(actionManager, &ActionManager::goUp, nav_, &NavigationController::loadParentDir);
-    connect(actionManager, &ActionManager::discardEdits, this, &Core::discardEdits);
-    connect(actionManager, &ActionManager::nextDirectory, nav_, &NavigationController::nextDirectory);
-    connect(actionManager, &ActionManager::prevDirectory, nav_, qOverload<>(&NavigationController::prevDirectory));
-    connect(actionManager, &ActionManager::print, this, &Core::print);
-    connect(actionManager, &ActionManager::toggleFullscreenInfoBar, this, &Core::toggleFullscreenInfoBar);
-    connect(actionManager, &ActionManager::pasteFile, this, &Core::openFromClipboard);
+    actionManager->connectAction("folderView", nav_, &NavigationController::enableFolderView);
+    actionManager->connectAction("documentView", nav_, &NavigationController::enableDocumentView);
+    actionManager->connectAction("toggleFolderView", nav_, &NavigationController::toggleFolderView);
+    actionManager->connectAction("reloadImage", this, qOverload<>(&Core::reloadImage));
+    actionManager->connectAction("copyFileClipboard", this, &Core::copyFileClipboard);
+    actionManager->connectAction("copyPathClipboard", this, &Core::copyPathClipboard);
+    actionManager->connectAction("renameFile", this, &Core::showRenameDialog);
+    actionManager->connectAction("sortByName", nav_, &NavigationController::sortByName);
+    actionManager->connectAction("sortByTime", nav_, &NavigationController::sortByTime);
+    actionManager->connectAction("sortBySize", nav_, &NavigationController::sortBySize);
+    actionManager->connectAction("toggleImageInfo", overlays_, &IOverlayHost::toggleImageInfoOverlay);
+    actionManager->connectAction("toggleShuffle", nav_, &NavigationController::toggleShuffle);
+    actionManager->connectAction("showInDirectory", this, &Core::showInDirectory);
+    actionManager->connectAction("toggleSlideshow", nav_, &NavigationController::toggleSlideshow);
+    actionManager->connectAction("goUp", nav_, &NavigationController::loadParentDir);
+    actionManager->connectAction("discardEdits", this, &Core::discardEdits);
+    actionManager->connectAction("nextDirectory", nav_, &NavigationController::nextDirectory);
+    actionManager->connectAction("prevDirectory", nav_, qOverload<>(&NavigationController::prevDirectory));
+    actionManager->connectAction("print", this, &Core::print);
+    actionManager->connectAction("toggleFullscreenInfoBar", this, &Core::toggleFullscreenInfoBar);
+    actionManager->connectAction("pasteFile", this, &Core::openFromClipboard);
     // the folder grid's scope actions, landed on the proxy the same way the
     // viewer commands land on ViewerWidget
     if(mw)
@@ -270,48 +273,48 @@ void Core::initActions() {
 }
 
 // The window-connected actions, kept as one block: headless Core has no keys and skips the whole
-// method — its tests call the slots directly. The connects stay in core.cpp
-// because R12 reads this file's text for the registry.
+// method — its tests call the slots directly. The connectAction calls stay
+// in core.cpp because R12 reads this file's text for the connected list.
 void Core::connectWindowActions() {
-    connect(actionManager, &ActionManager::fitWindow, mw->viewer(), &ViewerWidget::fitWindow);
-    connect(actionManager, &ActionManager::fitWidth, mw->viewer(), &ViewerWidget::fitWidth);
-    connect(actionManager, &ActionManager::fitNormal, mw->viewer(), &ViewerWidget::fitOriginal);
-    connect(actionManager, &ActionManager::nextFitMode, mw, &MW::cycleFitMode);
-    connect(actionManager, &ActionManager::toggleFitMode, mw, &MW::switchFitMode);
-    connect(actionManager, &ActionManager::toggleFullscreen, mw->shell(), &WindowShell::triggerFullScreen);
-    connect(actionManager, &ActionManager::lockZoom, mw->viewer(), &ViewerWidget::toggleLockZoom);
-    connect(actionManager, &ActionManager::lockView, mw->viewer(), &ViewerWidget::toggleLockView);
-    connect(actionManager, &ActionManager::zoomIn, mw->viewer(), &ViewerWidget::zoomIn);
-    connect(actionManager, &ActionManager::zoomOut, mw->viewer(), &ViewerWidget::zoomOut);
-    connect(actionManager, &ActionManager::zoomInCursor, mw->viewer(), &ViewerWidget::zoomInCursor);
-    connect(actionManager, &ActionManager::zoomOutCursor, mw->viewer(), &ViewerWidget::zoomOutCursor);
-    connect(actionManager, &ActionManager::scrollUp, mw->viewer(), &ViewerWidget::scrollUp);
-    connect(actionManager, &ActionManager::scrollDown, mw->viewer(), &ViewerWidget::scrollDown);
-    connect(actionManager, &ActionManager::scrollLeft, mw->viewer(), &ViewerWidget::scrollLeft);
-    connect(actionManager, &ActionManager::scrollRight, mw->viewer(), &ViewerWidget::scrollRight);
-    connect(actionManager, &ActionManager::openSettings, mw->dialogs(), &DialogHost::showSettings);
-    connect(actionManager, &ActionManager::closeFullScreenOrExit, mw->shell(), &WindowShell::closeFullScreenOrExit);
-    connect(actionManager, &ActionManager::pauseVideo, mw->viewer(), &ViewerWidget::pauseResumePlayback);
-    connect(actionManager, &ActionManager::seekVideoForward, mw->viewer(), &ViewerWidget::seekForward);
-    connect(actionManager, &ActionManager::seekVideoBackward, mw->viewer(), &ViewerWidget::seekBackward);
-    connect(actionManager, &ActionManager::frameStep, mw->viewer(), &ViewerWidget::frameStep);
-    connect(actionManager, &ActionManager::frameStepBack, mw->viewer(), &ViewerWidget::frameStepBack);
-    connect(actionManager, &ActionManager::contextMenu, mw, &MW::showContextMenu);
-    connect(actionManager, &ActionManager::toggleTransparencyGrid, mw->viewer(), &ViewerWidget::toggleTransparencyGrid);
-    connect(actionManager, &ActionManager::toggleScalingFilter, mw, &MW::toggleScalingFilter);
-    connect(actionManager, &ActionManager::toggleMute, mw->viewer(), &ViewerWidget::toggleMute);
-    connect(actionManager, &ActionManager::volumeUp, mw->viewer(), &ViewerWidget::volumeUp);
-    connect(actionManager, &ActionManager::volumeDown, mw->viewer(), &ViewerWidget::volumeDown);
-    connect(actionManager, &ActionManager::gridSelectNext, mw->getFolderView(), &FolderViewProxy::gridSelectNext);
-    connect(actionManager, &ActionManager::gridSelectPrev, mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
-    connect(actionManager, &ActionManager::gridSelectAbove, mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
-    connect(actionManager, &ActionManager::gridSelectBelow, mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
-    connect(actionManager, &ActionManager::gridPageUp, mw->getFolderView(), &FolderViewProxy::gridPageUp);
-    connect(actionManager, &ActionManager::gridPageDown, mw->getFolderView(), &FolderViewProxy::gridPageDown);
-    connect(actionManager, &ActionManager::gridSelectFirst, mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
-    connect(actionManager, &ActionManager::gridSelectLast, mw->getFolderView(), &FolderViewProxy::gridSelectLast);
-    connect(actionManager, &ActionManager::gridSelectAll, mw->getFolderView(), &FolderViewProxy::gridSelectAll);
-    connect(actionManager, &ActionManager::gridOpen, mw->getFolderView(), &FolderViewProxy::activateCurrent);
+    actionManager->connectAction("fitWindow", mw->viewer(), &ViewerWidget::fitWindow);
+    actionManager->connectAction("fitWidth", mw->viewer(), &ViewerWidget::fitWidth);
+    actionManager->connectAction("fitNormal", mw->viewer(), &ViewerWidget::fitOriginal);
+    actionManager->connectAction("nextFitMode", mw, &MW::cycleFitMode);
+    actionManager->connectAction("toggleFitMode", mw, &MW::switchFitMode);
+    actionManager->connectAction("toggleFullscreen", mw->shell(), &WindowShell::triggerFullScreen);
+    actionManager->connectAction("lockZoom", mw->viewer(), &ViewerWidget::toggleLockZoom);
+    actionManager->connectAction("lockView", mw->viewer(), &ViewerWidget::toggleLockView);
+    actionManager->connectAction("zoomIn", mw->viewer(), &ViewerWidget::zoomIn);
+    actionManager->connectAction("zoomOut", mw->viewer(), &ViewerWidget::zoomOut);
+    actionManager->connectAction("zoomInCursor", mw->viewer(), &ViewerWidget::zoomInCursor);
+    actionManager->connectAction("zoomOutCursor", mw->viewer(), &ViewerWidget::zoomOutCursor);
+    actionManager->connectAction("scrollUp", mw->viewer(), &ViewerWidget::scrollUp);
+    actionManager->connectAction("scrollDown", mw->viewer(), &ViewerWidget::scrollDown);
+    actionManager->connectAction("scrollLeft", mw->viewer(), &ViewerWidget::scrollLeft);
+    actionManager->connectAction("scrollRight", mw->viewer(), &ViewerWidget::scrollRight);
+    actionManager->connectAction("openSettings", mw->dialogs(), &DialogHost::showSettings);
+    actionManager->connectAction("closeFullScreenOrExit", mw->shell(), &WindowShell::closeFullScreenOrExit);
+    actionManager->connectAction("pauseVideo", mw->viewer(), &ViewerWidget::pauseResumePlayback);
+    actionManager->connectAction("seekVideoForward", mw->viewer(), &ViewerWidget::seekForward);
+    actionManager->connectAction("seekVideoBackward", mw->viewer(), &ViewerWidget::seekBackward);
+    actionManager->connectAction("frameStep", mw->viewer(), &ViewerWidget::frameStep);
+    actionManager->connectAction("frameStepBack", mw->viewer(), &ViewerWidget::frameStepBack);
+    actionManager->connectAction("contextMenu", mw, &MW::showContextMenu);
+    actionManager->connectAction("toggleTransparencyGrid", mw->viewer(), &ViewerWidget::toggleTransparencyGrid);
+    actionManager->connectAction("toggleScalingFilter", mw, &MW::toggleScalingFilter);
+    actionManager->connectAction("toggleMute", mw->viewer(), &ViewerWidget::toggleMute);
+    actionManager->connectAction("volumeUp", mw->viewer(), &ViewerWidget::volumeUp);
+    actionManager->connectAction("volumeDown", mw->viewer(), &ViewerWidget::volumeDown);
+    actionManager->connectAction("gridSelectNext", mw->getFolderView(), &FolderViewProxy::gridSelectNext);
+    actionManager->connectAction("gridSelectPrev", mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
+    actionManager->connectAction("gridSelectAbove", mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
+    actionManager->connectAction("gridSelectBelow", mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
+    actionManager->connectAction("gridPageUp", mw->getFolderView(), &FolderViewProxy::gridPageUp);
+    actionManager->connectAction("gridPageDown", mw->getFolderView(), &FolderViewProxy::gridPageDown);
+    actionManager->connectAction("gridSelectFirst", mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
+    actionManager->connectAction("gridSelectLast", mw->getFolderView(), &FolderViewProxy::gridSelectLast);
+    actionManager->connectAction("gridSelectAll", mw->getFolderView(), &FolderViewProxy::gridSelectAll);
+    actionManager->connectAction("gridOpen", mw->getFolderView(), &FolderViewProxy::activateCurrent);
 }
 
 void Core::loadTranslation() {

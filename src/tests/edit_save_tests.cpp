@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <utility>
 #include <QSignalSpy>
-#include <QCoreApplication>
+#include <QApplication>
 
 #include "core_test_helpers.h"
 #include "testhelpers.h"
@@ -13,7 +13,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
 // A presenter view without a widget. DirectoryPresenter::setView is a template
@@ -422,9 +421,16 @@ class TestEditSave : public QObject {
 };
 
 int main(int argc, char **argv) {
-    // QCoreApplication: the tested paths touch no widget — the save contract is
-    // pinned through FakeInteractions, the mode through Core's own state
-    QCoreApplication app(argc, argv);
+    // QApplication, not QCoreApplication: the tested paths still touch no
+    // widget — the save contract is pinned through FakeInteractions, the mode
+    // through Core's own state — but the action registry now carries QActions,
+    // and Qt's QAction constructor resolves its private-class factory through
+    // QGuiApplicationPrivate::self, which a bare QCoreApplication leaves null:
+    // the first action creation would segfault before any test could run.
+    // Offscreen keeps the run headless, the same way the QApplication suites
+    // run it.
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    QApplication app(argc, argv);
     // One process per test function — the same rationale as engine_stack_main's
     // fork per class, taken one level down: the suites decode images, which
     // makes QtGui spawn and clockjoin-join its own internal pooled threads, and

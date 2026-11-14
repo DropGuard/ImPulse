@@ -1,7 +1,6 @@
 ## SOURCES FOR QIMGV UTILITY CLASSES
 
 target_sources(qimgv_nongui PRIVATE
-    actions.cpp
     cmdoptionsrunner.cpp
     filelog.cpp
     folderend.cpp

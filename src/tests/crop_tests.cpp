@@ -13,7 +13,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
 #include "gui/crop/cropcontroller.h"
@@ -321,16 +320,18 @@ class TestCrop : public QObject {
         grid.populate(25);
         grid.show();
         grid.select(0);
-        connect(actionManager, &ActionManager::gridSelectNext, &grid, &FolderGridView::selectNext);
-        connect(actionManager, &ActionManager::gridSelectPrev, &grid, &FolderGridView::selectPrev);
-        connect(actionManager, &ActionManager::gridSelectAbove, &grid, &FolderGridView::selectAbove);
-        connect(actionManager, &ActionManager::gridSelectBelow, &grid, &FolderGridView::selectBelow);
-        connect(actionManager, &ActionManager::gridPageUp, &grid, &FolderGridView::pageUp);
-        connect(actionManager, &ActionManager::gridPageDown, &grid, &FolderGridView::pageDown);
-        connect(actionManager, &ActionManager::gridSelectFirst, &grid, &FolderGridView::selectFirst);
-        connect(actionManager, &ActionManager::gridSelectLast, &grid, &FolderGridView::selectLast);
-        connect(actionManager, &ActionManager::gridSelectAll, &grid, &FolderGridView::selectAll);
-        connect(actionManager, &ActionManager::gridOpen, &grid, &FolderGridView::activateCurrent);
+        // the grid-scope wiring, re-created the way core.cpp's
+        // connectWindowActions lands it: connectAction on the registry
+        actionManager->connectAction("gridSelectNext", &grid, &FolderGridView::selectNext);
+        actionManager->connectAction("gridSelectPrev", &grid, &FolderGridView::selectPrev);
+        actionManager->connectAction("gridSelectAbove", &grid, &FolderGridView::selectAbove);
+        actionManager->connectAction("gridSelectBelow", &grid, &FolderGridView::selectBelow);
+        actionManager->connectAction("gridPageUp", &grid, &FolderGridView::pageUp);
+        actionManager->connectAction("gridPageDown", &grid, &FolderGridView::pageDown);
+        actionManager->connectAction("gridSelectFirst", &grid, &FolderGridView::selectFirst);
+        actionManager->connectAction("gridSelectLast", &grid, &FolderGridView::selectLast);
+        actionManager->connectAction("gridSelectAll", &grid, &FolderGridView::selectAll);
+        actionManager->connectAction("gridOpen", &grid, &FolderGridView::activateCurrent);
 
         coretest::pressGridKey(grid, "Right", Qt::Key_Right);
         QCOMPARE(coretest::lastSelection(grid), 1);
@@ -355,7 +356,7 @@ class TestCrop : public QObject {
         coretest::pressGridKey(grid, "A", Qt::Key_A, Qt::ControlModifier);
         QCOMPARE(grid.selection().count(), 25); // Ctrl+A: everything
 
-        QSignalSpy up(actionManager, &ActionManager::goUp);
+        QSignalSpy up(actionManager->action("goUp"), &QAction::triggered);
         coretest::pressGridKey(grid, "Backspace", Qt::Key_Backspace);
         QCOMPARE(up.count(), 1); // goUp is the grid scope's own binding
 

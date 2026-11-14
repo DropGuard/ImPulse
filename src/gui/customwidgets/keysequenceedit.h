@@ -2,7 +2,6 @@
 
 #include <QPushButton>
 #include "shortcutbuilder.h"
-#include "utils/actions.h"
 
 class KeySequenceEdit : public QPushButton {
     Q_OBJECT

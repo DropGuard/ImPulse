@@ -10,7 +10,8 @@ ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux-only). The binary is
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
 single-Thumbnailer owner, R10 fd-shell purity, R11 key-door whitelist, R12
-action-connect completeness)
+action-connect completeness (addAction ↔ connectAction), R12b default-keymap
+completeness)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree

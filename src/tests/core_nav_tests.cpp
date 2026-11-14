@@ -49,7 +49,6 @@
 #include "components/actionmanager/actionmanager.h"
 #include "components/directorymanager/enginebridge.h"
 #include "components/scriptmanager/scriptmanager.h"
-#include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 #include "gui/contextmenu.h"
 #include "themestore.h"
@@ -377,12 +376,12 @@ class TestCoreNav : public QObject {
         // listing, so the first preload has a real neighbor to decode
 
         // one flip forward: from b the forward neighbor c decodes
-        emit actionManager->nextImage();
+        actionManager->action("nextImage")->trigger();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(1), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(2)), 10000);
 
         // another flip forward: from c the forward neighbor is d
-        emit actionManager->nextImage();
+        actionManager->action("nextImage")->trigger();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(2), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(3)), 10000);
 
@@ -395,7 +394,7 @@ class TestCoreNav : public QObject {
 
         // one backward move: the preload must follow the travel direction and
         // decode b, which a forward-facing policy would never have touched
-        emit actionManager->prevImage();
+        actionManager->action("prevImage")->trigger();
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(2), 10000);
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(1)), 10000);
     }
@@ -474,7 +473,7 @@ class TestCoreNav : public QObject {
         QCOMPARE(core.currentFilePath(), QDir(alpha).filePath("a.png"));
 
         const int before = listed.count();
-        emit actionManager->nextImage();
+        actionManager->action("nextImage")->trigger();
         QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, beta, before), 10000);
         // it must land on the new folder's image, not on whatever the previous
         // folder's mirror still had at index 0
@@ -491,7 +490,7 @@ class TestCoreNav : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, alpha), 10000);
 
         const int before = listed.count();
-        emit actionManager->nextImage();
+        actionManager->action("nextImage")->trigger();
         // settled = nothing outstanding *and* no deferred hop armed; the old
         // 500ms sleep could only hope the 40ms one was slow enough to be seen
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);

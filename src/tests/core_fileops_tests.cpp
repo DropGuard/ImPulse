@@ -9,7 +9,7 @@
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
 #include <QtTest/qtestcase.h>
-#include <QCoreApplication>
+#include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -926,10 +926,17 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
 };
 
 int main(int argc, char **argv) {
-    // QCoreApplication: the tested paths touch no widget, pixmap, movie frame
-    // or clipboard — the settings stylesheet loader guards on QApplication
-    // presence, so the singleton construction is font-wall free too
-    QCoreApplication app(argc, argv);
+    // QApplication, not QCoreApplication: the tested paths still touch no
+    // widget, pixmap, movie frame or clipboard — but the action registry now
+    // carries QActions, and Qt's QAction constructor resolves its
+    // private-class factory through QGuiApplicationPrivate::self, which a
+    // bare QCoreApplication leaves null: the first action creation would
+    // segfault before any test could run. The stylesheet loader's
+    // QApplication guard now passes for Settings — offscreen keeps the run
+    // headless, and the QApplication suites have run that loader this way
+    // all along.
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    QApplication app(argc, argv);
     // Its own binary, not a second class in core_nav's: a shared binary needs a
     // slot router that inspects the class in the parent, and any fixture the
     // router constructs would be inherited by every forked child -- the

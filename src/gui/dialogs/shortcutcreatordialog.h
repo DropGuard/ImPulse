@@ -4,7 +4,6 @@
 #include <QComboBox>
 #include <QRadioButton>
 #include "shortcutbuilder.h"
-#include "utils/actions.h"
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 // TODO: separate gui from components
