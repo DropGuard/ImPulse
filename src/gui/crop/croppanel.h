@@ -10,7 +10,7 @@
 #include "gui/customwidgets/sidepanelwidget.h"
 #include "gui/customwidgets/iconwidget.h"
 #include "gui/customwidgets/spinboxinputfix.h"
-#include "gui/overlays/cropoverlay.h"
+#include "gui/crop/cropoverlay.h"
 #include <QTimer>
 #include <QDebug>
 

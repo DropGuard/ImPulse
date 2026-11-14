@@ -17,10 +17,10 @@
 #include "gui/dialogs/settingsdialog.h"
 
 #include "gui/overlayhost.h"
-#include "gui/cropcontroller.h"
+#include "gui/crop/cropcontroller.h"
 #include "gui/overlays/copyoverlay.h"
 #include "gui/overlays/saveconfirmoverlay.h"
-#include "gui/overlays/cropoverlay.h"
+#include "gui/crop/cropoverlay.h"
 class TestOverlayKeys : public QObject {
     Q_OBJECT
 

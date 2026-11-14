@@ -16,9 +16,9 @@
 #include "utils/actions.h"
 #include "gui/dialogs/settingsdialog.h"
 
-#include "gui/cropcontroller.h"
-#include "gui/overlays/cropoverlay.h"
-#include "gui/panels/croppanel/croppanel.h"
+#include "gui/crop/cropcontroller.h"
+#include "gui/crop/cropoverlay.h"
+#include "gui/crop/croppanel.h"
 class TestCrop : public QObject {
     Q_OBJECT
 

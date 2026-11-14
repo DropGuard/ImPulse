@@ -44,7 +44,7 @@ target_sources(qimgv_gui PRIVATE
     overlays/clickzoneoverlay.cpp
     overlays/controlsoverlay.cpp
     overlays/copyoverlay.cpp
-    overlays/cropoverlay.cpp
+    crop/cropoverlay.cpp
     overlays/floatingmessage.cpp
     overlays/floatingmessageproxy.cpp
     overlays/fullscreeninfooverlay.cpp
@@ -59,7 +59,7 @@ target_sources(qimgv_gui PRIVATE
     overlays/zoomindicatoroverlay.cpp
     overlays/zoomindicatoroverlayproxy.cpp
 
-    panels/croppanel/croppanel.cpp
+    crop/croppanel.cpp
     panels/mainpanel/mainpanel.cpp
     panels/mainpanel/thumbnailstrip.cpp
     panels/mainpanel/thumbnailstripproxy.cpp
@@ -103,7 +103,7 @@ target_sources(qimgv_gui PRIVATE
     overlays/saveconfirmoverlay.ui
     overlays/videocontrols.ui
 
-    panels/croppanel/croppanel.ui
+    crop/croppanel.ui
     panels/sidepanel/sidepanel.ui
 
     panels/infobar/infobar.ui
