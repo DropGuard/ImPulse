@@ -79,16 +79,12 @@ class ActionManager : public QObject {
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
     QString actionForShortcut(const QString &keys);
-    // A floating surface's yield test, in one place so the four of them cannot
-    // drift: "does this event name a subject-changing action?" — true means the
-    // surface must consume the event instead of forwarding it.
-    bool eventIsSubjectChanging(QInputEvent *event);
-    // The ShortcutOverride-era form of the same question. An override event
-    // carries the LOGICAL key only — nativeScanCode is 0 by construction, so
-    // the scancode-token scan above cannot see it. This one keys on the
-    // projected sequence instead: true means the key names a subject-changing
-    // action in the effective projection (grid de-claims and the armed inspect
-    // layer respected), and the surface must claim the override back.
+    // A floating surface's yield test, in one place so the doors cannot
+    // drift: "does this key name a subject-changing action?" — true means the
+    // surface must claim the key back from QShortcutMap (ShortcutOverride) or
+    // consume it on delivery. Keys by sequence: an override event carries the
+    // logical key only (nativeScanCode is 0 by construction), and a delivered
+    // event answers through the same projected tables the map matched against.
     bool keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const;
     // which action (if any) the sequence claims in the effective projection
     QString actionForKeySequence(const QKeySequence &seq) const;

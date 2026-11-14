@@ -339,12 +339,6 @@ void MW::mouseMoveEvent(QMouseEvent *event) {
     event->ignore();
 }
 
-// hook up to actionManager
-void MW::keyPressEvent(QKeyEvent *event) {
-    event->accept();
-    actionManager->processEvent(event);
-}
-
 void MW::wheelEvent(QWheelEvent *event) {
     event->accept();
     actionManager->processEvent(event);

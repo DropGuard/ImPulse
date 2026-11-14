@@ -207,15 +207,13 @@ void CropPanel::keyPressEvent(QKeyEvent *event) {
     }
     if(event->matches(QKeySequence::SelectAll)) {
         emit selectAll();
-    } else if(actionManager->eventIsSubjectChanging(event)) {
+    } else if(actionManager->keyNamesSubjectChangingAction(event)) {
         // same rule as the overlay: the walk would move the image out from
-        // under the frame being edited. Zoom fine-tuning still yields.
-        return;
-    } else {
-        // the overlay's idiom: keys the surface does not own stay live in
-        // the action system (zoom fine-tuning is the point of Framing)
-        actionManager->processEvent(event);
+        // under the frame being edited. Consumed.
     }
+    // keys the surface does not own were already fired by QShortcutMap before
+    // delivery (zoom fine-tuning is the point of Framing) — the funnel has no
+    // keyboard jurisdiction here
 }
 
 void CropPanel::wheelEvent(QWheelEvent *event) {

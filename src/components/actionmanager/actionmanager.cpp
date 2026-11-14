@@ -197,8 +197,8 @@ static QList<QKeySequence> sequencesForToken(const QString &token) {
         return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
     QKeySequence seq = QKeySequence::fromString(token);
     if(seq.count() == 0)
-        return {}; // not a Qt name (Linux "Wake Up"/"PgBack"/"PgForward", macOS
-                   // enum names): display-only, the manual funnel still answers it
+        return {}; // not a Qt name: the vocabulary sweep
+                   // (everyInputMapNameIsQtParseable) keeps this branch empty
     return {seq};
 }
 //------------------------------------------------------------------------------
@@ -510,16 +510,6 @@ bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent
     return isSubjectChangingAction(actionForKeySequence(seq));
 }
 
-bool ActionManager::eventIsSubjectChanging(QInputEvent *event) {
-    const QString shortcut = ShortcutBuilder::fromEvent(event);
-    if(shortcut.isEmpty())
-        return false;
-    // const lookup: actionForShortcut's operator[] would insert an empty entry
-    // for every new key pressed in a surface — a slow leak in a long session
-    const auto it = shortcuts.constFind(shortcut);
-    return it != shortcuts.constEnd() && isSubjectChangingAction(*it);
-}
-
 // returns first shortcut that is found
 const QString ActionManager::shortcutForAction(const QString &action) {
     return shortcuts.key(action, "");
@@ -590,13 +580,35 @@ inline ActionType ActionManager::validateAction(const QString &actionName) {
     return ActionType::ACTION_INVALID;
 }
 //------------------------------------------------------------------------------
+// Tokens renamed when the keyboard vocabulary moved onto Qt's name table
+// (the vocabulary sweep pins that every InputMap name is Qt-parseable). Old
+// configs carrying the pre-rename spellings are folded forward here — without
+// this, a renamed binding would sit in the table, render in the editor, and
+// do nothing: the exact silent hole R12b closes on the action side.
+static void migrateLegacyTokenNames(QMap<QString, QString> &map) {
+    static const QHash<QString, QString> renames = {
+        {QStringLiteral("Wake Up"), QStringLiteral("WakeUp")},
+        {QStringLiteral("PgBack"), QStringLiteral("Back")},
+        {QStringLiteral("PgForward"), QStringLiteral("Forward")},
+    };
+    for(auto it = renames.constBegin(); it != renames.constEnd(); ++it) {
+        if(!map.contains(it.key()))
+            continue;
+        const QString action = map.take(it.key());
+        if(!map.contains(it.value()))
+            map.insert(it.value(), action);
+    }
+}
+
 void ActionManager::readShortcuts() {
     settings->readShortcuts(shortcuts);
+    migrateLegacyTokenNames(shortcuts);
     validateShortcuts(shortcuts);
 }
 
 void ActionManager::readGridShortcuts() {
     settings->readShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
+    migrateLegacyTokenNames(gridShortcuts);
     validateShortcuts(gridShortcuts);
 }
 
@@ -605,6 +617,7 @@ void ActionManager::readGridShortcuts() {
 void ActionManager::readInspectShortcuts() {
     inspectShortcuts = inspectDefaults;
     settings->readShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
+    migrateLegacyTokenNames(inspectShortcuts);
     validateShortcuts(inspectShortcuts);
 }
 

@@ -597,8 +597,14 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
     // the in-memory crop and then falls through below, so the global table
     // still does the writing — the disk belongs to Ctrl+S / Ctrl+Shift+S,
     // the tool just answers them.
-    if(hasSelection() && event->key() == Qt::Key_S && (event->modifiers() & Qt::ControlModifier))
+    if(hasSelection() && event->key() == Qt::Key_S && (event->modifiers() & Qt::ControlModifier)) {
         emit cropApply();
+        // the chord's second half is deliberate sequencing, not a fall-through:
+        // the veto kept it out of QShortcutMap, so the writing happens here —
+        // processEvent resolves save or saveAs, whichever the user bound
+        actionManager->processEvent(event);
+        return;
+    }
     if(const std::optional<CropAnswer> answer = cropAnswerForKey(event)) {
         // Enter is the crop's own key, with or without a selection: with
         // nothing selected there is nothing to apply, and the key is consumed
@@ -616,13 +622,12 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
     }
     if(event->matches(QKeySequence::SelectAll)) {
         selectAll();
-    } else if(actionManager->eventIsSubjectChanging(event)) {
+    } else if(actionManager->keyNamesSubjectChangingAction(event)) {
         // a different image clears the selection (onImageChanged), so yielding
         // the walk here would discard the crop the user is framing. Consumed.
-        return;
-    } else {
-        actionManager->processEvent(event);
     }
+    // everything else was either fired by QShortcutMap before delivery or is
+    // consumed above — the manual funnel has no keyboard jurisdiction here
 }
 
 //------------------------------------------------------------------------------

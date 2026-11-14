@@ -36,7 +36,7 @@ SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent)
 // fall through to the folder-view toggle behind the prompt.
 // The keyboard dispatch is QShortcutMap's now: a projected key fires before
 // this surface ever sees it. What still arrives is decided here — the walk,
-// the view switch and the way out (eventIsSubjectChanging) are vetoed back to
+// the view switch and the way out (keyNamesSubjectChangingAction) are vetoed back to
 // local delivery, because a Page Down would leave "save or discard?" pointing
 // at a file nobody is deciding about. The save chords are NOT vetoed: Ctrl+S
 // reaches the save action straight through the map, exactly as the buttons'
@@ -60,13 +60,12 @@ void SaveConfirmOverlay::keyPressEvent(QKeyEvent *event) {
     }
     if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
         return;
-    // the buttons' chords (Ctrl+S / Ctrl+Shift+S) and the display keys are
-    // meant to keep working through this surface; the walk is not — a new
-    // image would leave "save or discard?" pointing at a file the user is no
-    // longer deciding about
-    if(actionManager->eventIsSubjectChanging(event))
+    // the buttons' chords (Ctrl+S / Ctrl+Shift+S) fire through QShortcutMap
+    // before this handler runs; what arrives here is the walk the surface
+    // vetoed back — consumed, because a new image would leave "save or
+    // discard?" pointing at a file the user is no longer deciding about
+    if(actionManager->keyNamesSubjectChangingAction(event))
         return;
-    actionManager->processEvent(event);
 }
 
 void SaveConfirmOverlay::readSettings() {

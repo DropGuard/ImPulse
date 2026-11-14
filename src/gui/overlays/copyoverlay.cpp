@@ -194,9 +194,8 @@ void CopyOverlay::keyPressEvent(QKeyEvent *event) {
     // the menu names a target for a specific file: walking to another image
     // while it is open would leave the user unable to say which file they are
     // copying. Those keys are consumed, not yielded; zoom/fullscreen still are.
-    if(actionManager->eventIsSubjectChanging(event))
-        return;
-    actionManager->processEvent(event);
+    if(actionManager->keyNamesSubjectChangingAction(event))
+        return; // the walk was vetoed back here — consumed, same as the answer keys
 }
 
 // Clicking outside the menu is the same answer as Esc: dismiss without

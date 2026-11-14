@@ -333,43 +333,54 @@ class TestCrop : public QObject {
         actionManager->connectAction("gridSelectAll", &grid, &FolderGridView::selectAll);
         actionManager->connectAction("gridOpen", &grid, &FolderGridView::activateCurrent);
 
-        coretest::pressGridKey(grid, "Right", Qt::Key_Right);
+        // the grid surface goes live: the scope's keys ride QShortcuts on the
+        // grid and fire through QShortcutMap on window-delivered keys
+        actionManager->attachGridSurface(&grid);
+        grid.activateWindow();
+        QVERIFY(QTest::qWaitForWindowExposed(&grid));
+        grid.setFocus();
+        QVERIFY(grid.hasFocus());
+
+        coretest::deliverWindowKey(&grid, Qt::Key_Right);
         QCOMPARE(coretest::lastSelection(grid), 1);
-        coretest::pressGridKey(grid, "Left", Qt::Key_Left);
+        coretest::deliverWindowKey(&grid, Qt::Key_Left);
         QCOMPARE(coretest::lastSelection(grid), 0);
-        coretest::pressGridKey(grid, "Left", Qt::Key_Left);
+        coretest::deliverWindowKey(&grid, Qt::Key_Left);
         QCOMPARE(coretest::lastSelection(grid), 0); // past the start: stays
-        coretest::pressGridKey(grid, "Down", Qt::Key_Down);
-        coretest::pressGridKey(grid, "Up", Qt::Key_Up);
+        coretest::deliverWindowKey(&grid, Qt::Key_Down);
+        coretest::deliverWindowKey(&grid, Qt::Key_Up);
         QCOMPARE(coretest::lastSelection(grid), 0);
 
-        coretest::pressGridKey(grid, "End", Qt::Key_End);
+        coretest::deliverWindowKey(&grid, Qt::Key_End);
         QCOMPARE(coretest::lastSelection(grid), 24);
-        coretest::pressGridKey(grid, "Home", Qt::Key_Home);
+        coretest::deliverWindowKey(&grid, Qt::Key_Home);
         QCOMPARE(coretest::lastSelection(grid), 0);
-        coretest::pressGridKey(grid, "PgDown", Qt::Key_PageDown);
+        coretest::deliverWindowKey(&grid, Qt::Key_PageDown);
         const int paged = coretest::lastSelection(grid);
         QVERIFY2(paged > 0, "PgDown never left the first row");
-        coretest::pressGridKey(grid, "PgUp", Qt::Key_PageUp);
+        coretest::deliverWindowKey(&grid, Qt::Key_PageUp);
         QCOMPARE(coretest::lastSelection(grid), 0); // and back
 
-        coretest::pressGridKey(grid, "A", Qt::Key_A, Qt::ControlModifier);
+        coretest::deliverWindowKey(&grid, Qt::Key_A, Qt::ControlModifier);
         QCOMPARE(grid.selection().count(), 25); // Ctrl+A: everything
 
         QSignalSpy up(actionManager->action("goUp"), &QAction::triggered);
-        coretest::pressGridKey(grid, "Backspace", Qt::Key_Backspace);
+        coretest::deliverWindowKey(&grid, Qt::Key_Backspace);
         QCOMPARE(up.count(), 1); // goUp is the grid scope's own binding
 
         QSignalSpy activated(&grid, &FolderGridView::itemActivated);
-        coretest::pressGridKey(grid, "Enter", Qt::Key_Return);
+        coretest::deliverWindowKey(&grid, Qt::Key_Return);
         QCOMPARE(activated.count(), 1);
         QCOMPARE(activated.first().first().toInt(), 0);
 
         grid.select(5);
-        coretest::pressGridKey(grid, "Esc", Qt::Key_Escape);
+        coretest::deliverWindowKey(&grid, Qt::Key_Escape);
         QCOMPARE(coretest::lastSelection(grid), 5); // an unscoped key never moves the grid
 
-        // activation on an empty selection is guarded, not emitted blind
+        // activation on an empty selection is guarded, not emitted blind.
+        // This grid is never attached or shown, so it has no QShortcut
+        // surface: the pin is that an UNCLAIMED Return still cannot activate,
+        // which is the grid's own guard rather than the map's.
         coretest::TestableFolderGridView emptyGrid;
         emptyGrid.resize(300, 300);
         emptyGrid.populate(2);
