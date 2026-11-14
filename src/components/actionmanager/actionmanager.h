@@ -27,10 +27,15 @@ enum ActionType {
 // surface (Right pages in the document view, moves the grid selection in the
 // folder view), and one flat table cannot hold both.
 //
-// The whole keyboard answers to one law, least surprise by focus: keys are
-// handled by the surface that holds it — the focused one owns its keys,
-// yields the rest to the action system explicitly, and ranks above any
-// state-armed scope. Inside that law every floating surface answers Esc the
+// The whole keyboard answers to one law, least surprise by focus, in Qt's
+// own vocabulary now: a projected key fires through QShortcutMap before any
+// widget sees it; the focused surface claims back (ShortcutOverride veto)
+// the keys it must arbitrate — its own workflow keys, and every
+// subject-changing action, because a walk that swaps the file under a
+// floating surface destroys what that surface is acting on. The manual
+// funnel remains for the events QShortcutMap cannot match: pointer tokens
+// (wheel, mouse buttons, double-click) and the table entries no QKeySequence
+// can represent. Inside that law every floating surface answers Esc the
 // same way (close this layer — the flavors differ, the outcome does not),
 // and a disk write never sits on a bare key: in-memory answers only, the
 // save chords (Ctrl+S, Ctrl+Shift+S) and clicks do the writing.

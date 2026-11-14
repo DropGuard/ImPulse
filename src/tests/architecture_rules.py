@@ -332,6 +332,31 @@ for path, rel in sources():
     if '::keyPressEvent(' in text_of(path) and rel not in ALLOWED_KEY_DOORS:
         failures.append(f"R11 unauthorized key door: {rel} (add to ALLOWED_KEY_DOORS only after review)")
 
+# Rule 11b: the ShortcutOverride veto is the same door, new hinges. A surface
+# that handles QEvent::ShortcutOverride decides which keys reach QShortcutMap —
+# a claim outside this list is a second easter-egg hatch: it can silently
+# suppress every binding in the table, from a door no reader suspected.
+ALLOWED_OVERRIDE_DOORS = {
+    'gui/overlays/saveconfirmoverlay.cpp',   # the walk/view/exit keys are the prompt's to consume
+    'gui/overlays/copyoverlay.cpp',          # digits 1-9 are its per-destination hotkeys
+    'gui/crop/cropoverlay.cpp',              # the save chord commits the pending crop first
+    'gui/customwidgets/spinboxinputfix.cpp', # the spin box owns its editing keys (arrows included)
+    'gui/overlays/changelogwindow.cpp',      # Esc-local what's-new popup (filter on the focused button)
+    'gui/contextmenu.cpp',                   # popup: owns its keyboard outright
+    'gui/folderview/fvoptionspopup.cpp',     # popup: owns its keyboard outright
+    'gui/customwidgets/keysequenceedit.cpp', # the capture device takes every raw key
+    'gui/overlays/renameoverlay.cpp',        # filter on the focused line edit; exit chords pass through
+    'gui/folderview/treeviewcustom.cpp',     # the tree owns its keys (navigation + search)
+    'gui/customwidgets/styledcombobox.cpp',  # ignore-all routing: every key must be delivered to be ignored
+}
+for path, rel in sources():
+    if rel.startswith('tests/'):
+        continue
+    scanned['R11b'] = scanned.get('R11b', 0) + 1
+    if 'QEvent::ShortcutOverride' in text_of(path) and rel not in ALLOWED_OVERRIDE_DOORS:
+        failures.append(f"R11b unauthorized ShortcutOverride claim: {rel} (add to ALLOWED_OVERRIDE_DOORS "
+                        "only after review)")
+
 # Rule 12: every registered action must be connected. invokeAction resolves
 # ACTION_NORMAL by triggering the registered QAction — a registration without
 # a connectAction is an action that shows in the keymap, is invokable, and
