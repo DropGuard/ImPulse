@@ -17,6 +17,7 @@
 
 #include <QThread>
 #include <QDrag>
+#include <QFileInfo>
 #include <QTemporaryFile>
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -180,9 +181,27 @@ void Core::onFileRenamed(const QString &filePath, const QString &newPath, int ol
     updateInfoString();
 }
 
-// !! fixme
+// The model follows the disk for unedited entries (mtime compare + reload;
+// the repaint arrives via itemUpdated). What only Core can add: the current
+// image holds uncommitted edits while the disk moved under it — say so. The
+// edited state wins, and an explicit reload picks the disk content up; a
+// self-save is silent because Image::save refreshes the recorded mtime.
 void Core::onFileModified(const QString &filePath) {
-    Q_UNUSED(filePath)
+    if(filePath != state.currentFilePath)
+        return;
+    auto img = model->getImage(filePath);
+    if(!img || !img->isEdited())
+        return;
+    // the question is disk-vs-recorded, stat directly: the manager's meta is
+    // a mirror that can lag the very event that just arrived
+    const QDateTime disk = QFileInfo(filePath).lastModified();
+    if(disk == img->lastModified())
+        return;
+    if(filePath == divergenceAnnouncedFor && disk == divergenceAnnouncedAt)
+        return; // the same divergence, already announced
+    divergenceAnnouncedFor = filePath;
+    divergenceAnnouncedAt = disk;
+    overlays_->showMessage(tr("File changed on disk — your edits are kept in memory."));
 }
 
 void Core::sortByName() {

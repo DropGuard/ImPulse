@@ -237,8 +237,14 @@ void DirectoryModel::onFileModified(const QString &filePath) {
         auto img = cache.get(filePath);
         if(img) {
             // check if file on disk is different
-            if(modTime != img->lastModified())
-                reload(filePath);
+            if(modTime != img->lastModified()) {
+                // an edited image IS uncommitted work: the disk does not write
+                // over memory, exactly as bare keys do not write over disk.
+                // reload() would cache.remove() the user's edits away; the
+                // divergence is announced instead (Core, current file only).
+                if(!img->isEdited())
+                    reload(filePath);
+            }
         }
         emit fileModified(filePath);
     }

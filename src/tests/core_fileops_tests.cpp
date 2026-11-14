@@ -733,6 +733,70 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
         QCOMPARE(core.directoryModel()->fileCount(), 2); // lossless, as under an issued rename
     }
 
+    // The watcher's contract for the image on screen: an external rewrite is
+    // followed (the entry re-decodes, the screen repaints through itemUpdated),
+    // while an image holding uncommitted edits is never clobbered — the disk
+    // does not write over memory, exactly as bare keys do not write over disk.
+    // The clobber used to BE the model's reload (cache.remove over an edited
+    // entry), and Core's onFileModified was the empty slot under a `!! fixme`.
+    void externalModificationFollowsTheDiskButNeverClobbersEdits() {
+        const QString dir = uniqueDir("watchmod");
+        const QString file = QDir(dir).filePath("watched.png");
+        writeImage(file);
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        Core core(deps);
+        // the ctor's first-run message is this fork's own baseline noise
+        const int messageBaseline = overlayFake.messageCalls;
+        QVERIFY(core.loadPath(file));
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), file, 10000);
+
+        // (a) unedited, through the real watcher: an external rewrite is
+        // followed down to a repaint. The watcher leg gets a wide window —
+        // under the check target's -j4 the rescan→re-list chain stretches
+        // past the suite's usual 10 s, while a quiet machine lands it in
+        // milliseconds (QTRY exits early).
+        QImage bigger(20, 10, QImage::Format_RGB32);
+        bigger.fill(Qt::blue);
+        QVERIFY(bigger.save(file, "png"));
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(file)->size(), QSize(20, 10), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(view.showImageCalls >= 2, 30000); // the repaint rode itemUpdated, same event
+                                                                   // (and the flip below must not race it)
+        QCOMPARE(overlayFake.messageCalls, messageBaseline);       // silent: nothing held
+
+        // (b) edited, driven at the model signal (the same one Core attaches
+        // to): flip first, rewrite the disk, then deliver the event directly.
+        // This pins the Core contract — announce the divergence, keep the
+        // edit, land no repaint — without betting on watcher latency.
+        core.flipH();
+        QVERIFY(core.directoryModel()->getImage(file)->isEdited());
+        const int showCallsBefore = view.showImageCalls;
+        QImage other(4, 4, QImage::Format_RGB32);
+        other.fill(Qt::green);
+        // separate the two stamps: a coarse-jiffy filesystem stamps same-tick
+        // saves identically, and the mtime IS the change signal here
+        QTest::qWait(150);
+        QVERIFY(other.save(file, "png"));
+        emit core.directoryModel()->fileModified(file);
+
+        QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
+        QVERIFY(core.directoryModel()->getImage(file)->isEdited());
+        QCOMPARE(core.directoryModel()->getImage(file)->size(),
+                 QSize(20, 10));                        // the edited geometry, not the disk's 4x4
+        QCOMPARE(view.showImageCalls, showCallsBefore); // no clobber repaint
+
+        // the watcher reports one save as several events: the same divergence
+        // must not re-announce (dedup keyed by path + disk mtime)
+        emit core.directoryModel()->fileModified(file);
+        QCOMPARE(overlayFake.messageCalls, messageBaseline + 1);
+    }
+
     // ---- DirectoryPresenter lifecycle: the view is an injected observer, the
     // model connections are per-model, and disconnectView (until now a todo)
     // is what allows a presenter to outlive one view and bind another.
