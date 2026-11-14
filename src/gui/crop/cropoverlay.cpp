@@ -573,12 +573,12 @@ void CropOverlay::keyPressEvent(QKeyEvent *event) {
     if(hasSelection() && event->key() == Qt::Key_S && (event->modifiers() & Qt::ControlModifier))
         emit cropApply();
     if(const std::optional<CropAnswer> answer = cropAnswerForKey(event)) {
-        // Enter with nothing selected is not an answer yet — the key falls
-        // through to the action system like any unowned key
-        if(*answer == CropAnswer::Apply && !hasSelection()) {
-            actionManager->processEvent(event);
+        // Enter is the crop's own key, with or without a selection: with
+        // nothing selected there is nothing to apply, and the key is consumed
+        // — it must not resolve as folder view (its global binding) or trip
+        // the pending-work lock. Owned keys do not pass through.
+        if(*answer == CropAnswer::Apply && !hasSelection())
             return;
-        }
         if(*answer == CropAnswer::Apply) {
             emit cropApply(); // the in-memory crop only; the save is Ctrl+S's job
             return;
