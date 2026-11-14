@@ -133,6 +133,10 @@ class TestEditSave : public QObject {
         QCOMPARE(fake.confirmCalls, 0);
         QCOMPARE(coretest::contentOf(img), diskBefore);
 
+        // the pending-work lock: an uncommitted edit denies folder entry, so
+        // the document-mode edits resolve first — discard restores the disk
+        // state this test's baselines compare against
+        core.discardEdits();
         // the folder view is where an edit hits the disk, so the question has
         // to come first — and a declined question must mean nothing was written
         core.enableFolderView();
