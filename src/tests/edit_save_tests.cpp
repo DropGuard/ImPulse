@@ -62,6 +62,28 @@ class FakePresenterView : public QObject, public IDirectoryView {
     void droppedInto(const QMimeData *, QObject *, int) override;
 };
 
+// A scripted crop surface: the ICropSurface implementation without the
+// widget tree — the same shape CropController gives production minus the
+// panel/overlay. Records toggles, and the intent legs are real signals so a
+// test can wire them to Core's edit legs exactly the way connectComponents
+// wires the real controller.
+class FakeCropSurface : public QObject, public ICropSurface {
+    Q_OBJECT
+  public:
+    int toggleCalls = 0;
+    bool active = false;
+    void toggle() override {
+        ++toggleCalls;
+        active = !active;
+    }
+    bool isActive() const override {
+        return active;
+    }
+  signals:
+    void cropRequested(QRect rect) override;
+    void cropAndSaveRequested(QRect rect) override;
+};
+
 class TestEditSave : public QObject {
     Q_OBJECT
 
@@ -290,6 +312,48 @@ class TestEditSave : public QObject {
         core.discardEdits();
 
         QCOMPARE(core.directoryModel()->getImage(img)->size(), QSize(16, 8)); // back to the disk state
+    }
+
+    // The crop surface is a seam now (ICropSurface, Deps.crop): a headless
+    // Core can hold one, toggle it under Core's own policy, and take its
+    // intent through Core's public edit legs — all of which used to be
+    // unreachable without a window (the old path dereferenced mw->crop()).
+    void cropSurfaceTogglesThroughTheSeamAndIntentReachesTheEditLeg() {
+        const QString img = QDir(alpha).filePath("rect.png");
+        coretest::writeRectImage(img);
+
+        // no image on screen yet: Core's policy refuses to open the surface
+        coretest::FakeInteractions fake;
+        coretest::FakeOverlayHost overlayFake;
+        coretest::RecordingView view;
+        FakeCropSurface crop;
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &fake;
+        deps.overlays = &overlayFake;
+        deps.view = &view;
+        deps.crop = &crop;
+        Core core(deps);
+        core.toggleCropPanel();
+        QCOMPARE(crop.toggleCalls, 0); // the no-image guard, now testable headless
+
+        QVERIFY(core.loadPath(img));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        core.toggleCropPanel();
+        QCOMPARE(crop.toggleCalls, 1);
+        QVERIFY(crop.isActive());
+        core.toggleCropPanel();
+        QCOMPARE(crop.toggleCalls, 2);
+        QVERIFY(!crop.isActive());
+
+        // the intent leg: the surface's crop lands in Core's edit pipeline.
+        // The fixture is 16x8; cropping to the left half leaves 8x8 in memory.
+        core.toggleCropPanel();
+        QObject::connect(&crop, &FakeCropSurface::cropRequested, &core, &Core::crop);
+        emit crop.cropRequested(QRect(0, 0, 8, 8));
+        QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(8, 8), 10000);
+        QVERIFY(core.directoryModel()->getImage(img)->isEdited()); // in-memory: document mode never asks
+        QCOMPARE(fake.confirmCalls, 0);
     }
 
     // The edited-image export used to hand every consumer one fixed path,

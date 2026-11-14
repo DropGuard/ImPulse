@@ -233,8 +233,8 @@ class TestCoreNav : public QObject {
         QVERIFY(core.loadPath(QDir(base).filePath("cropkeys.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
 
-        core.mainWindow()->crop()->trigger();
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        core.mainWindow()->crop()->toggle();
+        QVERIFY(core.mainWindow()->crop()->isActive());
         auto *panel = core.mainWindow()->findChild<CropPanel *>();
         QVERIFY(panel);
 
@@ -296,7 +296,7 @@ class TestCoreNav : public QObject {
         // Apply does not dismiss: the surface stays open and, once the
         // applied crop settles into the viewer, the selection becomes the
         // whole new image — re-cropping is dragging again, no key needed
-        QVERIFY(core.mainWindow()->crop()->isCropPanelActive());
+        QVERIFY(core.mainWindow()->crop()->isActive());
         QTRY_COMPARE_WITH_TIMEOUT(widthBox->value(), originalWidth - 1, 10000);
         QTRY_COMPARE_WITH_TIMEOUT(heightBox->value(), originalHeight - 1, 10000);
         QCOMPARE(widthBox->maximum(), originalWidth - 1); // the readout tracks the new ground truth
@@ -316,7 +316,7 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(QImage(QDir(base).filePath("cropkeys.png")).size(),
                                   QSize(originalWidth - 2, originalHeight - 2), 10000); // ...and writes it
         QVERIFY2(
-            core.mainWindow()->crop()->isCropPanelActive(),
+            core.mainWindow()->crop()->isActive(),
             "the write went through the global save action, which does not own the surface — Esc is the only exit");
     }
 

@@ -25,6 +25,7 @@
 #include "gui/iuserinteractions.h"
 #include "gui/ioverlayhost.h"
 #include "gui/icoreview.h"
+#include "gui/icropsurface.h"
 #include "gui/folderview/foldergridview.h"
 #include "gui/panels/mainpanel/thumbnailstripproxy.h"
 #include "shortcutbuilder.h"
