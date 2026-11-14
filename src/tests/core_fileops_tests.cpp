@@ -49,6 +49,12 @@ class RecordingNavHost : public INavigationHost {
     void showGui() override {
         ++showGuiCalls;
     }
+    int viewModeChanges = 0;
+    ViewMode lastMode = MODE_DOCUMENT;
+    void onViewModeChanged(ViewMode mode) override {
+        ++viewModeChanges;
+        lastMode = mode;
+    }
 };
 
 class TestCoreFileOps : public QObject, protected EngineStackFixture {

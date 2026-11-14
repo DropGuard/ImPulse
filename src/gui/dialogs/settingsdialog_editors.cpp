@@ -36,6 +36,10 @@ const QString &scopeInspect() {
     static const QString s = QStringLiteral("inspect");
     return s;
 }
+const QString &scopeDocument() {
+    static const QString s = QStringLiteral("document");
+    return s;
+}
 } // namespace
 
 //------------------------------------------------------------------------------
@@ -101,6 +105,15 @@ void SettingsDialog::readShortcuts() {
     std::sort(rows.begin(), rows.end());
     for(const auto &row : rows)
         addShortcutToTable(row.first, row.second, scopeGlobal());
+
+    addSectionHeader(tr("Document view — while one image is on screen"));
+    rows.clear();
+    const QMap<QString, QString> docShortcuts = actionManager->allDocShortcuts();
+    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
+        rows.append({it.value(), it.key()});
+    std::sort(rows.begin(), rows.end());
+    for(const auto &row : rows)
+        addShortcutToTable(row.first, row.second, scopeDocument());
 
     addSectionHeader(tr("Folder view — while the thumbnail grid holds focus"));
     rows.clear();
@@ -310,6 +323,7 @@ void SettingsDialog::removeShortcut() {
 void SettingsDialog::saveShortcuts() {
     actionManager->removeAllShortcuts();
     actionManager->removeAllGridShortcuts();
+    actionManager->removeAllDocShortcuts();
     actionManager->removeAllInspectShortcuts();
     for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
         QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(i, 0);
@@ -323,6 +337,8 @@ void SettingsDialog::saveShortcuts() {
             actionManager->addGridShortcut(shortcut, action);
         else if(scope == scopeInspect())
             actionManager->addInspectShortcut(shortcut, action);
+        else if(scope == scopeDocument())
+            actionManager->addDocShortcut(shortcut, action);
         else if(scope == scopeGlobal())
             actionManager->addShortcut(shortcut, action);
     }

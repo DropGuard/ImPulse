@@ -115,68 +115,6 @@ template <class T> void Settings::store(const SettingDesc &d, const T &v) {
     settingsConf->setValue(d.key, v);
 }
 
-QString Settings::qimgvConfigDir() {
-    // QStandardPaths' GenericConfigLocation is $XDG_CONFIG_HOME (or ~/.config),
-    // and QSettings' NativeFormat puts an org/app pair under <that>/<org>/. The
-    // shared legacy identity was organization "qimgv", application "qimgv".
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/qimgv");
-}
-
-Settings::ImportReport Settings::importQimgvConfig(const QString &sourceDir, const QString &destinationDir) {
-    ImportReport report;
-    const QDir source(sourceDir);
-    // The one file whose absence means "nothing to import". savedState and theme
-    // are optional companions — a qimgv that never changed its theme has no
-    // theme.conf, and that is not a failure.
-    if(!QFileInfo::exists(source.filePath(QStringLiteral("qimgv.conf")))) {
-        report.detail = source.absolutePath();
-        return report; // NoSource
-    }
-
-    QDir dest(destinationDir);
-    if(!dest.exists() && !QDir().mkpath(dest.absolutePath())) {
-        report.outcome = ImportOutcome::Failed;
-        report.detail = dest.absolutePath();
-        return report;
-    }
-
-    // Copies, never moves, and never overwrites: the source belongs to qimgv,
-    // and a destination file that already exists is this app's own current
-    // configuration — replacing it would silently discard what the user has
-    // been running with.
-    const struct {
-        const char *from;
-        const char *to;
-    } files[] = {
-        {"qimgv.conf", "impulse.conf"},
-        {"savedState.conf", "savedState.conf"},
-        {"theme.conf", "theme.conf"},
-    };
-    for(const auto &f : files) {
-        const QString from = source.filePath(QString::fromLatin1(f.from));
-        const QString to = dest.filePath(QString::fromLatin1(f.to));
-        if(!QFileInfo::exists(from))
-            continue;
-        if(QFileInfo::exists(to)) {
-            report.skipped << QString::fromLatin1(f.to);
-        } else if(QFile::copy(from, to)) {
-            report.copied << QString::fromLatin1(f.to);
-        } else if(report.outcome != ImportOutcome::Failed) {
-            // first failure names the file; later ones do not overwrite it
-            report.outcome = ImportOutcome::Failed;
-            report.detail = from;
-        }
-    }
-
-    // One answer derived once, at the end: a partial success is still a
-    // success, and a run that copied nothing but skipped something is its own
-    // case rather than "failed".
-    if(report.outcome == ImportOutcome::Failed)
-        return report;
-    report.outcome = report.copied.isEmpty() ? ImportOutcome::AllSkipped : ImportOutcome::Imported;
-    return report;
-}
-
 // The private thumbnail store this fork used before the XDG adoption is dead
 // weight: nothing reads it any more, and it is regenerable by definition. It is
 // removed once per cache root, and the marker makes that "once" true across

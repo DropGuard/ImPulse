@@ -42,7 +42,6 @@ class SettingsDialog : public QDialog {
     // The message the import would show, built without showing it. The test
     // needs the text; QMessageBox::information blocks on a modal dialog that
     // no headless run can dismiss. Public for that seam, not for callers.
-    QString importMessage(const QString &sourceDir, const QString &destinationDir);
 
   private:
     void readColorScheme();
@@ -97,7 +96,6 @@ class SettingsDialog : public QDialog {
     // Explicit, never automatic: until 2026.11 this fork and upstream qimgv
     // shared the "qimgv/qimgv" identity, so the directory may belong to an
     // upstream installation. The user asks, the dialog reports what happened.
-    void importQimgvConfig();
     void onBgOpacitySliderChanged(int value);
     void onThumbnailerThreadsSliderChanged(int value);
     void onExpandLimitSliderChanged(int value);

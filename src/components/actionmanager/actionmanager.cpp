@@ -176,6 +176,20 @@ void ActionManager::attachGridSurface(QWidget *surface) {
     applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
+void ActionManager::attachDocumentSurface(QWidget *surface) {
+    if(documentSurface == surface)
+        return;
+    documentSurface = surface;
+    if(documentSurface) {
+        connect(documentSurface, &QObject::destroyed, this, [this]() {
+            documentSurface = nullptr;
+            documentProjections.clear();
+            applyKeyboardProjection();
+        });
+    }
+    applyKeyboardProjection();
+}
+
 void ActionManager::setGridActive(bool active) {
     if(gridActive == active)
         return;
@@ -185,6 +199,7 @@ void ActionManager::setGridActive(bool active) {
 //------------------------------------------------------------------------------
 void ActionManager::applyKeyboardProjection() {
     rebuildGridShortcuts();
+    rebuildDocumentShortcuts();
     reproject();
 }
 //------------------------------------------------------------------------------
@@ -202,33 +217,18 @@ static QList<QKeySequence> sequencesForToken(const QString &token) {
     return {seq};
 }
 //------------------------------------------------------------------------------
+// The global table's projection onto the registered QActions. What is left
+// here is small on purpose: the keyboard's view-specific keys are not in this
+// table at all any more, they ride the document surface's and the grid's own
+// QShortcuts. So there is nothing to de-claim — a key belongs to exactly one
+// surface by construction, and Qt's context rules do the rest.
 void ActionManager::reproject() {
-    // the keys the grid claims while it holds focus come off the global table
-    // — two live claims of one key would be ambiguous with NEITHER firing
-    // (dispatch_probe_tests), so the scopes de-claim instead of layering
-    QSet<QString> gridClaims;
-    if(gridActive && gridSurface) {
-        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it)
-            if(!isPointerToken(it.key()))
-                gridClaims.insert(it.key());
-    }
-    // the armed inspect layer replaces the global claims for its keys, except
-    // where the focused grid outranks it
-    QMap<QString, QString> inspectLayer;
-    if(inspectMode) {
-        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
-            if(!isPointerToken(it.key()) && !gridClaims.contains(it.key()))
-                inspectLayer.insert(it.key(), it.value());
-    }
-    // per-action shortcut lists over the effective global table
     QMap<QString, QList<QKeySequence>> projected;
     for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
-        if(isPointerToken(it.key()) || gridClaims.contains(it.key()) || inspectLayer.contains(it.key()))
-            continue;
+        if(isPointerToken(it.key()))
+            continue; // pointer tokens never ride QShortcutMap
         projected[it.value()].append(sequencesForToken(it.key()));
     }
-    for(auto it = inspectLayer.constBegin(); it != inspectLayer.constEnd(); ++it)
-        projected[it.value()].append(sequencesForToken(it.key()));
     // every registered action gets its projected list — an action with no
     // keyboard claim gets an empty one, clearing stale sequences
     for(auto it = mActions.constBegin(); it != mActions.constEnd(); ++it)
@@ -256,45 +256,44 @@ void ActionManager::rebuildGridShortcuts() {
     }
 }
 //------------------------------------------------------------------------------
+// The document view's set. Same shape as the grid's, one difference: the armed
+// inspect layer does not sit ABOVE this table, it is a variant OF it — fit
+// original / free zoom says "I am inspecting this image", and the arrows pan
+// the canvas instead of changing images. That is the same view, a different
+// mode of it, so it is built here and never competes for a key with the base.
+void ActionManager::rebuildDocumentShortcuts() {
+    qDeleteAll(documentProjections);
+    documentProjections.clear();
+    if(!documentSurface)
+        return;
+    QMap<QString, QString> effective = docShortcuts;
+    if(inspectMode) {
+        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+            if(!isPointerToken(it.key()))
+                effective.insert(it.key(), it.value());
+    }
+    for(auto it = effective.constBegin(); it != effective.constEnd(); ++it) {
+        if(isPointerToken(it.key()))
+            continue; // pointer tokens never ride QShortcutMap
+        const QList<QKeySequence> seqs = sequencesForToken(it.key());
+        for(const QKeySequence &seq : seqs) {
+            auto *sc = new QShortcut(seq, documentSurface);
+            sc->setContext(Qt::WidgetWithChildrenShortcut);
+            const QString actionName = it.value();
+            connect(sc, &QShortcut::activated, this, [this, actionName]() {
+                invokeAction(actionName);
+            });
+            documentProjections.append(sc);
+        }
+    }
+}
+//------------------------------------------------------------------------------
 void ActionManager::initDefaults() {
-    defaults.insert("Right", "nextImage");
-    defaults.insert("Left", "prevImage");
-    defaults.insert("XButton2", "nextImage");
-    defaults.insert("XButton1", "prevImage");
-    defaults.insert("WheelDown", "nextImage");
-    defaults.insert("WheelUp", "prevImage");
     defaults.insert("F", "toggleFullscreen");
     defaults.insert("F11", "toggleFullscreen");
     defaults.insert("LMB_DoubleClick", "toggleFullscreen");
     defaults.insert("MiddleButton", "exit");
-    defaults.insert("Space", "toggleFitMode");
-    defaults.insert(InputMap::keyNameShift() + "+Space", "nextFitMode");
-    defaults.insert("1", "fitWindow");
-    defaults.insert("2", "fitWidth");
-    defaults.insert("3", "fitNormal");
-    defaults.insert("R", "resize");
-    defaults.insert("H", "flipH");
-    defaults.insert("V", "flipV");
-    defaults.insert(InputMap::keyNameCtrl() + "+R", "rotateRight");
-    defaults.insert(InputMap::keyNameCtrl() + "+L", "rotateLeft");
-    defaults.insert(InputMap::keyNameCtrl() + "+WheelUp", "zoomInCursor");
-    defaults.insert(InputMap::keyNameCtrl() + "+WheelDown", "zoomOutCursor");
-    defaults.insert("=", "zoomIn"); // [=+] key on the number row
-    defaults.insert(InputMap::keyNameCtrl() + "+=", "zoomIn");
-    defaults.insert("+", "zoomIn");
-    defaults.insert(InputMap::keyNameCtrl() + "++", "zoomIn");
-    defaults.insert("-", "zoomOut");
-    defaults.insert(InputMap::keyNameCtrl() + "+-", "zoomOut");
-    defaults.insert(InputMap::keyNameCtrl() + "+Down", "zoomOut");
-    defaults.insert(InputMap::keyNameCtrl() + "+Up", "zoomIn");
-    defaults.insert("Up", "scrollUp");
-    defaults.insert("Down", "scrollDown");
     defaults.insert(InputMap::keyNameCtrl() + "+O", "open");
-    defaults.insert(InputMap::keyNameCtrl() + "+S", "save");
-    defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+S", "saveAs");
-    defaults.insert(InputMap::keyNameCtrl() + "+W", "setWallpaper");
-    defaults.insert("X", "crop");
-    defaults.insert(InputMap::keyNameCtrl() + "+P", "print");
     defaults.insert(InputMap::keyNameAlt() + "+X", "exit");
     defaults.insert(InputMap::keyNameCtrl() + "+Q", "exit");
     defaults.insert("Esc", "closeFullScreenOrExit");
@@ -302,29 +301,14 @@ void ActionManager::initDefaults() {
     defaults.insert(InputMap::keyNameShift() + "+Del", "removeFile");
     defaults.insert("C", "copyFile");
     defaults.insert("M", "moveFile");
-    defaults.insert("Home", "jumpToFirst");
-    defaults.insert("End", "jumpToLast");
-    defaults.insert("PgUp", "prevImage");
-    defaults.insert("PgDown", "nextImage");
-    defaults.insert(InputMap::keyNameCtrl() + "+Right", "seekVideoForward");
-    defaults.insert(InputMap::keyNameCtrl() + "+Left", "seekVideoBackward");
-    defaults.insert(",", "frameStepBack");
-    defaults.insert(".", "frameStep");
     defaults.insert("Enter", "folderView");
     defaults.insert("Backspace", "folderView");
-    defaults.insert("F5", "reloadImage");
     defaults.insert(InputMap::keyNameCtrl() + "+C", "copyFileClipboard");
     defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+C", "copyPathClipboard");
     defaults.insert("F2", "renameFile");
     defaults.insert("RMB", "contextMenu");
     defaults.insert("Menu", "contextMenu");
-    defaults.insert("I", "toggleImageInfo");
-    defaults.insert(InputMap::keyNameCtrl() + "+`", "toggleShuffle");
     defaults.insert(InputMap::keyNameCtrl() + "+D", "showInDirectory");
-    defaults.insert("`", "toggleSlideshow");
-    defaults.insert(InputMap::keyNameCtrl() + "+Z", "discardEdits");
-    defaults.insert(InputMap::keyNameShift() + "+Right", "nextDirectory");
-    defaults.insert(InputMap::keyNameShift() + "+Left", "prevDirectory");
     defaults.insert(InputMap::keyNameShift() + "+F", "toggleFullscreenInfoBar");
     defaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFile");
 
@@ -335,6 +319,61 @@ void ActionManager::initDefaults() {
 #else
     defaults.insert("P", "openSettings");
 #endif
+
+    // ---- the document view's keys ----------------------------------------
+    // Everything that only means something with one image on screen: the walk,
+    // zoom, fit, the edit verbs, and the commands whose result must be visible.
+    // These used to live in the global table with `if(viewMode == FOLDERVIEW)
+    // return` guards inside each command; a binding that does not exist in the
+    // folder view needs no guard, and the guard belonged to the wrong layer.
+    docDefaults.insert("Right", "nextImage");
+    docDefaults.insert("Left", "prevImage");
+    docDefaults.insert("XButton2", "nextImage");
+    docDefaults.insert("XButton1", "prevImage");
+    docDefaults.insert("WheelDown", "nextImage");
+    docDefaults.insert("WheelUp", "prevImage");
+    docDefaults.insert("PgUp", "prevImage");
+    docDefaults.insert("PgDown", "nextImage");
+    docDefaults.insert("Space", "toggleFitMode");
+    docDefaults.insert(InputMap::keyNameShift() + "+Space", "nextFitMode");
+    docDefaults.insert("1", "fitWindow");
+    docDefaults.insert("2", "fitWidth");
+    docDefaults.insert("3", "fitNormal");
+    docDefaults.insert("R", "resize");
+    docDefaults.insert("H", "flipH");
+    docDefaults.insert("V", "flipV");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+R", "rotateRight");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+L", "rotateLeft");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+WheelUp", "zoomInCursor");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+WheelDown", "zoomOutCursor");
+    docDefaults.insert("=", "zoomIn"); // [=+] key on the number row
+    docDefaults.insert(InputMap::keyNameCtrl() + "+=", "zoomIn");
+    docDefaults.insert("+", "zoomIn");
+    docDefaults.insert(InputMap::keyNameCtrl() + "++", "zoomIn");
+    docDefaults.insert("-", "zoomOut");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+-", "zoomOut");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+Down", "zoomOut");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+Up", "zoomIn");
+    docDefaults.insert("Up", "scrollUp");
+    docDefaults.insert("Down", "scrollDown");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+S", "save");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+S", "saveAs");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+W", "setWallpaper");
+    docDefaults.insert("X", "crop");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+P", "print");
+    docDefaults.insert("Home", "jumpToFirst");
+    docDefaults.insert("End", "jumpToLast");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+Right", "seekVideoForward");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+Left", "seekVideoBackward");
+    docDefaults.insert(",", "frameStepBack");
+    docDefaults.insert(".", "frameStep");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+Z", "discardEdits");
+    docDefaults.insert(InputMap::keyNameShift() + "+Right", "nextDirectory");
+    docDefaults.insert(InputMap::keyNameShift() + "+Left", "prevDirectory");
+    docDefaults.insert("`", "toggleSlideshow");
+    docDefaults.insert(InputMap::keyNameCtrl() + "+`", "toggleShuffle");
+    docDefaults.insert("I", "toggleImageInfo");
+    docDefaults.insert("F5", "reloadImage");
 
     // the inspect scope's defaults are platform-neutral: the arrows are the
     // canvas keys while fit original / free zoom declare an inspection
@@ -370,6 +409,7 @@ void ActionManager::initShortcuts() {
     gridShortcuts = gridDefaults;
     readShortcuts();
     readGridShortcuts();
+    readDocShortcuts();
     readInspectShortcuts();
 }
 //------------------------------------------------------------------------------
@@ -431,6 +471,13 @@ void ActionManager::resetDefaults() {
     applyKeyboardProjection();
 }
 
+void ActionManager::setDocumentActive(bool active) {
+    if(documentActive == active)
+        return;
+    documentActive = active;
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
 void ActionManager::setInspectMode(bool inspect) {
     inspectMode = inspect;
     applyKeyboardProjection(); // the armed layer swaps the projected claims
@@ -479,6 +526,11 @@ QString ActionManager::actionForShortcut(const QString &keys) {
 // table minus the focused grid's claims, plus the armed inspect layer. The
 // same de-claim law reproject() applies to the Qt-side shortcut lists — the
 // veto predicates must answer against what the map will actually fire.
+// What a key means right now, across every live table. The order is the
+// surfaces' own resolution: a focused grid outranks everything (its keys are
+// de-claimed from the document set by focus alone, since the grid's QShortcuts
+// belong to the grid's subtree), then the document view's table — the armed
+// inspect variant already folded into it — then the global one.
 QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
     QSet<QString> gridClaims;
     if(gridActive && gridSurface) {
@@ -486,19 +538,35 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
             if(!isPointerToken(it.key()))
                 gridClaims.insert(it.key());
     }
+    if(gridActive && gridSurface) {
+        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it) {
+            if(isPointerToken(it.key()))
+                continue;
+            if(sequencesForToken(it.key()).contains(seq))
+                return it.value();
+        }
+    }
+    // the document view's map answers only while its surface is on screen —
+    // the same condition that decides whether its QShortcuts are live, so the
+    // resolver and the dispatcher cannot disagree
+    if(documentActive) {
+        QMap<QString, QString> document = docShortcuts;
+        if(inspectMode)
+            for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+                if(!isPointerToken(it.key()))
+                    document.insert(it.key(), it.value());
+        for(auto it = document.constBegin(); it != document.constEnd(); ++it) {
+            if(isPointerToken(it.key()))
+                continue;
+            if(sequencesForToken(it.key()).contains(seq))
+                return it.value();
+        }
+    }
     for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()) || gridClaims.contains(it.key()))
             continue;
         if(sequencesForToken(it.key()).contains(seq))
             return it.value();
-    }
-    if(inspectMode) {
-        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it) {
-            if(isPointerToken(it.key()) || gridClaims.contains(it.key()))
-                continue;
-            if(sequencesForToken(it.key()).contains(seq))
-                return it.value();
-        }
     }
     return QString();
 }
@@ -516,7 +584,17 @@ const QString ActionManager::shortcutForAction(const QString &action) {
 }
 
 const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
-    return shortcuts.keys(action);
+    // every live table: a surface asking "which keys does this action carry?"
+    // must see the document view's binding too, or it will veto the wrong
+    // keys (the crop overlay's save chord is exactly that question)
+    QList<QString> keys = shortcuts.keys(action);
+    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
+        if(it.value() == action)
+            keys << it.key();
+    for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+        if(it.value() == action && !keys.contains(it.key()))
+            keys << it.key();
+    return keys;
 }
 
 //------------------------------------------------------------------------------
@@ -554,9 +632,17 @@ bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
 // surface now says that through its own QShortcuts plus a ShortcutOverride
 // claim — before this code is reached at all. Pointer events carry no focus
 // question: a wheel over the grid zooms the image, it does not page the grid.
+// A token ("Ctrl+S") resolved across every live table. This is the manual
+// funnel's entry: pointer tokens come through here directly, and a surface
+// that vetoed a key out of QShortcutMap re-emits it here to get the dispatch
+// it suppressed (the crop overlay's save chord is the one case today). Both
+// kinds must see the document view's bindings — a save chord is a save chord
+// whichever table it lives in.
 bool ActionManager::resolveShortcut(const QString &shortcut) {
     if(inspectMode && inspectShortcuts.contains(shortcut))
         return invokeAction(inspectShortcuts[shortcut]);
+    if(docShortcuts.contains(shortcut))
+        return invokeAction(docShortcuts[shortcut]);
     if(shortcuts.contains(shortcut))
         return invokeAction(shortcuts[shortcut]);
     return false;
@@ -617,6 +703,13 @@ void ActionManager::readGridShortcuts() {
 
 // the inspect layer's user overrides: defaults first, config entries overlay
 // them — the same insert-if-present semantic the global table carries
+void ActionManager::readDocShortcuts() {
+    docShortcuts = docDefaults;
+    settings->readShortcuts(docShortcuts, QStringLiteral("docShortcuts"));
+    migrateLegacyTokenNames(docShortcuts);
+    validateShortcuts(docShortcuts);
+}
+
 void ActionManager::readInspectShortcuts() {
     inspectShortcuts = inspectDefaults;
     settings->readShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
@@ -624,6 +717,37 @@ void ActionManager::readInspectShortcuts() {
     validateShortcuts(inspectShortcuts);
 }
 
+//------------------------------------------------------------------------------
+void ActionManager::addDocShortcut(const QString &keys, const QString &action) {
+    ActionType type = validateAction(action);
+    if(type != ActionType::ACTION_INVALID) {
+        docShortcuts.insert(keys, action);
+        applyKeyboardProjection();
+    }
+}
+//------------------------------------------------------------------------------
+const QMap<QString, QString> &ActionManager::allDocShortcuts() {
+    return docShortcuts;
+}
+//------------------------------------------------------------------------------
+void ActionManager::removeAllDocShortcuts() {
+    docShortcuts.clear();
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+void ActionManager::removeAllDocShortcuts(const QString &actionName) {
+    for(auto i = docShortcuts.begin(); i != docShortcuts.end();) {
+        if(i.value() == actionName)
+            i = docShortcuts.erase(i);
+        else
+            ++i;
+    }
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+void ActionManager::saveDocShortcuts() {
+    settings->saveShortcuts(docShortcuts, QStringLiteral("docShortcuts"));
+}
 //------------------------------------------------------------------------------
 void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);

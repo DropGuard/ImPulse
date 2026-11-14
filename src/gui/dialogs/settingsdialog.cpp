@@ -164,14 +164,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
     if(!settings->supportedFormats().contains("jxl"))
         ui->animatedJxlCheckBox->hide();
 
-    // The import button is only offered when there is something to import: a
-    // permanently dead control teaches the user nothing, and this one's absence
-    // is itself the message ("no qimgv configuration found on this machine").
-    const bool haveQimgvConfig = QFileInfo::exists(Settings::qimgvConfigDir() + "/qimgv.conf");
-    ui->importQimgvButton->setVisible(haveQimgvConfig);
-    ui->importQimgvNote->setVisible(haveQimgvConfig);
-    connect(ui->importQimgvButton, &QPushButton::clicked, this, &SettingsDialog::importQimgvConfig);
-
     setupSidebar();
 
     // setup radioBtn groups
@@ -499,6 +491,7 @@ void SettingsDialog::saveSettings() {
     scriptManager->saveScripts();
     actionManager->saveShortcuts();
     actionManager->saveGridShortcuts();
+    actionManager->saveDocShortcuts();
     actionManager->saveInspectShortcuts();
     emit settingsChanged();
 }
@@ -519,38 +512,6 @@ void SettingsDialog::selectMpvPath() {
     if(!file.isEmpty()) {
         ui->mpvLineEdit->setText(file);
     }
-}
-//------------------------------------------------------------------------------
-void SettingsDialog::importQimgvConfig() {
-    const QString source = Settings::qimgvConfigDir();
-    const QString dest = QFileInfo(QSettings().fileName()).absolutePath();
-    QMessageBox::information(this, tr("Import settings from qimgv"), importMessage(source, dest));
-}
-
-QString SettingsDialog::importMessage(const QString &sourceDir, const QString &destinationDir) {
-    const Settings::ImportReport report = Settings::importQimgvConfig(sourceDir, destinationDir);
-
-    // One message per outcome. The outcome is a value the import already
-    // decided; re-deriving it from flags here is how caller and callee end up
-    // disagreeing about what happened.
-    QString message;
-    switch(report.outcome) {
-    case Settings::ImportOutcome::NoSource:
-        message = tr("No qimgv configuration found in %1.").arg(report.detail);
-        break;
-    case Settings::ImportOutcome::Imported:
-        message = tr("Imported from qimgv: %1.").arg(report.copied.join(QStringLiteral(", ")));
-        if(!report.skipped.isEmpty())
-            message += QLatin1Char(' ') +
-                       tr("Already present here, left unchanged: %1.").arg(report.skipped.join(QStringLiteral(", ")));
-        message += QLatin1Char(' ') + tr("Restart to apply.");
-        break;
-    case Settings::ImportOutcome::AllSkipped:
-        message = tr("Nothing imported: %1 already exists here.").arg(report.skipped.join(QStringLiteral(", ")));
-        break;
-    case Settings::ImportOutcome::Failed: message = tr("Could not import from %1.").arg(report.detail); break;
-    }
-    return message;
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onExpandLimitSliderChanged(int value) {

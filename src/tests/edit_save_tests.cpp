@@ -96,7 +96,12 @@ class TestEditSave : public QObject {
     // nothing and must leave the file untouched. The fixture is 16x8 with the
     // right half blue, so a horizontal flip is visible in pixels while the
     // size stays the same.
-    void flipsFollowTheConditionalSaveContract() {
+    // The edit contract is memory-only in every view. The folder view's
+    // flush-immediately mode retired with the view-scoped keymap: a thumbnail
+    // cannot show a transform's result, so writing behind an invisible
+    // confirmation was a silent rewrite. Ctrl+S is the only path to the disk,
+    // and this pin is the memory half — the pixels change, the disk does not.
+    void flipsEditInMemoryOnly() {
         const QString dir = uniqueDir("flips");
         const QString img = dir + QStringLiteral("/half.png");
         coretest::writeRectImage(img);
@@ -130,55 +135,17 @@ class TestEditSave : public QObject {
         core.flipV();
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
         QCOMPARE(fake.confirmCalls, 0);
-        QCOMPARE(coretest::contentOf(img), diskBefore);
+        QCOMPARE(coretest::contentOf(img), diskBefore); // never asked, never written
 
-        // the pending-work lock: an uncommitted edit denies folder entry, so
-        // the document-mode edits resolve first — discard restores the disk
-        // state this test's baselines compare against
+        // and the folder view cannot edit at all: the key is not in its map
         core.discardEdits();
-        // the folder view is where an edit hits the disk, so the question has
-        // to come first — and a declined question must mean nothing was written
         core.enableFolderView();
         QCOMPARE(core.viewState().viewMode.value(), MODE_FOLDERVIEW);
-        fake.confirmAnswer = false;
+        const QByteArray beforeFolderFlip = coretest::contentOf(img);
         core.flipH();
-        QCOMPARE(fake.confirmCalls, 1);
-        QCOMPARE(coretest::contentOf(img), diskBefore);
+        QCOMPARE(fake.confirmCalls, 0); // no confirmation: no write path exists
+        QCOMPARE(coretest::contentOf(img), beforeFolderFlip);
     }
-
-    void folderViewEditWithConsentRewritesTheFile() {
-        const QString dir = uniqueDir("consent");
-        const QString img = dir + QStringLiteral("/half.png");
-        coretest::writeRectImage(img);
-        const QByteArray diskBefore = coretest::contentOf(img);
-
-        coretest::FakeInteractions fake;
-        coretest::FakeOverlayHost overlayFake;
-        coretest::RecordingView view;
-        Core::Deps deps;
-        deps.headless = true;
-        deps.ui = &fake;
-        deps.overlays = &overlayFake;
-        deps.view = &view;
-        Core core(deps);
-        FakePresenterView presenterView;
-        core.folderPresenter().setView(&presenterView);
-        QVERIFY(core.loadPath(img));
-        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-
-        core.enableFolderView();
-        core.folderPresenter().selectAndFocus(img);
-        QTRY_VERIFY2_WITH_TIMEOUT(!core.currentSelection().isEmpty(),
-                                  "precondition broken: the folder view holds no selection", 10000);
-
-        fake.confirmAnswer = true;
-        core.flipH();
-
-        QCOMPARE(fake.confirmCalls, 1);
-        QTRY_VERIFY2_WITH_TIMEOUT(coretest::contentOf(img) != diskBefore,
-                                  "a consented folder-view edit never reached the disk", 10000);
-    }
-
     void editingInDocumentModeEditsInMemoryWithoutConfirmation() {
         coretest::FakeInteractions fake;
         coretest::FakeOverlayHost overlayFake;
@@ -202,55 +169,6 @@ class TestEditSave : public QObject {
         QCOMPARE(fake.confirmCalls, 0);                 // document mode: in memory, no save, no ask
         QCOMPARE(coretest::contentOf(img), diskBefore); // the disk file is untouched until save
     }
-
-    void editingInFolderViewSavesAfterScriptedConfirmation() {
-        coretest::FakeInteractions fake;
-        coretest::FakeOverlayHost overlayFake;
-        coretest::RecordingView view;
-        Core::Deps deps;
-        deps.headless = true;
-        deps.ui = &fake;
-        deps.overlays = &overlayFake;
-        deps.view = &view;
-        Core core(deps);
-        const QString img = QDir(alpha).filePath("rect.png");
-        coretest::writeRectImage(img);
-        FakePresenterView presenterView;
-        core.folderPresenter().setView(&presenterView);
-        QVERIFY(core.loadPath(img));
-        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        core.toggleFolderView();
-        core.folderPresenter().selectAndFocus(img); // the edit targets the selection, stated not ambient
-
-        core.rotateLeft();
-
-        QCOMPARE(fake.confirmCalls, 1);             // folder view saves immediately, so it asks first
-        QCOMPARE(QImage(img).size(), QSize(8, 16)); // the disk file is the rotated one
-    }
-
-    void editingDeclinedInFolderViewLeavesTheDiskAlone() {
-        coretest::FakeInteractions fake;
-        coretest::FakeOverlayHost overlayFake;
-        coretest::RecordingView view;
-        Core::Deps deps;
-        deps.headless = true;
-        deps.ui = &fake;
-        deps.overlays = &overlayFake;
-        deps.view = &view;
-        Core core(deps);
-        fake.confirmAnswer = false;
-        const QString img = QDir(alpha).filePath("rect.png");
-        coretest::writeRectImage(img);
-        QVERIFY(core.loadPath(img));
-        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
-        core.toggleFolderView();
-
-        core.rotateLeft();
-
-        QCOMPARE(fake.confirmCalls, 1);
-        QCOMPARE(QImage(img).size(), QSize(16, 8)); // declined: the disk is untouched
-    }
-
     void resizeEditsTheLoadedImage() {
         coretest::FakeInteractions fake;
         coretest::FakeOverlayHost overlayFake;
@@ -272,12 +190,11 @@ class TestEditSave : public QObject {
         QCOMPARE(fake.confirmCalls, 0); // resize never asks
     }
 
-    // resize commits to MEMORY only (save=false), so it needs a surface that
-    // can show the result and a later Ctrl+S. A thumbnail grid shows neither:
-    // performing it there would leave an edit that the next unloadExcept
-    // discards, rewriting nothing while the user sees nothing. Refused, with a
-    // reason — the silent version of this was the bug.
-    void resizeIsRefusedWhereItsResultWouldBeInvisible() {
+    // resize commits to MEMORY only, so it needs a surface that can show the
+    // result and a later Ctrl+S. A thumbnail grid shows neither. The
+    // separation is structural now: resize's key is not in the folder view's
+    // map at all, so there is nothing to refuse and no guard to forget.
+    void resizeBelongsToTheDocumentViewOnly() {
         coretest::FakeInteractions fake;
         coretest::FakeOverlayHost overlayFake;
         coretest::RecordingView view;
@@ -297,19 +214,19 @@ class TestEditSave : public QObject {
         core.enableFolderView();
         QCOMPARE(core.viewState().viewMode.value(), MODE_FOLDERVIEW);
 
-        // the command's own entry point: DialogHost::resizeRequested connects
-        // straight to it, bypassing the dialog
-        core.resize(QSize(4, 4));
+        // the key does not exist in the folder view's map: R names nothing,
+        // so there is nothing to press and nothing to refuse — no message,
+        // and the image is untouched
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_R)), QString());
+        QCOMPARE(overlayFake.messageCalls, messagesBefore);
+        QCOMPARE(core.directoryModel()->getImage(img)->size(), before);
 
-        QCOMPARE(overlayFake.messageCalls, messagesBefore + 1);
-        QVERIFY2(overlayFake.lastMessage.contains(QStringLiteral("Resizing")),
-                 qPrintable(QStringLiteral("unexpected refusal text: ") + overlayFake.lastMessage));
-        QCOMPARE(core.directoryModel()->getImage(img)->size(), before); // untouched
-        QVERIFY(!core.directoryModel()->getImage(img)->isEdited());
-
-        // and back in document view it works, so the refusal is the state's
+        // and the command's own entry point has no view-state guard left —
+        // DialogHost::resizeRequested connects straight to it, so a caller
+        // that reaches it still edits. The gate is the binding's existence.
         core.toggleFolderView();
         QCOMPARE(core.viewState().viewMode.value(), MODE_DOCUMENT);
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_R)), QStringLiteral("resize"));
         core.resize(QSize(4, 4));
         QTRY_COMPARE_WITH_TIMEOUT(core.directoryModel()->getImage(img)->size(), QSize(4, 4), 10000);
     }

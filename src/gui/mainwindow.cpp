@@ -75,7 +75,11 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     // window on the state's change. The slideshow loop relay rides its own
     // binding above.
     viewModeObserver = state->viewMode.addNotifier([this, state = appState] {
-        state->viewMode.value() == MODE_FOLDERVIEW ? enableFolderView() : enableDocumentView();
+        const bool folder = state->viewMode.value() == MODE_FOLDERVIEW;
+        // the keymap's document scope follows the same state the view does:
+        // one truth, two consumers
+        actionManager->setDocumentActive(!folder);
+        folder ? enableFolderView() : enableDocumentView();
     });
 }
 
@@ -100,6 +104,14 @@ void MW::setupUi() {
     viewerWidget = new ViewerWidget(this);
     infoBarWindowed = new InfoBarProxy(this);
     docWidget = new DocumentWidget(viewerWidget, infoBarWindowed);
+    // the document view's keys are its own, not the global table's: they ride
+    // QShortcuts parented here, active exactly while this subtree is visible
+    // and focused (CentralWidget shows page 0 and focuses the focusProxy, so
+    // "visible" and "focusable" are the same condition).
+    actionManager->attachDocumentSurface(docWidget);
+    // the notifier below only fires on CHANGE; the initial mode is a state
+    // too, and the resolver needs to agree with it from the first keystroke
+    actionManager->setDocumentActive(appState->viewMode.value() != MODE_FOLDERVIEW);
     folderView = new FolderViewProxy(this);
     connect(folderView, &FolderViewProxy::sortingSelected, this, &MW::sortingSelected);
     connect(folderView, &FolderViewProxy::directorySelected, dialogHost, &DialogHost::opened);

@@ -41,12 +41,13 @@ void Core::toggleCropPanel() {
         return; // headless without a crop fake: nothing to toggle
     if(model->isEmpty())
         return;
-    // the surface is an interaction with the one image on screen, and its
-    // panel refuses folder view itself (CropController::showCropPanel) — but
-    // that refusal is silent, and a running clock would also move the image
-    // out from under a selection in progress. This says why, once, for both.
-    if(nav_->refuseIfNotDocument(tr("Cropping needs an image on screen.")))
+    // the folder view cannot reach this (no binding, and the panel refuses it
+    // silently anyway); a running clock can, and it would move the image out
+    // from under a selection in progress
+    if(nav_->interactionState() == NavigationController::InteractionState::Slideshow) {
+        nav_->refuseEdit();
         return;
+    }
     if(crop_->isActive() || state.hasActiveImage)
         crop_->toggle();
 }
@@ -69,8 +70,10 @@ void Core::showResizeDialog() {
     // the gate is here as well as in resize(): the dialog is modal but exec()
     // blocks only input, never the slideshow clock — a tick would fire behind
     // it and the edit would land on an image the user is no longer looking at
-    if(nav_->refuseIfNotDocument(tr("Resizing needs the image on screen.")))
+    if(nav_->interactionState() == NavigationController::InteractionState::Slideshow) {
+        nav_->refuseEdit();
         return;
+    }
     auto img = model->getImage(selectedPath());
     if(img)
         dialogs_->showResizeDialog(img->size());
@@ -80,9 +83,15 @@ std::shared_ptr<ImageStatic> Core::getEditableImage(const QString &filePath) {
     return std::dynamic_pointer_cast<ImageStatic>(model->getImage(filePath));
 }
 
+// The edit contract: a transform applied to the selection, in memory. There is
+// no "save" variant and no action name any more — the folder view's
+// flush-immediately mode retired
+// with the view-scoped keymap, because a thumbnail cannot show the result of a
+// transform and writing behind an invisible confirmation is a silent rewrite.
+// The disk is reached only by Ctrl+S / Ctrl+Shift+S, the same chords in both
+// views, and `saveFile` is their contract.
 template <typename... Args>
 void Core::edit_template(
-    bool save, const QString &action,
     const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &editFunc,
     Args &&...as) {
     if(model->isEmpty())
@@ -101,9 +110,6 @@ void Core::edit_template(
     case NavigationController::InteractionState::FolderView:
     case NavigationController::InteractionState::Document: break;
     }
-    if(save && !ui_->showConfirmation(action, tr("Perform action \"") + action + "\"? \n\n" +
-                                                  tr("Changes will be saved immediately.")))
-        return;
     const auto selection = currentSelection();
     for(const auto &path : selection) {
         auto img = getEditableImage(path);
@@ -114,48 +120,41 @@ void Core::edit_template(
         // site passes lvalues, so forwarding bought nothing but the trap.
         img->setEditedImage(editFunc(img->getImage(), as...));
         model->updateImage(path, std::static_pointer_cast<Image>(img));
-        if(save) {
-            saveFile(path);
-            if(state.currentFilePath != path)
-                model->unload(path);
-        }
     }
     updateInfoString();
 }
 
 void Core::flipH() {
-    edit_template((state.viewMode.value() == MODE_FOLDERVIEW), tr("Flip horizontal"), {ImageLib::flippedH});
+    edit_template({ImageLib::flippedH});
 }
 
 void Core::flipV() {
-    edit_template((state.viewMode.value() == MODE_FOLDERVIEW), tr("Flip vertical"), {ImageLib::flippedV});
+    edit_template({ImageLib::flippedV});
 }
 
 void Core::rotateByDegrees(int degrees) {
-    edit_template((state.viewMode.value() == MODE_FOLDERVIEW), tr("Rotate"), {ImageLib::rotated}, degrees);
+    edit_template({ImageLib::rotated}, degrees);
 }
 
 void Core::resize(QSize size) {
-    // the second entry point (DialogHost::resizeRequested connects straight
-    // here, bypassing showResizeDialog): the command must stand on its own.
-    // In folder view the result is invisible — a thumbnail cannot show a
-    // change in pixel dimensions — and edit_template would then keep an
-    // in-memory edit that the next unloadExcept discards.
-    if(nav_->refuseIfNotDocument(tr("Resizing needs the image on screen.")))
+    // the command stands on its own: DialogHost::resizeRequested connects
+    // straight here. The folder view is already out of reach — its keymap has
+    // no resize binding — so the only state still to refuse is the clock.
+    if(nav_->interactionState() == NavigationController::InteractionState::Slideshow) {
+        nav_->refuseEdit();
         return;
-    edit_template(false, tr("Resize"), {ImageLib::scaled}, size, QI_FILTER_BILINEAR);
+    }
+    edit_template({ImageLib::scaled}, size, QI_FILTER_BILINEAR);
 }
 
+// No folder-view guard: the crop key and its surface live in the document
+// view's keymap, so the folder view cannot reach this at all.
 void Core::crop(QRect rect) {
-    if(state.viewMode.value() == MODE_FOLDERVIEW)
-        return;
-    edit_template(false, tr("Crop"), {ImageLib::cropped}, rect);
+    edit_template({ImageLib::cropped}, rect);
 }
 
 void Core::cropAndSave(QRect rect) {
-    if(state.viewMode.value() == MODE_FOLDERVIEW)
-        return;
-    edit_template(false, tr("Crop"), {ImageLib::cropped}, rect);
+    edit_template({ImageLib::cropped}, rect);
     saveFile(selectedPath());
     updateInfoString();
 }

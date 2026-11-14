@@ -184,6 +184,7 @@ class Core : public QObject, public INavigationHost {
     explicit Core(const Deps &deps);
     ~Core() override;
     void showGui() override;
+    void onViewModeChanged(ViewMode mode) override;
     // the file on screen; the state Core owns and every navigation decision reads
     QString currentFilePath() const;
     bool firstFramePending() const;
@@ -368,8 +369,7 @@ class Core : public QObject, public INavigationHost {
     std::shared_ptr<ImageStatic> getEditableImage(const QString &filePath);
 
     template <typename... Args>
-    void edit_template(bool save, const QString &actionName,
-                       const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
+    void edit_template(const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
                        Args &&...as);
 
     void doInteractiveCopy(const QString &path, const QString &destDirectory, DialogResult &overwriteAllFiles);

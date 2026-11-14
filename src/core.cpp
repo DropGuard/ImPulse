@@ -148,6 +148,14 @@ void Core::readSettings() {
         nav_->syncRandomizer();
 }
 
+// The keymap's document scope follows the view mode. Navigation writes the
+// state and the window renders it; the keymap is a third consumer, and this is
+// where the coordinator hands it the same fact — headless Cores included,
+// which is why it cannot live in MW's notifier.
+void Core::onViewModeChanged(ViewMode mode) {
+    actionManager->setDocumentActive(mode != MODE_FOLDERVIEW);
+}
+
 void Core::showGui() {
     if(!mw)
         return; // headless Core has nothing to show

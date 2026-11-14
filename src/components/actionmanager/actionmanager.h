@@ -77,6 +77,11 @@ class ActionManager : public QObject {
     // bindings override the base ones — in fit original / free zoom the
     // arrow keys pan the canvas and never change images (mode = intent)
     void setInspectMode(bool inspect);
+    // The document view is on screen. The same switch decides whether that
+    // table's QShortcuts are live AND whether the resolver sees them — one
+    // condition, so the two cannot disagree. (The surface's own visibility is
+    // not the authority: a headless Core has a document view and no window.)
+    void setDocumentActive(bool active);
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
     QString actionForShortcut(const QString &keys);
@@ -87,7 +92,8 @@ class ActionManager : public QObject {
     // logical key only (nativeScanCode is 0 by construction), and a delivered
     // event answers through the same projected tables the map matched against.
     bool keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const;
-    // which action (if any) the sequence claims in the effective projection
+    // which action (if any) the sequence claims across the live tables —
+    // grid, then the document view's (inspect variant folded in), then global
     QString actionForKeySequence(const QKeySequence &seq) const;
     const QString shortcutForAction(const QString &action);
     const QList<QString> shortcutsForAction(const QString &action);
@@ -99,6 +105,13 @@ class ActionManager : public QObject {
     QString keyForNativeScancode(quint32 scanCode);
     void saveShortcuts();
     // the folder grid's scope layer, same shape as the global one
+    // the document view's scope, same shape as the grid's: the table is the
+    // keymap editor's storage and the projection's source
+    void addDocShortcut(const QString &keys, const QString &action);
+    const QMap<QString, QString> &allDocShortcuts();
+    void removeAllDocShortcuts();
+    void removeAllDocShortcuts(const QString &actionName);
+    void saveDocShortcuts();
     void addGridShortcut(const QString &keys, const QString &action);
     const QMap<QString, QString> &allGridShortcuts();
     void removeAllGridShortcuts();
@@ -163,9 +176,10 @@ class ActionManager : public QObject {
     // own bindings ride QShortcuts parented to the grid surface
     // (WidgetWithChildrenShortcut), active exactly while the subtree holds
     // focus.
-    void attachWindowSurface(QWidget *surface); // the actions become live on this window
-    void attachGridSurface(QWidget *surface);   // the grid scope's QShortcuts (null detaches)
-    void setGridActive(bool active);            // the grid surface gained/lost keyboard focus
+    void attachWindowSurface(QWidget *surface);   // the actions become live on this window
+    void attachGridSurface(QWidget *surface);     // the grid scope's QShortcuts (null detaches)
+    void attachDocumentSurface(QWidget *surface); // the document view's QShortcuts (null detaches)
+    void setGridActive(bool active);              // the grid surface gained/lost keyboard focus
   public slots:
     bool invokeAction(const QString &actionName);
 
@@ -179,22 +193,34 @@ class ActionManager : public QObject {
 
     // the keyboard projection's state and its one apply-everything entry
     // point, called from every table mutation
-    QWidget *windowSurface = nullptr;   // where the QActions are registered
-    QWidget *gridSurface = nullptr;     // where the grid scope's QShortcuts live
-    QList<QShortcut *> gridProjections; // rebuilt whenever the grid table moves
-    bool gridActive = false;            // the grid surface holds keyboard focus
+    QWidget *windowSurface = nullptr;       // where the QActions are registered
+    QWidget *gridSurface = nullptr;         // where the grid scope's QShortcuts live
+    QWidget *documentSurface = nullptr;     // where the document view's QShortcuts live
+    QList<QShortcut *> gridProjections;     // rebuilt whenever the grid table moves
+    QList<QShortcut *> documentProjections; // rebuilt whenever the document table moves
+    bool gridActive = false;                // the grid surface holds keyboard focus
     void applyKeyboardProjection();
-    void reproject();            // global table (de-claimed) + inspect layer -> setShortcuts
-    void rebuildGridShortcuts(); // grid table -> QShortcuts on the grid surface
+    void reproject();                // global table (de-claimed) + inspect layer -> setShortcuts
+    void rebuildGridShortcuts();     // grid table -> QShortcuts on the grid surface
+    void rebuildDocumentShortcuts(); // document table (+ inspect variant) -> QShortcuts
 
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
     // the inspect scope's layer: only the deltas live here (fit original /
     // free zoom pan with the arrows instead of changing images)
     QMap<QString, QString> inspectDefaults, inspectShortcuts; // <shortcut, action>
     bool inspectMode = false;
+    // true from construction: the app starts in the document view (State's own
+    // default), and a headless Core may never see a mode change at all
+    bool documentActive = true;
     // the folder grid's scope layer: defaults mirror the navigation the grid
     // hardcoded before the scope system existed
     QMap<QString, QString> gridDefaults, gridShortcuts; // <shortcut, action>
+    // the document view's scope layer: every key that only means something
+    // while one image is on screen — the walk, zoom, fit, the edit verbs and
+    // the two commands that need the result to be visible. They used to live
+    // in the global table with `if(viewMode == FOLDERVIEW) return` guards
+    // inside the commands; a binding that does not exist needs no guard.
+    QMap<QString, QString> docDefaults, docShortcuts; // <shortcut, action>
 
     void initDefaults();
     void initShortcuts();
@@ -202,6 +228,7 @@ class ActionManager : public QObject {
     void readShortcuts();
     void readGridShortcuts();
     void readInspectShortcuts();
+    void readDocShortcuts();
     bool resolveShortcut(const QString &shortcut);
     ActionType validateAction(const QString &actionName);
 
