@@ -129,6 +129,7 @@ void ActionManager::initActions() {
     addAction("print");
     addAction("toggleFullscreenInfoBar");
     addAction("pasteFile");
+    addAction("pasteFilesHere");
     // the folder grid's scope actions — the fork's own line
     addAction("gridSelectNext");
     addAction("gridSelectPrev");
@@ -644,6 +645,11 @@ void ActionManager::initDefaults() {
     gridDefaults.insert("Enter", "gridOpen");
     gridDefaults.insert("Backspace", "goUp");
     gridDefaults.insert(InputMap::keyNameCtrl() + "+A", "gridSelectAll");
+    // Ctrl+V in the folder view places the clipboard's files in the directory
+    // being browsed. The document view's Ctrl+V (pasteFile) shows the
+    // clipboard's image instead — same key, two meanings, which the scope
+    // system exists for: each table declares its own kind of "paste".
+    gridDefaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFilesHere");
 }
 
 //------------------------------------------------------------------------------

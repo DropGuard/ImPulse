@@ -247,6 +247,87 @@ class TestClipboard : public QObject {
         QVERIFY2(drags == 0, qPrintable(QStringLiteral("QDrag objects retained by Core after 8 drag-outs")));
         QCOMPARE(core.children().size(), before);
     }
+
+    // The folder view's Ctrl+V: the clipboard holds file paths, the browsing
+    // directory is the destination. This is a different command from
+    // openFromClipboard (which SHOWS the clipboard's file), and the whole
+    // point of two tables declaring Ctrl+V is that each does its own kind of
+    // paste. The assertions are on the filesystem, not on the tables: what
+    // matters is that the files arrive and that nothing is copied onto itself.
+    void pastingFileUrlsPlacesThemInTheBrowsingDirectory() {
+        const QString source = uniqueDir("paste-src");
+        const QString dest = uniqueDir("paste-dest");
+        const QString srcFile = source + QStringLiteral("/copied.png");
+        writeImage(srcFile);
+
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        // make the destination the browsed directory
+        QVERIFY(core.loadPath(dest)); // loadPath on a directory switches there
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        QMimeData *mime = new QMimeData();
+        mime->setUrls({QUrl::fromLocalFile(srcFile)});
+        QApplication::clipboard()->setMimeData(mime);
+
+        core.pasteFilesToCurrentDirectory();
+
+        const QString pasted = dest + QStringLiteral("/copied.png");
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(pasted), 10000);
+        QVERIFY2(QFileInfo::exists(srcFile), "paste removed the source — that is a move");
+    }
+
+    // A file already in the destination is skipped BEFORE interactiveCopy
+    // runs. copyFileTo would answer NOTHING_TO_DO on it, and interactiveCopy
+    // reports every non-SUCCESS result through showError — so without the
+    // filter, pressing Ctrl+V on a file that is already here surfaces
+    // "Nothing to do." as if it were a failure. The filesystem cannot show
+    // that difference (NOTHING_TO_DO changes nothing), so the assertion is on
+    // the overlay: a silent no-op, not an error.
+    void pastingAFileAlreadyInTheDirectoryIsSilent() {
+        const QString dest = uniqueDir("paste-self");
+        const QString file = dest + QStringLiteral("/here.png");
+        writeImage(file);
+
+        coretest::FakeOverlayHost overlayFake;
+        Core::Deps deps;
+        deps.overlays = &overlayFake;
+        Core core(deps);
+        QVERIFY(core.loadPath(file));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        QMimeData *mime = new QMimeData();
+        mime->setUrls({QUrl::fromLocalFile(file)});
+        QApplication::clipboard()->setMimeData(mime);
+
+        core.pasteFilesToCurrentDirectory();
+        coretest::drainEvents();
+
+        QVERIFY2(overlayFake.errorCalls == 0,
+                 qPrintable(QStringLiteral("pasting into the same directory reported: ") + overlayFake.lastError));
+        QVERIFY(QFileInfo::exists(file));
+        QVERIFY2(!QFileInfo::exists(dest + QStringLiteral("/here (1).png")),
+                 "pasting a file into its own directory created a copy");
+    }
+
+    // A remote url has no local path and is refused the same way
+    // openFromClipboard refuses it.
+    void pastingARemoteUrlDoesNothing() {
+        const QString dest = uniqueDir("paste-remote");
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        QVERIFY(core.loadPath(dest));
+
+        QMimeData *mime = new QMimeData();
+        mime->setUrls({QUrl(QStringLiteral("https://example.com/x.png"))});
+        QApplication::clipboard()->setMimeData(mime);
+
+        core.pasteFilesToCurrentDirectory();
+        coretest::drainEvents();
+        QVERIFY(QDir(dest).entryList(QDir::Files | QDir::NoDotAndDotDot).isEmpty());
+    }
 };
 
 int main(int argc, char **argv) {

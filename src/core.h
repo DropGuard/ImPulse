@@ -433,6 +433,12 @@ class Core : public QObject, public INavigationHost {
     void moveToTrash();
     void copyFileClipboard();
     void openFromClipboard();
+    // The folder view's Ctrl+V: the clipboard holds file paths, so this copies
+    // them into the directory being browsed. It is deliberately NOT the same
+    // command as openFromClipboard — that one shows the clipboard's image,
+    // which needs a document view; this one places files, which needs a
+    // directory. Same key, two scopes, because the subject differs.
+    void pasteFilesToCurrentDirectory();
     void toggleShuffle() {
         nav_->toggleShuffle();
     }
