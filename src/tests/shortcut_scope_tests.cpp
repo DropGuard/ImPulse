@@ -715,6 +715,32 @@ class TestShortcutScope : public QObject {
         QCOMPARE(doc.value(QStringLiteral("M")), QStringLiteral("moveFile"));
     }
 
+    // The same correction, for the two bindings whose ACTION only exists in
+    // the document view — both were global claims reaching a surface the
+    // folder view does not have:
+    //   RMB -> contextMenu   ContextMenu is constructed and shown by
+    //                        ViewerWidget and refuses when it is not visible.
+    //                        The grid's right-click is an unwritten TODO and
+    //                        its options popup is a toolbar button.
+    //   Ctrl+V -> pasteFile  openFromClipboard's whole effect is loadPath():
+    //                        "the file on screen is now that one". No document
+    //                        view, no subject.
+    // The global table keeps Menu -> contextMenu: a menu key is meaningful
+    // wherever a menu exists, and it is a different token, not a collision.
+    void documentOnlyActionsLeaveTheGlobalTable() {
+        const QMap<QString, QString> global = actionManager->allShortcuts();
+        const QMap<QString, QString> doc = actionManager->allDocShortcuts();
+
+        QVERIFY2(!global.contains(QStringLiteral("RMB")), "RMB claims a global context menu the grid cannot show");
+        QVERIFY2(!global.contains(QStringLiteral("Ctrl+V")), "Ctrl+V reaches a document-only action from everywhere");
+
+        QCOMPARE(doc.value(QStringLiteral("RMB")), QStringLiteral("contextMenu"));
+        QCOMPARE(doc.value(QStringLiteral("Ctrl+V")), QStringLiteral("pasteFile"));
+        // Menu still works everywhere it used to: a menu key is meaningful
+        // wherever a menu exists, and it is a different token, not a collision
+        QCOMPARE(global.value(QStringLiteral("Menu")), QStringLiteral("contextMenu"));
+    }
+
     // The settings editor's conflict warning asks the SAME scope walk the
     // disjointness law uses — one implementation, so a table added later is
     // visible to both by construction. The hand-written three-table version

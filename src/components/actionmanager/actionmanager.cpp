@@ -519,11 +519,9 @@ void ActionManager::initDefaults() {
     defaults.insert(InputMap::keyNameCtrl() + "+C", "copyFileClipboard");
     defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+C", "copyPathClipboard");
     defaults.insert("F2", "renameFile");
-    defaults.insert("RMB", "contextMenu");
     defaults.insert("Menu", "contextMenu");
     defaults.insert(InputMap::keyNameCtrl() + "+D", "showInDirectory");
     defaults.insert(InputMap::keyNameShift() + "+F", "toggleFullscreenInfoBar");
-    defaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFile");
 
 #ifdef __APPLE__
     defaults.insert(InputMap::keyNameAlt() + "+Up", "zoomIn");
@@ -564,6 +562,18 @@ void ActionManager::initDefaults() {
     // contract, but the key no longer reaches it there at all.
     docDefaults.insert("C", "copyFile");
     docDefaults.insert("M", "moveFile");
+    // The context menu is ViewerWidget's (ContextMenu is constructed and shown
+    // there, and it refuses when the viewer is not visible). The grid's
+    // right-click is an unwritten TODO (thumbnailview.cpp: "todo: context
+    // menu maybe?"), and its options popup is opened by a toolbar button, not
+    // a gesture — so RMB here never reached anything in the folder view.
+    docDefaults.insert("RMB", "contextMenu");
+    // Ctrl+V opens what the clipboard holds — a URL, or an image buffer saved
+    // to a file first. Its effect is loadPath(), i.e. "the file on screen is
+    // now that one", which needs a document view to mean anything. In the
+    // folder view there is no "the file on screen", so the binding was a
+    // global claim reaching a document action.
+    docDefaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFile");
     // the toggle pair: keys that LEAVE the document view for the grid. They
     // belong here, not in the global table — the grid's own Enter/Backspace
     // (gridOpen/goUp) are live exactly while the grid holds focus, and a
