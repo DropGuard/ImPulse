@@ -111,6 +111,21 @@ pub fn event_is_live(wd: i32, kind: &RawWatchKind, live_wd: Option<i32>) -> bool
     live_wd == Some(wd)
 }
 
+/// The joined subject path, in the engine's wire form. On Windows the join
+/// would hand back mixed separators — the watch directory arrives in Qt's
+/// forward-slash form and the FFI contract hands paths to a C++ side that
+/// compares them as strings against the form it opened the directory with —
+/// so the Windows build normalizes here, at the only place subjects are born.
+/// POSIX joins are byte-exact (a backslash is a legal filename character
+/// there) and the no-op replace keeps that side identical. This is the wire
+/// form's authority: the test suites read the same rule.
+pub fn subject_path(dir: &Path, name: &str) -> String {
+    let joined = dir.join(name).to_string_lossy().into_owned();
+    #[cfg(windows)]
+    let joined = joined.replace('\\', "/");
+    joined
+}
+
 /// What the engine loop should do with a parsed event.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Applied {
@@ -235,12 +250,7 @@ pub fn apply_event(
             if ev.is_dir {
                 return WatchAction::Ignored(IgnoreReason::DirIsCanonical);
             }
-            restat(
-                state,
-                dir.join(ev.name.as_deref().unwrap_or(""))
-                    .to_string_lossy()
-                    .into_owned(),
-            )
+            restat(state, subject_path(dir, ev.name.as_deref().unwrap_or("")))
         }
         K::Renamed { from } => rename(state, filter, overrides, show_hidden, dir, ev, from),
     }
@@ -318,11 +328,11 @@ fn admit(
     is_dir: bool,
     arrival: Arrival,
 ) -> WatchAction {
-    let path = dir.join(name);
+    let path_str = subject_path(dir, name);
+    let path = Path::new(&path_str);
     if let Some(reason) = rejection(is_dir, &path, name, filter, overrides, show_hidden) {
         return WatchAction::Ignored(reason);
     }
-    let path_str = path.to_string_lossy().into_owned();
     if state.contains_path(&path_str) {
         // A move landing on a listed path is an overwrite: the contents the row
         // describes are gone and the moved-in file's are here. Answering
@@ -378,10 +388,7 @@ fn admit(
 /// held is nothing, and saying so is what keeps a stale event from taking a row
 /// out of the wrong folder.
 fn remove_listed(state: &mut DirectoryState, dir: &Path, ev: &RawWatchEvent) -> WatchAction {
-    let path = dir
-        .join(ev.name.as_deref().unwrap_or(""))
-        .to_string_lossy()
-        .into_owned();
+    let path = subject_path(dir, ev.name.as_deref().unwrap_or(""));
     remove_or_ignore(state, path, ev.is_dir)
 }
 
@@ -451,9 +458,9 @@ fn rename(
     let Some(name) = &ev.name else {
         return WatchAction::Ignored(IgnoreReason::NoName);
     };
-    let from_path = dir.join(from).to_string_lossy().into_owned();
-    let to_path = dir.join(name);
-    let to_str = to_path.to_string_lossy().into_owned();
+    let from_path = subject_path(dir, from);
+    let to_str = subject_path(dir, name);
+    let to_path = Path::new(&to_str);
     // Renaming a file onto the name it already has is a no-op in POSIX and
     // emits nothing, so arriving here means the kernel or a test said otherwise.
     // Take it as no change: the alternative is removing the row for the

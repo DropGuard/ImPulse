@@ -609,10 +609,11 @@ impl Drop for Engine {
         // wakes the loop thread; it shuts workers and the watcher down
         let _ = self.cmd_tx.send(Command::Shutdown);
         // ...and wait for it. The C++ side calls the notify callback with a
-        // pointer to its own eventfd member, and it frees this engine from
-        // ~EngineBridge before closing that fd. Returning here while the loop
-        // thread could still fire a callback would leave it writing through a
-        // dangling pointer, and into a descriptor number that has been recycled.
+        // pointer to the bridge itself, and ~EngineBridge frees this engine
+        // before the bridge's destruction completes — queued notifications are
+        // cancelled with the receiving QObject. Returning here while the loop
+        // thread could still fire a callback would leave it posting through a
+        // dangling pointer.
         if let Some(j) = self.loop_join.take() {
             let _ = j.join();
         }

@@ -6,12 +6,12 @@
 #include <vector>
 
 struct qimgv_engine;
-class QSocketNotifier;
 
 // Owns the process-wide Rust engine instance and pumps its events into the
-// Qt event loop. The engine's notify callback writes to an eventfd; a
-// QSocketNotifier wakes the UI thread, which drains qimgv_engine_take_event.
-// Engine calls never block the UI thread.
+// Qt event loop. The engine's notify callback queues a drain on the UI
+// thread's event loop, and the drain pulls qimgv_engine_take_event until the
+// engine is empty. Engine calls never block the UI thread, and the hop is
+// Qt's own queued-invoke vocabulary, so the file carries no platform branch.
 class EngineBridge : public QObject {
     Q_OBJECT
   public:
@@ -24,7 +24,7 @@ class EngineBridge : public QObject {
 
     static EngineBridge &instance();
     // Construction is public: the class is instance-safe (each object owns its
-    // engine, eventfd and notifier), and tests need isolated bridges — the
+    // engine), and tests need isolated bridges — the
     // global instance's watch state would otherwise force every test into
     // unique-directory workarounds. Production keeps using instance().
     explicit EngineBridge(QObject *parent = nullptr);
@@ -98,8 +98,6 @@ class EngineBridge : public QObject {
 
   private:
     qimgv_engine *engine = nullptr;
-    int eventFd = -1;
-    QSocketNotifier *notifier = nullptr;
     quint32 sessionEpoch = 0;
     QString mListedDir;
 };

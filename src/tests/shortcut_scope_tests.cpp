@@ -1,6 +1,5 @@
 #include <QTest>
-#include <sys/wait.h>
-#include <unistd.h>
+#include "slot_harness.h"
 #include <utility>
 #include <QSignalSpy>
 #include <QApplication>
@@ -488,9 +487,14 @@ class TestShortcutScope : public QObject {
     void pagingKeysHaveNamesAndDefaults() {
         // a press with no name in the scancode table cannot reach the action
         // layer at all; a name with no default never fires for a config that
-        // predates the binding — pin both halves, plus the lookup itself
-        QVERIFY(inputMap->keys().value(112) == "PgUp");
-        QVERIFY(inputMap->keys().value(117) == "PgDown");
+        // predates the binding — pin both halves, plus the lookup itself.
+        // The scan codes come from the platform's own table (Windows pairs
+        // PgUp with 329/57417, X11 with 112 — hardcoded values would pin one
+        // platform), via the shared lookup helper.
+        const quint32 pgUpCode = coretest::scanCodeFor(QStringLiteral("PgUp"));
+        const quint32 pgDownCode = coretest::scanCodeFor(QStringLiteral("PgDown"));
+        QVERIFY2(pgUpCode != 0 && inputMap->keys().value(pgUpCode) == "PgUp", "PgUp has a platform scan code");
+        QVERIFY2(pgDownCode != 0 && inputMap->keys().value(pgDownCode) == "PgDown", "PgDown has a platform scan code");
         // PgUp/PgDown are the document view's binding — the token lookup has
         // to reach that table, not only the global one
         QVERIFY(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageUp)) == "prevImage");
@@ -1058,44 +1062,16 @@ int main(int argc, char **argv) {
         TestShortcutScope t;
         return QTest::qExec(&t, argc, argv) != 0 ? 1 : 0;
     }
-    const QMetaObject *mo = &TestShortcutScope::staticMetaObject;
-    QStringList testSlots;
-    for(int i = 0; i < mo->methodCount(); ++i) {
-        const QMetaMethod m = mo->method(i);
-        const QByteArray name = m.name();
-        if(m.methodType() == QMetaMethod::Slot && m.access() == QMetaMethod::Private && m.parameterCount() == 0 &&
-           name != "initTestCase" && name != "cleanupTestCase" && name != "init" && name != "cleanup")
-            testSlots << QString::fromUtf8(name);
-    }
-    int failures = 0, consecutiveAbnormal = 0;
-    for(const QString &slot : std::as_const(testSlots)) {
-        fflush(nullptr); // fork would duplicate whatever is buffered in stdout
-        pid_t pid = fork();
-        if(pid == 0) {
+    return slot_harness::run_units_one_process_each(
+        argc, argv, slot_harness::testSlots(&TestShortcutScope::staticMetaObject),
+        "shortcut_scope_tests",
+        [argv](const QString &slot) -> int {
             coretest::setChildCoreLimit();
             QByteArray nameBytes = slot.toUtf8();
             char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
             TestShortcutScope t; // this child's own fixture, its own temp tree and settings
             return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        }
-        int status = 0;
-        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
-        }
-        // a crashed child loses its buffered output entirely — without naming
-        // the slot here, the evidence is a red ctest with nothing in the log
-        if(!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
-            fprintf(stderr, "shortcut_scope_tests: slot '%s' exited abnormally (exit=%d, sig=%d)\n",
-                    slot.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-                    WIFSIGNALED(status) ? WTERMSIG(status) : -1);
-        // the crash-burst guard: three consecutive abnormal slots mean a
-        // fixture-wide failure — the remaining slots carry no new evidence,
-        // and each was streaming a full core through systemd-coredump
-        consecutiveAbnormal = (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : consecutiveAbnormal + 1;
-        if(consecutiveAbnormal == 3)
-            break;
-        failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
-    }
-    return failures;
+        });
 }
 
 #include "shortcut_scope_tests.moc"

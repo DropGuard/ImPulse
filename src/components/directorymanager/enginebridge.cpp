@@ -1,6 +1,5 @@
 #include "enginebridge.h"
 
-#include <QSocketNotifier>
 #include <QDebug>
 #include <QtEndian>
 #include <algorithm>
@@ -9,9 +8,6 @@
 
 #include "qimgv_engine.h"
 #include "settings.h"
-
-#include <sys/eventfd.h>
-#include <unistd.h>
 
 QByteArray EngineBridge::extensionListFor(const QList<QByteArray> &formats) {
     // the '\n'-joined extension whitelist for the engine, sourced from the
@@ -25,13 +21,13 @@ QByteArray EngineBridge::extensionListFor(const QList<QByteArray> &formats) {
 }
 
 void EngineBridge::notifyCb(void *user) {
-    // Runs on an engine thread. eventfd writes coalesce; the read side drains.
-    const uint64_t one = 1;
-    ssize_t rc;
-    do {
-        rc = ::write(*static_cast<int *>(user), &one, sizeof(one));
-    } while(rc == -1 && errno == EINTR);
-    (void)rc;
+    // Runs on an engine thread. The queued call is the whole wake: drainEvents
+    // drains until the engine is empty, so N callbacks cost N idempotent drains
+    // and no event is ever lost. (The Linux tree used an eventfd and a
+    // QSocketNotifier for this hop; the queued invoke is the same hop in Qt's
+    // own vocabulary, which is why this file carries no platform branch.)
+    auto *bridge = static_cast<EngineBridge *>(user);
+    QMetaObject::invokeMethod(bridge, [bridge] { bridge->drainEvents(); }, Qt::QueuedConnection);
 }
 
 EngineBridge &EngineBridge::instance() {
@@ -40,31 +36,22 @@ EngineBridge &EngineBridge::instance() {
 }
 
 EngineBridge::EngineBridge(QObject *parent) : QObject(parent) {
-    eventFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    if(eventFd == -1) {
-        qWarning() << "[EngineBridge] eventfd failed:" << std::strerror(errno);
-        return;
-    }
     const QByteArray exts = settings ? extensionListFor(settings->supportedFormats()) : QByteArray();
-    engine = qimgv_engine_new(&EngineBridge::notifyCb, &eventFd, 2, exts.isEmpty() ? nullptr : exts.constData());
+    engine = qimgv_engine_new(&EngineBridge::notifyCb, this, 2, exts.isEmpty() ? nullptr : exts.constData());
     if(!engine) {
         const char *err = qimgv_last_error();
         qWarning() << "[EngineBridge] engine init failed:" << (err ? err : "unknown");
         return;
     }
-    qDebug() << "[EngineBridge] ctor done, eventFd:" << eventFd;
-    notifier = new QSocketNotifier(eventFd, QSocketNotifier::Read, this);
-    connect(notifier, &QSocketNotifier::activated, this, [this]() {
-        drainEvents();
-    });
+    qDebug() << "[EngineBridge] ctor done";
 }
 
 EngineBridge::~EngineBridge() {
-    delete notifier;
+    // freeing first joins the engine's threads, so no notify callback can fire
+    // past this point; queued invocations already posted are cancelled with the
+    // receiving object (this), which everything below outlives
     if(engine)
         qimgv_engine_free(engine);
-    if(eventFd != -1)
-        ::close(eventFd);
 }
 
 bool EngineBridge::openDir(const QString &path, int sortMode, bool showHidden) {
@@ -280,11 +267,6 @@ bool EngineBridge::entryAt(int index, bool dirs, EngineEntry &out) const {
 }
 
 void EngineBridge::drainEvents() {
-    // clear the wake counter (multiple notifies may have coalesced)
-    uint64_t val = 0;
-    while(::read(eventFd, &val, sizeof(val)) == static_cast<ssize_t>(sizeof(val))) {
-    }
-
     if(!engine)
         return;
     // Grown on demand instead of fixed: an event the buffer could not hold is

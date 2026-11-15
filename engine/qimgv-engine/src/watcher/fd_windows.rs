@@ -89,6 +89,7 @@ const FILE_ACTION_MODIFIED: u32 = 3;
 const FILE_ACTION_RENAMED_OLD_NAME: u32 = 4;
 const FILE_ACTION_RENAMED_NEW_NAME: u32 = 5;
 const WAIT_OBJECT_0: u32 = 0;
+const WAIT_TIMEOUT: u32 = 258;
 const WAIT_FAILED: u32 = 0xFFFF_FFFF;
 const ERROR_ACCESS_DENIED: u32 = 5;
 const ERROR_IO_PENDING: u32 = 997;
@@ -433,6 +434,44 @@ fn drain_records(
     records
 }
 
+/// The watched directory is gone (deleted, or renamed away from under the
+/// watch): retire the handle and report WatchGone through the pairing layer,
+/// exactly as IN_DELETE_SELF does — the engine answers DirGone with its own
+/// rescan. The record carries the watch's generation so the liveness check
+/// passes. The pending read, if any, is cancelled and drained before the
+/// close (reuse or close while pending is undefined).
+fn retire_gone(
+    watch: &mut Option<Watch>,
+    overlapped: &mut Overlapped,
+    ev_tx: &Sender<super::RawWatchEvent>,
+    pairer: &mut super::Pairer,
+) {
+    let Some(w) = watch.take() else { return };
+    let generation = w.id;
+    let dir = w.path.clone();
+    unsafe { CancelIoEx(w.dir, std::ptr::null_mut()) };
+    let mut drained: u32 = 0;
+    let _ = unsafe { GetOverlappedResult(w.dir, overlapped, &mut drained, 1) };
+    unsafe { CloseHandle(w.dir) };
+    let live_wd = Some(generation);
+    let rec = super::Record {
+        wd: generation,
+        bits: mask::DELETE_SELF,
+        cookie: 0,
+        name: None,
+    };
+    for out in pairer.intake(rec, Some(dir.as_path()), live_wd) {
+        if !dispatch(ev_tx, out, live_wd) {
+            return;
+        }
+    }
+    for out in pairer.settle() {
+        if !dispatch(ev_tx, out, live_wd) {
+            return;
+        }
+    }
+}
+
 fn watcher_loop(
     cmd_rx: &Receiver<WatchCmd>,
     ev_tx: &Sender<super::RawWatchEvent>,
@@ -507,20 +546,7 @@ fn watcher_loop(
                         }
                         // the watched directory itself went away
                         ERROR_ACCESS_DENIED => {
-                            let rec = super::Record {
-                                wd: live_wd.unwrap_or(-1),
-                                bits: mask::DELETE_SELF,
-                                cookie: 0,
-                                name: None,
-                            };
-                            for out in pairer.intake(rec, dir_opt, live_wd) {
-                                if !dispatch(ev_tx, out, live_wd) {
-                                    return;
-                                }
-                            }
-                            // the read completed with the denial; nothing is
-                            // pending, so the handle just closes
-                            retire_watch(watch.take(), &mut overlapped, false);
+                            retire_gone(&mut watch, &mut overlapped, ev_tx, &mut pairer);
                         }
                         _ => {
                             log::warn!(
@@ -569,6 +595,19 @@ fn watcher_loop(
                 // an unarmed wait can only see a stale signal (an abort
                 // drained during a retire); clear it so the loop cannot spin
                 completion.reset();
+            }
+        }
+
+        if waited == WAIT_TIMEOUT {
+            // RDCW's pending read does not complete when the watched directory
+            // is deleted or renamed away — the open handle holds it in
+            // pending-delete and the read never signals. The half-second beat
+            // (the same beat fd.rs's poll timeout keeps) is what notices the
+            // loss: IN_DELETE_SELF's Windows answer, fed through the same
+            // pairing layer so the engine's DirGone → rescan answer runs
+            // unchanged.
+            if watch.as_ref().is_some_and(|w| !w.path.exists()) {
+                retire_gone(&mut watch, &mut overlapped, ev_tx, &mut pairer);
             }
         }
 

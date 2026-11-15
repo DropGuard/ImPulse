@@ -42,21 +42,21 @@ struct SettingDesc {
 };
 
 namespace SettingRow {
-static constexpr SettingDesc BOOL(const char *key, bool def) {
+static constexpr SettingDesc Bool(const char *key, bool def) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Bool;
     d.defB = def;
     return d;
 }
-static constexpr SettingDesc INT(const char *key, qlonglong def) {
+static constexpr SettingDesc Int(const char *key, qlonglong def) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Int;
     d.defI = def;
     return d;
 }
-static constexpr SettingDesc INT(const char *key, qlonglong def, qlonglong lo) {
+static constexpr SettingDesc Int(const char *key, qlonglong def, qlonglong lo) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Int;
@@ -65,7 +65,7 @@ static constexpr SettingDesc INT(const char *key, qlonglong def, qlonglong lo) {
     d.hasLo = true;
     return d;
 }
-static constexpr SettingDesc INT(const char *key, qlonglong def, qlonglong lo, qlonglong hi) {
+static constexpr SettingDesc Int(const char *key, qlonglong def, qlonglong lo, qlonglong hi) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Int;
@@ -77,7 +77,7 @@ static constexpr SettingDesc INT(const char *key, qlonglong def, qlonglong lo, q
     return d;
 }
 // the same bounds, the other policy: out of range means "take the default"
-static constexpr SettingDesc INT_RESET(const char *key, qlonglong def, qlonglong lo) {
+static constexpr SettingDesc IntReset(const char *key, qlonglong def, qlonglong lo) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Int;
@@ -87,7 +87,7 @@ static constexpr SettingDesc INT_RESET(const char *key, qlonglong def, qlonglong
     d.resetOnRange = true;
     return d;
 }
-static constexpr SettingDesc INT_RESET(const char *key, qlonglong def, qlonglong lo, qlonglong hi) {
+static constexpr SettingDesc IntReset(const char *key, qlonglong def, qlonglong lo, qlonglong hi) {
     SettingDesc d;
     d.key = key;
     d.kind = SettingDesc::Kind::Int;
@@ -119,70 +119,70 @@ static constexpr SettingDesc STR(const char *key, const char *def) {
 }
 } // namespace SettingRow
 
-using SettingRow::BOOL;
-using SettingRow::INT;
-using SettingRow::INT_RESET;
+using SettingRow::Bool;
+using SettingRow::Int;
+using SettingRow::IntReset;
 using SettingRow::REAL;
 using SettingRow::STR;
 
 // ---- rows -------------------------------------------------------------------
 
-inline constexpr SettingDesc K_VideoPlayback = BOOL("videoPlayback", true);
-inline constexpr SettingDesc K_UseSystemColorScheme = BOOL("useSystemColorScheme", false);
-inline constexpr SettingDesc K_ShowChangelogs = BOOL("showChangelogs", true);
-inline constexpr SettingDesc K_BlurBackground = BOOL("blurBackground", true);
-inline constexpr SettingDesc K_PlayVideoSounds = BOOL("playVideoSounds", false);
-inline constexpr SettingDesc K_UsePreloader = BOOL("usePreloader", true);
-inline constexpr SettingDesc K_FullscreenMode = BOOL("openInFullscreen", false);
-inline constexpr SettingDesc K_PanelEnabled = BOOL("panelEnabled", true);
-inline constexpr SettingDesc K_PanelFullscreenOnly = BOOL("panelFullscreenOnly", true);
-inline constexpr SettingDesc K_PanelPinned = BOOL("panelPinned", false);
-inline constexpr SettingDesc K_LoopSlideshow = BOOL("loopSlideshow", false);
-inline constexpr SettingDesc K_SquareThumbnails = BOOL("squareThumbnails", false);
-inline constexpr SettingDesc K_TransparencyGrid = BOOL("drawTransparencyGrid", false);
-inline constexpr SettingDesc K_EnableSmoothScroll = BOOL("enableSmoothScroll", true);
-inline constexpr SettingDesc K_UseThumbnailCache = BOOL("thumbnailCache", true);
-inline constexpr SettingDesc K_SmoothUpscaling = BOOL("smoothUpscaling", true);
-inline constexpr SettingDesc K_ExpandImage = BOOL("expandImage", false);
-inline constexpr SettingDesc K_SmoothAnimatedImages = BOOL("smoothAnimatedImages", true);
-inline constexpr SettingDesc K_InfoBarFullscreen = BOOL("infoBarFullscreen", true);
-inline constexpr SettingDesc K_InfoBarWindowed = BOOL("infoBarWindowed", false);
-inline constexpr SettingDesc K_WindowTitleExtendedInfo = BOOL("windowTitleExtendedInfo", true);
-inline constexpr SettingDesc K_CursorAutohide = BOOL("cursorAutohiding", true);
-inline constexpr SettingDesc K_FirstRun = BOOL("firstRun", true);
-inline constexpr SettingDesc K_ShowSaveOverlay = BOOL("showSaveOverlay", true);
-inline constexpr SettingDesc K_ConfirmTrash = BOOL("confirmTrash", true);
-inline constexpr SettingDesc K_UnloadThumbs = BOOL("unloadThumbs", true);
-inline constexpr SettingDesc K_JxlAnimation = BOOL("jxlAnimation", false);
-inline constexpr SettingDesc K_AutoResizeWindow = BOOL("autoResizeWindow", false);
-inline constexpr SettingDesc K_UseFixedZoomLevels = BOOL("useFixedZoomLevels", false);
-inline constexpr SettingDesc K_UnlockMinZoom = BOOL("unlockMinZoom", true);
-inline constexpr SettingDesc K_TrackpadDetection = BOOL("trackpadDetection", true);
-inline constexpr SettingDesc K_ClickableEdges = BOOL("clickableEdges", false);
-inline constexpr SettingDesc K_ClickableEdgesVisible = BOOL("clickableEdgesVisible", true);
-inline constexpr SettingDesc K_ShowHiddenFiles = BOOL("showHiddenFiles", false);
-inline constexpr SettingDesc K_PanelCenterSelection = BOOL("panelCenterSelection", false);
-inline constexpr SettingDesc K_FolderViewIconSize = INT("folderViewIconSize", 120);
-inline constexpr SettingDesc K_DefaultFitMode = INT_RESET("defaultFitMode", 0, 0, 3);
-inline constexpr SettingDesc K_FocusPointIn1to1Mode = INT_RESET("focusPointIn1to1Mode", 1, 0, 2);
-inline constexpr SettingDesc K_DefaultCropAction = INT_RESET("defaultCropAction", 0, 0, 1);
-inline constexpr SettingDesc K_DefaultViewMode = INT_RESET("defaultViewMode", 0, 0, 1);
-inline constexpr SettingDesc K_SortingMode = INT_RESET("sortingMode", 0, 0, 5);
-inline constexpr SettingDesc K_FolderEndAction = INT_RESET("folderEndAction", 0, 0, 2);
-inline constexpr SettingDesc K_FolderViewMode = INT_RESET("folderViewMode", 2, 0, 2);
-inline constexpr SettingDesc K_ThumbPanelStyle = INT_RESET("thumbPanelStyle", 1, 0, 1);
-inline constexpr SettingDesc K_ImageScrolling = INT_RESET("imageScrolling", 1, 0, 2);
-inline constexpr SettingDesc K_ZoomIndicatorMode = INT_RESET("zoomIndicatorMode", 0, 0, 2);
-inline constexpr SettingDesc K_MemoryAllocationLimit = INT("memoryAllocationLimit", 1024, 512, 8192);
-inline constexpr SettingDesc K_SlideshowInterval = INT_RESET("slideshowInterval", 3000, 1);
-inline constexpr SettingDesc K_ThumbnailerThreads = INT_RESET("thumbnailerThreads", 4, 1);
-inline constexpr SettingDesc K_PanelPreviewsSize = INT("panelPreviewsSize", 140, 100, 250);
-inline constexpr SettingDesc K_AutoResizeLimit = INT_RESET("autoResizeLimit", 90, 30, 100);
-inline constexpr SettingDesc K_JPEGSaveQuality = INT("JPEGSaveQuality", 95, 0, 100);
-inline constexpr SettingDesc K_ExpandLimit = INT("expandLimit", 2);
-inline constexpr SettingDesc K_LastVerMajor = INT("lastVerMajor", 0);
-inline constexpr SettingDesc K_LastVerMinor = INT("lastVerMinor", 0);
-inline constexpr SettingDesc K_LastVerMicro = INT("lastVerMicro", 0);
+inline constexpr SettingDesc K_VideoPlayback = Bool("videoPlayback", true);
+inline constexpr SettingDesc K_UseSystemColorScheme = Bool("useSystemColorScheme", false);
+inline constexpr SettingDesc K_ShowChangelogs = Bool("showChangelogs", true);
+inline constexpr SettingDesc K_BlurBackground = Bool("blurBackground", true);
+inline constexpr SettingDesc K_PlayVideoSounds = Bool("playVideoSounds", false);
+inline constexpr SettingDesc K_UsePreloader = Bool("usePreloader", true);
+inline constexpr SettingDesc K_FullscreenMode = Bool("openInFullscreen", false);
+inline constexpr SettingDesc K_PanelEnabled = Bool("panelEnabled", true);
+inline constexpr SettingDesc K_PanelFullscreenOnly = Bool("panelFullscreenOnly", true);
+inline constexpr SettingDesc K_PanelPinned = Bool("panelPinned", false);
+inline constexpr SettingDesc K_LoopSlideshow = Bool("loopSlideshow", false);
+inline constexpr SettingDesc K_SquareThumbnails = Bool("squareThumbnails", false);
+inline constexpr SettingDesc K_TransparencyGrid = Bool("drawTransparencyGrid", false);
+inline constexpr SettingDesc K_EnableSmoothScroll = Bool("enableSmoothScroll", true);
+inline constexpr SettingDesc K_UseThumbnailCache = Bool("thumbnailCache", true);
+inline constexpr SettingDesc K_SmoothUpscaling = Bool("smoothUpscaling", true);
+inline constexpr SettingDesc K_ExpandImage = Bool("expandImage", false);
+inline constexpr SettingDesc K_SmoothAnimatedImages = Bool("smoothAnimatedImages", true);
+inline constexpr SettingDesc K_InfoBarFullscreen = Bool("infoBarFullscreen", true);
+inline constexpr SettingDesc K_InfoBarWindowed = Bool("infoBarWindowed", false);
+inline constexpr SettingDesc K_WindowTitleExtendedInfo = Bool("windowTitleExtendedInfo", true);
+inline constexpr SettingDesc K_CursorAutohide = Bool("cursorAutohiding", true);
+inline constexpr SettingDesc K_FirstRun = Bool("firstRun", true);
+inline constexpr SettingDesc K_ShowSaveOverlay = Bool("showSaveOverlay", true);
+inline constexpr SettingDesc K_ConfirmTrash = Bool("confirmTrash", true);
+inline constexpr SettingDesc K_UnloadThumbs = Bool("unloadThumbs", true);
+inline constexpr SettingDesc K_JxlAnimation = Bool("jxlAnimation", false);
+inline constexpr SettingDesc K_AutoResizeWindow = Bool("autoResizeWindow", false);
+inline constexpr SettingDesc K_UseFixedZoomLevels = Bool("useFixedZoomLevels", false);
+inline constexpr SettingDesc K_UnlockMinZoom = Bool("unlockMinZoom", true);
+inline constexpr SettingDesc K_TrackpadDetection = Bool("trackpadDetection", true);
+inline constexpr SettingDesc K_ClickableEdges = Bool("clickableEdges", false);
+inline constexpr SettingDesc K_ClickableEdgesVisible = Bool("clickableEdgesVisible", true);
+inline constexpr SettingDesc K_ShowHiddenFiles = Bool("showHiddenFiles", false);
+inline constexpr SettingDesc K_PanelCenterSelection = Bool("panelCenterSelection", false);
+inline constexpr SettingDesc K_FolderViewIconSize = Int("folderViewIconSize", 120);
+inline constexpr SettingDesc K_DefaultFitMode = IntReset("defaultFitMode", 0, 0, 3);
+inline constexpr SettingDesc K_FocusPointIn1to1Mode = IntReset("focusPointIn1to1Mode", 1, 0, 2);
+inline constexpr SettingDesc K_DefaultCropAction = IntReset("defaultCropAction", 0, 0, 1);
+inline constexpr SettingDesc K_DefaultViewMode = IntReset("defaultViewMode", 0, 0, 1);
+inline constexpr SettingDesc K_SortingMode = IntReset("sortingMode", 0, 0, 5);
+inline constexpr SettingDesc K_FolderEndAction = IntReset("folderEndAction", 0, 0, 2);
+inline constexpr SettingDesc K_FolderViewMode = IntReset("folderViewMode", 2, 0, 2);
+inline constexpr SettingDesc K_ThumbPanelStyle = IntReset("thumbPanelStyle", 1, 0, 1);
+inline constexpr SettingDesc K_ImageScrolling = IntReset("imageScrolling", 1, 0, 2);
+inline constexpr SettingDesc K_ZoomIndicatorMode = IntReset("zoomIndicatorMode", 0, 0, 2);
+inline constexpr SettingDesc K_MemoryAllocationLimit = Int("memoryAllocationLimit", 1024, 512, 8192);
+inline constexpr SettingDesc K_SlideshowInterval = IntReset("slideshowInterval", 3000, 1);
+inline constexpr SettingDesc K_ThumbnailerThreads = IntReset("thumbnailerThreads", 4, 1);
+inline constexpr SettingDesc K_PanelPreviewsSize = Int("panelPreviewsSize", 140, 100, 250);
+inline constexpr SettingDesc K_AutoResizeLimit = IntReset("autoResizeLimit", 90, 30, 100);
+inline constexpr SettingDesc K_JPEGSaveQuality = Int("JPEGSaveQuality", 95, 0, 100);
+inline constexpr SettingDesc K_ExpandLimit = Int("expandLimit", 2);
+inline constexpr SettingDesc K_LastVerMajor = Int("lastVerMajor", 0);
+inline constexpr SettingDesc K_LastVerMinor = Int("lastVerMinor", 0);
+inline constexpr SettingDesc K_LastVerMicro = Int("lastVerMicro", 0);
 
 inline constexpr SettingDesc K_ZoomStep = REAL("zoomStep", 0.2, 0.01, 0.5);
 inline constexpr SettingDesc K_MouseScrollingSpeed = REAL("mouseScrollingSpeed", 1.0, 0.5, 2.0);

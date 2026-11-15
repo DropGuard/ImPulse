@@ -8,6 +8,7 @@
 
 #include "qimgv_engine.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -40,7 +41,14 @@ static std::string makeFixture() {
     std::ofstream(dir / "b.jpg") << "x";
     std::ofstream(dir / "skip.txt") << "x";
     fs::create_directory(dir / "subdir");
-    return dir.string();
+    // the wire hands paths back in the form the caller opened with — Qt's
+    // forward slashes on Windows — so the fixture is built forward too and
+    // the string compares below mean the same thing on both platforms
+    std::string out = dir.string();
+#ifdef _WIN32
+    std::replace(out.begin(), out.end(), '\\', '/');
+#endif
+    return out;
 }
 
 int main() {
@@ -160,7 +168,11 @@ int main() {
         CHECK(ev.kind == QIMGV_EVENT_DIR_MUTATED);
         CHECK(mut.kind == QIMGV_MUT_RENAMED);
         CHECK(std::strcmp(dirbuf, to.c_str()) == 0);
+        if(std::strcmp(dirbuf, to.c_str()) != 0)
+            std::printf("  [contract] dirbuf=[%s]  to=[%s]\n", dirbuf, to.c_str());
         CHECK(std::strcmp(oldbuf, from.c_str()) == 0);
+        if(std::strcmp(oldbuf, from.c_str()) != 0)
+            std::printf("  [contract] oldbuf=[%s]  from=[%s]\n", oldbuf, from.c_str());
         CHECK(mut.size == 1);
         // z.jpg after a.jpg in the engine's own order, and the event says so
         CHECK(mut.index == 1);

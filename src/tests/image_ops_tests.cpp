@@ -186,8 +186,12 @@ class TestImageOps : public QObject, protected EngineStackFixture {
     void rolledBackSaveRestoresTheRowInsteadOfRebuildingIt() {
         // act runs its container as root, and root ignores permission bits — a save
         // into a read-only file SUCCEEDS there. The pin needs a user account.
+        // Windows needs no root skip: its read-only attribute refuses the same
+        // reopen, so the premise holds without the POSIX check.
+#ifndef Q_OS_WIN
         if(geteuid() == 0)
             QSKIP("running as root: permission bits cannot make a destination unwritable");
+#endif
         resetFixture();
         DirectoryManager dm{EngineBridge::instance()};
         QVERIFY(dm.setDirectory(fixtureDir));
@@ -491,8 +495,17 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         // that with wall-clock time; setting it says it directly, cannot be
         // shortened by a coarse clock, and costs nothing.
         QVERIFY(writeBigImage(fixtureDir + "/newer.png", "png", QSize(8, 8)));
+#ifdef Q_OS_WIN
+        {
+            QFile backdate(fixtureDir + "/newer.png");
+            QVERIFY(backdate.open(QIODevice::ReadWrite));
+            QVERIFY(backdate.setFileTime(QDateTime::fromSecsSinceEpoch(before.toSecsSinceEpoch() - 60),
+                                         QFileDevice::FileModificationTime));
+        }
+#else
         const struct timespec stamp[2] = {{0, UTIME_OMIT}, {before.toSecsSinceEpoch() - 60, 0}};
         QVERIFY(::utimensat(AT_FDCWD, (fixtureDir + "/newer.png").toLocal8Bit().constData(), stamp, 0) == 0);
+#endif
         FileOperations::copyFileTo(fixtureDir + "/newer.png", fixtureDir + "/destdir", true, result);
         QCOMPARE(result, FileOpResult::SUCCESS);
         QFileInfo overwritten(fixtureDir + "/destdir/renamed.png");

@@ -1,6 +1,5 @@
 #include <QTest>
-#include <sys/wait.h>
-#include <unistd.h>
+#include "slot_harness.h"
 #include <utility>
 #include <QSignalSpy>
 #include <QApplication>
@@ -361,44 +360,16 @@ int main(int argc, char **argv) {
         TestEditSave t;
         return QTest::qExec(&t, argc, argv) != 0 ? 1 : 0;
     }
-    const QMetaObject *mo = &TestEditSave::staticMetaObject;
-    QStringList testSlots;
-    for(int i = 0; i < mo->methodCount(); ++i) {
-        const QMetaMethod m = mo->method(i);
-        const QByteArray name = m.name();
-        if(m.methodType() == QMetaMethod::Slot && m.access() == QMetaMethod::Private && m.parameterCount() == 0 &&
-           name != "initTestCase" && name != "cleanupTestCase" && name != "init" && name != "cleanup")
-            testSlots << QString::fromUtf8(name);
-    }
-    int failures = 0, consecutiveAbnormal = 0;
-    for(const QString &slot : std::as_const(testSlots)) {
-        fflush(nullptr); // fork would duplicate whatever is buffered in stdout
-        pid_t pid = fork();
-        if(pid == 0) {
+    return slot_harness::run_units_one_process_each(
+        argc, argv, slot_harness::testSlots(&TestEditSave::staticMetaObject),
+        "edit_save_tests",
+        [argv](const QString &slot) -> int {
             coretest::setChildCoreLimit();
             QByteArray nameBytes = slot.toUtf8();
             char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
             TestEditSave t; // this child's own fixture, its own temp tree and settings
             return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        }
-        int status = 0;
-        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
-        }
-        // a crashed child loses its buffered output entirely — without naming
-        // the slot here, the evidence is a red ctest with nothing in the log
-        if(!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
-            fprintf(stderr, "edit_save_tests: slot '%s' exited abnormally (exit=%d, sig=%d)\n",
-                    slot.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-                    WIFSIGNALED(status) ? WTERMSIG(status) : -1);
-        // the crash-burst guard: three consecutive abnormal slots mean a
-        // fixture-wide failure — the remaining slots carry no new evidence,
-        // and each was streaming a full core through systemd-coredump
-        consecutiveAbnormal = (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : consecutiveAbnormal + 1;
-        if(consecutiveAbnormal == 3)
-            break;
-        failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
-    }
-    return failures;
+        });
 }
 
 #include "edit_save_tests.moc"
