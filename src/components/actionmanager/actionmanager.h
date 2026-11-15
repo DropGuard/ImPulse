@@ -66,6 +66,12 @@ class ActionManager : public QObject {
     static ActionManager *getInstance();
     ~ActionManager() override;
     bool processEvent(QInputEvent *);
+    // The one token->QKeySequence expansion, shared by the projection, the
+    // veto predicates and every surface that reads sequences from tokens.
+    // "Enter" claims both Returns (Qt reads the main-row Enter as Return and
+    // keeps Enter for the keypad); a token that is not a Qt name expands to
+    // nothing — the vocabulary sweep keeps that branch empty.
+    static QList<QKeySequence> sequencesForToken(const QString &token);
     // the keymap's resolution primitive: shortcut string -> action dispatch,
     // walking the armed inspect layer -> global. Public so the pointer
     // funnel's decision itself is testable (ShortcutBuilder's physical event
@@ -218,10 +224,6 @@ class ActionManager : public QObject {
     };
     using TableMutator = std::function<void(QMap<QString, QString> &)>;
     void commit(Scope scope, const TableMutator &mutate);
-    // READ access only, and unused today: the point is that no writable table
-    // accessor exists at all. commit() is the only function that touches a
-    // table mutably.
-    const QMap<QString, QString> &tableFor(Scope scope) const;
     // the shared erase-all-by-action loop the four removeAll* doors use
     static void eraseAction(QMap<QString, QString> &table, const QString &actionName);
     // the disjointness law, run by commit() after every write: a token a

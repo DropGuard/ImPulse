@@ -43,10 +43,6 @@ void ChangelogWindow::wheelEvent(QWheelEvent *event) {
 // The close button holds focus while this window is up, so the ShortcutOverride
 // for Esc arrives there, not at the window — the filter claims it back. Without
 // it, Esc would fire closeFullScreenOrExit behind a what's-new popup.
-bool ChangelogWindow::event(QEvent *event) {
-    return OverlayWidget::event(event);
-}
-
 bool ChangelogWindow::eventFilter(QObject *watched, QEvent *event) {
     if(event->type() == QEvent::ShortcutOverride) {
         auto *ke = static_cast<QKeyEvent *>(event);

@@ -28,7 +28,6 @@ class ChangelogWindow : public OverlayWidget {
   protected:
     void paintEvent(QPaintEvent *) override;
     void wheelEvent(QWheelEvent *) override;
-    bool event(QEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void keyPressEvent(QKeyEvent *) override;
 
