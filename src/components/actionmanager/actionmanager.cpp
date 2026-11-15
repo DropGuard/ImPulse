@@ -164,11 +164,37 @@ void ActionManager::attachWindowSurface(QWidget *surface) {
     // (pinned in dispatch_probe_tests) — the window is that widget
     if(windowSurface == surface)
         return;
+    // detach: take the actions back off the old window before the pointer is
+    // replaced. A QAction's shortcut is live exactly while it is added to a
+    // widget, so leaving them on a still-alive surface would keep them firing
+    // after the new window attached — the same one-owner rule as everything
+    // else in this tree.
+    if(windowSurface) {
+        for(QAction *a : std::as_const(mActions))
+            windowSurface->removeAction(a);
+    }
     windowSurface = surface;
-    if(!windowSurface)
+    if(!windowSurface) {
+        applyKeyboardProjection();
         return;
+    }
     for(QAction *a : std::as_const(mActions))
         windowSurface->addAction(a);
+    // The same destroyed hook the grid and document surfaces carry. It is
+    // not a crash fix today — ActionManager is a never-destructed singleton,
+    // so the dangling pointer is only ever compared, never dereferenced, and
+    // ASan has nothing to report. It is the implicit context removed: the
+    // safety of this pointer rested on two unstated assumptions, "the
+    // singleton outlives every window" and "the next Core re-attaches before
+    // anyone reads it". The guard makes it explicit, and the guard matters:
+    // an unconditional clear would erase a NEWER surface's pointer when an
+    // OLDER window dies late.
+    connect(windowSurface, &QObject::destroyed, this, [this](QObject *dead) {
+        if(windowSurface != dead)
+            return; // a newer surface already replaced this one
+        windowSurface = nullptr;
+        applyKeyboardProjection();
+    });
     applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
@@ -180,12 +206,12 @@ void ActionManager::attachGridSurface(QWidget *surface) {
         // the surface dies with the window it belongs to; its QShortcuts are
         // its children, so the projections die with it and the stale pointer
         // is cleaned up here rather than in a destructor nobody owns
-        connect(gridSurface, &QObject::destroyed, this, [this]() {
+        connect(gridSurface, &QObject::destroyed, this, [this](QObject *dead) {
+            if(gridSurface != dead)
+                return; // a newer surface already replaced this one
             gridSurface = nullptr;
             gridProjections.clear();
-            if(gridActive) {
-                gridActive = false;
-            }
+            gridActive = false;
             applyKeyboardProjection();
         });
     }
@@ -197,7 +223,9 @@ void ActionManager::attachDocumentSurface(QWidget *surface) {
         return;
     documentSurface = surface;
     if(documentSurface) {
-        connect(documentSurface, &QObject::destroyed, this, [this]() {
+        connect(documentSurface, &QObject::destroyed, this, [this](QObject *dead) {
+            if(documentSurface != dead)
+                return; // a newer surface already replaced this one
             documentSurface = nullptr;
             documentProjections.clear();
             inspectProjections.clear(); // both claim sets die with the surface

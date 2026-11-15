@@ -626,6 +626,54 @@ class TestShortcutScope : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(mw->viewer()->fitMode(), FIT_WINDOW, 5000);
     }
 
+    // Surface handover. A QAction's shortcut is live exactly while the action
+    // is added to a widget, so replacing the window surface must take the
+    // actions off the OLD window — otherwise both windows answer, and the
+    // "one owner" law is broken in the same silent way the whole keymap work
+    // has been about. This is the observable half of the lifecycle change.
+    //
+    // The destroyed-hook guard (only clear if the dying surface is still the
+    // current one) is NOT testable through this API: with the manager as a
+    // never-destructed singleton, a stale clear is overwritten by the next
+    // attach and leaves no trace. It exists for the code that would one day
+    // dereference windowSurface, and the comment on it says so rather than
+    // pretending a test covers it. Each slot is its own process, so mutating
+    // the singleton here is contained.
+    void replacingTheWindowSurfaceDetachesTheOldOne() {
+        Core core;
+        auto *real = core.mainWindow();
+        QVERIFY(real != nullptr);
+        QAction *fullscreen = actionManager->action(QStringLiteral("toggleFullscreen"));
+        QVERIFY(fullscreen);
+        QVERIFY2(real->actions().contains(fullscreen), "the real window is not a live surface");
+
+        auto *other = new QWidget();
+        actionManager->attachWindowSurface(other);
+        // one owner: the old window let go, the new one holds it
+        QVERIFY2(!real->actions().contains(fullscreen), "the previous window kept the action — two live surfaces");
+        QVERIFY2(other->actions().contains(fullscreen), "the new window never received the action");
+
+        // and the claim is inert on the old window: a projected shortcut
+        // there does nothing, while the same key on the live surface fires
+        QVERIFY(!fullscreen->shortcuts().isEmpty());
+
+        actionManager->attachWindowSurface(real);
+        QVERIFY(real->actions().contains(fullscreen));
+        QVERIFY2(!other->actions().contains(fullscreen), "detach on the way back failed");
+        delete other;
+
+        auto *floating = new QWidget();
+        actionManager->attachWindowSurface(floating);
+        delete floating; // the CURRENT surface dies: its hook must leave the manager usable
+        auto *after = new QWidget();
+        actionManager->attachWindowSurface(after);
+        QVERIFY2(after->actions().contains(fullscreen), "a surface death left the manager unable to attach again");
+        delete after;
+
+        actionManager->attachWindowSurface(real);
+        QVERIFY2(real->actions().contains(fullscreen), "could not restore the real window");
+    }
+
     // The settings editor's conflict warning asks the SAME scope walk the
     // disjointness law uses — one implementation, so a table added later is
     // visible to both by construction. The hand-written three-table version
