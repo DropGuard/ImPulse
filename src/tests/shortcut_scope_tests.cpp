@@ -465,6 +465,73 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
     }
 
+    // commit() is the one write path: whatever door the edit came through,
+    // the disjointness law and the projection rebuild run after it. This
+    // pins the property from BOTH sides — a scope insert that collides with
+    // a global token, and a global insert that collides with a scope token —
+    // because the old code only guarded the second direction (and only after
+    // config load, not after every editor insert).
+    void everyWriteDoorEnforcesDisjointness() {
+        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
+        const QMap<QString, QString> docBefore = actionManager->allDocShortcuts();
+        const QMap<QString, QString> gridBefore = actionManager->allGridShortcuts();
+
+        // direction 1: a scope insert of a token the global table holds.
+        // "openSettings" is P, and P is also a document binding? — pick a
+        // token known to be global-only, then bind it into the document
+        // scope and watch the global copy disappear.
+        QVERIFY(actionManager->allShortcuts().contains(QStringLiteral("Del")));
+        actionManager->addDocShortcut(QStringLiteral("Del"), QStringLiteral("crop"));
+        QVERIFY2(!actionManager->allShortcuts().contains(QStringLiteral("Del")),
+                 "a document insert left the global claim live — the pair is ambiguous");
+
+        // direction 2: the reverse (the door addShortcut already had)
+        actionManager->addShortcut(QStringLiteral("Right"), QStringLiteral("exit"));
+        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+
+        // the projection agrees with the tables — no stale claim survives
+        QVERIFY(!actionManager->action("moveToTrash")->shortcuts().contains(QKeySequence(Qt::Key_Delete)));
+        QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Right)));
+
+        // restore through the same doors
+        actionManager->removeAllDocShortcuts(QStringLiteral("crop"));
+        actionManager->removeAllShortcuts(QStringLiteral("exit"));
+        actionManager->resetDefaults();
+        QCOMPARE(actionManager->allShortcuts(), globalBefore);
+        QCOMPARE(actionManager->allDocShortcuts(), docBefore);
+        QCOMPARE(actionManager->allGridShortcuts(), gridBefore);
+    }
+
+    // The settings editor's conflict warning asks the SAME scope walk the
+    // disjointness law uses — one implementation, so a table added later is
+    // visible to both by construction. The hand-written three-table version
+    // this replaced had forgotten the document table, so a document-scope
+    // collision produced no warning: the user's key silently landed in two
+    // places. "Enter" is the sharpest probe — it is the one token whose
+    // spelling ("Enter") differs from what the document/grid tables hold
+    // ("Enter" as Return+keypad), so a naive string compare reports nothing.
+    void scopeClaimsNameEveryTableHoldingTheKey() {
+        // Right lives in the document table and the grid table
+        const QStringList right = actionManager->scopeClaimsForToken(QStringLiteral("Right"));
+        QVERIFY2(right.contains(QStringLiteral("document")), qPrintable(right.join(", ")));
+        QVERIFY2(right.contains(QStringLiteral("folder view")), qPrintable(right.join(", ")));
+        // Left additionally lives in inspect
+        const QStringList left = actionManager->scopeClaimsForToken(QStringLiteral("Left"));
+        QVERIFY2(left.contains(QStringLiteral("document")), qPrintable(left.join(", ")));
+        QVERIFY2(left.contains(QStringLiteral("folder view")), qPrintable(left.join(", ")));
+        QVERIFY2(left.contains(QStringLiteral("inspect")), qPrintable(left.join(", ")));
+        // Enter: document (folderView) and grid (gridOpen) — the token that
+        // exposed the missing table, and whose sequence expansion is the
+        // reason a spelling comparison would have missed it
+        const QStringList enter = actionManager->scopeClaimsForToken(QStringLiteral("Enter"));
+        QVERIFY2(enter.contains(QStringLiteral("document")), qPrintable(enter.join(", ")));
+        QVERIFY2(enter.contains(QStringLiteral("folder view")), qPrintable(enter.join(", ")));
+        // a key nobody scopes claims nothing
+        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
+        // pointer tokens never ride QShortcutMap and are exempt by design
+        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("WheelUp")).isEmpty());
+    }
+
     // The context menu prints a binding hint per item, and it reads the
     // action through shortcutForAction. When 7b20e6e6 moved save/crop/the
     // edit verbs/setWallpaper into the document table, this reader kept

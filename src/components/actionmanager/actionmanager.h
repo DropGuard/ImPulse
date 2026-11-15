@@ -96,6 +96,11 @@ class ActionManager : public QObject {
     // logical key only (nativeScanCode is 0 by construction), and a delivered
     // event answers through the same projected tables the map matched against.
     bool keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const;
+    // Which scope tables already claim this token, by display name ("document",
+    // "folder view", "inspect"), empty when none does. The conflict checker
+    // asks this instead of walking the tables itself — the four-table walk it
+    // replaced had already forgotten the document table once.
+    QStringList scopeClaimsForToken(const QString &token) const;
     // which action (if any) the sequence claims across the live tables —
     // grid, then the document view's (inspect variant folded in), then global
     QString actionForKeySequence(const QKeySequence &seq) const;
@@ -189,6 +194,45 @@ class ActionManager : public QObject {
 
   private:
     explicit ActionManager(QObject *parent = nullptr);
+
+    // ---- the one write path ------------------------------------------------
+    //
+    // Every table mutation goes through commit(scope). A writer cannot reach
+    // the QMap directly any more: it calls commit() with a lambda that edits
+    // the map, and commit() is the only place that (a) enforces the
+    // one-key-one-surface law against the changed table, (b) rebuilds the
+    // projection, and (c) keeps the tables' invariants. The four bugs this
+    // replaced (resetDefaults missing a table, the menu hint reader, the
+    // conflict checker, the Enter dead key) were all "a writer did the map
+    // edit but skipped one of the follow-ups" — a shape that cannot be
+    // written once the map is not handed out.
+    //
+    // The map is passed as a MUTABLE REFERENCE inside the lambda, so the
+    // lambda body is ordinary QMap code; what it cannot do is forget the
+    // follow-up, because it never gets a chance to run one.
+    enum class Scope {
+        Global,
+        Document,
+        Grid,
+        Inspect
+    };
+    using TableMutator = std::function<void(QMap<QString, QString> &)>;
+    void commit(Scope scope, const TableMutator &mutate);
+    // READ access only, and unused today: the point is that no writable table
+    // accessor exists at all. commit() is the only function that touches a
+    // table mutably.
+    const QMap<QString, QString> &tableFor(Scope scope) const;
+    // the shared erase-all-by-action loop the four removeAll* doors use
+    static void eraseAction(QMap<QString, QString> &table, const QString &actionName);
+    // the disjointness law, run by commit() after every write: a token a
+    // scope table owns is removed from the global table. Returns true when
+    // it removed something (commit ignores the result; it exists for tests).
+    bool enforceDisjointness();
+    // the read side of the same law: which scope tables claim this token.
+    // One implementation, used by the conflict checker and by the editor's
+    // warning — a new table cannot be forgotten by a reader that asks here.
+    QStringList scopesClaiming(const QString &token) const;
+
     // the registry's single registration point: one parented QAction per
     // name. R12 reads this list against core.cpp's connectAction calls.
     QAction *addAction(const QString &name);
