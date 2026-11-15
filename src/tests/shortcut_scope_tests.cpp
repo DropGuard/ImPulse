@@ -465,6 +465,31 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
     }
 
+    // The context menu prints a binding hint per item, and it reads the
+    // action through shortcutForAction. When 7b20e6e6 moved save/crop/the
+    // edit verbs/setWallpaper into the document table, this reader kept
+    // reading only the global one — every document-view menu item that had
+    // a chord lost its hint, silently, because nothing asserted the hint.
+    // The menu only ever appears on ViewerWidget, so the document table is
+    // the right answer for it.
+    void contextMenuHintsReadTheDocumentTable() {
+        // commands the view split moved out of the global table
+        for(const QString &action : {QStringLiteral("save"), QStringLiteral("crop"), QStringLiteral("setWallpaper"),
+                                     QStringLiteral("rotateLeft"), QStringLiteral("fitWindow")}) {
+            QVERIFY2(!actionManager->allShortcuts().values().contains(action),
+                     qPrintable(QStringLiteral("expected no global binding for ") + action +
+                                " — this action is documented as document-scope only"));
+            QVERIFY2(!actionManager->shortcutForAction(action).isEmpty(),
+                     qPrintable(QStringLiteral("the menu hint for ") + action +
+                                " is blank — the reader lost the document table"));
+        }
+        // and the answer is the document table's own token, not a stale one
+        QCOMPARE(actionManager->shortcutForAction(QStringLiteral("setWallpaper")), QStringLiteral("W"));
+        QCOMPARE(actionManager->shortcutForAction(QStringLiteral("save")), QStringLiteral("Ctrl+S"));
+        // a global-table action still answers from there
+        QCOMPARE(actionManager->shortcutForAction(QStringLiteral("openSettings")), QStringLiteral("P"));
+    }
+
     // The keymap page renders as scenarios: one section per scope under a
     // header row, and a row saves into the table its section stands for.
     // The render half is pinned through readSettings (a public slot); the
