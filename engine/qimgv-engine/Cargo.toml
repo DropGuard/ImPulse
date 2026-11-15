@@ -12,9 +12,13 @@ thiserror = { workspace = true }
 log = { workspace = true }
 imagesize = { workspace = true }
 kamadak-exif = { workspace = true }
-inotify = { workspace = true }
 
+# The watcher's syscall shells are platform-shaped: inotify (+libc) on Linux,
+# declared kernel32 entry points on Windows (watcher/fd_windows.rs carries its
+# own bounded extern block — no -sys crate, so the surface stays reviewable
+# in one place and cannot grow by accident).
 [target.'cfg(target_os = "linux")'.dependencies]
+inotify = { workspace = true }
 libc = { workspace = true }
 
 [dev-dependencies]

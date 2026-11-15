@@ -11,7 +11,7 @@ pub mod model;
 pub mod scan;
 pub mod sort;
 pub mod trace;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 pub mod watcher;
 
 pub use engine::{

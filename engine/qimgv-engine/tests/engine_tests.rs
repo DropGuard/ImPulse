@@ -175,7 +175,6 @@ fn rapid_open_dir_keeps_only_latest() {
     }
 }
 
-#[test]
 // The owner's live mismatch (2026-11-11, /mnt/disk4t/已阅/色图新): Dolphin
 // (ICU/DUCET collation) orders the bracket-named file first; a codepoint
 // comparison puts the digit-named one first. The comparator weights
@@ -208,6 +207,10 @@ fn natural_orders_classes_like_the_desktop_and_runs_digits_by_value() {
     );
 }
 
+// Revived 2026-11-15 (Windows port audit): this test had lost its #[test]
+// attribute — the suite stayed green while it silently never ran, the exact
+// shape AGENTS.md rule 7 pins. It runs by name on every platform now.
+#[test]
 fn set_sort_reorders_and_notifies() {
     let (notify_tx, _notify_rx) = mpsc::channel::<()>();
     let engine = Engine::spawn(
