@@ -502,16 +502,20 @@ void ActionManager::applyInspectProjection() {
 void ActionManager::initDefaults() {
     defaults.insert("F", "toggleFullscreen");
     defaults.insert("F11", "toggleFullscreen");
+    // A double click is a mouse GESTURE, not a key: it stays at the global
+    // level because fullscreen is the one action with no conflicting
+    // gesture-level meaning (a double click on a thumbnail opens it, which is
+    // a grid-scope affair). Kept as a token because the keymap editor shows
+    // it, but it is not a keyboard binding.
     defaults.insert("LMB_DoubleClick", "toggleFullscreen");
-    defaults.insert("MiddleButton", "exit");
+    // MiddleButton->exit is gone. Middle-click is "open in a new tab" /
+    // "autoscroll" muscle memory, and quitting the application on a mis-tap
+    // loses whatever the user had open. Exit keeps its standard chords.
     defaults.insert(InputMap::keyNameCtrl() + "+O", "open");
-    defaults.insert(InputMap::keyNameAlt() + "+X", "exit");
     defaults.insert(InputMap::keyNameCtrl() + "+Q", "exit");
     defaults.insert("Esc", "closeFullScreenOrExit");
     defaults.insert("Del", "moveToTrash");
     defaults.insert(InputMap::keyNameShift() + "+Del", "removeFile");
-    defaults.insert("C", "copyFile");
-    defaults.insert("M", "moveFile");
     defaults.insert(InputMap::keyNameCtrl() + "+C", "copyFileClipboard");
     defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+C", "copyPathClipboard");
     defaults.insert("F2", "renameFile");
@@ -551,6 +555,15 @@ void ActionManager::initDefaults() {
     docDefaults.insert("R", "resize");
     docDefaults.insert("H", "flipH");
     docDefaults.insert("V", "flipV");
+    // copy/move to a chosen directory, via the overlays. Document-scope by
+    // what the action needs, not by habit: the target overlay names the file
+    // it is about to move, and the folder view has no "the file" to name (it
+    // has a selection, and the overlay path reads selectedPath()). The runtime
+    // guard that used to skip FOLDERVIEW here is gone with the binding —
+    // OverlayHost::triggerCopyOverlay still refuses folder mode as its own
+    // contract, but the key no longer reaches it there at all.
+    docDefaults.insert("C", "copyFile");
+    docDefaults.insert("M", "moveFile");
     // the toggle pair: keys that LEAVE the document view for the grid. They
     // belong here, not in the global table — the grid's own Enter/Backspace
     // (gridOpen/goUp) are live exactly while the grid holds focus, and a

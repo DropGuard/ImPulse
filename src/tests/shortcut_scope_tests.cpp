@@ -674,6 +674,47 @@ class TestShortcutScope : public QObject {
         QVERIFY2(real->actions().contains(fullscreen), "could not restore the real window");
     }
 
+    // The global table is the WIDE scope, and wide means "standard or absent".
+    // Every key here is either a mass-standard chord or a gesture with no
+    // conflicting meaning. Three things were removed because they failed that
+    // test and each has a reason worth pinning:
+    //   MiddleButton->exit   a mis-tap quits and loses the session
+    //   Alt+X->exit          a second exit chord nobody expects
+    //   C/M->copyFile/moveFile  file ops that need a visible subject, now
+    //                        document-scope (and everywhere reachable at all)
+    void theGlobalTableKeepsOnlyStandardOrSubjectlessKeys() {
+        const QMap<QString, QString> global = actionManager->allShortcuts();
+
+        // the removals — one forward walk instead of QMap::keys(value), which
+        // allocates a temporary list per call and tripped clazy
+        QSet<QString> exitKeys;
+        QSet<QString> copyClipboardKeys;
+        QSet<QString> openKeys;
+        for(auto it = global.constBegin(); it != global.constEnd(); ++it) {
+            if(it.value() == QLatin1String("exit"))
+                exitKeys.insert(it.key());
+            else if(it.value() == QLatin1String("copyFileClipboard"))
+                copyClipboardKeys.insert(it.key());
+            else if(it.value() == QLatin1String("open"))
+                openKeys.insert(it.key());
+        }
+        QVERIFY2(!exitKeys.contains(QStringLiteral("MiddleButton")), "MiddleButton still exits the application");
+        QVERIFY2(!exitKeys.contains(QStringLiteral("Alt+X")), "the non-standard Alt+X exit chord came back");
+        QVERIFY2(!global.contains(QStringLiteral("C")), "C belongs to the document scope now");
+        QVERIFY2(!global.contains(QStringLiteral("M")), "M belongs to the document scope now");
+
+        // the standard chords that must stay
+        QVERIFY(exitKeys.contains(QStringLiteral("Ctrl+Q")));
+        QVERIFY(copyClipboardKeys.contains(QStringLiteral("Ctrl+C")));
+        QVERIFY(openKeys.contains(QStringLiteral("Ctrl+O")));
+
+        // C/M are reachable in the document view, where their overlays have a
+        // subject to act on
+        const QMap<QString, QString> doc = actionManager->allDocShortcuts();
+        QCOMPARE(doc.value(QStringLiteral("C")), QStringLiteral("copyFile"));
+        QCOMPARE(doc.value(QStringLiteral("M")), QStringLiteral("moveFile"));
+    }
+
     // The settings editor's conflict warning asks the SAME scope walk the
     // disjointness law uses — one implementation, so a table added later is
     // visible to both by construction. The hand-written three-table version
