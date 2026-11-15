@@ -53,6 +53,43 @@ void Core::copyPathClipboard() {
 
 // open from clipboard
 // todo: actual file paste into folderview (like filemanager)
+// The folder view's Ctrl+V. The clipboard's urls are the files to place; the
+// model's directory is where. interactiveCopy is the same path the copy
+// overlay uses, so overwrite prompts, error decoding and the watcher's
+// refresh are all the ones already exercised — this command adds no file
+// machinery of its own, it only answers "which paths, which directory".
+//
+// Deliberately skipped rather than reported:
+//   - a remote url (toLocalFile() is empty) — the same refusal
+//     openFromClipboard makes, for the same reason: only local files exist
+//     for this application;
+//   - a file already in the destination directory — copying a file onto
+//     itself is not a user intent, and interactiveCopy would raise an
+//     overwrite prompt for an operation that can only produce an identical
+//     file.
+void Core::pasteFilesToCurrentDirectory() {
+    const QString destDir = model->directoryPath();
+    if(destDir.isEmpty())
+        return; // no directory to paste into
+    const QMimeData *mimeData = QApplication::clipboard()->mimeData();
+    if(!mimeData || !mimeData->hasUrls())
+        return;
+    QList<QString> paths;
+    const QDir dest(destDir);
+    const QList<QUrl> urls = mimeData->urls(); // a temp QList in the range-for detaches per iteration
+    for(const QUrl &url : urls) {
+        const QString path = url.toLocalFile();
+        if(path.isEmpty())
+            continue; // remote: not this application's kind of file
+        if(QFileInfo(path).absolutePath() == dest.absolutePath())
+            continue; // already here
+        paths << path;
+    }
+    if(paths.isEmpty())
+        return;
+    interactiveCopy(paths, destDir);
+}
+
 void Core::openFromClipboard() {
     auto cb = QApplication::clipboard();
     auto mimeData = cb->mimeData();

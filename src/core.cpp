@@ -327,6 +327,10 @@ void Core::connectWindowActions() {
     actionManager->connectAction("gridSelectLast", mw->getFolderView(), &FolderViewProxy::gridSelectLast);
     actionManager->connectAction("gridSelectAll", mw->getFolderView(), &FolderViewProxy::gridSelectAll);
     actionManager->connectAction("gridOpen", mw->getFolderView(), &FolderViewProxy::activateCurrent);
+    // the folder view's Ctrl+V. Landed on Core, not the grid: the destination
+    // is the model's directory and the work is interactiveCopy, both of which
+    // the grid surface has no business owning.
+    actionManager->connectAction("pasteFilesHere", this, &Core::pasteFilesToCurrentDirectory);
 }
 
 void Core::loadTranslation() {
