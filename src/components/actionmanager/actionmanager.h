@@ -241,16 +241,35 @@ class ActionManager : public QObject {
 
     // the keyboard projection's state and its one apply-everything entry
     // point, called from every table mutation
-    QWidget *windowSurface = nullptr;       // where the QActions are registered
-    QWidget *gridSurface = nullptr;         // where the grid scope's QShortcuts live
-    QWidget *documentSurface = nullptr;     // where the document view's QShortcuts live
-    QList<QShortcut *> gridProjections;     // rebuilt whenever the grid table moves
-    QList<QShortcut *> documentProjections; // rebuilt whenever the document table moves
-    bool gridActive = false;                // the grid surface holds keyboard focus
+    QWidget *windowSurface = nullptr;   // where the QActions are registered
+    QWidget *gridSurface = nullptr;     // where the grid scope's QShortcuts live
+    QWidget *documentSurface = nullptr; // where the document view's QShortcuts live
+    QList<QShortcut *> gridProjections; // rebuilt whenever the grid table moves
+    // Both document-surface claim sets store their source token: the hand-over
+    // when inspection arms is per KEY, and a QShortcut does not remember which
+    // table token produced it ("Enter" expands to two sequences, so squinting
+    // at sc->key() would miss half the claim).
+    struct SurfaceClaim {
+        QShortcut *shortcut;
+        QString token;
+    };
+    QList<SurfaceClaim> documentProjections; // the document table's claims
+    // The inspect layer's own claim set, kept apart from documentProjections so
+    // arming it is an enabled-bit flip instead of a rebuild. It is a SAME-KEY,
+    // SAME-SURFACE variant: Left means prevImage normally and scrollLeft when
+    // inspection is armed. Two live claims on one surface are ambiguous with
+    // NEITHER firing (dispatch_probe_tests), so arming cannot be "add a second
+    // claim" — it is "disable the document claim and enable the inspect one,
+    // per shared key". QShortcut's enabled bit does exactly that, and unlike a
+    // QAction's it has no trigger() path to swallow: invokeAction() bypasses
+    // QShortcut entirely, so menus keep working while a scope is disarmed.
+    QList<SurfaceClaim> inspectProjections;
+    bool gridActive = false; // the grid surface holds keyboard focus
     void applyKeyboardProjection();
     void reproject();                // global table (de-claimed) + inspect layer -> setShortcuts
     void rebuildGridShortcuts();     // grid table -> QShortcuts on the grid surface
-    void rebuildDocumentShortcuts(); // document table (+ inspect variant) -> QShortcuts
+    void rebuildDocumentShortcuts(); // document table -> QShortcuts; inspect -> inspectProjections
+    void applyInspectProjection();   // inspectMode -> the enabled bits (no rebuild)
 
     QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
     // the inspect scope's layer: only the deltas live here (fit original /
