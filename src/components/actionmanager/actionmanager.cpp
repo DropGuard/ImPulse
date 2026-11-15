@@ -1,6 +1,7 @@
 #include "actionmanager.h"
 
 #include <QShortcut>
+#include <functional>
 #include <QWidget>
 
 ActionManager *actionManager = nullptr;
@@ -13,6 +14,21 @@ bool isPointerToken(const QString &token) {
            token == QStringLiteral("LMB") || token == QStringLiteral("RMB") ||
            token == QStringLiteral("MiddleButton") || token == QStringLiteral("XButton1") ||
            token == QStringLiteral("XButton2") || token.endsWith(QStringLiteral("_DoubleClick"));
+}
+
+// one keyboard token -> its QKeySequence claims. "Enter" is the one InputMap
+// name that does not map 1:1: Qt reads the main-row Enter as Return and keeps
+// Enter for the keypad, and both scancodes resolve to the same token today —
+// so the token claims both sequences. Declared here because the disjointness
+// law (scopesClaiming) compares claims by expanded sequence, not by spelling.
+QList<QKeySequence> sequencesForToken(const QString &token) {
+    if(token == QStringLiteral("Enter"))
+        return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
+    QKeySequence seq = QKeySequence::fromString(token);
+    if(seq.count() == 0)
+        return {}; // not a Qt name: the vocabulary sweep
+                   // (everyInputMapNameIsQtParseable) keeps this branch empty
+    return {seq};
 }
 } // namespace
 
@@ -197,24 +213,126 @@ void ActionManager::setGridActive(bool active) {
     applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
+// The one write path. See the declaration comment: a writer hands commit()
+// a lambda that edits the table it was given, and commit() owns the
+// follow-ups. Enforcing disjointness lives HERE, not at each call site, so
+// a scope edit that collides with the global table is caught whether it came
+// from the editor, a config load, or a test.
+// one erase-all-by-action, shared by the four removeAll*Shortcuts(action)
+// doors — the loop shape lived four times, which is how one would eventually
+// disagree with the others
+void ActionManager::eraseAction(QMap<QString, QString> &table, const QString &actionName) {
+    for(auto i = table.begin(); i != table.end();) {
+        if(i.value() == actionName)
+            i = table.erase(i);
+        else
+            ++i;
+    }
+}
+
+void ActionManager::commit(Scope scope, const TableMutator &mutate) {
+    // the mutable table reference never leaves this function: it is created,
+    // handed to the mutator, and gone. There is no accessor returning a
+    // writable table, so a writer cannot edit a table and skip the law or
+    // the projection rebuild — that combination is unwritable, not just
+    // discouraged.
+    QMap<QString, QString> *table = &shortcuts;
+    switch(scope) {
+    case Scope::Global: table = &shortcuts; break;
+    case Scope::Document: table = &docShortcuts; break;
+    case Scope::Grid: table = &gridShortcuts; break;
+    case Scope::Inspect: table = &inspectShortcuts; break;
+    }
+    mutate(*table);
+    // the law applies to every commit: a global edit can introduce a token a
+    // scope owns, and a scope edit can introduce a token the global table
+    // still holds — either direction is the same ambiguity
+    enforceDisjointness();
+    applyKeyboardProjection();
+}
+//------------------------------------------------------------------------------
+const QMap<QString, QString> &ActionManager::tableFor(Scope scope) const {
+    switch(scope) {
+    case Scope::Global: return shortcuts;
+    case Scope::Document: return docShortcuts;
+    case Scope::Grid: return gridShortcuts;
+    case Scope::Inspect: return inspectShortcuts;
+    }
+    return shortcuts;
+}
+//------------------------------------------------------------------------------
+// The one-key-one-surface law on the live tables: a token a scope table owns
+// is removed from the global table. The global table's claims are always
+// live, so a shared token is ambiguous in that scope with neither claim
+// firing. Pointer tokens are exempt (they never ride QShortcutMap).
+bool ActionManager::enforceDisjointness() {
+    bool removed = false;
+    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
+        bool claimed = false;
+        if(!isPointerToken(i.key()))
+            claimed = !scopesClaiming(i.key()).isEmpty();
+        if(claimed) {
+            i = shortcuts.erase(i);
+            removed = true;
+        } else {
+            ++i;
+        }
+    }
+    return removed;
+}
+//------------------------------------------------------------------------------
+// The read side of the disjointness law: which scope tables claim this token,
+// by expanded sequence ("Enter" claims both Return and keypad Enter). ONE
+// implementation — the conflict checker, the editor warning, and
+// enforceDisjointness all ask here, so a fifth scope added later is visible
+// to all of them by construction.
+QStringList ActionManager::scopesClaiming(const QString &token) const {
+    QStringList claims;
+    if(isPointerToken(token))
+        return claims;
+    const QList<QKeySequence> seqs = sequencesForToken(token);
+    struct ScopeTable {
+        Scope scope;
+        const QMap<QString, QString> *table;
+        const char *label;
+    };
+    const ScopeTable tables[] = {
+        {Scope::Document, &docShortcuts, "document"},
+        {Scope::Grid, &gridShortcuts, "folder view"},
+        {Scope::Inspect, &inspectShortcuts, "inspect"},
+    };
+    for(const ScopeTable &entry : tables) {
+        bool found = false;
+        for(auto it = entry.table->constBegin(); it != entry.table->constEnd() && !found; ++it) {
+            if(isPointerToken(it.key()))
+                continue;
+            const QList<QKeySequence> tokenSeqs = sequencesForToken(it.key());
+            for(const QKeySequence &seq : tokenSeqs) {
+                if(seqs.contains(seq)) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if(found)
+            claims << QString::fromLatin1(entry.label);
+    }
+    return claims;
+}
+
+// The public face of the same law, for the settings editor's conflict
+// warning: a key may legitimately live in several scopes, so the editor names
+// each table holding it. This is the ONE walk over the scope tables — the
+// hand-written three-table version it replaced had forgotten the document
+// table, which is how a document-scope collision showed no warning.
+QStringList ActionManager::scopeClaimsForToken(const QString &token) const {
+    return scopesClaiming(token);
+}
+//------------------------------------------------------------------------------
 void ActionManager::applyKeyboardProjection() {
     rebuildGridShortcuts();
     rebuildDocumentShortcuts();
     reproject();
-}
-//------------------------------------------------------------------------------
-// one keyboard token -> its QKeySequence claims. "Enter" is the one InputMap
-// name that does not map 1:1: Qt reads the main-row Enter as Return and keeps
-// Enter for the keypad, and both scancodes resolve to the same token today —
-// so the token claims both sequences.
-static QList<QKeySequence> sequencesForToken(const QString &token) {
-    if(token == QStringLiteral("Enter"))
-        return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
-    QKeySequence seq = QKeySequence::fromString(token);
-    if(seq.count() == 0)
-        return {}; // not a Qt name: the vocabulary sweep
-                   // (everyInputMapNameIsQtParseable) keeps this branch empty
-    return {seq};
 }
 //------------------------------------------------------------------------------
 // The global table's projection onto the registered QActions. What is left
@@ -430,62 +548,26 @@ void ActionManager::initShortcuts() {
     // a config saved by an older release carries the pre-split global table,
     // Enter and Backspace included — the disjointness law has to survive
     // config load, not just live in the defaults
-    dropGlobalEntriesClaimedByScopes();
+    enforceDisjointness();
 }
 
 //------------------------------------------------------------------------------
-// The one-key-one-surface law, enforced on the live tables: a token the
-// global table shares with any scope table is ambiguous in that scope (two
-// live claims of one key fire nothing — dispatch_probe_tests), so the
-// scope's claim wins and the global entry goes. Runs at config load and on
-// every editor insert, so the tables cannot drift back into a collision
-// from either direction. Pointer tokens are exempt: they never ride
-// QShortcutMap, and resolveShortcut ranks them itself.
-void ActionManager::dropGlobalEntriesClaimedByScopes() {
-    QList<QKeySequence> scopeSeqs;
-    for(const QMap<QString, QString> *scope : {&docShortcuts, &gridShortcuts, &inspectShortcuts}) {
-        for(auto it = scope->constBegin(); it != scope->constEnd(); ++it) {
-            if(isPointerToken(it.key()))
-                continue;
-            const QList<QKeySequence> seqs = sequencesForToken(it.key());
-            for(const QKeySequence &seq : seqs)
-                if(!scopeSeqs.contains(seq))
-                    scopeSeqs.append(seq);
-        }
-    }
-    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
-        bool claimed = false;
-        if(!isPointerToken(i.key())) {
-            const QList<QKeySequence> globalSeqs = sequencesForToken(i.key());
-            for(const QKeySequence &seq : globalSeqs) {
-                if(scopeSeqs.contains(seq)) {
-                    claimed = true;
-                    break;
-                }
-            }
-        }
-        if(claimed) {
-            i = shortcuts.erase(i);
-        } else {
-            ++i;
-        }
-    }
-}
-//------------------------------------------------------------------------------
 void ActionManager::addShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
-    if(type != ActionType::ACTION_INVALID) {
-        shortcuts.insert(keys, action);
-        // the editor door: a token a scope table owns never enters here —
-        // silently dropped rather than saved into an ambiguous pair
-        dropGlobalEntriesClaimedByScopes();
-        applyKeyboardProjection();
-    }
+    if(type == ActionType::ACTION_INVALID)
+        return;
+    // the editor door: a token a scope table owns never enters here — commit()
+    // runs the disjointness law and the projection update, so this site cannot
+    // forget either
+    commit(Scope::Global, [&](QMap<QString, QString> &t) {
+        t.insert(keys, action);
+    });
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeShortcut(const QString &keys) {
-    shortcuts.remove(keys);
-    applyKeyboardProjection();
+    commit(Scope::Global, [&](QMap<QString, QString> &t) {
+        t.remove(keys);
+    });
 }
 //------------------------------------------------------------------------------
 QStringList ActionManager::actionList() {
@@ -501,22 +583,18 @@ const QMap<QString, QString> &ActionManager::allShortcuts() {
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeAllShortcuts() {
-    shortcuts.clear();
-    applyKeyboardProjection();
+    commit(Scope::Global, [](QMap<QString, QString> &t) {
+        t.clear();
+    });
 }
 //------------------------------------------------------------------------------
 // Removes all shortcuts for specified action. Slow (reverse map lookup).
 void ActionManager::removeAllShortcuts(const QString &actionName) {
     if(validateAction(actionName) == ActionType::ACTION_INVALID)
         return;
-
-    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
-        if(i.value() == actionName)
-            i = shortcuts.erase(i);
-        else
-            ++i;
-    }
-    applyKeyboardProjection();
+    commit(Scope::Global, [&](QMap<QString, QString> &t) {
+        eraseAction(t, actionName);
+    });
 }
 //------------------------------------------------------------------------------
 QString ActionManager::keyForNativeScancode(quint32 scanCode) {
@@ -527,11 +605,22 @@ QString ActionManager::keyForNativeScancode(quint32 scanCode) {
 }
 //------------------------------------------------------------------------------
 void ActionManager::resetDefaults() {
-    shortcuts = defaults;
-    inspectShortcuts = inspectDefaults;
-    gridShortcuts = gridDefaults;
-    docShortcuts = docDefaults; // the fourth table joined in with the view split
-    applyKeyboardProjection();
+    // every table through the same door: a table added to the family later
+    // cannot be silently forgotten here — a missing commit is a missing line
+    // this function's shape makes conspicuous, not a map assignment buried
+    // among three correct ones (which is exactly how docShortcuts was missed)
+    commit(Scope::Global, [&](QMap<QString, QString> &t) {
+        t = defaults;
+    });
+    commit(Scope::Document, [&](QMap<QString, QString> &t) {
+        t = docDefaults;
+    });
+    commit(Scope::Grid, [&](QMap<QString, QString> &t) {
+        t = gridDefaults;
+    });
+    commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
+        t = inspectDefaults;
+    });
 }
 
 void ActionManager::setDocumentActive(bool active) {
@@ -806,10 +895,11 @@ void ActionManager::readInspectShortcuts() {
 //------------------------------------------------------------------------------
 void ActionManager::addDocShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
-    if(type != ActionType::ACTION_INVALID) {
-        docShortcuts.insert(keys, action);
-        applyKeyboardProjection();
-    }
+    if(type == ActionType::ACTION_INVALID)
+        return;
+    commit(Scope::Document, [&](QMap<QString, QString> &t) {
+        t.insert(keys, action);
+    });
 }
 //------------------------------------------------------------------------------
 const QMap<QString, QString> &ActionManager::allDocShortcuts() {
@@ -817,18 +907,15 @@ const QMap<QString, QString> &ActionManager::allDocShortcuts() {
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeAllDocShortcuts() {
-    docShortcuts.clear();
-    applyKeyboardProjection();
+    commit(Scope::Document, [](QMap<QString, QString> &t) {
+        t.clear();
+    });
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeAllDocShortcuts(const QString &actionName) {
-    for(auto i = docShortcuts.begin(); i != docShortcuts.end();) {
-        if(i.value() == actionName)
-            i = docShortcuts.erase(i);
-        else
-            ++i;
-    }
-    applyKeyboardProjection();
+    commit(Scope::Document, [&](QMap<QString, QString> &t) {
+        eraseAction(t, actionName);
+    });
 }
 //------------------------------------------------------------------------------
 void ActionManager::saveDocShortcuts() {
@@ -837,10 +924,11 @@ void ActionManager::saveDocShortcuts() {
 //------------------------------------------------------------------------------
 void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
-    if(type != ActionType::ACTION_INVALID) {
-        gridShortcuts.insert(keys, action);
-        applyKeyboardProjection();
-    }
+    if(type == ActionType::ACTION_INVALID)
+        return;
+    commit(Scope::Grid, [&](QMap<QString, QString> &t) {
+        t.insert(keys, action);
+    });
 }
 
 const QMap<QString, QString> &ActionManager::allGridShortcuts() {
@@ -848,22 +936,18 @@ const QMap<QString, QString> &ActionManager::allGridShortcuts() {
 }
 
 void ActionManager::removeAllGridShortcuts() {
-    gridShortcuts.clear();
-    applyKeyboardProjection();
+    commit(Scope::Grid, [](QMap<QString, QString> &t) {
+        t.clear();
+    });
 }
 
 // Removes all grid shortcuts for specified action. Slow (reverse map lookup).
 void ActionManager::removeAllGridShortcuts(const QString &actionName) {
     if(validateAction(actionName) == ActionType::ACTION_INVALID)
         return;
-
-    for(auto i = gridShortcuts.begin(); i != gridShortcuts.end();) {
-        if(i.value() == actionName)
-            i = gridShortcuts.erase(i);
-        else
-            ++i;
-    }
-    applyKeyboardProjection();
+    commit(Scope::Grid, [&](QMap<QString, QString> &t) {
+        eraseAction(t, actionName);
+    });
 }
 
 void ActionManager::saveGridShortcuts() {
@@ -872,10 +956,11 @@ void ActionManager::saveGridShortcuts() {
 
 void ActionManager::addInspectShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
-    if(type != ActionType::ACTION_INVALID) {
-        inspectShortcuts.insert(keys, action);
-        applyKeyboardProjection();
-    }
+    if(type == ActionType::ACTION_INVALID)
+        return;
+    commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
+        t.insert(keys, action);
+    });
 }
 
 const QMap<QString, QString> &ActionManager::allInspectShortcuts() {
@@ -883,22 +968,18 @@ const QMap<QString, QString> &ActionManager::allInspectShortcuts() {
 }
 
 void ActionManager::removeAllInspectShortcuts() {
-    inspectShortcuts.clear();
-    applyKeyboardProjection();
+    commit(Scope::Inspect, [](QMap<QString, QString> &t) {
+        t.clear();
+    });
 }
 
 // Removes all inspect shortcuts for specified action. Slow (reverse map lookup).
 void ActionManager::removeAllInspectShortcuts(const QString &actionName) {
     if(validateAction(actionName) == ActionType::ACTION_INVALID)
         return;
-
-    for(auto i = inspectShortcuts.begin(); i != inspectShortcuts.end();) {
-        if(i.value() == actionName)
-            i = inspectShortcuts.erase(i);
-        else
-            ++i;
-    }
-    applyKeyboardProjection();
+    commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
+        eraseAction(t, actionName);
+    });
 }
 
 void ActionManager::saveInspectShortcuts() {
