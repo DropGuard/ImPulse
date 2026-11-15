@@ -291,9 +291,17 @@ std::optional<CachedThumbnail> ThumbnailCache::read(const QString &sourcePath, i
 
     // A hit means "used today": the idle clock is the file's mtime, so a
     // thumbnail still being displayed survives the sweep. utimensat because
-    // Qt's setFileTime needs the file open for write and a write-open truncates.
+    // Qt's setFileTime needs the file open for write and a write-open
+    // truncates — ReadWrite does not, which is the form the Windows branch
+    // uses (utimensat is POSIX-only).
+#ifdef Q_OS_WIN
+    QFile touch(filePath);
+    if(touch.open(QIODevice::ReadWrite))
+        touch.setFileTime(QDateTime::currentDateTime(), QFileDevice::FileModificationTime);
+#else
     const struct timespec times[2] = {{0, UTIME_OMIT}, {0, UTIME_NOW}};
     ::utimensat(AT_FDCWD, filePath.toLocal8Bit().constData(), times, 0);
+#endif
     return hit;
 }
 
@@ -327,7 +335,13 @@ bool ThumbnailCache::save(QImage &image, const QString &sourcePath, int bucket, 
     QSaveFile out(filePath);
     if(!out.open(QIODevice::WriteOnly))
         return false;
+#ifndef Q_OS_WIN
+    // Windows has no mode bits — the file carries ACLs, and the 600-vs-umask
+    // question the spec answers is already decided by the profile's ACLs there
     ::fchmod(static_cast<int>(out.handle()), fileMode);
+#else
+    (void)fileMode;
+#endif
     QImageWriter writer;
     writer.setDevice(&out);
     writer.setFormat("png");

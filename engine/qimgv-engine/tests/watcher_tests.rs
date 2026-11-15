@@ -8,8 +8,8 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use qimgv_engine::watcher::{
-    Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record,
-    WatchAction, apply_event, classify, event_is_live, is_dir_mask,
+    Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record, WatchAction,
+    apply_event, classify, event_is_live, is_dir_mask, subject_path,
 };
 use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode, WatchChangeKind};
 
@@ -101,7 +101,7 @@ fn state_with_file() -> (
         dir.path().to_owned(),
         vec![qimgv_engine::EntryData {
             name: "a.jpg".into(),
-            path: dir.path().join("a.jpg").to_string_lossy().into_owned(),
+            path: subject_path(dir.path(), "a.jpg"),
             is_dir: false,
             size: 1,
             mtime: std::time::UNIX_EPOCH,
@@ -318,14 +318,14 @@ fn state_of(
 ) -> qimgv_engine::DirectoryState {
     let file_entries = names.iter().map(|n| qimgv_engine::EntryData {
         name: (*n).into(),
-        path: dir.join(n).to_string_lossy().into_owned(),
+        path: subject_path(dir, n),
         is_dir: false,
         size: 1,
         mtime: std::time::UNIX_EPOCH,
     });
     let dir_entries = dirs.iter().map(|n| qimgv_engine::EntryData {
         name: (*n).into(),
-        path: dir.join(n).to_string_lossy().into_owned(),
+        path: subject_path(dir, n),
         is_dir: true,
         size: 0,
         mtime: std::time::UNIX_EPOCH,
@@ -339,8 +339,27 @@ fn state_of(
     st
 }
 
+// The wire form of a subject path: what apply_event hands the engine and the
+// FFI hands to C++ (Qt's forward slashes on Windows — the authority is apply's
+// subject_path; the drift pin below keeps this reading the same rule).
 fn s(p: &std::path::Path) -> String {
-    p.to_string_lossy().into_owned()
+    let joined = p.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    let joined = joined.replace('\\', "/");
+    joined
+}
+
+#[test]
+fn the_suite_wire_form_matches_applys() {
+    // if either side of this equality changes its path-form rule alone, the
+    // suite's expectations drift from the wire — this is the tripwire.
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("x.jpg");
+    assert_eq!(
+        s(&p),
+        subject_path(dir.path(), "x.jpg"),
+        "the suite's wire form and apply's must be one rule"
+    );
 }
 
 #[test]
@@ -782,10 +801,7 @@ fn the_watcher_pairs_a_live_rename_into_one_event() {
 
     let old = dir.path().join("a.jpg");
     let new = dir.path().join("z.jpg");
-    let (want_old, want_new) = (
-        old.to_string_lossy().into_owned(),
-        new.to_string_lossy().into_owned(),
-    );
+    let (want_old, want_new) = (s(&old), s(&new));
     std::fs::rename(&old, &new).unwrap();
 
     let deadline = std::time::Instant::now() + Duration::from_secs(10);

@@ -306,7 +306,7 @@ else:
 # twin of fd.rs (same WatchCmd/WatcherHandle contract, same purity seam), and its
 # inventory is frozen for the same reason — decisions live in pair.rs/apply.rs.
 FD_WIN_FNS = {'new', 'set', 'reset', 'raw', 'drop', 'spawn', 'send', 'shutdown',
-              'watcher_loop', 'retire_watch', 'arm_read', 'open_dir', 'drain_records',
+              'watcher_loop', 'retire_watch', 'retire_gone', 'arm_read', 'open_dir', 'drain_records',
               'u32_at'}
 fdw_path = os.path.join(ROOT, 'engine', 'qimgv-engine', 'src', 'watcher', 'fd_windows.rs')
 if not os.path.exists(fdw_path):

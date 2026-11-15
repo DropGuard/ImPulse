@@ -106,6 +106,15 @@ pub fn scan_directory(path: &Path, opts: &ScanOptions) -> Result<ScanOutput, Eng
         }
 
         let full_path = entry.path();
+        // The wire form the FFI hands to C++ is Qt's forward-slash shape on
+        // Windows (the C++ side compares paths as strings against the form it
+        // opened the directory with), so the scan's subjects are normalized
+        // here, at the only place listing paths are born. POSIX joins are
+        // byte-exact — a backslash is a legal filename character there — and
+        // the no-op replace keeps that side identical.
+        #[cfg(windows)]
+        let full_str = full_path.to_string_lossy().replace('\\', "/");
+        #[cfg(not(windows))]
         let full_str = full_path.to_string_lossy().into_owned();
 
         let allowed = opts.filter.matches(&name)

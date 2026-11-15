@@ -162,9 +162,15 @@ void TestFileOps::copyFileToRejectsADirectoryCollision() {
 
 void TestFileOps::copyFileToReportsAnUnwritableDestination() {
     // act runs its container as root, and root ignores permission bits — "unwritable" is not
-    // expressible there. The pin needs a user account to exist.
+    // expressible there. The pin needs a user account to exist. Windows has no
+    // POSIX permission-bit model either (a directory's read-only attribute does
+    // not stop file creation), so this pin stays where its premise holds.
+#ifdef Q_OS_WIN
+    QSKIP("windows: permission bits cannot make a destination unwritable");
+#else
     if(geteuid() == 0)
         QSKIP("running as root: permission bits cannot make a destination unwritable");
+#endif
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
     QString destDir = fixtureDir + "/rodest";
@@ -208,9 +214,15 @@ void TestFileOps::moveFileToMovesContentAndRemovesTheSource() {
 // SOURCE_NOT_REMOVED says so in those words.
 void TestFileOps::moveFileToReportsASourceItCouldNotRemove() {
     // act runs its container as root, and root ignores permission bits — "unwritable" is not
-    // expressible there. The pin needs a user account to exist.
+    // expressible there. The pin needs a user account to exist. Windows has no
+    // POSIX permission-bit model either (a directory's read-only attribute does
+    // not stop file creation), so this pin stays where its premise holds.
+#ifdef Q_OS_WIN
+    QSKIP("windows: permission bits cannot make a destination unwritable");
+#else
     if(geteuid() == 0)
         QSKIP("running as root: permission bits cannot make a destination unwritable");
+#endif
     resetFixture();
     QString srcDir = fixtureDir + "/mvsrc";
     QVERIFY(QDir().mkpath(srcDir));

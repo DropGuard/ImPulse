@@ -12,6 +12,8 @@
 // which is how the listing used to die mid-scan with EBADF.
 #pragma once
 
+#include <cstring>
+
 #include <QTest>
 #include <QDeadlineTimer> // the convergence deadline in assertMirrorMatchesEngineExport
 #include <QtEndian>
@@ -287,8 +289,15 @@ inline bool owns(const QObject &test, const QByteArray &name) {
 }
 
 inline int runIfOwned(QObject &test, int argc, char **argv) {
-    for(int i = 1; i < argc; ++i)
+    for(int i = 1; i < argc; ++i) {
+        // -o (a QTest log destination) rides with two value args that are a
+        // path and a format word, not unit-name filters — skip the trio
+        if(std::strcmp(argv[i], "-o") == 0) {
+            i += 2;
+            continue;
+        }
         if(argv[i][0] != '-' && !owns(test, argv[i]))
             return 0;
+    }
     return QTest::qExec(&test, argc, argv);
 }

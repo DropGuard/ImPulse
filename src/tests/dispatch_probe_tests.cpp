@@ -25,8 +25,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-#include <sys/wait.h>
-#include <unistd.h>
+#include "slot_harness.h"
 
 namespace {
 
@@ -419,38 +418,15 @@ int main(int argc, char **argv) {
         DispatchProbe t;
         return QTest::qExec(&t, argc, argv) != 0 ? 1 : 0;
     }
-    const QMetaObject *mo = &DispatchProbe::staticMetaObject;
-    QStringList testSlots;
-    for(int i = 0; i < mo->methodCount(); ++i) {
-        const QMetaMethod m = mo->method(i);
-        const QByteArray name = m.name();
-        if(m.methodType() == QMetaMethod::Slot && m.access() == QMetaMethod::Private && m.parameterCount() == 0 &&
-           name != "initTestCase" && name != "cleanupTestCase" && name != "init" && name != "cleanup")
-            testSlots << QString::fromUtf8(name);
-    }
-    int failures = 0, consecutiveAbnormal = 0;
-    for(const QString &slot : std::as_const(testSlots)) {
-        fflush(nullptr); // fork would duplicate whatever is buffered in stdout
-        pid_t pid = fork();
-        if(pid == 0) {
+    return slot_harness::run_units_one_process_each(
+        argc, argv, slot_harness::testSlots(&DispatchProbe::staticMetaObject),
+        "dispatch_probe_tests",
+        [argv](const QString &slot) -> int {
             QByteArray nameBytes = slot.toUtf8();
             char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
             DispatchProbe t; // this child's own fixture
             return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        }
-        int status = 0;
-        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
-        }
-        if(!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
-            fprintf(stderr, "dispatch_probe_tests: slot '%s' exited abnormally (exit=%d, sig=%d)\n",
-                    slot.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-                    WIFSIGNALED(status) ? WTERMSIG(status) : -1);
-        consecutiveAbnormal = (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : consecutiveAbnormal + 1;
-        if(consecutiveAbnormal == 3)
-            break;
-        failures += (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : 1;
-    }
-    return failures;
+        });
 }
 
 #include "dispatch_probe_tests.moc"

@@ -20,6 +20,22 @@
 #include <sys/stat.h>
 #include <time.h>
 
+// The mtime the cache's clocks read, set to whole-second epochs: utimensat on
+// POSIX; Qt's setFileTime over a ReadWrite open on Windows (utimensat is
+// POSIX-only, and a WriteOnly open would truncate). Returns success -- the
+// callers QVERIFY it, so a silent no-op cannot fake an aged file.
+static bool setMTimeSecs(const QString &path, qint64 secs) {
+#ifdef Q_OS_WIN
+    QFile f(path);
+    if(!f.open(QIODevice::ReadWrite))
+        return false;
+    return f.setFileTime(QDateTime::fromSecsSinceEpoch(secs), QFileDevice::FileModificationTime);
+#else
+    const struct timespec times[2] = {{0, UTIME_OMIT}, {secs, 0}};
+    return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
+#endif
+}
+
 class TestThumbnailStore : public QObject, protected EngineStackFixture {
     Q_OBJECT
   public:
@@ -93,8 +109,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // whole seconds, so a rewrite that lands in the same second is, by
         // design, invisible to Thumb::MTime (see ThumbnailCache's header).
         const QDateTime future = QDateTime::currentDateTime().addSecs(120);
-        const struct timespec moved[2] = {{0, UTIME_OMIT}, {future.toSecsSinceEpoch(), 0}};
-        QVERIFY(::utimensat(AT_FDCWD, source.toLocal8Bit().constData(), moved, 0) == 0);
+        QVERIFY(setMTimeSecs(source, future.toSecsSinceEpoch()));
         QVERIFY2(!cache.read(source, 128, QFileInfo(source)).has_value(),
                  "a source whose mtime moved past Thumb::MTime must be a miss");
 
@@ -132,8 +147,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // copied-over file leaves behind
         const qint64 stamp = QFileInfo(source).lastModified().toSecsSinceEpoch();
         QVERIFY(writeBigImage(source, "png", QSize(1024, 1024)));
-        const struct timespec keep[2] = {{0, UTIME_OMIT}, {stamp, 0}};
-        QVERIFY(::utimensat(AT_FDCWD, source.toLocal8Bit().constData(), keep, 0) == 0);
+        QVERIFY(setMTimeSecs(source, stamp));
         const QImage storedImage(cache.thumbnailPath(source, 128));
         QVERIFY2(storedImage.text(QStringLiteral("Thumb::Size")) != QString::number(QFileInfo(source).size()),
                  "fixture degenerate: the replacement must differ in size for this test to mean anything");
@@ -202,8 +216,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
 
         const QDateTime now = QDateTime::currentDateTime();
         auto age = [&now](const QString &path, int days) {
-            const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-days).toSecsSinceEpoch(), 0}};
-            return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
+            return setMTimeSecs(path, now.addDays(-days).toSecsSinceEpoch());
         };
         QVERIFY(age(foreign, 40));
         QVERIFY(age(cache.thumbnailPath(source, 128), 40));
@@ -282,8 +295,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // re-write it as someone else's, age it 90 days, require survival
         QVERIFY(theirs.save(path, "png"));
         const QDateTime now = QDateTime::currentDateTime();
-        const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-90).toSecsSinceEpoch(), 0}};
-        QVERIFY(::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0);
+        QVERIFY(setMTimeSecs(path, now.addDays(-90).toSecsSinceEpoch()));
         QCOMPARE(cache.purgeOlderThan(15, ThumbnailCache::cacheMaxBytes).idleDropped, 0);
         QVERIFY2(QFile::exists(path), "a foreign thumbnail must survive the idle sweep no matter its age");
     }
@@ -363,8 +375,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         dot.fill(Qt::black);
         const QDateTime now = QDateTime::currentDateTime();
         auto age = [&now](const QString &path, int days) {
-            const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-days).toSecsSinceEpoch(), 0}};
-            return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
+            return setMTimeSecs(path, now.addDays(-days).toSecsSinceEpoch());
         };
         const QString hot = fixtureDir + "/img1.jpg";
         const QString stale = fixtureDir + "/img2.jpg";
@@ -445,8 +456,7 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         dot.fill(Qt::green);
         const QDateTime now = QDateTime::currentDateTime();
         auto age = [&now](const QString &path, int days) {
-            const struct timespec times[2] = {{0, UTIME_OMIT}, {now.addDays(-days).toSecsSinceEpoch(), 0}};
-            return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
+            return setMTimeSecs(path, now.addDays(-days).toSecsSinceEpoch());
         };
         auto size = [](const QString &path) {
             return QFileInfo(path).size();
