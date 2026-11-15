@@ -539,6 +539,93 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->allGridShortcuts(), gridBefore);
     }
 
+    // The delivery leg of the inspect hand-over, which the resolver tests
+    // above cannot see: arming is now an enabled-bit flip between two claim
+    // sets that live on the SAME surface at the SAME time. A resolver test
+    // passing says nothing about whether Qt's map fires the right one — and
+    // "both enabled" is exactly the ambiguous state that fires NEITHER
+    // (dispatch_probe_tests). So this drives real keys through the window.
+    void inspectArmingHandsTheKeyOverWithoutRebuilding() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *mw = core.mainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        mw->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(mw));
+        mw->viewer()->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(mw->viewer()->hasFocus(), 5000);
+
+        QSignalSpy prev(actionManager->action("prevImage"), &QAction::triggered);
+        QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
+        QVERIFY(prev.isValid() && scroll.isValid());
+
+        // disarmed: Left is the walk
+        coretest::deliverWindowKey(mw, Qt::Key_Left);
+        QTRY_COMPARE_WITH_TIMEOUT(prev.count(), 1, 5000);
+        QCOMPARE(scroll.count(), 0);
+
+        // arm through the real observer
+        mw->fitOriginal();
+        QTRY_COMPARE_WITH_TIMEOUT(mw->viewer()->fitMode(), FIT_ORIGINAL, 5000);
+        mw->viewer()->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(mw->viewer()->hasFocus(), 5000);
+        prev.clear();
+        scroll.clear();
+
+        // armed: the same key now pans — and prev must NOT fire, which would
+        // mean both claims were live (the ambiguous state)
+        coretest::deliverWindowKey(mw, Qt::Key_Left);
+        QTRY_COMPARE_WITH_TIMEOUT(scroll.count(), 1, 5000);
+        QCOMPARE(prev.count(), 0);
+
+        // disarm: the walk gets the key back
+        mw->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(mw->viewer()->fitMode(), FIT_WINDOW, 5000);
+        mw->viewer()->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(mw->viewer()->hasFocus(), 5000);
+        prev.clear();
+        scroll.clear();
+        coretest::deliverWindowKey(mw, Qt::Key_Left);
+        QTRY_COMPARE_WITH_TIMEOUT(prev.count(), 1, 5000);
+        QCOMPARE(scroll.count(), 0);
+    }
+
+    // The hand-over is per TOKEN, not per set: arming inspect must take ONLY
+    // the keys inspect claims, leaving every other document key live. A
+    // set-wide "disable document while armed" would pass a Left-only test and
+    // still break Ctrl+S, Space, and the rest — so this drives a key inspect
+    // does not touch.
+    void inspectArmingKeepsUnclaimedDocumentKeysLive() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *mw = core.mainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        mw->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(mw));
+
+        QSignalSpy save(actionManager->action("save"), &QAction::triggered);
+        QSignalSpy fullscreen(actionManager->action("toggleFullscreen"), &QAction::triggered);
+        QVERIFY(save.isValid() && fullscreen.isValid());
+
+        mw->fitOriginal();
+        QTRY_COMPARE_WITH_TIMEOUT(mw->viewer()->fitMode(), FIT_ORIGINAL, 5000);
+        mw->viewer()->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(mw->viewer()->hasFocus(), 5000);
+
+        // Ctrl+S and F are not inspect claims: they stay live while armed
+        coretest::deliverWindowKey(mw, Qt::Key_S, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(save.count(), 1, 5000);
+        coretest::deliverWindowKey(mw, Qt::Key_F);
+        QTRY_COMPARE_WITH_TIMEOUT(fullscreen.count(), 1, 5000);
+
+        mw->fitWindow();
+        QTRY_COMPARE_WITH_TIMEOUT(mw->viewer()->fitMode(), FIT_WINDOW, 5000);
+    }
+
     // The settings editor's conflict warning asks the SAME scope walk the
     // disjointness law uses — one implementation, so a table added later is
     // visible to both by construction. The hand-written three-table version

@@ -200,6 +200,7 @@ void ActionManager::attachDocumentSurface(QWidget *surface) {
         connect(documentSurface, &QObject::destroyed, this, [this]() {
             documentSurface = nullptr;
             documentProjections.clear();
+            inspectProjections.clear(); // both claim sets die with the surface
             applyKeyboardProjection();
         });
     }
@@ -383,35 +384,90 @@ void ActionManager::rebuildGridShortcuts() {
     }
 }
 //------------------------------------------------------------------------------
-// The document view's set. Same shape as the grid's, one difference: the armed
-// inspect layer does not sit ABOVE this table, it is a variant OF it — fit
-// original / free zoom says "I am inspecting this image", and the arrows pan
-// the canvas instead of changing images. That is the same view, a different
-// mode of it, so it is built here and never competes for a key with the base.
+// The document view's set, plus the inspect layer's own claims. The inspect
+// layer does not sit ABOVE this table, it is a variant OF it: fit original /
+// free zoom says "I am inspecting this image", and the arrows pan the canvas
+// instead of changing images. That is the same view in a different mode.
+//
+// The two claim sets are built side by side but stay separate lists, because
+// the way they hand over changed: arming is now an enabled-bit flip
+// (applyInspectProjection), not a rebuild. A rebuild per fit-mode change was
+// deleting and recreating the whole document projection to express what is
+// one boolean of routing.
 void ActionManager::rebuildDocumentShortcuts() {
-    qDeleteAll(documentProjections);
+    for(const SurfaceClaim &claim : std::as_const(documentProjections))
+        delete claim.shortcut;
     documentProjections.clear();
+    for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+        delete claim.shortcut;
+    inspectProjections.clear();
     if(!documentSurface)
         return;
-    QMap<QString, QString> effective = docShortcuts;
-    if(inspectMode) {
-        for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
-            if(!isPointerToken(it.key()))
-                effective.insert(it.key(), it.value());
-    }
-    for(auto it = effective.constBegin(); it != effective.constEnd(); ++it) {
+
+    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue; // pointer tokens never ride QShortcutMap
         const QList<QKeySequence> seqs = sequencesForToken(it.key());
         for(const QKeySequence &seq : seqs) {
             auto *sc = new QShortcut(seq, documentSurface);
             sc->setContext(Qt::WidgetWithChildrenShortcut);
+            sc->setEnabled(false); // applyInspectProjection decides; arming was deferred to it
             const QString actionName = it.value();
             connect(sc, &QShortcut::activated, this, [this, actionName]() {
                 invokeAction(actionName);
             });
-            documentProjections.append(sc);
+            documentProjections.append({sc, it.key()});
         }
+    }
+    for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it) {
+        if(isPointerToken(it.key()))
+            continue;
+        const QList<QKeySequence> seqs = sequencesForToken(it.key());
+        for(const QKeySequence &seq : seqs) {
+            auto *sc = new QShortcut(seq, documentSurface);
+            sc->setContext(Qt::WidgetWithChildrenShortcut);
+            sc->setEnabled(false);
+            const QString actionName = it.value();
+            connect(sc, &QShortcut::activated, this, [this, actionName]() {
+                invokeAction(actionName);
+            });
+            inspectProjections.append({sc, it.key()});
+        }
+    }
+    // the bits are set once, here, so the projection and inspectMode agree the
+    // moment the objects exist — no window where both sets or neither is live
+    applyInspectProjection();
+}
+//------------------------------------------------------------------------------
+// Arming and disarming, without touching an object: the inspect claims and the
+// document claims they shadow are both already built; only their enabled bits
+// move. The law is per TOKEN, not per set, because users can bind any token
+// into either table — "disable all of document while inspect is armed" would
+// silently take away document keys that inspect does not claim (every
+// non-arrow key). Token comparison, not sequence comparison: two tables can
+// spell the same physical key differently and still collide.
+//
+// Order matters for exactly one reason: turn OFF before turning ON, so no key
+// is ever live twice, not even between two statements.
+void ActionManager::applyInspectProjection() {
+    QSet<QString> inspectTokens;
+    for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+        inspectTokens.insert(claim.token);
+
+    if(inspectMode) {
+        // document first: give up every claim the inspect layer is about to take
+        for(const SurfaceClaim &claim : std::as_const(documentProjections)) {
+            if(inspectTokens.contains(claim.token))
+                claim.shortcut->setEnabled(false);
+        }
+        for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+            claim.shortcut->setEnabled(true);
+    } else {
+        // disarm first, then hand the document's own claims back
+        for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+            claim.shortcut->setEnabled(false);
+        for(const SurfaceClaim &claim : std::as_const(documentProjections))
+            claim.shortcut->setEnabled(true);
     }
 }
 //------------------------------------------------------------------------------
@@ -640,8 +696,14 @@ void ActionManager::setDocumentActive(bool active) {
 }
 //------------------------------------------------------------------------------
 void ActionManager::setInspectMode(bool inspect) {
+    if(inspectMode == inspect)
+        return;
     inspectMode = inspect;
-    applyKeyboardProjection(); // the armed layer swaps the projected claims
+    // no object is created or destroyed: the two claim sets are already built
+    // on the document surface, and arming is a hand-over of enabled bits per
+    // shared token. This was a full qDeleteAll-and-recreate per fit-mode
+    // change — the last remaining rebuild triggered by a state flip.
+    applyInspectProjection();
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
