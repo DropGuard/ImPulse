@@ -841,9 +841,13 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
 }
 
 QString ActionManager::actionForToken(const QString &token) const {
-    // pointer tokens skip the grid gate on purpose: a wheel over the grid
-    // zooms the image, it does not page the grid — the pointer has no focus
-    // to rank, so its tables are inspect -> doc -> global
+    // pointer tokens skip the grid gate on purpose. The gate asks "which
+    // surface holds KEYBOARD focus" — a question a pointer event cannot be
+    // the answer to. In practice every surface consumes its own wheel first
+    // (the grid scrolls its list, or zooms thumbnails under Ctrl; the viewer
+    // scrolls or pages), so what reaches this funnel at all is a pointer
+    // event no surface wanted: it has no surface to rank, and its tables are
+    // inspect -> doc -> global.
     if(!isPointerToken(token) && gridActive && gridSurface) {
         auto it = gridShortcuts.constFind(token);
         if(it != gridShortcuts.constEnd())

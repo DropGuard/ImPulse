@@ -115,8 +115,10 @@ class ActionManager : public QObject {
     // the token-shaped twin of actionForKeySequence: same tables, same order,
     // same gates — only the predicate differs (exact token match instead of
     // expanded-sequence match). Pointer tokens are the deliberate exception:
-    // a wheel over the grid zooms the image, it does not page the grid, so a
-    // pointer token skips the grid gate and answers inspect -> doc -> global.
+    // the grid gate asks which surface holds KEYBOARD focus, a question no
+    // pointer event answers — every surface consumes its own wheel first, so
+    // a pointer token reaching here has no surface to rank and answers
+    // inspect -> doc -> global.
     QString actionForToken(const QString &token) const;
     const QString shortcutForAction(const QString &action);
     const QList<QString> shortcutsForAction(const QString &action);
