@@ -575,14 +575,12 @@ bool CropOverlay::event(QEvent *event) {
         const QKeySequence pressed(ke->key() | ke->modifiers());
         bool saveChord = false;
         for(const QString &token : actionManager->shortcutsForAction(QStringLiteral("save"))) {
-            // the same token->sequence expansion the projection uses; "Enter"
-            // claims both Returns
-            if(token == QStringLiteral("Enter")) {
-                saveChord |= pressed == QKeySequence(QStringLiteral("Return"));
-                saveChord |= pressed == QKeySequence(QStringLiteral("Enter"));
-            } else {
-                saveChord |= pressed == QKeySequence::fromString(token);
-            }
+            // the projection's own token->sequence expansion: "Enter" claims
+            // both Returns. (const copy, so clazy's range-loop-detach stays
+            // quiet on the actionManager call's return value.)
+            const QList<QKeySequence> seqs = ActionManager::sequencesForToken(token);
+            for(const QKeySequence &seq : seqs)
+                saveChord |= pressed == seq;
         }
         if(actionManager->keyNamesSubjectChangingAction(ke) || (saveChord && hasSelection()))
             event->accept();

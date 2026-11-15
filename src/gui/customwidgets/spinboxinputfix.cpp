@@ -2,34 +2,26 @@
 
 #include "components/actionmanager/actionmanager.h"
 
-SpinBoxInputFix::SpinBoxInputFix(QWidget *parent)
-    : QSpinBox(parent),
-      allowedLogicalKeys{Qt::Key_0,        Qt::Key_1,     Qt::Key_2,    Qt::Key_3,      Qt::Key_4,
-                         Qt::Key_5,        Qt::Key_6,     Qt::Key_7,    Qt::Key_8,      Qt::Key_9,
-                         Qt::Key_Up,       Qt::Key_Down,  Qt::Key_Left, Qt::Key_Right,  Qt::Key_PageUp,
-                         Qt::Key_PageDown, Qt::Key_Home,  Qt::Key_End,  Qt::Key_Delete, Qt::Key_Backspace,
-                         Qt::Key_Enter,    Qt::Key_Return} {
-    allowedKeys << "1"
-                << "2"
-                << "3"
-                << "4"
-                << "5"
-                << "6"
-                << "7"
-                << "8"
-                << "9"
-                << "0"
-                << "Up"
-                << "Down"
-                << "Left"
-                << "Right"
-                << "PgUp"
-                << "PgDown"
-                << "Enter"
-                << "Home"
-                << "End"
-                << "Del"
-                << "Backspace";
+#include <utility>
+
+SpinBoxInputFix::SpinBoxInputFix(QWidget *parent) : QSpinBox(parent) {
+    // one source of truth: each entry is {logical key, scancode-table name}.
+    // The two gates need different vocabularies — ShortcutOverride carries the
+    // logical key, keyPressEvent resolves the scancode to a token name — so
+    // both allowed sets are derived from this one table. "Enter" is the token
+    // both Returns resolve to; PgUp/PgDown/Del are the table's spellings of
+    // PageUp/PageDown/Delete.
+    const std::initializer_list<std::pair<Qt::Key, const char *>> ownedKeys{
+        {Qt::Key_0, "1"},         {Qt::Key_1, "2"},         {Qt::Key_2, "3"},         {Qt::Key_3, "4"},
+        {Qt::Key_4, "5"},         {Qt::Key_5, "6"},         {Qt::Key_6, "7"},         {Qt::Key_7, "8"},
+        {Qt::Key_8, "9"},         {Qt::Key_9, "0"},         {Qt::Key_Up, "Up"},       {Qt::Key_Down, "Down"},
+        {Qt::Key_Left, "Left"},   {Qt::Key_Right, "Right"}, {Qt::Key_PageUp, "PgUp"}, {Qt::Key_PageDown, "PgDown"},
+        {Qt::Key_Home, "Home"},   {Qt::Key_End, "End"},     {Qt::Key_Delete, "Del"},  {Qt::Key_Backspace, "Backspace"},
+        {Qt::Key_Enter, "Enter"}, {Qt::Key_Return, "Enter"}};
+    for(const auto &[key, name] : ownedKeys) {
+        allowedLogicalKeys.insert(key);
+        allowedKeys << QString::fromLatin1(name);
+    }
 }
 
 // The spin boxes inside the crop panel must own their editing keys: Qt

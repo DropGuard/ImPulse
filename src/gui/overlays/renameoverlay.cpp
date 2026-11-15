@@ -19,12 +19,10 @@ RenameOverlay::RenameOverlay(FloatingWidgetContainer *parent) : OverlayWidget(pa
     keyFilter.append(actionManager->shortcutsForAction("exit"));
     keyFilter.append(actionManager->shortcutsForAction("renameFile"));
     // the veto filter reads sequences: ShortcutOverride events carry the
-    // logical key, not the scancode the token table answers to
-    for(const QString &token : std::as_const(keyFilter)) {
-        keyFilterSequences.append(QKeySequence::fromString(token));
-        if(token == QStringLiteral("Enter"))
-            keyFilterSequences.append(QKeySequence(QStringLiteral("Return")));
-    }
+    // logical key, not the scancode the token table answers to. The expansion
+    // is ActionManager's own — the same one the projection uses.
+    for(const QString &token : std::as_const(keyFilter))
+        keyFilterSequences.append(ActionManager::sequencesForToken(token));
 
     hide();
     if(parent)

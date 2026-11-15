@@ -17,19 +17,6 @@ bool isPointerToken(const QString &token) {
 }
 
 // one keyboard token -> its QKeySequence claims. "Enter" is the one InputMap
-// name that does not map 1:1: Qt reads the main-row Enter as Return and keeps
-// Enter for the keypad, and both scancodes resolve to the same token today —
-// so the token claims both sequences. Declared here because the disjointness
-// law (scopesClaiming) compares claims by expanded sequence, not by spelling.
-QList<QKeySequence> sequencesForToken(const QString &token) {
-    if(token == QStringLiteral("Enter"))
-        return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
-    QKeySequence seq = QKeySequence::fromString(token);
-    if(seq.count() == 0)
-        return {}; // not a Qt name: the vocabulary sweep
-                   // (everyInputMapNameIsQtParseable) keeps this branch empty
-    return {seq};
-}
 } // namespace
 
 ActionManager::ActionManager(QObject *parent) : QObject(parent) {
@@ -286,16 +273,16 @@ void ActionManager::commit(Scope scope, const TableMutator &mutate) {
     enforceDisjointness();
     applyKeyboardProjection();
 }
-//------------------------------------------------------------------------------
-const QMap<QString, QString> &ActionManager::tableFor(Scope scope) const {
-    switch(scope) {
-    case Scope::Global: return shortcuts;
-    case Scope::Document: return docShortcuts;
-    case Scope::Grid: return gridShortcuts;
-    case Scope::Inspect: return inspectShortcuts;
-    }
-    return shortcuts;
+QList<QKeySequence> ActionManager::sequencesForToken(const QString &token) {
+    if(token == QStringLiteral("Enter"))
+        return {QKeySequence(QStringLiteral("Return")), QKeySequence(QStringLiteral("Enter"))};
+    QKeySequence seq = QKeySequence::fromString(token);
+    if(seq.count() == 0)
+        return {}; // not a Qt name: the vocabulary sweep
+                   // (everyInputMapNameIsQtParseable) keeps this branch empty
+    return {seq};
 }
+
 //------------------------------------------------------------------------------
 // The one-key-one-surface law on the live tables: a token a scope table owns
 // is removed from the global table. The global table's claims are always
@@ -812,12 +799,9 @@ QString ActionManager::actionForShortcut(const QString &keys) {
 // belong to the grid's subtree), then the document view's table — the armed
 // inspect variant already folded into it — then the global one.
 QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
-    QSet<QString> gridClaims;
-    if(gridActive && gridSurface) {
-        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it)
-            if(!isPointerToken(it.key()))
-                gridClaims.insert(it.key());
-    }
+    // enforceDisjointness() guarantees the global table holds no token a scope
+    // table owns, so no de-claim pass is needed here — the global loop below
+    // cannot shadow a live grid or document binding.
     if(gridActive && gridSurface) {
         for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it) {
             if(isPointerToken(it.key()))
@@ -843,7 +827,7 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
         }
     }
     for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
-        if(isPointerToken(it.key()) || gridClaims.contains(it.key()))
+        if(isPointerToken(it.key()))
             continue;
         if(sequencesForToken(it.key()).contains(seq))
             return it.value();

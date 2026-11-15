@@ -287,6 +287,45 @@ class TestShortcutScope : public QObject {
     // The armed inspect layer replaces the global claims for its keys and
     // gives them back on disarm — the projection's answer to "fit original
     // pans with the arrows instead of changing images".
+    // The contract the resolver's simplicity stands on: the global table can
+    // never hold a token a scope owns (enforceDisjointness runs on every
+    // commit), so actionForKeySequence needs no de-claim pass — asking the
+    // tables in focus order IS the answer. Pinned here so a future change to
+    // either side breaks this test, not the dispatch.
+    void resolverAnswersTheLiveTableWithoutADeclaimPass() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *proxy = core.mainWindow()->getFolderView();
+        proxy->init();
+        auto *grid = proxy->findChild<FolderGridView *>();
+        QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+
+        // the grid's token is absent from the global table even while the
+        // grid is live — disjointness is unconditional, not focus-dependent
+        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
+
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
+    }
+
+    // The one token->sequence expansion every reader shares: "Enter" claims
+    // both Returns, and a non-Qt token expands to nothing rather than to a
+    // guess. The crop overlay's save-chord veto and the rename overlay's
+    // filter read through this — a second spelling here would desync them.
+    void tokenExpansionIsTheSharedOne() {
+        const QList<QKeySequence> enter = ActionManager::sequencesForToken(QStringLiteral("Enter"));
+        QCOMPARE(enter.size(), 2);
+        QVERIFY(enter.contains(QKeySequence(Qt::Key_Return)));
+        QVERIFY(enter.contains(QKeySequence(Qt::Key_Enter)));
+
+        QVERIFY(ActionManager::sequencesForToken(QStringLiteral("Ctrl+S")).size() == 1);
+        QCOMPARE(ActionManager::sequencesForToken(QStringLiteral("Ctrl+S")).constFirst(),
+                 QKeySequence::fromString(QStringLiteral("Ctrl+S")));
+    }
+
     void armedInspectSwapsTheProjection() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
