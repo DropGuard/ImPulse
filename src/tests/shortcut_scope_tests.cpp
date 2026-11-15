@@ -328,10 +328,11 @@ class TestShortcutScope : public QObject {
 
     // The token walk's contract, after the merge: invokeActionForShortcut
     // answers through actionForToken — the same tables, order and gates
-    // actionForKeySequence runs, with the pointer-token exception (a wheel
-    // over the grid zooms the image, it does not page the grid, so a pointer
-    // token skips the grid gate). The dispatch leg is heard through its own
-    // signal; the lookup leg is asserted by name.
+    // actionForKeySequence runs, with the pointer-token exception (the grid
+    // gate asks which surface holds keyboard focus; a pointer event reaching
+    // the funnel was not consumed by any surface, so it has no surface to
+    // rank). The dispatch leg is heard through its own signal; the lookup
+    // leg is asserted by name.
     void tokenWalkAnswersThroughTheSameTables() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
@@ -354,7 +355,8 @@ class TestShortcutScope : public QObject {
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
 
         // the pointer exception: WheelDown answers the document table even
-        // while the grid holds focus — the pointer has no focus to rank
+        // while the grid holds focus — the gate is a keyboard-focus question,
+        // and the wheel event the funnel sees was not consumed by any surface
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
         QCOMPARE(actionManager->actionForToken(QStringLiteral("WheelDown")), QStringLiteral("nextImage"));
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
