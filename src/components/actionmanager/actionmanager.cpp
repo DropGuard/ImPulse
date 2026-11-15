@@ -641,19 +641,38 @@ bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent
     return isSubjectChangingAction(actionForKeySequence(seq));
 }
 
-// returns first shortcut that is found
+// The first token bound to this action in a table the surface can be showing
+// — used by the context menu to PRINT a hint, so it must answer with a key
+// the user can actually press. The document table comes first because most
+// of the menu's commands (save, crop, the edit verbs, setWallpaper) moved
+// there in the view split; reading only the global table left those items
+// with a blank hint (7b20e6e6 moved the bindings and this reader did not
+// follow). This menu belongs to ViewerWidget, so it is only ever shown with
+// the document scope live. The grid table is NOT read: the grid has its own
+// popup (FVOptionsPopup), and its bare navigation tokens would name keys
+// whose meaning at that surface is gridOpen/goUp, not this action.
 const QString ActionManager::shortcutForAction(const QString &action) {
+    const QString doc = docShortcuts.key(action, QString());
+    if(!doc.isEmpty())
+        return doc;
+    const QString inspect = inspectShortcuts.key(action, QString());
+    if(!inspect.isEmpty())
+        return inspect;
     return shortcuts.key(action, "");
 }
 
+// The reverse query a floating surface uses to build its veto list: given an
+// action, which tokens does the map dispatch to it? Every caller treats the
+// result as a WHITELIST ("let these through" in the rename overlay, "claim
+// these back" in the crop overlay), so a longer answer can only make the
+// surface yield more, never swallow more. That is why the grid table's
+// absence is not a veto hole — but it is also why it must not be added
+// blindly: the callers feed these tokens straight to QKeySequence, and the
+// grid's bare navigation names would widen a whitelist with keys that mean
+// something else at that surface. Add it the day a grid binding becomes a
+// subject-changing action the overlays must arbitrate; the veto predicate
+// itself (isSubjectChangingAction) is where that decision lives.
 const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
-    // the tables a floating surface can be vetoing against: the global one,
-    // the document view's, and its armed inspect variant. The grid's table is
-    // deliberately absent — no grid-only action is a subject-changing veto
-    // target, and the only callers (rename overlay, crop overlay, context
-    // menu) ask about commands that live in the document/global tables. Add
-    // it the day a grid binding becomes one of those questions; widening the
-    // set blindly would let a global veto swallow the grid's keys.
     QList<QString> keys = shortcuts.keys(action);
     for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
         if(it.value() == action)
