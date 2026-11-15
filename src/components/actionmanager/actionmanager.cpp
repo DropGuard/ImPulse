@@ -798,6 +798,11 @@ QString ActionManager::actionForShortcut(const QString &keys) {
 // de-claimed from the document set by focus alone, since the grid's QShortcuts
 // belong to the grid's subtree), then the document view's table — the armed
 // inspect variant already folded into it — then the global one.
+//
+// actionForToken is the token-shaped twin: same tables, same order, same
+// gates, only the predicate differs (exact token match instead of expanded-
+// sequence match). One walk, two spellings of the question — a second order
+// here would be a second answer to "what does this key do".
 QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
     // enforceDisjointness() guarantees the global table holds no token a scope
     // table owns, so no de-claim pass is needed here — the global loop below
@@ -833,6 +838,28 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
             return it.value();
     }
     return QString();
+}
+
+QString ActionManager::actionForToken(const QString &token) const {
+    // pointer tokens skip the grid gate on purpose: a wheel over the grid
+    // zooms the image, it does not page the grid — the pointer has no focus
+    // to rank, so its tables are inspect -> doc -> global
+    if(!isPointerToken(token) && gridActive && gridSurface) {
+        auto it = gridShortcuts.constFind(token);
+        if(it != gridShortcuts.constEnd())
+            return it.value();
+    }
+    if(inspectMode) {
+        auto it = inspectShortcuts.constFind(token);
+        if(it != inspectShortcuts.constEnd())
+            return it.value();
+    }
+    if(documentActive) {
+        auto it = docShortcuts.constFind(token);
+        if(it != docShortcuts.constEnd())
+            return it.value();
+    }
+    return shortcuts.value(token);
 }
 
 bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const {
@@ -905,34 +932,10 @@ bool ActionManager::invokeAction(const QString &actionName) {
 bool ActionManager::invokeActionForShortcut(const QString &shortcut) {
     if(shortcut.isEmpty())
         return false;
-    return resolveShortcut(shortcut);
-}
-
-// The resolution order for the events this path still owns — pointer tokens
-// only, since the keyboard is QShortcutMap's now: the armed inspect layer
-// (fit original / free zoom means "I am inspecting this image", and the
-// software does not get to decide the inspection is over), then the global
-// table.
-//
-// There is deliberately no caller-scope rank here any more. The grid's rank
-// was "the surface being typed at is the freshest intent", and a focused
-// surface now says that through its own QShortcuts plus a ShortcutOverride
-// claim — before this code is reached at all. Pointer events carry no focus
-// question: a wheel over the grid zooms the image, it does not page the grid.
-// A token ("Ctrl+S") resolved across every live table. This is the manual
-// funnel's entry: pointer tokens come through here directly, and a surface
-// that vetoed a key out of QShortcutMap re-emits it here to get the dispatch
-// it suppressed (the crop overlay's save chord is the one case today). Both
-// kinds must see the document view's bindings — a save chord is a save chord
-// whichever table it lives in.
-bool ActionManager::resolveShortcut(const QString &shortcut) {
-    if(inspectMode && inspectShortcuts.contains(shortcut))
-        return invokeAction(inspectShortcuts[shortcut]);
-    if(docShortcuts.contains(shortcut))
-        return invokeAction(docShortcuts[shortcut]);
-    if(shortcuts.contains(shortcut))
-        return invokeAction(shortcuts[shortcut]);
-    return false;
+    const QString action = actionForToken(shortcut);
+    if(action.isEmpty())
+        return false;
+    return invokeAction(action);
 }
 //------------------------------------------------------------------------------
 void ActionManager::validateShortcuts(QMap<QString, QString> &map) {

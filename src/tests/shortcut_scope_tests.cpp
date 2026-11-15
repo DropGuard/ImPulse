@@ -326,6 +326,48 @@ class TestShortcutScope : public QObject {
                  QKeySequence::fromString(QStringLiteral("Ctrl+S")));
     }
 
+    // The token walk's contract, after the merge: invokeActionForShortcut
+    // answers through actionForToken — the same tables, order and gates
+    // actionForKeySequence runs, with the pointer-token exception (a wheel
+    // over the grid zooms the image, it does not page the grid, so a pointer
+    // token skips the grid gate). The dispatch leg is heard through its own
+    // signal; the lookup leg is asserted by name.
+    void tokenWalkAnswersThroughTheSameTables() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *proxy = core.mainWindow()->getFolderView();
+        proxy->init();
+        auto *grid = proxy->findChild<FolderGridView *>();
+        QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
+
+        // keyboard token, grid unfocused: the document table answers
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+        QCOMPARE(actionManager->actionForToken(QStringLiteral("Right")), QStringLiteral("nextImage"));
+        QCOMPARE(actionManager->actionForToken(QStringLiteral("Ctrl+V")), QStringLiteral("pasteFile"));
+
+        // keyboard token, grid focused: the grid's table answers — the same
+        // gate actionForKeySequence applies
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+        QCOMPARE(actionManager->actionForToken(QStringLiteral("Right")), QStringLiteral("gridSelectNext"));
+        QCOMPARE(actionManager->actionForToken(QStringLiteral("Ctrl+V")), QStringLiteral("pasteFilesHere"));
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+
+        // the pointer exception: WheelDown answers the document table even
+        // while the grid holds focus — the pointer has no focus to rank
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+        QCOMPARE(actionManager->actionForToken(QStringLiteral("WheelDown")), QStringLiteral("nextImage"));
+        QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+
+        // the dispatch leg fires the action the walk named
+        QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
+        QVERIFY(actionManager->invokeActionForShortcut(QStringLiteral("WheelDown")));
+        QCOMPARE(next.count(), 1);
+        // an unbound token dispatches nothing and reports the miss
+        QVERIFY(!actionManager->invokeActionForShortcut(QStringLiteral("F13")));
+        QCOMPARE(next.count(), 1);
+    }
+
     void armedInspectSwapsTheProjection() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));

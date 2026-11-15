@@ -81,9 +81,11 @@ class ActionManager : public QObject {
     // comes through this path at all. A focused surface's keys are projected
     // onto QShortcuts and claimed back with ShortcutOverride; what reaches
     // here is a pointer token (wheel, buttons, double-click), which has no
-    // surface to rank.
-    bool invokeActionForShortcut(const QString &shortcut);
-    // arms/disarms the inspect scope: while armed, the inspect layer's
+    // surface to rank — or a key a surface vetoed out of QShortcutMap and
+    // re-emitted (the crop overlay's save chord). Both answer through
+    // actionForToken, the same walk actionForKeySequence runs.
+    bool invokeActionForShortcut(
+        const QString &shortcut); // arms/disarms the inspect scope: while armed, the inspect layer's
     // bindings override the base ones — in fit original / free zoom the
     // arrow keys pan the canvas and never change images (mode = intent)
     void setInspectMode(bool inspect);
@@ -110,6 +112,12 @@ class ActionManager : public QObject {
     // which action (if any) the sequence claims across the live tables —
     // grid, then the document view's (inspect variant folded in), then global
     QString actionForKeySequence(const QKeySequence &seq) const;
+    // the token-shaped twin of actionForKeySequence: same tables, same order,
+    // same gates — only the predicate differs (exact token match instead of
+    // expanded-sequence match). Pointer tokens are the deliberate exception:
+    // a wheel over the grid zooms the image, it does not page the grid, so a
+    // pointer token skips the grid gate and answers inspect -> doc -> global.
+    QString actionForToken(const QString &token) const;
     const QString shortcutForAction(const QString &action);
     const QList<QString> shortcutsForAction(const QString &action);
     QStringList actionList();
@@ -303,7 +311,6 @@ class ActionManager : public QObject {
     void readGridShortcuts();
     void readInspectShortcuts();
     void readDocShortcuts();
-    bool resolveShortcut(const QString &shortcut);
     ActionType validateAction(const QString &actionName);
 
   signals:
