@@ -900,8 +900,12 @@ class TestShortcutScope : public QObject {
         for(int r = 0; r < table->rowCount(); r++) {
             QTableWidgetItem *item = table->item(r, 0);
             const QString tag = item ? item->data(Qt::UserRole).toString() : QString();
+            // count only rows that carry a key: the section also offers the
+            // scope's unbound actions as gray rows with an empty cell
             if(tag.isEmpty())
                 headers++;
+            else if(table->item(r, 1)->text().isEmpty())
+                continue;
             else if(tag == QLatin1String("all"))
                 global++;
             else if(tag == QLatin1String("grid"))
@@ -937,6 +941,83 @@ class TestShortcutScope : public QObject {
         actionManager->removeAllGridShortcuts();
         for(auto it = gridSnapshot.constBegin(); it != gridSnapshot.constEnd(); ++it)
             actionManager->addGridShortcut(it.key(), it.value());
+    }
+
+    // The actions no table claims are offered, not hidden: each unbound
+    // action renders as a gray row with an empty shortcut cell, in the
+    // section its first binding would land in. The save cycle must ignore
+    // the empty cells (an offer is not a binding), and editing one must
+    // bind into the section it sits in — placement IS the destination.
+    void unboundActionsAreOfferedAndIgnoredBySave() {
+        const QMap<QString, QString> docSnapshot = actionManager->allDocShortcuts();
+        const QMap<QString, QString> gridSnapshot = actionManager->allGridShortcuts();
+        const QMap<QString, QString> globalSnapshot = actionManager->allShortcuts();
+        const QMap<QString, QString> inspectSnapshot = actionManager->allInspectShortcuts();
+
+        SettingsDialog dialog;
+        dialog.readSettings();
+        auto *table = dialog.findChild<QTableWidget *>(QStringLiteral("shortcutsTableWidget"));
+        QVERIFY2(table, "the shortcuts table did not materialize");
+
+        // the orphans render, gray, with an empty shortcut cell — and every
+        // registered action appears at least once across bound + offered
+        // rows (an action may hold several keys, so "at least once" is the
+        // contract; the dupes are one action with multiple bindings)
+        QSet<QString> seen;
+        int unboundRows = 0;
+        for(int r = 0; r < table->rowCount(); r++) {
+            QTableWidgetItem *actionItem = table->item(r, 0);
+            if(!actionItem || actionItem->data(Qt::UserRole).toString().isEmpty())
+                continue; // a header
+            const QString action = actionItem->text();
+            const QString shortcut = table->item(r, 1)->text();
+            if(shortcut.isEmpty()) {
+                unboundRows++;
+                QVERIFY2(!seen.contains(action), qPrintable(QStringLiteral("unbound action offered twice: ") + action));
+                QVERIFY2(actionItem->foreground().color() == Qt::gray,
+                         qPrintable(QStringLiteral("the unbound row for ") + action + " does not read as an offer"));
+            }
+            seen.insert(action);
+        }
+        QVERIFY2(unboundRows > 0, "no unbound actions were offered — the orphans are still invisible");
+        const QStringList registered = actionManager->actionList();
+        for(const QString &action : registered)
+            QVERIFY2(seen.contains(action), qPrintable(QStringLiteral("registered action not offered: ") + action));
+        QCOMPARE(seen.size(), registered.size());
+
+        // the save cycle ignores the offers: an untouched dialog round-trips
+        // every table unchanged
+        dialog.saveShortcuts();
+        QCOMPARE(actionManager->allDocShortcuts(), docSnapshot);
+        QCOMPARE(actionManager->allGridShortcuts(), gridSnapshot);
+        QCOMPARE(actionManager->allShortcuts(), globalSnapshot);
+        QCOMPARE(actionManager->allInspectShortcuts(), inspectSnapshot);
+
+        // editing an offer binds it into the section it sits in. quickCopy
+        // has no default key anywhere; its row lives in the document
+        // section, so that is where the binding must land.
+        int quickCopyRow = -1;
+        for(int r = 0; r < table->rowCount(); r++) {
+            QTableWidgetItem *actionItem = table->item(r, 0);
+            if(actionItem && actionItem->text() == QLatin1String("quickCopy") &&
+               !actionItem->data(Qt::UserRole).toString().isEmpty())
+                quickCopyRow = r;
+        }
+        QVERIFY2(quickCopyRow >= 0, "quickCopy was not offered");
+        const QString quickCopyScope = table->item(quickCopyRow, 0)->data(Qt::UserRole).toString();
+        table->item(quickCopyRow, 1)->setText(QStringLiteral("F8"));
+        dialog.saveShortcuts();
+        if(quickCopyScope == QLatin1String("document"))
+            QCOMPARE(actionManager->allDocShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+        else if(quickCopyScope == QLatin1String("grid"))
+            QCOMPARE(actionManager->allGridShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+        else
+            QCOMPARE(actionManager->allShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+
+        // put the manager back the way the rest of the suite expects it
+        actionManager->removeAllDocShortcuts();
+        for(auto it = docSnapshot.constBegin(); it != docSnapshot.constEnd(); ++it)
+            actionManager->addDocShortcut(it.key(), it.value());
     }
 
     // The Save As prefill for an edited image: the desktop's numbered-variant

@@ -114,6 +114,7 @@ void SettingsDialog::readShortcuts() {
     std::sort(rows.begin(), rows.end());
     for(const auto &row : rows)
         addShortcutToTable(row.first, row.second, scopeDocument());
+    addUnboundRows(scopeDocument());
 
     addSectionHeader(tr("Folder view — while the thumbnail grid holds focus"));
     rows.clear();
@@ -123,6 +124,7 @@ void SettingsDialog::readShortcuts() {
     std::sort(rows.begin(), rows.end());
     for(const auto &row : rows)
         addShortcutToTable(row.first, row.second, scopeGrid());
+    addUnboundRows(scopeGrid());
 
     addSectionHeader(tr("Inspect — while fit original / free zoom is armed"));
     rows.clear();
@@ -217,6 +219,62 @@ void SettingsDialog::addShortcutToTable(const QString &action, const QString &sh
     QTableWidgetItem *shortcutItem = new QTableWidgetItem(shortcut);
     shortcutItem->setTextAlignment(Qt::AlignCenter);
     ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
+}
+
+// an unbound action: registered and wired, but carrying no key anywhere.
+// The empty shortcut cell is the message; gray text says the row is an
+// invitation, not a binding. The scope tag still rides the action item, so
+// editing the row binds into the section it sits in — placement IS the
+// destination, the same "section = table" rule every bound row follows.
+void SettingsDialog::addUnboundActionRow(const QString &action, const QString &scope) {
+    ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
+    QTableWidgetItem *actionItem = new QTableWidgetItem(action);
+    actionItem->setTextAlignment(Qt::AlignCenter);
+    actionItem->setData(Qt::UserRole, scope);
+    actionItem->setForeground(QBrush(Qt::gray));
+    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
+    QTableWidgetItem *shortcutItem = new QTableWidgetItem();
+    shortcutItem->setTextAlignment(Qt::AlignCenter);
+    shortcutItem->setForeground(QBrush(Qt::gray));
+    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
+}
+
+// the actions no table claims, offered at the bottom of the section their
+// first binding belongs in. The home section is derived, not measured: a
+// command that needs "the file on screen" is a document-scope affair (the
+// same reasoning that put copy/move/crop there), a command that departs the
+// grid or arranges it sits with the grid (documentView is the mirror of the
+// doc table's Enter->folderView; the sorts are the grid's own affair).
+// Everything unbound defaults to the document section, so a future action
+// with no default key is offered somewhere by construction, not invisible.
+void SettingsDialog::addUnboundRows(const QString &scope) {
+    static const QSet<QString> gridHome = {
+        QStringLiteral("documentView"),
+        QStringLiteral("sortByName"),
+        QStringLiteral("sortByTime"),
+        QStringLiteral("sortBySize"),
+    };
+    QSet<QString> bound;
+    const QList<QString> globalValues = actionManager->allShortcuts().values();
+    for(const QString &action : globalValues)
+        bound.insert(action);
+    const QList<QString> docValues = actionManager->allDocShortcuts().values();
+    for(const QString &action : docValues)
+        bound.insert(action);
+    const QList<QString> gridValues = actionManager->allGridShortcuts().values();
+    for(const QString &action : gridValues)
+        bound.insert(action);
+    const QList<QString> inspectValues = actionManager->allInspectShortcuts().values();
+    for(const QString &action : inspectValues)
+        bound.insert(action);
+    const QStringList registered = actionManager->actionList();
+    for(const QString &action : registered) {
+        if(bound.contains(action))
+            continue;
+        const QString &home = gridHome.contains(action) ? scopeGrid() : scopeDocument();
+        if(home == scope)
+            addUnboundActionRow(action, scope);
+    }
 }
 
 // a scenario opener, not a binding: no scope tag, so every sweep skips it
@@ -333,6 +391,8 @@ void SettingsDialog::saveShortcuts() {
         const QString scope = rowScope(i);
         const QString shortcut = shortcutItem->text();
         const QString action = actionItem->text();
+        if(shortcut.isEmpty())
+            continue; // an unbound-action row: offered, never bound
         if(scope == scopeGrid())
             actionManager->addGridShortcut(shortcut, action);
         else if(scope == scopeInspect())
