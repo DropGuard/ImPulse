@@ -210,7 +210,13 @@ void ActionManager::setGridActive(bool active) {
     if(gridActive == active)
         return;
     gridActive = active;
-    applyKeyboardProjection();
+    // No projection rebuild. gridActive is consumed by the RESOLVER
+    // (actionForKeySequence), not by any projection function: the grid's
+    // QShortcuts are gated by Qt's own WidgetWithChildrenShortcut context on
+    // the focused subtree, and the global projection has carried no grid
+    // token since the view split made the tables disjoint. Rebuilding here
+    // was the de-claim era's leftover — it deleted and recreated every
+    // QShortcut on a focus change that changed nothing.
 }
 //------------------------------------------------------------------------------
 // The one write path. See the declaration comment: a writer hands commit()
@@ -627,7 +633,10 @@ void ActionManager::setDocumentActive(bool active) {
     if(documentActive == active)
         return;
     documentActive = active;
-    applyKeyboardProjection();
+    // Same shape as setGridActive: only the resolver consumes this flag. The
+    // document QShortcuts live on DocumentWidget and are gated by its
+    // WidgetWithChildrenShortcut context; the projection does not read
+    // documentActive, so rebuilding on a mode change was all churn.
 }
 //------------------------------------------------------------------------------
 void ActionManager::setInspectMode(bool inspect) {
