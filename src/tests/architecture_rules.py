@@ -390,6 +390,55 @@ if init_defaults:
                         "name in ActionManager::initDefaults")
 scanned['R12b'] = scanned.get('R12b', 0) + 1
 
+# Rule 12c: the global default table shares no live claim with any scope
+# table. QShortcutMap has no context precedence — two live claims of one key
+# are ambiguous and NEITHER fires (dispatch_probe_tests pins this) — and the
+# global table's claims are always live (ApplicationShortcut), so a token it
+# shares with the document/grid/inspect tables is a dead key in that scope.
+# 7b20e6e6 retired the central de-claim believing one key lived in exactly
+# one table by construction; Enter and Backspace still lived in two, and
+# gridOpen/goUp went silent under a green suite. Scope-vs-scope pairs are
+# exempt: the grid's and the document's claims are focus-exclusive (their
+# subtrees cannot hold focus at once), and inspect is a variant OF the
+# document table (rebuildDocumentShortcuts folds it in as a replacement, it
+# never competes). Pointer tokens are exempt: they never ride QShortcutMap.
+# "Enter" is the one token claiming two sequences (Return + keypad Enter),
+# so tokens are compared through the sequences they expand to.
+POINTER_TOKENS = {'WheelUp', 'WheelDown', 'LMB', 'RMB', 'MiddleButton',
+                  'XButton1', 'XButton2'}  # + *_DoubleClick — mirrors isPointerToken
+
+
+def _sequences_of(token):
+    if token in ('Enter', 'Return'):
+        return {'Enter', 'Return'}
+    return {token}
+
+
+if init_defaults:
+    table_tokens = {}
+    for m in re.finditer(r'(\w+)\.insert\(([^;]+?),\s*"([^"]+)"\);', init_defaults.group(1)):
+        table, key_expr = m.group(1), m.group(2)
+        expr = (key_expr.replace('InputMap::keyNameCtrl()', '"Ctrl"')
+                        .replace('InputMap::keyNameAlt()', '"Alt"')
+                        .replace('InputMap::keyNameShift()', '"Shift"'))
+        token = '+'.join(re.findall(r'"([^"]*)"', expr))
+        if token in POINTER_TOKENS or token.endswith('_DoubleClick'):
+            continue
+        table_tokens.setdefault(table, {})[token] = _sequences_of(token)
+    if 'defaults' not in table_tokens:
+        failures.append("R12c the global defaults table was not found — the rule is blind, "
+                        "fix the parse before trusting the tree")
+    else:
+        for scope in ('docDefaults', 'gridDefaults', 'inspectDefaults'):
+            for g_tok, g_seqs in sorted(table_tokens.get('defaults', {}).items()):
+                for s_tok, s_seqs in sorted(table_tokens.get(scope, {}).items()):
+                    if g_seqs & s_seqs:
+                        failures.append(f"R12c global table shares a live claim with {scope}: "
+                                        f"'{g_tok}' vs '{s_tok}' — two live claims of one key are "
+                                        "ambiguous and fire nothing (dispatch_probe_tests); move the "
+                                        "binding into the scope that owns it")
+scanned['R12c'] = scanned.get('R12c', 0) + 1
+
 if failures:
     print("architecture violations:")
     for f in failures:

@@ -221,7 +221,10 @@ static QList<QKeySequence> sequencesForToken(const QString &token) {
 // here is small on purpose: the keyboard's view-specific keys are not in this
 // table at all any more, they ride the document surface's and the grid's own
 // QShortcuts. So there is nothing to de-claim — a key belongs to exactly one
-// surface by construction, and Qt's context rules do the rest.
+// surface by construction, and Qt's context rules do the rest. That
+// construction is not a hope: R12c keeps the default tables disjoint, and
+// dropGlobalEntriesClaimedByScopes holds the line against config load and
+// editor inserts.
 void ActionManager::reproject() {
     QMap<QString, QList<QKeySequence>> projected;
     for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
@@ -301,8 +304,6 @@ void ActionManager::initDefaults() {
     defaults.insert(InputMap::keyNameShift() + "+Del", "removeFile");
     defaults.insert("C", "copyFile");
     defaults.insert("M", "moveFile");
-    defaults.insert("Enter", "folderView");
-    defaults.insert("Backspace", "folderView");
     defaults.insert(InputMap::keyNameCtrl() + "+C", "copyFileClipboard");
     defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+C", "copyPathClipboard");
     defaults.insert("F2", "renameFile");
@@ -342,6 +343,14 @@ void ActionManager::initDefaults() {
     docDefaults.insert("R", "resize");
     docDefaults.insert("H", "flipH");
     docDefaults.insert("V", "flipV");
+    // the toggle pair: keys that LEAVE the document view for the grid. They
+    // belong here, not in the global table — the grid's own Enter/Backspace
+    // (gridOpen/goUp) are live exactly while the grid holds focus, and a
+    // global claim of the same key would be ambiguous there with NEITHER
+    // firing (dispatch_probe_tests). R12c holds the tables disjoint; a key
+    // belongs to the surface it departs, not the surface it points to.
+    docDefaults.insert("Enter", "folderView");
+    docDefaults.insert("Backspace", "folderView");
     docDefaults.insert(InputMap::keyNameCtrl() + "+R", "rotateRight");
     docDefaults.insert(InputMap::keyNameCtrl() + "+L", "rotateLeft");
     docDefaults.insert(InputMap::keyNameCtrl() + "+WheelUp", "zoomInCursor");
@@ -358,7 +367,12 @@ void ActionManager::initDefaults() {
     docDefaults.insert("Down", "scrollDown");
     docDefaults.insert(InputMap::keyNameCtrl() + "+S", "save");
     docDefaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+S", "saveAs");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+W", "setWallpaper");
+    // W, not Ctrl+W: the mass-standard close-window chord must not carry a
+    // desktop-wide side effect. The context menu keeps the command reachable
+    // (contextmenu.cpp), so the default chord only decides what the keyboard
+    // does — and bare W sits with the view's other single-letter verbs
+    // (R resize, H flip, V flip, X crop, I info).
+    docDefaults.insert("W", "setWallpaper");
     docDefaults.insert("X", "crop");
     docDefaults.insert(InputMap::keyNameCtrl() + "+P", "print");
     docDefaults.insert("Home", "jumpToFirst");
@@ -383,9 +397,11 @@ void ActionManager::initDefaults() {
     // the folder grid's scope defaults are the navigation the grid hardcoded
     // before the scope system existed — one translation of that switch, so
     // the default grid behaves byte-identically to the hardcoded era. goUp
-    // is the global action the switch used to invoke directly; Enter opens
-    // the selection rather than toggling the view (the global Enter binding
-    // is the toggle, and the grid's capture used to precede it).
+    // is the action the switch used to invoke directly; Enter opens the
+    // selection rather than toggling the view — the toggle lives in the
+    // DOCUMENT table (the view it departs), so neither table carries the
+    // other's key: a shared token would be ambiguous while the grid holds
+    // focus, with neither claim firing (R12c).
     gridDefaults.insert("Left", "gridSelectPrev");
     gridDefaults.insert("Right", "gridSelectNext");
     gridDefaults.insert("Up", "gridSelectAbove");
@@ -411,12 +427,58 @@ void ActionManager::initShortcuts() {
     readGridShortcuts();
     readDocShortcuts();
     readInspectShortcuts();
+    // a config saved by an older release carries the pre-split global table,
+    // Enter and Backspace included — the disjointness law has to survive
+    // config load, not just live in the defaults
+    dropGlobalEntriesClaimedByScopes();
+}
+
+//------------------------------------------------------------------------------
+// The one-key-one-surface law, enforced on the live tables: a token the
+// global table shares with any scope table is ambiguous in that scope (two
+// live claims of one key fire nothing — dispatch_probe_tests), so the
+// scope's claim wins and the global entry goes. Runs at config load and on
+// every editor insert, so the tables cannot drift back into a collision
+// from either direction. Pointer tokens are exempt: they never ride
+// QShortcutMap, and resolveShortcut ranks them itself.
+void ActionManager::dropGlobalEntriesClaimedByScopes() {
+    QList<QKeySequence> scopeSeqs;
+    for(const QMap<QString, QString> *scope : {&docShortcuts, &gridShortcuts, &inspectShortcuts}) {
+        for(auto it = scope->constBegin(); it != scope->constEnd(); ++it) {
+            if(isPointerToken(it.key()))
+                continue;
+            const QList<QKeySequence> seqs = sequencesForToken(it.key());
+            for(const QKeySequence &seq : seqs)
+                if(!scopeSeqs.contains(seq))
+                    scopeSeqs.append(seq);
+        }
+    }
+    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
+        bool claimed = false;
+        if(!isPointerToken(i.key())) {
+            const QList<QKeySequence> globalSeqs = sequencesForToken(i.key());
+            for(const QKeySequence &seq : globalSeqs) {
+                if(scopeSeqs.contains(seq)) {
+                    claimed = true;
+                    break;
+                }
+            }
+        }
+        if(claimed) {
+            i = shortcuts.erase(i);
+        } else {
+            ++i;
+        }
+    }
 }
 //------------------------------------------------------------------------------
 void ActionManager::addShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
     if(type != ActionType::ACTION_INVALID) {
         shortcuts.insert(keys, action);
+        // the editor door: a token a scope table owns never enters here —
+        // silently dropped rather than saved into an ambiguous pair
+        dropGlobalEntriesClaimedByScopes();
         applyKeyboardProjection();
     }
 }
@@ -468,6 +530,7 @@ void ActionManager::resetDefaults() {
     shortcuts = defaults;
     inspectShortcuts = inspectDefaults;
     gridShortcuts = gridDefaults;
+    docShortcuts = docDefaults; // the fourth table joined in with the view split
     applyKeyboardProjection();
 }
 
@@ -584,9 +647,13 @@ const QString ActionManager::shortcutForAction(const QString &action) {
 }
 
 const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
-    // every live table: a surface asking "which keys does this action carry?"
-    // must see the document view's binding too, or it will veto the wrong
-    // keys (the crop overlay's save chord is exactly that question)
+    // the tables a floating surface can be vetoing against: the global one,
+    // the document view's, and its armed inspect variant. The grid's table is
+    // deliberately absent — no grid-only action is a subject-changing veto
+    // target, and the only callers (rename overlay, crop overlay, context
+    // menu) ask about commands that live in the document/global tables. Add
+    // it the day a grid binding becomes one of those questions; widening the
+    // set blindly would let a global veto swallow the grid's keys.
     QList<QString> keys = shortcuts.keys(action);
     for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
         if(it.value() == action)

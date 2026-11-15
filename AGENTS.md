@@ -11,7 +11,9 @@ whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
 single-Thumbnailer owner, R10 fd-shell purity, R11 key-door whitelist, R11b
 ShortcutOverride-claim whitelist, R12 action-connect completeness (addAction ↔
-connectAction), R12b default-keymap completeness)
+connectAction), R12b default-keymap completeness, R12c global-table/scope
+claim disjointness — two live claims of one key are ambiguous and fire
+nothing, so the global table owns no token a scope table claims)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree
