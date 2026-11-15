@@ -812,7 +812,14 @@ fn sort_codes_map_to_the_documented_orders() {
     for &(name, size, mtime) in &layout {
         let p = dir.path().join(name);
         std::fs::write(&p, vec![b'x'; size]).unwrap();
-        std::fs::File::open(&p)
+        // the handle must carry write access for the time set to succeed:
+        // Windows SetFileTime demands FILE_WRITE_ATTRIBUTES (a read-only
+        // File::open handle is refused), while Linux futimens only asked for
+        // file ownership — the platform assumption this fixture carried
+        // unnoticed until the Windows port surfaced it
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&p)
             .unwrap()
             .set_modified(mtime)
             .unwrap();

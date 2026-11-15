@@ -13,7 +13,7 @@ use crate::filter::NameFilter;
 use crate::model::DirectoryState;
 use crate::scan::{ScanOptions, ScanOutput};
 use crate::sort::SortMode;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use crate::watcher::{self, WatcherHandle};
 
 /// Called (from an engine thread) after an event was queued. The FFI layer
@@ -254,8 +254,9 @@ impl ThumbScheduler {
 }
 
 impl Engine {
-    /// Starts the engine loop thread, the scan worker pool and (on Linux) the
-    /// inotify watcher thread. Dropping the returned handle shuts everything
+    /// Starts the engine loop thread, the scan worker pool and the platform
+    /// watcher thread (inotify on Linux, ReadDirectoryChangesW on Windows).
+    /// Dropping the returned handle shuts everything
     /// down (command channel closes → loop breaks → job channel closes →
     /// workers exit; watcher is joined explicitly).
     pub fn spawn(cfg: EngineConfig, notify: Notify) -> Engine {
@@ -270,7 +271,7 @@ impl Engine {
         let filter = cfg.filter;
         let overrides: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         let (watcher, watch_ev_rx) = {
             let options = ScanOptions {
                 show_hidden: Arc::clone(&show_hidden),
@@ -280,7 +281,7 @@ impl Engine {
             let (handle, rx) = WatcherHandle::spawn(options, res_tx.clone());
             (Some(handle), rx)
         };
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", windows)))]
         let watch_ev_rx: Receiver<()> = crossbeam_channel::never();
 
         let loop_join = {
@@ -324,7 +325,7 @@ impl Engine {
                                     };
                                     let job = req.rescan(&mut next_dispatch);
                                     listing = Some(req);
-                                    #[cfg(target_os = "linux")]
+                                    #[cfg(any(target_os = "linux", windows))]
                                     if let Some(w) = &watcher {
                                         w.send(watcher::WatchCmd::Watch {
                                             path: job.path,
@@ -341,7 +342,7 @@ impl Engine {
                                         Some(req) if req.dir == dir => Some(req.rescan(&mut next_dispatch)),
                                         _ => None,
                                     };
-                                    #[cfg(target_os = "linux")]
+                                    #[cfg(any(target_os = "linux", windows))]
                                     if let Some(job) = job {
                                         if let Some(w) = &watcher {
                                             w.send(watcher::WatchCmd::Enumerate {
@@ -402,7 +403,7 @@ impl Engine {
                                 }
                                 Ok(Command::StopWatch) => {
                                     listing = None;
-                                    #[cfg(target_os = "linux")]
+                                    #[cfg(any(target_os = "linux", windows))]
                                     if let Some(w) = &watcher {
                                         w.send(watcher::WatchCmd::Unwatch);
                                     }
@@ -452,7 +453,7 @@ impl Engine {
                             }
                         }
                         recv(watch_ev_rx) -> tagged => {
-                            #[cfg(target_os = "linux")]
+                            #[cfg(any(target_os = "linux", windows))]
                             {
                                 let Ok(raw) = tagged else { break };
                                 // Only events about the folder the current request
@@ -534,14 +535,14 @@ impl Engine {
                                     watcher::WatchAction::Ignored(_) => {}
                                 }
                             }
-                            #[cfg(not(target_os = "linux"))]
+                            #[cfg(not(any(target_os = "linux", windows)))]
                             {
                                 let _ = tagged;
                             }
                         }
                     }
                 }
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", windows))]
                 if let Some(mut w) = watcher {
                     w.shutdown();
                 }
@@ -599,7 +600,7 @@ impl Engine {
     }
 
     pub fn supports_watching() -> bool {
-        cfg!(target_os = "linux")
+        cfg!(any(target_os = "linux", windows))
     }
 }
 

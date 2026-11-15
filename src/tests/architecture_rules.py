@@ -283,8 +283,7 @@ for path, rel in sources():
 # instrument silently: native cargo test would pass it, Miri never sees it,
 # and nothing else would notice. A new fn here fails the rule; adding a name
 # to the set is the review, the way R2's caller set and R7's writer set are.
-FD_FNS = {'spawn', 'send', 'shutdown', 'drop', 'new_eventfd',
-          'enumerate_and_report', 'dispatch', 'watcher_loop'}
+FD_FNS = {'spawn', 'send', 'shutdown', 'drop', 'new_eventfd', 'watcher_loop'}
 fd_path = os.path.join(ROOT, 'engine', 'qimgv-engine', 'src', 'watcher', 'fd.rs')
 if not os.path.exists(fd_path):
     failures.append("R10 cannot run: watcher/fd.rs missing — scanned 0 files is not a pass")
@@ -302,6 +301,34 @@ else:
                         "from the hook's Miri trigger, so its tests never run under the interpreter "
                         "and fake their coverage; tests for fd behavior live in watcher_tests.rs "
                         "(the real-machinery pins) or in pair.rs/apply.rs (the pure layer)")
+
+# The same rule over the Windows shell: fd_windows.rs is the ReadDirectoryChangesW
+# twin of fd.rs (same WatchCmd/WatcherHandle contract, same purity seam), and its
+# inventory is frozen for the same reason — decisions live in pair.rs/apply.rs.
+FD_WIN_FNS = {'new', 'set', 'reset', 'raw', 'drop', 'spawn', 'send', 'shutdown',
+              'watcher_loop', 'retire_watch', 'arm_read', 'open_dir', 'drain_records',
+              'u32_at'}
+fdw_path = os.path.join(ROOT, 'engine', 'qimgv-engine', 'src', 'watcher', 'fd_windows.rs')
+if not os.path.exists(fdw_path):
+    failures.append("R10 cannot run: watcher/fd_windows.rs missing — scanned 0 files is not a pass")
+else:
+    scanned['R10'] = scanned.get('R10', 0) + 1
+    fdw_text = open(fdw_path, encoding='utf-8', errors='replace').read()
+    for m in re.finditer(r'\bfn\s+([a-z_][a-z0-9_]*)', fdw_text):
+        if m.group(1) not in FD_WIN_FNS:
+            line = fdw_text[:m.start()].count('\n') + 1
+            failures.append(f"R10 decision logic in the syscall shell: watcher/fd_windows.rs:{line} defines "
+                            f"fn {m.group(1)} — the watcher's decisions live in pair.rs/apply.rs "
+                            "(the surfaces Miri runs); extend FD_WIN_FNS only after reading the purity seam")
+    if re.search(r'#\[cfg\(test\)\]|#\[test\]', fdw_text):
+        failures.append("R10 uninstrumented tests: watcher/fd_windows.rs carries test code — it is excluded "
+                        "from the hook's Miri trigger, so its tests never run under the interpreter "
+                        "and fake their coverage; tests for fd behavior live in watcher_tests.rs "
+                        "(the real-machinery pins) or in pair.rs/apply.rs (the pure layer)")
+
+# The glue both shells share — the WatchCmd vocabulary, the stream dispatch,
+# the baseline enumeration — is the contract, not the shell: it lives in
+# watcher.rs and is not frozen by this rule.
 
 # Rule 11: keyboard policy is a closed list of doors. Every keyPressEvent
 # override must live in ALLOWED_KEY_DOORS — a new door outside the list is

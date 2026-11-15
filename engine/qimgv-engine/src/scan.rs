@@ -37,15 +37,25 @@ pub struct ScanOutput {
 /// decided before the extension whitelist and before `overrides`, so a
 /// force-included path is still not admitted while it is hidden.
 pub fn is_hidden(path: &Path, name: &str) -> bool {
+    // The dotfile half is the fork's own semantic and holds on every platform
+    // (the hidden rule is one rule: a dot-named entry is not a member while
+    // show_hidden is false, whatever the file system says). Windows adds the
+    // file-system hidden attribute on top — the only platform-specific fact
+    // here.
+    if name.starts_with('.') {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        std::fs::metadata(path)
+            .map(|m| std::os::windows::fs::MetadataExt::file_attributes(&m) & 0x2 != 0)
+            .unwrap_or(false)
+    }
     #[cfg(not(windows))]
     {
         let _ = path;
-        name.starts_with('.')
+        false
     }
-    #[cfg(windows)]
-    std::fs::metadata(path)
-        .map(|m| std::os::windows::fs::MetadataExt::file_attributes(&m) & 0x2 != 0)
-        .unwrap_or(false)
 }
 
 pub fn scan_directory(path: &Path, opts: &ScanOptions) -> Result<ScanOutput, EngineError> {
