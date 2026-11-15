@@ -35,12 +35,16 @@ enum ActionType {
 // sits on a bare key: in-memory answers only, the save chords (Ctrl+S,
 // Ctrl+Shift+S) and clicks do the writing.
 //
-// The binding tables still hold two scopes — the grid's and the armed
-// inspect layer's — because the same physical key means different things per
-// surface. What they no longer have is a caller-declared rank: the keyboard
-// does not travel through a resolve call that a caller annotates. A focused
-// surface ranks by claiming its keys back before dispatch, which is why the
-// projection de-claims them from the global table instead of layering.
+// The binding tables hold one global set and three scopes — the document
+// view's, the grid's, and the inspect variant folded into the document's —
+// because the same physical key means different things per surface. The
+// global set is disjoint from all three (R12c): its claims are always live
+// (ApplicationShortcut), so a token it shared with a scope table would be
+// ambiguous in that scope with NEITHER claim firing. What the tables do not
+// have is a caller-declared rank: the keyboard does not travel through a
+// resolve call that a caller annotates. A focused surface ranks by claiming
+// its keys back before dispatch (its own QShortcuts plus ShortcutOverride),
+// which is why ownership replaces layering.
 
 // A floating surface that does not own a key yields it to the action system —
 // that is the overlay idiom, and it is what keeps zoom, fullscreen and the
@@ -224,6 +228,11 @@ class ActionManager : public QObject {
 
     void initDefaults();
     void initShortcuts();
+    // the one-key-one-surface law on the live tables: global entries whose
+    // token a scope table claims are erased (they would be ambiguous in the
+    // owning scope — two live claims of one key fire nothing). Runs at
+    // config load and on every editor insert.
+    void dropGlobalEntriesClaimedByScopes();
     void validateShortcuts(QMap<QString, QString> &map);
     void readShortcuts();
     void readGridShortcuts();

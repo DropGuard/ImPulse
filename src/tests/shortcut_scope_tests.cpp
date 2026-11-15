@@ -47,7 +47,7 @@ class TestShortcutScope : public QObject {
     // caller-declared surface rank — the keyboard left this path entirely, and
     // a focused surface ranks by claiming its keys back (QShortcuts plus
     // ShortcutOverride) before dispatch ever reaches this code. That is pinned
-    // where it lives: gridFocusDecLaimsTheGridsKeysFromTheGlobalTable and
+    // where it lives: gridFocusAnswersThroughTheGridsTable and
     // windowDeliveryFiresTheProjectedAction.
     //
     // So this test now pins what the funnel still owns: the inspect layer
@@ -253,11 +253,14 @@ class TestShortcutScope : public QObject {
         }
     }
 
-    // The scopes de-claim instead of layering — two live claims of one key are
-    // ambiguous with NEITHER firing (dispatch_probe_tests), so while the grid
-    // holds focus its keys must be OFF the global projection, and back on the
-    // moment focus leaves. The grid's own claims ride its QShortcuts.
-    void gridFocusDecLaimsTheGridsKeysFromTheGlobalTable() {
+    // The scopes own their keys instead of layering — two live claims of one
+    // key are ambiguous with NEITHER firing (dispatch_probe_tests), so the
+    // grid's tokens are not in the global table at all (R12c keeps the
+    // default tables disjoint, dropGlobalEntriesClaimedByScopes the live
+    // ones) and the resolver asks the focused grid's table first. This pins
+    // the resolver's ranking; the delivery leg lives in
+    // returnKeyMeansFolderViewInTheDocumentAndGridOpenInTheGrid.
+    void gridFocusAnswersThroughTheGridsTable() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
         QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
@@ -325,6 +328,59 @@ class TestShortcutScope : public QObject {
         QCOMPARE(save.count(), 1); // Ctrl+S: the chord reached its action too
     }
 
+    // One physical key, two meanings, both delivered for real: Return in the
+    // document view is folderView (the toggle belongs to the view it
+    // departs), and the same key in the grid is gridOpen. This is the leg
+    // 7b20e6e6 lost: it retired the central de-claim while Enter still lived
+    // in both the global and the grid tables, and two live claims of one key
+    // fire NOTHING (dispatch_probe_tests) — Enter and Backspace went silent
+    // in the folder view under a green suite, because the only other grid
+    // delivery test (crop_tests) runs a standalone grid with no window
+    // surface attached and never sees the global claim. Here both claims'
+    // carriers are live at once: the window surface carries the global
+    // projection, the grid surface carries its own.
+    void returnKeyMeansFolderViewInTheDocumentAndGridOpenInTheGrid() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *mw = core.mainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        mw->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(mw));
+
+        QSignalSpy folderView(actionManager->action("folderView"), &QAction::triggered);
+        QSignalSpy gridOpen(actionManager->action("gridOpen"), &QAction::triggered);
+        QVERIFY(folderView.isValid() && gridOpen.isValid());
+
+        // leg one: the document view is on screen and its viewer holds focus
+        // — the doc scope's claim is live, the grid's is not, the global
+        // table carries no Enter at all
+        mw->viewer()->setFocus();
+        QVERIFY2(mw->viewer()->hasFocus() || QApplication::focusWidget() == mw,
+                 "no focus in the document view to carry the doc claim");
+        coretest::deliverWindowKey(mw, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(folderView.count(), 1, 5000);
+        QCOMPARE(gridOpen.count(), 0);
+
+        // that very delivery switched to the folder view; the grid surfaces
+        auto *proxy = mw->getFolderView();
+        proxy->init();
+        auto *grid = proxy->findChild<FolderGridView *>();
+        QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
+        QTRY_VERIFY_WITH_TIMEOUT(grid->isVisible(), 5000);
+        grid->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(grid->hasFocus(), 5000);
+        folderView.clear();
+        gridOpen.clear();
+
+        // leg two: the grid holds focus — gridOpen fires alone, and the
+        // toggle does not re-fire (an ambiguous pair would fire NEITHER)
+        coretest::deliverWindowKey(mw, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(gridOpen.count(), 1, 5000);
+        QCOMPARE(folderView.count(), 0);
+    }
+
     // the inspect scope carries user overrides: while armed, an override
     // replaces the inspect default for that key — the armed chain reads the
     // layer, not the seed defaults. The table is snapshotted and restored;
@@ -359,6 +415,54 @@ class TestShortcutScope : public QObject {
         QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown))));
         QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageUp))));
         QVERIFY(actionManager->actionForShortcut("F13").isEmpty());
+    }
+
+    // The one-key-one-surface law holds against the editor and the config,
+    // not just the defaults: a token a scope table claims cannot enter the
+    // global table. addShortcut is the editor's insert door; initShortcuts
+    // runs the same drop after readShortcuts for configs saved by older
+    // releases (which carry the pre-split global table, Enter included).
+    // A dropped entry must not reach the projection either — the ambiguity
+    // never gets to QShortcutMap.
+    void globalTableRefusesTokensOwnedByScopes() {
+        const QMap<QString, QString> before = actionManager->allShortcuts();
+
+        // Enter: the grid's and the doc's; Right: the doc's and the grid's
+        actionManager->addShortcut(QStringLiteral("Enter"), QStringLiteral("exit"));
+        actionManager->addShortcut(QStringLiteral("Right"), QStringLiteral("exit"));
+        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Enter")));
+        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+        QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Return)));
+        QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Right)));
+
+        // a token nobody scopes still lands — the door is narrow, not shut
+        actionManager->addShortcut(QStringLiteral("F13"), QStringLiteral("exit"));
+        QVERIFY(actionManager->allShortcuts().contains(QStringLiteral("F13")));
+        QVERIFY(actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_F13)));
+        actionManager->removeShortcut(QStringLiteral("F13"));
+
+        QCOMPARE(actionManager->allShortcuts(), before);
+    }
+
+    // resetDefaults restores every table — the document table joined the
+    // family in the view split and the reset left it behind, so the keymap
+    // editor's reset button could not undo a document-scope rebinding
+    void resetDefaultsRestoresEveryTable() {
+        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
+        const QMap<QString, QString> docBefore = actionManager->allDocShortcuts();
+        const QMap<QString, QString> gridBefore = actionManager->allGridShortcuts();
+        const QMap<QString, QString> inspectBefore = actionManager->allInspectShortcuts();
+
+        actionManager->addShortcut(QStringLiteral("F13"), QStringLiteral("exit"));
+        actionManager->addDocShortcut(QStringLiteral("F14"), QStringLiteral("crop"));
+        actionManager->addGridShortcut(QStringLiteral("F15"), QStringLiteral("gridOpen"));
+        actionManager->addInspectShortcut(QStringLiteral("F16"), QStringLiteral("scrollLeft"));
+        actionManager->resetDefaults();
+
+        QCOMPARE(actionManager->allShortcuts(), globalBefore);
+        QCOMPARE(actionManager->allDocShortcuts(), docBefore);
+        QCOMPARE(actionManager->allGridShortcuts(), gridBefore);
+        QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
     }
 
     // The keymap page renders as scenarios: one section per scope under a
