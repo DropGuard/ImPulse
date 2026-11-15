@@ -465,6 +465,43 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
     }
 
+    // Liveness flags are consumed by the resolver only — no projection
+    // function reads gridActive/documentActive (grid is gated by Qt's
+    // WidgetWithChildrenShortcut context on the focused subtree, the document
+    // the same on DocumentWidget). The rebuilds those setters used to run
+    // were the de-claim era's leftover. This pins the OBSERVABLE consequence:
+    // after a real view switch, each scope's keys still mean their scope's
+    // action, with no projection rebuild on the switch itself.
+    void viewSwitchKeepsBothScopesLiveWithoutRebuilding() {
+        Core core;
+        QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+        auto *mw = core.mainWindow();
+
+        // document view: the resolver answers with the document table
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Return)), QStringLiteral("folderView"));
+
+        // switch to the folder view (the real observer path, not a direct call)
+        QVERIFY(actionManager->invokeAction(QStringLiteral("folderView")));
+        auto *proxy = mw->getFolderView();
+        proxy->init();
+        auto *grid = proxy->findChild<FolderGridView *>();
+        QVERIFY2(grid != nullptr, "no FolderGridView under the folder view");
+        grid->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(grid->hasFocus(), 5000);
+
+        // the grid now answers for its own keys — no rebuild was needed for
+        // this to be true, the grid's QShortcuts were already attached
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
+        QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Return)), QStringLiteral("gridOpen"));
+
+        // and the document table is still intact underneath — the switch
+        // did not clear it (the old rebuild did clear and recreate it)
+        QVERIFY(actionManager->allDocShortcuts().values().contains(QStringLiteral("nextImage")));
+        QVERIFY(actionManager->allDocShortcuts().values().contains(QStringLiteral("folderView")));
+    }
+
     // commit() is the one write path: whatever door the edit came through,
     // the disjointness law and the projection rebuild run after it. This
     // pins the property from BOTH sides — a scope insert that collides with

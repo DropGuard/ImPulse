@@ -325,6 +325,88 @@ class DispatchProbe : public QObject {
         // today's behavior for free, and no door veto is needed inside them
         QCOMPARE(globalFired.count(), 0);
     }
+
+    // ENABLED as a liveness mechanism — the fact this suite exists to keep
+    // honest. The project expresses "this scope is live" by table membership
+    // (the binding is present or absent from the projection), not by Qt's
+    // enabled bit, because ActionManager's actions are stateless trigger
+    // tokens. That choice costs a hand-maintained projection; Qt's standard
+    // answer would be setEnabled, and the price of THAT is the trigger()
+    // contract below. Nothing here is production code — it is the boundary
+    // measurement that decides whether the trade can ever be revisited.
+    //
+    // Two claims, each asserted rather than remembered:
+    //   1. a disabled QAction's shortcut leaves QShortcutMap's match set
+    //      (so enabled DOES express liveness correctly), and
+    //   2. a disabled QAction ignores trigger() (so enabling/disabling cannot
+    //      be used as a pure dispatch gate without breaking invokeAction,
+    //      which calls trigger() on every resolved name).
+    void disabledActionsLeaveTheMatchSetAndIgnoreTrigger() {
+        QWidget host;
+        host.resize(300, 120);
+        host.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        host.setFocus();
+
+        QAction action(&host);
+        action.setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
+        action.setShortcutContext(Qt::ApplicationShortcut);
+        host.addAction(&action);
+        QSignalSpy fired(&action, &QAction::triggered);
+
+        // enabled: the shortcut fires through the map
+        deliverKey(&host, Qt::Key_E, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 1);
+
+        // disabled: the map no longer matches it, so the key falls through
+        fired.clear();
+        action.setEnabled(false);
+        deliverKey(&host, Qt::Key_E, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 0);
+
+        // and a direct trigger() is swallowed — this is the cost of using
+        // enabled as a dispatch gate for a registry that dispatches by
+        // trigger() rather than by signal emission
+        action.trigger();
+        QCOMPARE(fired.count(), 0);
+
+        // re-enabling restores both, so the bit is a clean on/off gate
+        fired.clear();
+        action.setEnabled(true);
+        deliverKey(&host, Qt::Key_E, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 1);
+        action.trigger();
+        QCOMPARE(fired.count(), 2);
+    }
+
+    // QShortcut's own enabled bit, for completeness: the Grid/Document
+    // projections are QShortcuts, and the same question applies — if a future
+    // design gates a scope with QShortcut::setEnabled instead of by table
+    // membership, this is what it buys. A disabled QShortcut does not fire.
+    void disabledShortcutDoesNotFire() {
+        QWidget host;
+        host.resize(300, 120);
+        host.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        host.setFocus();
+
+        QShortcut sc(QStringLiteral("Ctrl+R"), &host);
+        sc.setContext(Qt::WidgetWithChildrenShortcut);
+        QSignalSpy fired(&sc, &QShortcut::activated);
+
+        deliverKey(&host, Qt::Key_R, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 1);
+
+        fired.clear();
+        sc.setEnabled(false);
+        deliverKey(&host, Qt::Key_R, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 0);
+
+        fired.clear();
+        sc.setEnabled(true);
+        deliverKey(&host, Qt::Key_R, Qt::ControlModifier);
+        QCOMPARE(fired.count(), 1);
+    }
 };
 
 int main(int argc, char **argv) {
