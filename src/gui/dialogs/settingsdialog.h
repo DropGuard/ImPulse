@@ -53,6 +53,8 @@ class SettingsDialog : public QDialog {
 
     void addShortcutToTable(const QString &action, const QString &shortcut, const QString &scope);
     void addSectionHeader(const QString &title);
+    void addUnboundActionRow(const QString &action, const QString &scope);
+    void addUnboundRows(const QString &scope);
     QString rowScope(int row) const;
     QString selectedScope() const;
     void addScriptToList(const QString &name);
