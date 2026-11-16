@@ -466,6 +466,66 @@ if init_defaults:
                                         "binding into the scope that owns it")
 scanned['R12c'] = scanned.get('R12c', 0) + 1
 
+# Rule 13: the unit-harness protocol is closed. slot_harness re-spawns the
+# executable once per unit on Windows (there is no fork to lean on), so every
+# suite main that calls the harness must dispatch its own children, and the
+# harness must carry both halves of the routing — or one suite run multiplies
+# into a self-relaunching process tree. That shape shipped once: engine_stack's
+# child path read QIMGV_TEST_UNIT while nothing ever set it, so every spawned
+# child re-entered the harness and re-spawned (bounded only by crashes), and
+# the tree ate the machine overnight (2026-11-16). Three greppable halves:
+#   a) every harness user dispatches its child itself (an argc>1 branch, or the
+#      QIMGV_TEST_UNIT consumption for a class suite);
+#   b) the Windows spawn applies a child environment carrying both the routing
+#      variable and the marker;
+#   c) the harness refuses to run inside a spawned child — the re-entry guard —
+#      so the next protocol break is a loud red instead of a fork bomb.
+HARNESS = os.path.join(ROOT, 'qimgv/tests/slot_harness.h')
+if not os.path.exists(HARNESS):
+    failures.append(f"R13 cannot run: the harness moved ({HARNESS}) — update this "
+                    "rule, do not let it scan nothing")
+harness_text = text_of(HARNESS) if os.path.exists(HARNESS) else ""
+scanned['R13'] = scanned.get('R13', 0) + 1
+for path, rel in sources():
+    if not rel.startswith('tests/') or rel == 'tests/slot_harness.h':
+        continue
+    text = text_of(path)
+    if 'run_units_one_process_each' not in text:
+        continue
+    scanned['R13'] = scanned.get('R13', 0) + 1
+    if 'argc > 1' not in text and 'QIMGV_TEST_UNIT' not in text:
+        failures.append(f"R13 harness protocol: {rel} calls run_units_one_process_each "
+                        "but its main has no child dispatch — an argc>1 branch or the "
+                        "QIMGV_TEST_UNIT consumption; without one, every spawned child "
+                        "re-enters the harness and re-spawns (the 2026-11-16 fork bomb)")
+for needle, what in (
+    ('QIMGV_TEST_UNIT', 'the routing variable a class-suite child consumes'),
+    ('QIMGV_TEST_HARNESS_CHILD', 'the spawned-child marker'),
+    ('setProcessEnvironment', 'the child environment actually applied to the spawn'),
+    ('proc.kill()', 'the timeout kill (a timed-out waitForFinished does not kill)'),
+):
+    if needle not in harness_text:
+        failures.append(f"R13 harness protocol: slot_harness.h lost {what} ({needle})")
+# d) the exit-code verdict lands before the result-file dump. The Windows
+# branch dumps a red unit's QTest log only when `ok` is false, and the natural
+# reading order (wait → dump → convert the exit code into the verdict) checks
+# the dump against "exited normally" — true for every unit that ran to
+# completion and failed its tests. That ordering shipped once (2026-11-16):
+# five red engine_stack units surfaced as one bare line each, the logs the
+# per-unit files existed to carry never shown. The verdict line must sit above
+# the dump that reads it.
+verdict_at = harness_text.find('ok = exitCode == 0')
+dump_at = harness_text.find('QFile res(resultPath)')
+if verdict_at == -1 or dump_at == -1 or verdict_at > dump_at:
+    failures.append("R13 harness protocol: the exit-code verdict ('ok = exitCode == 0') "
+                    "must be computed BEFORE the per-unit result-file dump reads it, or a "
+                    "unit that fails its tests normally never surfaces its log "
+                    "(the 2026-11-16 unreadable reds)")
+if harness_text.count('QIMGV_TEST_HARNESS_CHILD') < 2:
+    failures.append("R13 harness protocol: slot_harness.h must both set the child "
+                    "marker and read it in the re-entry guard — one half of the guard "
+                    "is the bomb with a lock on only one door")
+
 if failures:
     print("architecture violations:")
     for f in failures:

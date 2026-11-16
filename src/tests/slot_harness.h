@@ -13,7 +13,10 @@
 #pragma once
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QMetaMethod>
+#include <QStandardPaths>
 #include <QMetaObject>
 #include <QProcess>
 #include <QString>
@@ -54,6 +57,21 @@ inline int run_units_one_process_each(int argc, char **argv,
                                       [[maybe_unused]] const std::function<int(const QString &)> &runUnitInChild) {
     (void)argc;
     (void)argv;
+    // The re-entry guard. A child spawned by this harness carries the
+    // QIMGV_TEST_HARNESS_CHILD marker in its environment; a process that
+    // reaches this function while marked was spawned but did not consume its
+    // unit routing, and one more spawn from here is the recursive
+    // self-relaunch that multiplied a single suite run into a system-eating
+    // process tree (2026-11-16: engine_stack's child path read QIMGV_TEST_UNIT,
+    // which nothing ever set). Die loudly, spawn nothing.
+    if(!qEnvironmentVariableIsEmpty("QIMGV_TEST_HARNESS_CHILD")) {
+        std::fprintf(stderr,
+                     "%s: a spawned child re-entered the unit harness "
+                     "(QIMGV_TEST_HARNESS_CHILD is set) without consuming its unit "
+                     "routing — refusing to spawn. This is a harness protocol break, "
+                     "not a test failure.\n", suiteName);
+        return 1;
+    }
     int failures = 0, consecutiveAbnormal = 0;
     for(const QString &unit : units) {
         std::fflush(nullptr); // fork would duplicate whatever is buffered in stdout
@@ -68,7 +86,18 @@ inline int run_units_one_process_each(int argc, char **argv,
             + QString("/%1_%2_result.txt").arg(suiteName, unit);
         QProcess proc;
         proc.setProgram(QCoreApplication::applicationFilePath());
-        proc.setArguments({unit, "-o", resultPath, "txt"});
+        proc.setArguments({unit, "-o", resultPath + ",txt"});
+        // The child's routing, carried in the environment where the child reads
+        // it: the unit label rides argv[1] for the slot suites (their main
+        // filters QTest on it) and QIMGV_TEST_UNIT for the class suites (a label
+        // like "listing" owns no slot, so a suite routing through the meta-object
+        // lookup needs it here); the marker arms the re-entry guard at the top
+        // of this function. The env was the half that was never written once
+        // (2026-11-16 fork bomb).
+        QProcessEnvironment childEnv = QProcessEnvironment::systemEnvironment();
+        childEnv.insert(QStringLiteral("QIMGV_TEST_UNIT"), unit);
+        childEnv.insert(QStringLiteral("QIMGV_TEST_HARNESS_CHILD"), QStringLiteral("1"));
+        proc.setProcessEnvironment(childEnv);
         // the child's own stderr (engine trace, crashes) still forwards live
         proc.setProcessChannelMode(QProcess::ForwardedChannels);
         proc.start();
@@ -77,7 +106,21 @@ inline int run_units_one_process_each(int argc, char **argv,
         if(proc.waitForStarted(10000) && proc.waitForFinished(300000)) {
             ok = proc.exitStatus() == QProcess::NormalExit;
             exitCode = proc.exitCode();
+        } else {
+            // a timed-out waitForFinished does NOT kill the child: without
+            // this, a hung unit outlives the accounting that tracks it,
+            // carrying its spawn rights into the next run
+            proc.kill();
+            proc.waitForFinished(5000);
         }
+        // the exit-code verdict lands BEFORE the dump: at this point `ok` still
+        // means "the process exited normally", and a unit that ran to completion
+        // and failed its tests exits normally with a nonzero code — checking the
+        // dump against the pre-verdict `ok` skipped the log for exactly the units
+        // whose failure someone needs to read (2026-11-16: five red engine_stack
+        // units surfaced as one bare line each, their logs never shown)
+        if(ok)
+            ok = exitCode == 0;
         {
             QFile res(resultPath);
             if(res.open(QIODevice::ReadOnly)) {
@@ -88,8 +131,6 @@ inline int run_units_one_process_each(int argc, char **argv,
                 res.remove();
             }
         }
-        if(ok)
-            ok = exitCode == 0;
         if(!ok) {
             std::fprintf(stderr, "%s: unit '%s' failed to run or exited abnormally (exit=%d)\n",
                          suiteName, unit.toUtf8().constData(), exitCode);

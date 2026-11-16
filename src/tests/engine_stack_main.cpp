@@ -9,6 +9,7 @@
 #include <QStandardPaths>
 
 #include <cstring>
+#include <vector>
 
 #include "slot_harness.h"
 
@@ -76,7 +77,21 @@ int main(int argc, char **argv) {
         for(const auto &r : kRuns)
             if(harnessUnit == r.name) {
                 coretest::setChildCoreLimit();
-                return r.run(argc, argv) != 0 ? 1 : 0;
+                // The harness hands the unit label over twice: argv[1] (what the
+                // slot suites' mains feed to QTest as a function filter) and
+                // QIMGV_TEST_UNIT (what routes a class suite — a label like
+                // "listing" owns no slot, so runIfOwned would answer "not owned"
+                // and quietly run nothing if the label stayed in argv). The
+                // kRuns lookup consumed the label; the argv the unit runs on
+                // keeps the rest, the -o trio included, minus the label itself.
+                std::vector<char *> unitArgv;
+                unitArgv.push_back(argv[0]);
+                for(int i = 1; i < argc; ++i)
+                    if(harnessUnit != argv[i])
+                        unitArgv.push_back(argv[i]);
+                unitArgv.push_back(nullptr);
+                const int unitArgc = static_cast<int>(unitArgv.size()) - 1;
+                return r.run(unitArgc, unitArgv.data()) != 0 ? 1 : 0;
             }
         return 2;
     }
