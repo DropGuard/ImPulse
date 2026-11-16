@@ -166,7 +166,13 @@ void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
         gate = true; // the running job finishes normally
         pool.waitForOwner(PoolOwner::Loader);
         QCOMPARE(runs.load(), 0);   // drained jobs never ran
-        QCOMPARE(deaths.load(), 4); // the gated job was pool-deleted
+        // the gated job was pool-deleted. The destructor lands on the worker
+        // thread right after run() returns — the documented order — but
+        // waitForOwner's guarantee is run() completion, not the destructor's
+        // instant: under load the two are observable apart (measured one full
+        // gap apart on a busy desktop). What is pinned here is that the pool
+        // destroys it, which must still hold.
+        QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 4, 10000);
     }
     QCOMPARE(deaths.load(), 4);
 }

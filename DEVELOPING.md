@@ -6,18 +6,65 @@ discipline (each rule mapped to the incident that earned it) lives in
 [AGENTS.md](AGENTS.md); the structural rules themselves are executable —
 `qimgv/tests/architecture_rules.py` runs as part of ctest.
 
-## Platform: Linux only
+## Platform: Linux and Windows (msys2)
 
-The listing's watcher is inotify (the ownership story is the next
-section). On other
-platforms the event channel is `never()`, the old `QFileSystemWatcher` fallback is
-gone, and the `inotify` crate is an unconditional dependency (`libc` rides the
-linux target gate) — so live folder updates, and the build itself, are not
-expected to work elsewhere. Picking another platform
-up starts with `cargo check --target x86_64-pc-windows-gnu`: it does not link, so it
-runs here and reports how much is missing before anything is written.
+The listing's watcher is inotify on Linux and ReadDirectoryChangesW on
+Windows — the same seam, the same `WatchCmd` vocabulary, twin syscall shells
+(`watcher/fd.rs`, `watcher/fd_windows.rs`) over one shared glue (`watcher.rs`)
+and one pure layer (`watcher/pair.rs`, `watcher/apply.rs`). Everything else in
+the event story is platform-neutral. The old `QFileSystemWatcher` fallback is
+gone, and the `inotify` crate rides the linux target gate.
 
 Distro packages named `qimgv` install upstream, not this fork.
+
+### Windows specifics (msys2 / mingw64)
+
+The supported Windows toolchain is msys2's mingw64 environment: gcc with the
+mingw Qt 6.12 stack, ninja, Corrosion driving cargo inside the same build.
+Configure exactly as on Linux (`cmake -S . -B build -G Ninja` from an msys2
+shell). The git gate is bash-shaped by design — run git from the msys2 shell,
+where bash, the coreutils and the hook's environment exist; from a bare cmd
+the hook's interpreter is not resolvable. Tools the machine does not have are
+skipped loudly by the hook, never silently: cppcheck/clang-tidy (the lint
+baseline), clang-format, rustfmt and Miri each name their absence, and
+cmake/ctest/pytest-equivalents are read from the configure-time cache rather
+than hoped for on PATH.
+
+Feature availability on this toolchain, measured rather than assumed:
+
+| Option | msys2 mingw64 | note |
+| --- | --- | --- |
+| `EXIV2` | **not available** | the mingw64 repo does not carry exiv2 (ucrt64/clang64 do); the exif path compiles out under `USE_EXIV2` and the exif test skips |
+| `VIDEO_SUPPORT` | OFF by default here | needs libmpv; the mime policy collapses to "video formats never offered" (`Settings::videoPlayback` answers false without `USE_MPV`) |
+| `OPENCV_SUPPORT` | ON works | mingw-w64-x86_64-opencv installs cleanly |
+
+Windows file-system facts the code is written against (each pinned by a test):
+
+* **Sharing is the denial channel.** There are no mode bits; a file another
+  handle holds open without sharing cannot be moved, renamed, deleted or
+  opened, and Qt's ACL-derived `isReadable()` never answers false for an
+  existing file. Where POSIX checks mode bits, the Windows branches probe with
+  an actual open (ThumbnailCache's unreadable-original gate) and the tests
+  hold exclusive handles as the refusal fixture.
+* **`rename()` has no atomic replace** (mingw's MSRT semantics answer EEXIST);
+  `MoveFileEx(REPLACE_EXISTING)` is the spelling both `FileOperations::rename`
+  and the tests use.
+* **Open handles block deletion and rename** — DeleteFile and MoveFileEx fail
+  on a file any handle in the same process holds; fixtures close their
+  read-back handles before mutating.
+* **`IMG2.jpg` and `img2.jpg` are one name.** The case-insensitive file system
+  makes case-pair fixtures impossible; where the Linux test stresses
+  case-collation the Windows branch uses a non-colliding variant.
+* **`SetFileTime` needs `FILE_WRITE_ATTRIBUTES`** — a read-only open does not
+  carry it, unlike futimens through an O_RDONLY fd.
+* **A delete-pending directory can hold the notify IRP past the cancel** —
+  the watcher's retire drains the abort completion with a bound, never a
+  plain wait, or `Engine::drop`'s join waits on the thread that is waiting.
+
+Test fixture environment: portable mode reads conf and cache from the exe's
+directory; `QIMGV_CONF_DIR` and `QIMGV_CACHE_DIR` redirect both (FreshSettings
+sets them per test instance), and the `cacheDir` hand-edit key outranks the
+redirect — logs and temp frames must follow the same directory the app picks.
 
 ## Architecture: what changed underneath
 
@@ -116,8 +163,19 @@ impulse /path/to/image-or-directory
 Verify a build:
 
 ```bash
-cd build && ctest -j4                 # six suites, including the architecture rules
+cd build && ctest -j4                 # the suites, including the architecture rules
 cd engine/qimgv-engine && cargo test    # the engine's own suites
+```
+
+Every suite is one binary with a uniform contract: bare argv runs all units
+(one process per unit — the crash-isolation harness), and argv[1] names a
+single unit or a single test function. The unit's Totals line prints as it
+finishes; a red unit's whole QTest log is surfaced by the harness parent.
+
+```bash
+build/qimgv/tests/crop_tests                    # all units, one process each
+build/qimgv/tests/crop_tests cropRatioLocks     # one test function
+build/qimgv/tests/engine_stack_tests listing    # one unit (a whole class)
 ```
 
 Maintainer gate (runs in the pre-commit hook) — the clazy/clang-tidy/cppcheck/gcc counts are baselined against
