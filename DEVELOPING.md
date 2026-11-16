@@ -17,26 +17,31 @@ gone, and the `inotify` crate rides the linux target gate.
 
 Distro packages named `qimgv` install upstream, not this fork.
 
-### Windows specifics (msys2 / mingw64)
+### Windows specifics (msys2 / ucrt64)
 
-The supported Windows toolchain is msys2's mingw64 environment: gcc with the
-mingw Qt 6.12 stack, ninja, Corrosion driving cargo inside the same build.
+The supported Windows toolchain is msys2's **ucrt64** environment: gcc with the
+Qt 6.12 stack, ninja, Corrosion driving cargo inside the same build, and the
+full feature set (exiv2 and libmpv are packaged for ucrt64 and **not** for the
+mingw64 environment — msvcrt-based mingw64 is where those repos stop).
 Configure exactly as on Linux (`cmake -S . -B build -G Ninja` from an msys2
-shell). The git gate is bash-shaped by design — run git from the msys2 shell,
-where bash, the coreutils and the hook's environment exist; from a bare cmd
-the hook's interpreter is not resolvable. Tools the machine does not have are
-skipped loudly by the hook, never silently: cppcheck/clang-tidy (the lint
-baseline), clang-format, rustfmt and Miri each name their absence, and
-cmake/ctest/pytest-equivalents are read from the configure-time cache rather
-than hoped for on PATH.
+shell, with ucrt64's bin first on PATH so the configure finds its own Qt).
+The Rust side stays `x86_64-pc-windows-gnu`; its self-contained CRT objects
+link cleanly against ucrt64 gcc through the pure C ABI (measured, zero
+undefined symbols). The git gate is bash-shaped by design — run git from the
+msys2 shell, where bash, the coreutils and the hook's environment exist; from
+a bare cmd the hook's interpreter is not resolvable. Tools the machine does
+not have are skipped loudly by the hook, never silently:
+cppcheck/clang-tidy (the lint baseline), clang-format, rustfmt and Miri each
+name their absence, and cmake/ctest/pytest-equivalents are read from the
+configure-time cache rather than hoped for on PATH.
 
 Feature availability on this toolchain, measured rather than assumed:
 
-| Option | msys2 mingw64 | note |
+| Option | msys2 ucrt64 | note |
 | --- | --- | --- |
-| `EXIV2` | **not available** | the mingw64 repo does not carry exiv2 (ucrt64/clang64 do); the exif path compiles out under `USE_EXIV2` and the exif test skips |
-| `VIDEO_SUPPORT` | OFF by default here | needs libmpv; the mime policy collapses to "video formats never offered" (`Settings::videoPlayback` answers false without `USE_MPV`) |
-| `OPENCV_SUPPORT` | ON works | mingw-w64-x86_64-opencv installs cleanly |
+| `EXIV2` | ON | mingw-w64-ucrt-x86_64-exiv2 0.28; its 0.28 API takes UTF-8 narrow paths on every platform (`QString::toStdString`, not the old wide-char helper) |
+| `VIDEO_SUPPORT` | ON | mingw-w64-ucrt-x86_64-mpv 0.42; the plugin builds as `build/plugins/player_mpv/player_mpv.dll` |
+| `OPENCV_SUPPORT` | ON | mingw-w64-ucrt-x86_64-opencv 5.0 |
 
 Windows file-system facts the code is written against (each pinned by a test):
 
