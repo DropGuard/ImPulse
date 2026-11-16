@@ -250,18 +250,26 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         FileOpResult result;
         FileOperations::copyFileTo(fixtureDir + "/img1.jpg", destDir, false, result);
         QCOMPARE(result, FileOpResult::SUCCESS);
-        QFile src(fixtureDir + "/img1.jpg");
-        QVERIFY(src.open(QIODevice::ReadOnly));
-        QByteArray srcBytes = src.readAll();
-        QFile dst(destDir + "/img1.jpg");
-        QVERIFY(dst.open(QIODevice::ReadOnly));
-        QCOMPARE(dst.readAll(), srcBytes);
+        QByteArray srcBytes;
+        {
+            QFile src(fixtureDir + "/img1.jpg");
+            QVERIFY(src.open(QIODevice::ReadOnly));
+            srcBytes = src.readAll();
+            QFile dst(destDir + "/img1.jpg");
+            QVERIFY(dst.open(QIODevice::ReadOnly));
+            QCOMPARE(dst.readAll(), srcBytes);
+        }
+        // the read-back handles close with the block above: Windows refuses
+        // to rename a file another handle in this same process holds open,
+        // and the rename below is exactly that case
 
         FileOperations::copyFileTo(fixtureDir + "/img1.jpg", destDir, false, result);
         QCOMPARE(result, FileOpResult::DESTINATION_FILE_EXISTS);
-        QFile dst2(destDir + "/img1.jpg");
-        QVERIFY(dst2.open(QIODevice::ReadOnly));
-        QCOMPARE(dst2.readAll(), srcBytes);
+        {
+            QFile dst2(destDir + "/img1.jpg");
+            QVERIFY(dst2.open(QIODevice::ReadOnly));
+            QCOMPARE(dst2.readAll(), srcBytes);
+        }
 
         FileOperations::moveFileTo(fixtureDir + "/img2.jpg", destDir, false, result);
         QCOMPARE(result, FileOpResult::SUCCESS);
@@ -459,7 +467,14 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         resetFixture();
         QVERIFY(writeBigImage(fixtureDir + "/src.png", "png", QSize(8, 8)));
         QFile src(fixtureDir + "/src.png");
+#ifdef Q_OS_WIN
+        // futimens works through an O_RDONLY fd for the file's owner;
+        // SetFileTime needs FILE_WRITE_ATTRIBUTES, which a read-only open
+        // does not carry — the write-capable open changes no bytes
+        QVERIFY(src.open(QIODevice::ReadWrite));
+#else
         QVERIFY(src.open(QIODevice::ReadOnly));
+#endif
         QVERIFY(src.setFileTime(QDateTime(QDate(2020, 1, 2), QTime(3, 4, 5)), QFileDevice::FileModificationTime));
         src.close();
         QDir().mkpath(fixtureDir + "/destdir");

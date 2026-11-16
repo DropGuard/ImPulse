@@ -327,12 +327,35 @@ fn arm_read(
 /// handle — in that order: closing (or re-arming) while a read is pending is
 /// undefined, and the abort's completion would otherwise signal the shared
 /// event after the next arm.
+///
+/// The drain is bounded, not a plain wait: a delete-pending directory can
+/// hold the notify IRP past the cancel (the kernel completes it at handle
+/// cleanup instead), and an unbounded GetOverlappedResult(wait=TRUE) there
+/// wedged the watcher thread mid-retire — the engine's own rescan test hung
+/// forever inside Engine::drop's join, because the thread it was joining was
+/// the one waiting (ENGINE_RUST timeout, 2026-11-17). Closing with an
+/// undrained read is safe here: this watch is retiring, nothing re-arms on
+/// this overlapped, and a late abort signal lands on the manual-reset
+/// completion event whose next consumer clears it (the unarmed-wait branch).
+const RETIRE_DRAIN: std::time::Duration = std::time::Duration::from_millis(100);
+
+fn drain_aborted(dir: HANDLE, overlapped: &mut Overlapped) {
+    let deadline = std::time::Instant::now() + RETIRE_DRAIN;
+    loop {
+        let mut drained: u32 = 0;
+        let done = unsafe { GetOverlappedResult(dir, overlapped, &mut drained, 0) };
+        if done != 0 || std::time::Instant::now() >= deadline {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
 fn retire_watch(watch: Option<Watch>, overlapped: &mut Overlapped, armed: bool) {
     if let Some(w) = watch {
         if armed {
             unsafe { CancelIoEx(w.dir, std::ptr::null_mut()) };
-            let mut drained: u32 = 0;
-            let _ = unsafe { GetOverlappedResult(w.dir, overlapped, &mut drained, 1) };
+            drain_aborted(w.dir, overlapped);
         }
         unsafe { CloseHandle(w.dir) };
     }
@@ -450,8 +473,7 @@ fn retire_gone(
     let generation = w.id;
     let dir = w.path.clone();
     unsafe { CancelIoEx(w.dir, std::ptr::null_mut()) };
-    let mut drained: u32 = 0;
-    let _ = unsafe { GetOverlappedResult(w.dir, overlapped, &mut drained, 1) };
+    drain_aborted(w.dir, overlapped);
     unsafe { CloseHandle(w.dir) };
     let live_wd = Some(generation);
     let rec = super::Record {

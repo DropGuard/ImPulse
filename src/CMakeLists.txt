@@ -90,7 +90,11 @@ if(KDE_SUPPORT)
     target_compile_definitions(qimgv_nongui PRIVATE USE_KDE_BLUR)
 endif()
 if(VIDEO_SUPPORT)
-    target_compile_definitions(qimgv_nongui PRIVATE USE_MPV)
+    # PUBLIC, same rule as USE_EXIV2 below the executable's mirror: the macro
+    # answers "is libmpv available", and the test binaries that compile
+    # settings tests need the same answer the video.cpp TU got — the mime
+    # policy test's positive half only exists where the toggle does.
+    target_compile_definitions(qimgv_nongui PUBLIC USE_MPV)
 endif()
 if(OPENCV_SUPPORT)
     target_link_libraries(qimgv_nongui PUBLIC ${OpenCV_LIBS})

@@ -15,6 +15,9 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QUrl>
+#ifdef Q_OS_WIN
+#include <qt_windows.h> // CreateFileW: the exclusive lock is the platform's denial channel
+#endif
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -174,14 +177,29 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         QVERIFY(cache.save(picture, source, 128, QFileInfo(source), QSize(64, 64), false, false));
         QVERIFY(cache.exists(source, 128));
 
-        QVERIFY(::chmod(source.toLocal8Bit().constData(), 0) == 0);
         QFileInfo locked(source);
+#ifdef Q_OS_WIN
+        // mode bits do not exist here — Qt's ACL-derived isReadable() answers
+        // true for anything that exists. The platform's denial channel is
+        // sharing: a file held open with no sharing cannot be opened for read
+        // by anyone, and the cache's open-probe is what refuses.
+        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(source.utf16()),
+                                  GENERIC_READ | GENERIC_WRITE, 0 /* no sharing */, nullptr,
+                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        QVERIFY2(held != INVALID_HANDLE_VALUE, "the lock fixture failed to open the source");
+#else
+        QVERIFY(::chmod(source.toLocal8Bit().constData(), 0) == 0);
         QVERIFY(!locked.isReadable());
+#endif
         QVERIFY2(!cache.read(source, 128, locked).has_value(),
                  "an unreadable original must not be served from the cache");
         QVERIFY2(!cache.save(picture, source, 128, locked, QSize(64, 64), false, false),
                  "nothing may be written for an unreadable original, the failure marker included");
+#ifdef Q_OS_WIN
+        QVERIFY(CloseHandle(held));
+#else
         ::chmod(source.toLocal8Bit().constData(), 0644);
+#endif
     }
 
     // The store is shared, so this app's sweep policy may only reach this app's
@@ -278,16 +296,22 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // entry look like OUR orphan (same Keys, our Software, original gone)
         // and require the sweep to delete it: only a correct chunk walk can see
         // the URI, and only a seen URI can be declared orphaned.
-        QFile::remove(source);
+        QVERIFY2(QFile::remove(source), qPrintable(QStringLiteral("fixture broken: the source must be removable: ") + source));
         QImage orphan(256, 192, QImage::Format_ARGB32);
         orphan.fill(Qt::red);
         orphan.setText(QStringLiteral("Thumb::URI"), ThumbnailCache::uriFor(source));
         orphan.setText(QStringLiteral("Thumb::MTime"), QStringLiteral("1"));
         orphan.setText(QStringLiteral("Software"), QStringLiteral("ImPulse"));
         QVERIFY(orphan.save(path, "png")); // a long URI: Qt stores this one compressed
-        QFile raw(path);
-        QVERIFY(raw.open(QIODevice::ReadOnly));
-        QVERIFY2(raw.readAll().contains("zTXt"), "fixture degenerate: this entry must exercise the compressed path");
+        {
+            QFile raw(path);
+            QVERIFY(raw.open(QIODevice::ReadOnly));
+            QVERIFY2(raw.readAll().contains("zTXt"), "fixture degenerate: this entry must exercise the compressed path");
+        }
+        // the probe's handle closes above, before the sweep: Windows refuses
+        // DeleteFile on an open handle (QFile shares read+write but never
+        // delete), so an open fixture file turns the sweep's removal into a
+        // silent failure — measured as orphanDropped stuck at 0
         QCOMPARE(cache.purgeOlderThan(15, ThumbnailCache::cacheMaxBytes).orphanDropped, 1);
         QVERIFY(!QFile::exists(path));
 
@@ -323,9 +347,16 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         struct stat st{};
         const QString path = cache.thumbnailPath(source, 128);
         QVERIFY(::stat(path.toLocal8Bit().constData(), &st) == 0);
+#ifdef Q_OS_WIN
+        // there are no mode bits on Windows: the spec's 600/700 question is
+        // answered by the profile's ACLs (a per-user store is already
+        // private), and the CRT stat reports a flat 0666 for everything
+        QSKIP("mode bits are a POSIX fact; the Windows store is per-user by ACL");
+#else
         QCOMPARE(int(st.st_mode & 07777), 0600);
         QVERIFY(::stat(QFileInfo(path).absolutePath().toLocal8Bit().constData(), &st) == 0);
         QCOMPARE(int(st.st_mode & 07777), 0700);
+#endif
     }
 
     // A zoom step must not be a new file: the request is answered from a bucket

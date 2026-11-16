@@ -307,7 +307,13 @@ else:
 # inventory is frozen for the same reason — decisions live in pair.rs/apply.rs.
 FD_WIN_FNS = {'new', 'set', 'reset', 'raw', 'drop', 'spawn', 'send', 'shutdown',
               'watcher_loop', 'retire_watch', 'retire_gone', 'arm_read', 'open_dir', 'drain_records',
-              'u32_at'}
+              'u32_at',
+              # drain_aborted is retire machinery, not a decision: CancelIoEx
+              # plus a bounded wait for the abort completion (a delete-pending
+              # directory can hold the notify IRP past the cancel, and the
+              # unbounded wait it replaces hung Engine::drop — 2026-11-17). It
+              # classifies nothing and yields nothing to the stream.
+              'drain_aborted'}
 fdw_path = os.path.join(ROOT, 'engine', 'qimgv-engine', 'src', 'watcher', 'fd_windows.rs')
 if not os.path.exists(fdw_path):
     failures.append("R10 cannot run: watcher/fd_windows.rs missing — scanned 0 files is not a pass")
@@ -469,17 +475,19 @@ scanned['R12c'] = scanned.get('R12c', 0) + 1
 # Rule 13: the unit-harness protocol is closed. slot_harness re-spawns the
 # executable once per unit on Windows (there is no fork to lean on), so every
 # suite main that calls the harness must dispatch its own children, and the
-# harness must carry both halves of the routing — or one suite run multiplies
-# into a self-relaunching process tree. That shape shipped once: engine_stack's
-# child path read QIMGV_TEST_UNIT while nothing ever set it, so every spawned
-# child re-entered the harness and re-spawned (bounded only by crashes), and
-# the tree ate the machine overnight (2026-11-16). Three greppable halves:
-#   a) every harness user dispatches its child itself (an argc>1 branch, or the
-#      QIMGV_TEST_UNIT consumption for a class suite);
-#   b) the Windows spawn applies a child environment carrying both the routing
-#      variable and the marker;
+# harness must carry its safety halves — or one suite run multiplies into a
+# self-relaunching process tree. That shape shipped once: engine_stack's child
+# path read a routing environment variable while the spawn wrote a different
+# channel, so every spawned child re-entered the harness and re-spawned
+# (bounded only by crashes), and the tree ate the machine overnight
+# (2026-11-16). Four greppable halves:
+#   a) every harness user dispatches its child itself (an argc>1 branch — the
+#      unit label rides argv[1], the only channel);
+#   b) the Windows spawn applies a child environment carrying the marker;
 #   c) the harness refuses to run inside a spawned child — the re-entry guard —
-#      so the next protocol break is a loud red instead of a fork bomb.
+#      so the next protocol break is a loud red instead of a fork bomb;
+#   d) the dead routing variable stays dead: nothing sets it, so any reader is
+#      a half-rebuilt protocol and fails by name.
 HARNESS = os.path.join(ROOT, 'qimgv/tests/slot_harness.h')
 if not os.path.exists(HARNESS):
     failures.append(f"R13 cannot run: the harness moved ({HARNESS}) — update this "
@@ -493,13 +501,17 @@ for path, rel in sources():
     if 'run_units_one_process_each' not in text:
         continue
     scanned['R13'] = scanned.get('R13', 0) + 1
-    if 'argc > 1' not in text and 'QIMGV_TEST_UNIT' not in text:
+    if 'argc > 1' not in text:
         failures.append(f"R13 harness protocol: {rel} calls run_units_one_process_each "
-                        "but its main has no child dispatch — an argc>1 branch or the "
-                        "QIMGV_TEST_UNIT consumption; without one, every spawned child "
-                        "re-enters the harness and re-spawns (the 2026-11-16 fork bomb)")
+                        "but its main has no argc>1 child dispatch — without one, every "
+                        "spawned child re-enters the harness and re-spawns (the "
+                        "2026-11-16 fork bomb)")
+    if 'QIMGV_TEST_UNIT' in text:
+        failures.append(f"R13 harness protocol: {rel} reads QIMGV_TEST_UNIT — the "
+                        "routing variable is dead (nothing sets it; the unit label "
+                        "rides argv[1] now). A reader here is a half-rebuilt protocol: "
+                        "the spawned child would re-enter the harness and re-spawn")
 for needle, what in (
-    ('QIMGV_TEST_UNIT', 'the routing variable a class-suite child consumes'),
     ('QIMGV_TEST_HARNESS_CHILD', 'the spawned-child marker'),
     ('setProcessEnvironment', 'the child environment actually applied to the spawn'),
     ('proc.kill()', 'the timeout kill (a timed-out waitForFinished does not kill)'),
@@ -514,10 +526,10 @@ for needle, what in (
 # five red engine_stack units surfaced as one bare line each, the logs the
 # per-unit files existed to carry never shown. The verdict line must sit above
 # the dump that reads it.
-verdict_at = harness_text.find('ok = exitCode == 0')
+verdict_at = harness_text.find('exitCode == 0')
 dump_at = harness_text.find('QFile res(resultPath)')
 if verdict_at == -1 or dump_at == -1 or verdict_at > dump_at:
-    failures.append("R13 harness protocol: the exit-code verdict ('ok = exitCode == 0') "
+    failures.append("R13 harness protocol: the exit-code verdict ('exitCode == 0') "
                     "must be computed BEFORE the per-unit result-file dump reads it, or a "
                     "unit that fails its tests normally never surfaces its log "
                     "(the 2026-11-16 unreadable reds)")

@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include <QTest>
+#include "slot_harness.h"
 #include <QDeadlineTimer> // the convergence deadline in assertMirrorMatchesEngineExport
 #include <QtEndian>
 #include <QGuiApplication>
@@ -279,15 +280,9 @@ class EngineStackFixture {
 // does not have, which would make `engine_stack_tests someSlot` report a failure in
 // every other class. A positional filter therefore goes only to the classes that own
 // it — and the lookup scans the method table, because a private slot is not where
-// indexOfSlot looks.
-inline bool owns(const QObject &test, const QByteArray &name) {
-    const QMetaObject *mo = test.metaObject();
-    for(int i = 0; i < mo->methodCount(); ++i)
-        if(mo->method(i).name() == name)
-            return true;
-    return false;
-}
-
+// indexOfSlot looks. The yield is -1, never 0: 0 is a legitimate "ran and passed",
+// and a caller that must distinguish "owned it, passed" from "not mine" (the
+// slot-name dispatch in engine_stack_main) would otherwise be unable to.
 inline int runIfOwned(QObject &test, int argc, char **argv) {
     for(int i = 1; i < argc; ++i) {
         // -o (a QTest log destination) rides with two value args that are a
@@ -296,8 +291,8 @@ inline int runIfOwned(QObject &test, int argc, char **argv) {
             i += 2;
             continue;
         }
-        if(argv[i][0] != '-' && !owns(test, argv[i]))
-            return 0;
+        if(argv[i][0] != '-' && !slot_harness::owns(test, argv[i]))
+            return -1;
     }
     return QTest::qExec(&test, argc, argv);
 }

@@ -2,6 +2,9 @@
 
 #include <cstdio> // std::rename: RENAME_NOREPLACE is QFile::rename, and an
                   // overwrite is exactly what the paired event is for
+#ifdef Q_OS_WIN
+#include <qt_windows.h> // MoveFileExW: mingw's rename() has no atomic replace
+#endif
 
 // the bridge event pump, DirectoryManager's async open, the deferred-listing
 // primitive and the single-writer rule
@@ -199,9 +202,20 @@ class TestListing : public QObject, protected EngineStackFixture {
 
         // QFile::rename would not do: it maps to RENAME_NOREPLACE and cannot
         // overwrite, so it cannot even produce the event this test is about.
+#ifdef Q_OS_WIN
+        // mingw's rename() carries the MSRT semantics and answers EEXIST for
+        // an existing destination — the exact case this test exists to
+        // produce. MoveFileEx(REPLACE_EXISTING) is rename(2)'s overwrite
+        // atomics on this platform, the same spelling FileOperations::rename
+        // uses for the forced-overwrite branch.
+        QVERIFY(MoveFileExW(reinterpret_cast<const WCHAR *>((fixtureDir + QStringLiteral("/over.jpg")).utf16()),
+                            reinterpret_cast<const WCHAR *>((fixtureDir + QStringLiteral("/img1.jpg")).utf16()),
+                            MOVEFILE_REPLACE_EXISTING));
+#else
         const QByteArray from = (fixtureDir + "/over.jpg").toLocal8Bit();
         const QByteArray to = (fixtureDir + "/img1.jpg").toLocal8Bit();
         QCOMPARE(std::rename(from.constData(), to.constData()), 0);
+#endif
 
         QTRY_COMPARE_WITH_TIMEOUT(renamed.count(), 1, 10000);
         QCOMPARE(added.count(), 0);
@@ -327,8 +341,16 @@ class TestListing : public QObject, protected EngineStackFixture {
         QTRY_COMPARE_WITH_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
         // tricky names — exactly where the two producers used to disagree —
-        // plus a removal and a modification, all through the watcher
+        // plus a removal and a modification, all through the watcher.
+        // IMG2/img2 are one name on a case-insensitive filesystem: creating
+        // "IMG2.jpg" there would reopen the img2.jpg that is already listed
+        // and the add never happens, so the Windows variant stresses the same
+        // collation with IMG3 instead.
+#ifdef Q_OS_WIN
+        makeFile("IMG3.jpg");
+#else
         makeFile("IMG2.jpg");
+#endif
         makeFile("img 10.jpg");
         makeFile("10.jpg");
         QVERIFY(QFile::remove(fixtureDir + "/img1.jpg"));

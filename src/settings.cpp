@@ -152,8 +152,16 @@ Settings::Settings(QObject *parent) : QObject(parent) {
     stateConf = new QSettings(QCoreApplication::organizationName(), "savedState");
     themeConf = new QSettings(QCoreApplication::organizationName(), "theme");
 #else
-    mConfDir = new QDir(QApplication::applicationDirPath() + "/conf");
-    mConfDir->mkpath(QApplication::applicationDirPath() + "/conf");
+    // Portable mode: the conf dir rides the exe — EXCEPT when tests redirect
+    // it. QIMGV_CONF_DIR is what makes FreshSettings' org/app isolation
+    // actually hold on this platform: without it, every test instance shares
+    // one ini next to the binary and the junk-vs-default pins read whatever
+    // the previous unit left behind.
+    const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
+        ? QApplication::applicationDirPath() + "/conf"
+        : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+    mConfDir = new QDir(confBase);
+    mConfDir->mkpath(confBase);
     settingsConf =
         new QSettings(mConfDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
     stateConf = new QSettings(mConfDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
@@ -205,7 +213,26 @@ QString Settings::resolveCacheDir() {
     }
     return cacheLocation;
 #else
-    QString cacheLocation = QApplication::applicationDirPath() + "/cache";
+    // cacheDir is the same hand-edit key the Linux branch honors: the file
+    // log installs itself with this resolver before Settings exists, so logs
+    // and temp frames must follow the exact directory setupCache picks — or
+    // they split. The hand-edit lives in the portable conf ini (redirected by
+    // QIMGV_CONF_DIR in tests, the same file every other consumer reads), and
+    // it outranks QIMGV_CACHE_DIR — the test-isolation twin that names a fresh
+    // directory only where no explicit key exists, exactly as the Linux
+    // branch's redirected QSettings does.
+    const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
+        ? QApplication::applicationDirPath() + "/conf"
+        : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+    QSettings conf(confBase + "/" + QCoreApplication::applicationName() + ".ini", QSettings::IniFormat);
+    if(conf.contains(QStringLiteral("cacheDir"))) {
+        const QString explicitDir = conf.value(QStringLiteral("cacheDir")).toString();
+        QDir(explicitDir).mkpath(explicitDir);
+        return explicitDir;
+    }
+    QString cacheLocation = qEnvironmentVariableIsEmpty("QIMGV_CACHE_DIR")
+        ? QApplication::applicationDirPath() + "/cache"
+        : QString::fromUtf8(qgetenv("QIMGV_CACHE_DIR"));
     QDir(cacheLocation).mkpath(cacheLocation);
     return cacheLocation;
 #endif

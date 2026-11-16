@@ -22,7 +22,15 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
 
     void settingsTableRowsSurviveJunkAndClamps() {
         FreshSettings fresh;
+        // the conf backend is per-platform (see FreshSettings): write through
+        // the SAME one the Settings instance reads, or the junk lands in a
+        // backend the app never opens
+#ifdef Q_OS_WIN
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+                       QSettings::IniFormat);
+#else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+#endif
 
         // missing key: every row serves its default
         for(const SettingDesc *d : kAllSettings) {
@@ -110,7 +118,14 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     // from a corrupt config while its row declared the default 95.
     void jpegSaveQualityServesTheDeclaredDefaultOnJunk() {
         FreshSettings fresh;
+        // the conf backend is per-platform (see FreshSettings): write through
+        // the SAME one the Settings instance reads
+#ifdef Q_OS_WIN
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+                       QSettings::IniFormat);
+#else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+#endif
 
         junk.setValue("JPEGSaveQuality", QVariant(QStringLiteral("banana")));
         junk.sync();
@@ -131,7 +146,12 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     // would otherwise hide every case after the first.
     void junkFallsBackToTheDeclaredDefaultNotToSomeOtherValue() {
         FreshSettings fresh;
+#ifdef Q_OS_WIN
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+                       QSettings::IniFormat);
+#else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+#endif
         const QList<QByteArray> keys{"backgroundOpacity",     "folderViewMode", "thumbPanelStyle",
                                      "memoryAllocationLimit", "imageScrolling", "focusPointIn1to1Mode"};
         for(const QByteArray &k : keys)
@@ -164,7 +184,12 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     // the machinery audit above does not.
     void outOfRangeSettingsResolveThroughTheirAccessors() {
         FreshSettings fresh;
+#ifdef Q_OS_WIN
+        QSettings probe(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+                        QSettings::IniFormat);
+#else
         QSettings probe(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+#endif
 
         struct Item {
             const SettingDesc *row;
@@ -278,11 +303,17 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     }
 
     // the open-dialog filter policy: Qt's decodable mime types plus the
-    // hardcoded video formats, gated by videoPlayback
+    // hardcoded video formats, gated by videoPlayback. Without USE_MPV the
+    // toggle collapses to a constant (Settings::videoPlayback answers false
+    // unconditionally), so the policy that can be pinned here is "the video
+    // formats are never offered" — the positive half is compiled to the
+    // build that actually has the toggle.
     void supportedMimeTypesFollowVideoPlaybackPolicy() {
         FreshSettings fresh;
         settings->setVideoPlayback(true);
+#ifdef USE_MPV
         QVERIFY(settings->supportedMimeTypes().contains("video/mp4"));
+#endif
         QVERIFY(settings->supportedMimeTypes().contains("image/jpeg"));
         settings->setVideoPlayback(false);
         QVERIFY(!settings->supportedMimeTypes().contains("video/mp4"));
@@ -362,8 +393,18 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         QCOMPARE(out.size(), 1);
         QCOMPARE(out.value("Favorite").command, QStringLiteral("/usr/local/bin/fav a b %file%"));
         QCOMPARE(out.value("Favorite").blocking, true);
-        // the stored form must be a JSON string, not a @Variant(...) shell
-        QSettings probe(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+        // the stored form must be a JSON string, not a @Variant(...) shell.
+        // The probe must read the SAME backend saveScripts wrote: portable
+        // mode keeps the conf in the redirected ini, and the org/app mapping
+        // would answer from a store nothing here wrote
+        QSettings probe(
+#ifdef Q_OS_WIN
+            QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+            QSettings::IniFormat
+#else
+            QCoreApplication::organizationName(), QCoreApplication::applicationName()
+#endif
+        );
         probe.beginGroup("Scripts");
         const QVariant raw = probe.value("script/1/value");
         probe.endGroup();
@@ -373,7 +414,12 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
 
     void scriptsFallBackToPreJsonPlainKeys() {
         FreshSettings fresh;
+#ifdef Q_OS_WIN
+        QSettings conf(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+                       QSettings::IniFormat);
+#else
         QSettings conf(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+#endif
         conf.beginGroup("Scripts");
         conf.beginWriteArray("script");
         conf.setArrayIndex(0);
@@ -392,11 +438,20 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     void resolveCacheDirHonorsExplicitCacheDirKey() {
         // main() installs the file log with this resolver before Settings
         // exists; a configured cacheDir must be honored there exactly as it
-        // is inside setupCache, or logs and thumbnails split across dirs
+        // is inside setupCache, or logs and thumbnails split across dirs.
+        // The key must be written to the backend the resolver reads: portable
+        // mode keeps the conf in the redirected ini.
         FreshSettings fresh;
         const QString alt =
             QDir::tempPath() + QStringLiteral("/qimgv-cache-alt-%1").arg(QCoreApplication::applicationPid());
-        QSettings conf;
+        QSettings conf(
+#ifdef Q_OS_WIN
+            QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+            QSettings::IniFormat
+#else
+            QCoreApplication::organizationName(), QCoreApplication::applicationName()
+#endif
+        );
         conf.setValue(QStringLiteral("cacheDir"), alt);
         conf.sync();
         QCOMPARE(Settings::resolveCacheDir(), alt);

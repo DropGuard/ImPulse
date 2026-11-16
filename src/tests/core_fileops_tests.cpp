@@ -641,14 +641,6 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     // the renamed file is still the app's job, and the two ways a file gets renamed
     // are two separate pins: this one is the rename the app issued, where a call
     // site knows the destination, and the next is one done behind its back.
-
-    // A rename is one event: the engine pairs the kernel's MOVED_FROM and MOVED_TO
-    // by cookie and answers with RENAMED(old -> new), so the mirror moves a row
-    // instead of dropping one and growing another (DirectoryManager::applyEngineRename,
-    // with the wire half pinned by listing_tests' liveRenameIsOneEvent). Following
-    // the renamed file is still the app's job, and the two ways a file gets renamed
-    // are two separate pins: this one is the rename the app issued, where a call
-    // site knows the destination, and the next is one done behind its back.
     void renamingTheCurrentFileConvergesTheListingAndLandsOnTheNewName() {
         const QString dir = uniqueDir("renamelanding");
         const QString from = QDir(dir).filePath("aardvark.png");
@@ -948,7 +940,7 @@ int main(int argc, char **argv) {
     // parent-fixture bug this suite was already bitten by.
     if(argc > 1) {
         TestCoreFileOps t;
-        return QTest::qExec(&t, argc, argv);
+        return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
         argc, argv, slot_harness::testSlots(&TestCoreFileOps::staticMetaObject),

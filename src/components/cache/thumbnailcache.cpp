@@ -252,6 +252,17 @@ std::optional<CachedThumbnail> ThumbnailCache::read(const QString &sourcePath, i
     // thumbnailing must start working again when the permission is restored.
     if(!source.isReadable())
         return std::nullopt;
+#ifdef Q_OS_WIN
+    // Windows denies through sharing, not mode bits: the ACL-derived
+    // isReadable() answers true for any existing file, including one another
+    // process holds open with no sharing. The platform's honest translation
+    // of spec 6.1 is the open attempt itself.
+    {
+        QFile probe(sourcePath);
+        if(!probe.open(QIODevice::ReadOnly))
+            return std::nullopt;
+    }
+#endif
 
     const QString filePath = thumbnailPath(sourcePath, bucket);
     QFileInfo file(filePath);
@@ -309,6 +320,15 @@ bool ThumbnailCache::save(QImage &image, const QString &sourcePath, int bucket, 
                           const QSize &originalSize, bool animated, bool video) {
     if(image.isNull() || !source.isReadable())
         return false;
+#ifdef Q_OS_WIN
+    // same translation as read(): a locked original is the Windows shape of
+    // "unreadable", and nothing may be written for it, failure marker included
+    {
+        QFile probe(sourcePath);
+        if(!probe.open(QIODevice::ReadOnly))
+            return false;
+    }
+#endif
 
     const QString filePath = thumbnailPath(sourcePath, bucket);
     if(!ensureDir(QFileInfo(filePath).absolutePath()))
