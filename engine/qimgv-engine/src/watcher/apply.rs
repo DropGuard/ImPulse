@@ -166,7 +166,9 @@ pub enum IgnoreReason {
     NotListed,
     /// A modify on a directory: its own mtime has no listing meaning.
     DirIsCanonical,
-    /// A modify whose on-disk mtime equals the one already stored.
+    /// A modify whose on-disk size AND mtime both equal the ones already
+    /// stored (on NTFS the mtime alone cannot be trusted: ~10 ms stamp
+    /// granularity makes same-tick writes carry an identical mtime).
     MtimeUnchanged,
     /// The application step panicked; the engine loop's guard reports this and
     /// prints the payload.
@@ -414,18 +416,25 @@ fn remove_or_ignore(state: &mut DirectoryState, path: String, is_dir: bool) -> W
 /// by the destination of a rename — all three say "this row's file changed", and
 /// none of them may be answered by re-deriving an order here.
 fn restat(state: &mut DirectoryState, path: String) -> WatchAction {
-    let Some((_, old_mtime)) = state.entry_meta(&path) else {
+    let Some((old_size, old_mtime)) = state.entry_meta(&path) else {
         return WatchAction::Ignored(IgnoreReason::NotListed);
     };
     let meta = match fs::metadata(&path) {
         Ok(m) => m,
         Err(_) => return WatchAction::Ignored(IgnoreReason::StatFailed),
     };
+    let size = meta.len();
     let mtime = meta.modified().unwrap_or(UNIX_EPOCH);
-    if mtime == old_mtime {
+    // the gate is BOTH facts, not the mtime alone: NTFS stamps at ~10 ms
+    // granularity, so a write that closes in the tick the file was created in
+    // carries an identical mtime — under load that is the common case, and a
+    // mtime-only gate swallowed a 4 KiB append whole (the listing flake:
+    // three full-ctest runs, the mirror faithful to an engine that never saw
+    // the change). ext4's nanosecond stamps never collide, which is why the
+    // mtime-only form survived on Linux.
+    if mtime == old_mtime && size == old_size {
         return WatchAction::Ignored(IgnoreReason::MtimeUnchanged);
     }
-    let size = meta.len();
     let Some(index) = state.update_entry_meta(&path, size, mtime) else {
         return WatchAction::Ignored(IgnoreReason::NotListed);
     };

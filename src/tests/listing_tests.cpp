@@ -379,8 +379,31 @@ class TestListing : public QObject, protected EngineStackFixture {
             QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Append));
             QVERIFY(f.write(QByteArray(4096, 'x')));
         }
-        QTRY_VERIFY_WITH_TIMEOUT(dm.indexOfFile(fixtureDir + "/10.jpg") > dm.indexOfFile(fixtureDir + "/img2.jpg"),
-                                 10000);
+        // the reseat must land; when it does not, the failure names the
+        // divergence — which half is behind, and what both orders actually
+        // hold. An unattributed index flake is an unmeasured one (this flake
+        // failed three full-ctest runs before it could speak).
+        const QString tenJpg = fixtureDir + QStringLiteral("/10.jpg");
+        const QString img2Jpg = fixtureDir + QStringLiteral("/img2.jpg");
+        bool reseatLanded = false;
+        QDeadlineTimer reseatDeadline(10000);
+        while(!((reseatLanded = dm.indexOfFile(tenJpg) > dm.indexOfFile(img2Jpg))) && !reseatDeadline.hasExpired())
+            QTest::qWait(50);
+        if(!reseatLanded) {
+            QString diff;
+            mirrorMatchesEngineExport(dm, diff);
+            const int tenIdx = dm.indexOfFile(tenJpg);
+            const int img2Idx = dm.indexOfFile(img2Jpg);
+            const quint64 tenSize = tenIdx >= 0 ? dm.fileEntryAt(tenIdx).size : 0;
+            const quint64 img2Size = img2Idx >= 0 ? dm.fileEntryAt(img2Idx).size : 0;
+            QFAIL(qPrintable(QStringLiteral("the size reseat never landed in 10 s: 10.jpg index %1 size %2, "
+                                            "img2.jpg index %3 size %4 — %5")
+                                 .arg(tenIdx)
+                                 .arg(tenSize)
+                                 .arg(img2Idx)
+                                 .arg(img2Size)
+                                 .arg(diff)));
+        }
         QTRY_VERIFY_WITH_TIMEOUT(dm.isSettled(), 10000);
         assertMirrorMatchesEngineExport(dm);
     }

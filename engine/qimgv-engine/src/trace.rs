@@ -1,5 +1,4 @@
-//! One switch for every point a watch event can stop. (PROBE: temporary
-//! timestamps added by review — see /tmp/trace.rs.bak for the original.)
+//! One switch for every point a watch event can stop.
 //!
 //! A file missing from a listing has a long candidate list — the kernel never
 //! reported it, the loop dropped it as not-the-current-folder, the filter
@@ -10,9 +9,19 @@
 //! they are holding, and they have to be off by default. So this is one env
 //! variable (`QIMGV_ENGINE_TRACE`, unset or `0` means silent), one function,
 //! and a name at every call site.
+//!
+//! The sink: stderr by default, or a per-process file when
+//! `QIMGV_ENGINE_TRACE_FILE` names a prefix (`<prefix><pid>.log`). The file
+//! sink exists because the sink itself is part of the measurement — an
+//! eprintln into a ctest pipe paces the engine loop thread enough to hide a
+//! burst-order race (the mirrorStays flake: trace-on passed every run the
+//! untraced build failed), so the diagnosis has to be able to run at full
+//! speed with the trace still on.
 
 use std::env;
-use std::sync::OnceLock;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 fn enabled() -> bool {
@@ -21,6 +30,23 @@ fn enabled() -> bool {
         Some(v) => v != "0",
         None => false,
     })
+}
+
+fn file_sink() -> Option<&'static Mutex<File>> {
+    static SINK: OnceLock<Option<Mutex<File>>> = OnceLock::new();
+    SINK.get_or_init(|| {
+        let prefix = env::var_os("QIMGV_ENGINE_TRACE_FILE")?;
+        let path = std::path::PathBuf::from(prefix)
+            .with_extension(format!("{}.log", std::process::id()));
+        match OpenOptions::new().create(true).append(true).open(&path) {
+            Ok(f) => Some(Mutex::new(f)),
+            Err(e) => {
+                eprintln!("[engine trace] cannot open {:?}: {e} — falling back to stderr", path);
+                None
+            }
+        }
+    })
+    .as_ref()
 }
 
 static T0: OnceLock<Instant> = OnceLock::new();
@@ -34,9 +60,16 @@ pub fn line(node: &str, detail: impl FnOnce() -> String) {
         return;
     }
     let t0 = T0.get_or_init(Instant::now);
-    eprintln!(
+    let line = format!(
         "[engine trace] +{:>8.1}ms {node} {}",
         t0.elapsed().as_secs_f64() * 1000.0,
         detail()
     );
+    match file_sink() {
+        Some(file) => {
+            let mut f = file.lock().unwrap_or_else(|e| e.into_inner());
+            let _ = writeln!(f, "{line}");
+        }
+        None => eprintln!("{line}"),
+    }
 }
