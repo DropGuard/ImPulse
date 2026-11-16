@@ -14,6 +14,9 @@
 
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
+#ifdef Q_OS_WIN
+#include <qt_windows.h> // CreateFileW: the exclusive lock is the platform's refusal channel
+#endif
 #include <QtTest/qtestcase.h>
 #include <QQueue>
 #include "gui/overlays/imageinfooverlayproxy.h"
@@ -707,11 +710,26 @@ class TestCoreNav : public QObject {
     // exact split is a property of the trash topology (a mount with no trash
     // at all fails every member), so the pin is the format, not the counts.
     void batchTrashReportsHowManyFailed() {
+#ifdef Q_OS_WIN
+        // the 254-char fixture cannot even be written here: the path crosses
+        // MAX_PATH before the name exhausts any NAME_MAX, writeImage fails
+        // silently, and exists() answers false for a file that never existed.
+        // The refusable subject on this platform is a file held open with no
+        // sharing — the shell's recycle cannot take it while the handle
+        // lives, and it stays a visible, existing refusal.
+        const QString longFile = QDir(alpha).filePath(QStringLiteral("locked.png"));
+        writeImage(longFile);
+        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()),
+                                  GENERIC_READ | GENERIC_WRITE, 0 /* no sharing */, nullptr,
+                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        QVERIFY2(held != INVALID_HANDLE_VALUE, "the lock fixture failed to open the refusable subject");
+#else
         // 250 'l' + ".png" fits the source directory (254 <= NAME_MAX) but
         // cannot fit any real trash: even HOME=/ gives a 26-char files/ prefix.
         const QString longName = QString(250, QLatin1Char('l')) + QStringLiteral(".png");
         const QString longFile = QDir(alpha).filePath(longName);
         writeImage(longFile);
+#endif
 
         coretest::FakeOverlayHost overlayFake;
         Core::Deps deps;
@@ -735,6 +753,9 @@ class TestCoreNav : public QObject {
         static const QRegularExpression bothHalves(QStringLiteral("\\d+ files, \\d+ failed"));
         QVERIFY2(bothHalves.match(overlayFake.lastError).hasMatch(),
                  qPrintable(QStringLiteral("batch report lost a half: \"") + overlayFake.lastError + "\""));
+#ifdef Q_OS_WIN
+        QVERIFY(CloseHandle(held));
+#endif
     }
 
     // The other half of the same report: a batch where nothing failed keeps
@@ -799,7 +820,7 @@ int main(int argc, char **argv) {
     // and clipboardFileCopyAdvertisesTheFileInEveryFormat exist to catch.
     if(argc > 1) {
         TestCoreNav t;
-        return QTest::qExec(&t, argc, argv);
+        return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
         argc, argv, slot_harness::testSlots(&TestCoreNav::staticMetaObject),

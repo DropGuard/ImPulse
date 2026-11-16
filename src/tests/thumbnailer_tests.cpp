@@ -54,7 +54,14 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
         CancelToken token;
         token.request();
         QProcess process;
+#ifdef Q_OS_WIN
+        // sleep is coreutils; the always-present Windows face of "a process
+        // that runs for 30 seconds" is ping against the loopback (one second
+        // per -n beyond the first, killable mid-wait)
+        process.start("cmd", {"/c", "ping", "-n", "31", "127.0.0.1"});
+#else
         process.start("sleep", {"30"});
+#endif
         QVERIFY(process.waitForStarted(2000));
         QElapsedTimer t;
         t.start();
@@ -65,7 +72,11 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
 
     void waitForProcessWithoutATokenWaitsInTheOneCall() {
         QProcess process;
+#ifdef Q_OS_WIN
+        process.start("cmd", {"/c", "exit", "0"});
+#else
         process.start("true");
+#endif
         QVERIFY(process.waitForStarted(2000));
         ThumbnailerRunnable::waitForProcess(process, nullptr, 8000);
         QCOMPARE(process.state(), QProcess::NotRunning);

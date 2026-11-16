@@ -416,7 +416,7 @@ int main(int argc, char **argv) {
     // per slot. No Core and no engine here, so no core-limit plumbing.
     if(argc > 1) {
         DispatchProbe t;
-        return QTest::qExec(&t, argc, argv) != 0 ? 1 : 0;
+        return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
         argc, argv, slot_harness::testSlots(&DispatchProbe::staticMetaObject),

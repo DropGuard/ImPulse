@@ -289,7 +289,13 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         auto sm = ScriptManager::getInstance();
         QSignalSpy errored(sm, &ScriptManager::error);
         QVERIFY(errored.isValid());
+#ifdef Q_OS_WIN
+        // /bin/true is a POSIX face of "a command that exits 0"; the always-
+        // present Windows spelling is cmd /c exit
+        sm->addScript("true-bin", Script(QStringLiteral("cmd /c exit 0"), true));
+#else
         sm->addScript("true-bin", Script("/bin/true", true));
+#endif
         sm->runScript("true-bin", nullptr);
         // runScript blocks internally, so nothing is pending: drain rather than
         // sleep, and the assertion means "the queue had nothing in it"
@@ -317,7 +323,10 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         auto img = *ImageFactory::createImage(fixtureDir + "/tagged.png", false, loadPolicy());
         QStringList cmd = {"tool", "%file%"};
         ScriptManager::processArguments(cmd, img);
-        QCOMPARE(cmd.at(1), fixtureDir + "/tagged.png");
+        // the substitution hands the file to a foreign tool, so the path
+        // arrives in the platform's native separators; the comparison
+        // normalizes them instead of pinning one spelling
+        QCOMPARE(QDir::fromNativeSeparators(cmd.at(1)), fixtureDir + "/tagged.png");
     }
 
     // Loader::clearTasks() is the user leaving a folder: the queued half comes
@@ -501,6 +510,13 @@ class TestMachinery : public QObject, protected EngineStackFixture {
     // the orientation accessor and the tag map
     void documentInfoReadsExifOrientationAndTags() {
         resetFixture();
+#ifndef USE_EXIV2
+        // the tag map and the orientation accessor are exiv2's domain, and
+        // this build has no exiv2 (the mingw64 repo does not carry it) —
+        // DocumentInfo compiles its exif path out, so there is nothing to
+        // read with here
+        QSKIP("exiv2 is not built into this binary");
+#endif
         // orientation 6 = rotate 90 CW; Make/Model/DateTime feed loadExifTags
         // (PIL-written at authoring time; one long literal, correctness over beauty)
         const QByteArray exifBytes = QByteArray::fromBase64(

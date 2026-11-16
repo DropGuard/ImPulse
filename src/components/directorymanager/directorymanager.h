@@ -27,10 +27,6 @@
 class QTimer;
 class EngineBridge;
 
-#ifdef Q_OS_WIN32
-#include "windows.h"
-#endif
-
 class DirectoryManager;
 
 typedef bool (DirectoryManager::*CompareFunction)(const FSEntry &e1, const FSEntry &e2) const;

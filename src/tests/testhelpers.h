@@ -135,6 +135,18 @@ class FreshSettings {
             QStringLiteral("qimgv-test-%1-%2").arg(QCoreApplication::applicationPid()).arg(++counter, 0, 16);
         savedApp = QCoreApplication::applicationName();
         QCoreApplication::setApplicationName(fresh);
+        // Windows portable mode reads conf and cache from the exe's directory
+        // and ignores the applicationName swap entirely — this env redirect is
+        // what makes the isolation actually hold on that platform (the same
+        // trick the XDG vars above are for on Linux).
+        savedConfEnv = qgetenv("QIMGV_CONF_DIR");
+        savedCacheEnv = qgetenv("QIMGV_CACHE_DIR");
+        const QString confFresh = dir.path() + "/conf";
+        const QString cacheFresh = dir.path() + "/cache";
+        QDir().mkpath(confFresh);
+        QDir().mkpath(cacheFresh);
+        qputenv("QIMGV_CONF_DIR", confFresh.toUtf8());
+        qputenv("QIMGV_CACHE_DIR", cacheFresh.toUtf8());
         ::settings = new Settings();
     }
 
@@ -146,6 +158,14 @@ class FreshSettings {
         // nothing else in the run expects -- IsolatedHome, in particular,
         // assumes applicationName is the production one.
         QCoreApplication::setApplicationName(savedApp);
+        if(savedConfEnv.isEmpty())
+            qunsetenv("QIMGV_CONF_DIR");
+        else
+            qputenv("QIMGV_CONF_DIR", savedConfEnv);
+        if(savedCacheEnv.isEmpty())
+            qunsetenv("QIMGV_CACHE_DIR");
+        else
+            qputenv("QIMGV_CACHE_DIR", savedCacheEnv);
     }
 
     FreshSettings(const FreshSettings &) = delete;
@@ -155,4 +175,6 @@ class FreshSettings {
     inline static int counter = 0;
     Settings *saved = nullptr;
     QString savedApp;
+    QByteArray savedConfEnv, savedCacheEnv;
+    QTemporaryDir dir;
 };

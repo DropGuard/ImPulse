@@ -69,30 +69,36 @@ int main(int argc, char **argv) {
     // with; one process per class gives every watchdog a private registry that
     // is abandoned at exit before any pthread_t value can be reused. Per-class
     // LSan attribution at exit is a side effect worth having.
-    // The harness routes the unit through the environment: the label cannot
-    // ride argv[1] (runIfOwned reads non-dash args as function filters, and
-    // the class labels are not slot names).
-    const QByteArray harnessUnit = qgetenv("QIMGV_TEST_UNIT");
-    if(!harnessUnit.isEmpty()) {
+    // The unit label rides argv[1], the same channel every other suite
+    // dispatches on: a unit name runs that class whole (the label is consumed
+    // here and stripped from the argv the class sees — runIfOwned would answer
+    // "not owned" for it, since a label like "listing" owns no slot); any other
+    // positional name goes to the classes as a function filter, and the first
+    // that owns it runs just that slot (the -1 yield tells not-owned apart from
+    // owned-and-passed). A name that is neither is refused with the vocabulary
+    // that exists — QTest would run zero tests and exit green on it.
+    if(argc > 1) {
         for(const auto &r : kRuns)
-            if(harnessUnit == r.name) {
+            if(std::strcmp(argv[1], r.name) == 0) {
                 coretest::setChildCoreLimit();
-                // The harness hands the unit label over twice: argv[1] (what the
-                // slot suites' mains feed to QTest as a function filter) and
-                // QIMGV_TEST_UNIT (what routes a class suite — a label like
-                // "listing" owns no slot, so runIfOwned would answer "not owned"
-                // and quietly run nothing if the label stayed in argv). The
-                // kRuns lookup consumed the label; the argv the unit runs on
-                // keeps the rest, the -o trio included, minus the label itself.
                 std::vector<char *> unitArgv;
                 unitArgv.push_back(argv[0]);
-                for(int i = 1; i < argc; ++i)
-                    if(harnessUnit != argv[i])
-                        unitArgv.push_back(argv[i]);
+                for(int i = 2; i < argc; ++i)
+                    unitArgv.push_back(argv[i]);
                 unitArgv.push_back(nullptr);
                 const int unitArgc = static_cast<int>(unitArgv.size()) - 1;
                 return r.run(unitArgc, unitArgv.data()) != 0 ? 1 : 0;
             }
+        for(const auto &r : kRuns) {
+            coretest::setChildCoreLimit();
+            const int rc = r.run(argc, argv);
+            if(rc >= 0)
+                return rc != 0 ? 1 : 0;
+        }
+        std::fprintf(stderr, "engine_stack: '%s' names neither a unit nor a test slot — units:", argv[1]);
+        for(const auto &r : kRuns)
+            std::fprintf(stderr, " %s", r.name);
+        std::fprintf(stderr, "\n");
         return 2;
     }
     QStringList units;

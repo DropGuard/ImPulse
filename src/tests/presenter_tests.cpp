@@ -390,7 +390,7 @@ int main(int argc, char **argv) {
     // tmpDir dies with the first child to exit.
     if(argc > 1) {
         TestPresenter t;
-        return QTest::qExec(&t, argc, argv) != 0 ? 1 : 0;
+        return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
         argc, argv, slot_harness::testSlots(&TestPresenter::staticMetaObject),

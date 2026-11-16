@@ -456,7 +456,18 @@ class TestGuiWidgets : public QObject {
 
     void themeColorRowsSurviveJunk() {
         FreshSettings fresh;
+        // the conf backend is per-platform: Linux reads QSettings(org, app),
+        // Windows portable mode reads the redirected ini — write through the
+        // SAME backend loadTheme reads, or the junk lands where nothing reads
+        // it back
+#ifdef Q_OS_WIN
+        const QString confBase = QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+        QSettings theme((confBase.isEmpty() ? QCoreApplication::applicationDirPath() + "/conf" : confBase)
+                            + QStringLiteral("/theme.ini"),
+                        QSettings::IniFormat);
+#else
         QSettings theme(QCoreApplication::organizationName(), "theme");
+#endif
         theme.beginGroup("Colors");
         theme.setValue("background", "banana"); // junk -> default
         theme.setValue("accent", "#ff0000");    // valid -> passes through
@@ -576,7 +587,7 @@ int main(int argc, char **argv) {
     // later child runs with a tmpDir that does not exist.
     if(argc > 1) {
         TestGuiWidgets t;
-        return QTest::qExec(&t, argc, argv);
+        return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
         argc, argv, slot_harness::testSlots(&TestGuiWidgets::staticMetaObject),
