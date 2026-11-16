@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# /bin/bash, not /usr/bin/env bash: the hook runs with whatever PATH the git
+# invocation carried, and on Windows that PATH frequently has no bash in it at
+# all — env then cannot resolve the interpreter and the gate dies before its
+# first line. /bin is where msys2 keeps bash and what /bin points at on every
+# modern Linux, so the absolute path resolves on both.
 # The gate on every commit: format check + lint --gate + incremental build +
-# the six suites (+ Miri when the engine pure layer moved). Order is the cost
+# the suites (+ Miri when the engine pure layer moved). Order is the cost
 # order: the format check is instant, lint is cache-warm ~5s and needs only a
 # configured build dir (not a successful build) — so a lint-red amend no
 # longer pays build+ctest before showing its reason. lint used to sit at push
@@ -8,8 +13,20 @@
 # brought the warm run to ~5s, cheap enough to sit between a human and a
 # commit. Escape hatch: git commit --no-verify, but a red gate in history is
 # how f8e8b216's six regressions landed unseen.
+#
+# Tool degradation contract: a tool the tree cannot find is skipped LOUDLY,
+# never silently and never fatally — the gate must not fake coverage (an
+# instrument that scans nothing is indistinguishable from a passing one), and
+# it must not make an armed-but-partial machine unable to commit at all. On a
+# fully armed box every gate runs; on a partial one each skip names what to
+# install. cmake/ctest/python are not looked up in PATH at all: the
+# configure-time cache records the exact binaries the tree was configured
+# with, and the gate must run with those, not with whatever happens to be
+# first on a cross-toolchain machine's PATH.
 set -e
 cd "$(git rev-parse --show-toplevel)"
+
+have() { command -v "$1" > /dev/null 2>&1; }
 
 # a fresh clone has no configured build dir: the gate cannot run, and
 # blocking docs-only commits on a full configure would be worse than the
@@ -19,13 +36,24 @@ if [ ! -f build/CMakeCache.txt ]; then
     exit 0
 fi
 
+cache_value() { grep -E "^$1:(INTERNAL|FILEPATH)=" build/CMakeCache.txt | head -1 | cut -d= -f2-; }
+CMAKE_CMD=$(cache_value CMAKE_COMMAND)
+[ -n "$CMAKE_CMD" ] || CMAKE_CMD=cmake
+CTEST_CMD="$(dirname "$CMAKE_CMD")/ctest"
+[ -x "$CTEST_CMD" ] || CTEST_CMD=ctest
+PYTHON_CMD=$(cache_value Python3_EXECUTABLE | cut -d';' -f1)
+[ -n "$PYTHON_CMD" ] || PYTHON_CMD=python3
+if have nproc; then JOBS=$(nproc); else JOBS=4; fi
+
 # format gate on staged C++ files (working-tree contents, same scan surface as
 # the lint gate): the tree's style is .clang-format, and an unformatted file
 # dies at the commit that introduced it
 STAGED_CPP=$(git diff --cached --name-only --diff-filter=ACMR \
     | grep -E '^qimgv/.*\.(cpp|h)$' | grep -v '/3rdparty/' || true)
 if [ -n "$STAGED_CPP" ]; then
-    if ! printf '%s\n' "$STAGED_CPP" | xargs clang-format --dry-run --Werror > /tmp/qimgv-hook-format.log 2>&1; then
+    if ! have clang-format; then
+        echo "pre-commit: clang-format not found — format gate skipped (install clang-format to arm it)" >&2
+    elif ! printf '%s\n' "$STAGED_CPP" | xargs clang-format --dry-run --Werror > /tmp/qimgv-hook-format.log 2>&1; then
         head -5 /tmp/qimgv-hook-format.log >&2
         echo "pre-commit: not formatted — run: clang-format -i <the files above>" >&2
         exit 1
@@ -36,33 +64,43 @@ fi
 # file the wrong formatter has mangled (clang-format happily accepts .rs) or
 # that was never formatted dies here.
 if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '^engine/.*\.rs$'; then
-    if ! cargo fmt --all --check > /tmp/qimgv-hook-rustfmt.log 2>&1; then
+    if ! have cargo; then
+        echo "pre-commit: cargo not found — rustfmt gate skipped" >&2
+    elif ! cargo fmt --version > /dev/null 2>&1; then
+        echo "pre-commit: rustfmt not installed — rustfmt gate skipped (rustup component add rustfmt)" >&2
+    elif ! cargo fmt --all --check > /tmp/qimgv-hook-rustfmt.log 2>&1; then
         head -8 /tmp/qimgv-hook-rustfmt.log >&2
         echo "pre-commit: not rustfmt-clean — run: cargo fmt" >&2
         exit 1
     fi
 fi
 
-python3 scripts/lint.py build --gate > /tmp/qimgv-hook-lint.log 2>&1 || {
+# the static-analysis gate is pinned to its instrument: a foreign toolchain
+# fails it BY DESIGN (the fingerprint names the change), and a machine without
+# the tools cannot scan anything — skipping loudly is the honest state there.
+if ! have python3 && ! [ -x "$PYTHON_CMD" ]; then
+    echo "pre-commit: python3 not found — lint gate skipped" >&2
+elif ! have cppcheck || ! have clang-tidy; then
+    echo "pre-commit: cppcheck/clang-tidy not found — lint gate skipped (the pinned baseline needs them)" >&2
+elif ! "$PYTHON_CMD" scripts/lint.py build --gate > /tmp/qimgv-hook-lint.log 2>&1; then
     echo "pre-commit: lint gate red:" >&2
     tail -20 /tmp/qimgv-hook-lint.log >&2
     echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
     exit 1
-}
+fi
 
-cmake --build build -j"$(nproc)" > /tmp/qimgv-hook-build.log 2>&1 || {
+"$CMAKE_CMD" --build build -j"$JOBS" > /tmp/qimgv-hook-build.log 2>&1 || {
     echo "pre-commit: build failed:" >&2
     grep -E "error|FAILED" /tmp/qimgv-hook-build.log | head -10 >&2
     exit 1
 }
-# -j4: the six binaries are independent processes and the wall time halves
-# (measured 22.5/23.6/25.2s serial against 11.2/11.0/12.4s parallel, 6/6
-# green each). Safe by construction, not by luck: engine_stack_main sweeps
+# -j4: the binaries are independent processes and the wall time quarters
+# against serial. Safe by construction, not by luck: engine_stack_main sweeps
 # only its own pid-scoped fixture tree ("Sweeping the whole base was wrong:
 # it deletes the directories a concurrently running instance is watching"),
 # and FreshSettings gives every test instance a pid-unique application name,
 # so its config file is one nothing else reads or has cached.
-if ! (cd build && ctest -Q -j4); then
+if ! (cd build && "$CTEST_CMD" -Q -j4); then
     echo "pre-commit: ctest red — evidence in build/Testing/Temporary/LastTest.log" >&2
     echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
     exit 1
@@ -71,17 +109,24 @@ fi
 # engine pure layer touched → Miri rides the commit. The semantics layer's only
 # deep instrument (watcher/apply, model, meta, property — scripts/miri.sh) is
 # too slow for every commit (~2 min hot, ~8 min cold) and too easy to forget
-# otherwise, so the trigger is mechanical. fd.rs and engine.rs are excluded
-# from the trigger: their tests are the ones Miri refuses (real fd machinery),
-# so an instrument run there buys nothing — they are covered by the
-# integration suites on the real machine instead.
+# otherwise, so the trigger is mechanical. fd.rs, fd_windows.rs and engine.rs
+# are excluded from the trigger: their tests are the ones Miri refuses (real
+# fd machinery — fd_windows' behavior is pinned by watcher_tests' live tests on
+# the real machine instead).
 PURE_TOUCHED=$(git diff --cached --name-only --diff-filter=ACMR -- engine/qimgv-engine \
-    | grep -vE '(watcher/fd\.rs|src/engine\.rs)' || true)
+    | grep -vE '(watcher/fd\.rs|watcher/fd_windows\.rs|src/engine\.rs)' || true)
 if [ -n "$PURE_TOUCHED" ]; then
     echo "pre-commit: engine pure layer touched — running Miri (~2 min)" >&2
-    sh scripts/miri.sh || {
-        echo "pre-commit: Miri red — evidence above" >&2
-        echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
-        exit 1
-    }
+    if sh scripts/miri.sh; then
+        :
+    else
+        miri_rc=$?
+        if [ "$miri_rc" -eq 2 ]; then
+            echo "pre-commit: Miri unavailable (nightly + the miri component) — Miri gate skipped" >&2
+        else
+            echo "pre-commit: Miri red — evidence above" >&2
+            echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
+            exit 1
+        fi
+    fi
 fi
