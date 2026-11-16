@@ -1,0 +1,58 @@
+name: windows-ci
+# Windows joined the supported-platforms table (DEVELOPING.md, "Linux and
+# Windows (msys2)"): this job mirrors the local ucrt64 recipe step for step —
+# the same pacman package set the dev machine installs, the same configure
+# flags (EXIV2, VIDEO_SUPPORT and OPENCV_SUPPORT all on), the same suites
+# ctest runs locally. Deliberately NO aqtinstall: Qt 6.12 comes from the
+# msys2 packages themselves, so the job never faces the Qt-download problem
+# the aqt-based Linux jobs face in constrained networks — pacman walks its
+# own mirrors.
+#
+# Trigger policy: workflow_dispatch and windows-port pushes only. The
+# per-push iteration loop is the local pre-commit gate — the machine that
+# owns the code runs the full build and suite set in ~2 minutes — so CI here
+# is not the dev loop, it is the fresh-clone confirmation: it catches what a
+# warm local tree cannot see (package-set drift in the rolling msys2 repos,
+# a configure step that quietly depended on local state). The old
+# msys2-test.yml (created 51278bec) predates the engine rework and was a
+# stub; this job is its replacement, written from the measured local recipe.
+on:
+  workflow_dispatch:
+  push:
+    branches: [windows-port]
+jobs:
+  windows-ucrt64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: install the ucrt64 toolchain and libraries (the dev machine's exact set)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          release: false
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-imageformats
+            mingw-w64-ucrt-x86_64-qt6-svg
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-opencv
+            mingw-w64-ucrt-x86_64-exiv2
+            mingw-w64-ucrt-x86_64-mpv
+      - name: configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DEXIV2=ON -DVIDEO_SUPPORT=ON -DOPENCV_SUPPORT=ON
+      - name: build (warnings are contractual — the fatal families are -Werror)
+        run: cmake --build build -j"$(nproc)"
+      - name: the suites (ENGINE_RUST rides inside ctest; offscreen for the GUI ones)
+        run: cd build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
