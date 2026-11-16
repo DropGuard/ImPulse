@@ -670,7 +670,7 @@ class TestImageOps : public QObject, protected EngineStackFixture {
 
 #ifdef USE_EXIV2
         {
-            auto meta = Exiv2::ImageFactory::open(toStdString(source));
+            auto meta = Exiv2::ImageFactory::open(source.toStdString()); // exiv2 0.28: UTF-8 everywhere
             meta->readMetadata();
             Exiv2::ExifData &exif = meta->exifData();
             exif["Exif.Image.Make"] = "Canon";
@@ -689,7 +689,7 @@ class TestImageOps : public QObject, protected EngineStackFixture {
         const QImage rotated = img.transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         QVERIFY(FileOperations::saveWithBackup(rotated, dest, 95, source));
 
-        auto check = Exiv2::ImageFactory::open(toStdString(dest));
+        auto check = Exiv2::ImageFactory::open(dest.toStdString()); // exiv2 0.28: UTF-8 everywhere
         check->readMetadata();
         const Exiv2::ExifData &exif = check->exifData();
         QVERIFY2(!exif.empty(), "the saved file carries no EXIF at all");

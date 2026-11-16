@@ -189,7 +189,11 @@ void DocumentInfo::loadExifTags() {
     try {
         std::unique_ptr<Exiv2::Image> image;
 
-        image = Exiv2::ImageFactory::open(toStdString(fileInfo.filePath()));
+        // exiv2 0.28 dropped the unicode-path overloads: every platform takes
+        // the UTF-8 narrow string (wide paths are converted internally), which
+        // is exactly QString::toStdString — the old wide-char helper would
+        // find no matching open() here
+        image = Exiv2::ImageFactory::open(fileInfo.filePath().toStdString());
 
         assert(image.get() != 0);
         image->readMetadata();

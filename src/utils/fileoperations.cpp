@@ -430,12 +430,14 @@ bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath
 bool FileOperations::carryMetadata(const QString &source, const QString &dest, bool resetOrientation) {
 #ifdef USE_EXIV2
     try {
-        const std::unique_ptr<Exiv2::Image> from = Exiv2::ImageFactory::open(toStdString(source));
+        // exiv2 0.28 takes the UTF-8 narrow string on every platform (the
+        // 0.27 unicode-path overloads are gone); QString::toStdString is it
+        const std::unique_ptr<Exiv2::Image> from = Exiv2::ImageFactory::open(source.toStdString());
         from->readMetadata();
         if(from->exifData().empty() && from->xmpData().empty() && from->iptcData().empty())
             return false;
 
-        const std::unique_ptr<Exiv2::Image> to = Exiv2::ImageFactory::open(toStdString(dest));
+        const std::unique_ptr<Exiv2::Image> to = Exiv2::ImageFactory::open(dest.toStdString());
         to->readMetadata();
         to->setExifData(from->exifData());
         to->setXmpData(from->xmpData());
