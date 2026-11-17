@@ -43,6 +43,11 @@ cmake --build build --target check-crop_tests
 # ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
 # --no-cache forces the full scan.
 python3 scripts/lint.py build --gate
+# style gate over the whole tree (3rdparty excluded). A ctest, not only a hook
+# stage: a hook that skips for a missing tool leaves no trace, which is how the
+# Windows port's fifteen hand-formatted files arrived. Skips (77) and names the
+# missing tool rather than pretending to have checked.
+python3 qimgv/tests/format_rules.py
 
 # clazy, separate configured tree (clazy 1.17 + level0/level1/detaching)
 CLAZY_CHECKS="level0,level1,detaching" cmake --build build-clazy -j$(nproc)
