@@ -52,12 +52,18 @@ int main(int argc, char **argv) {
         const char *name;
         int (*run)(int, char **);
     } kRuns[] = {
-        {"listing", runListingTests},                {"wire_format", runWireFormatTests},
-        {"folder_boundary", runFolderBoundaryTests}, {"decode", runDecodeTests},
-        {"settings", runSettingsTableTests},         {"filelog", runFileLogTests},
-        {"machinery", runMachineryTests},            {"thumbnail_store", runThumbnailStoreTests},
-        {"thumbnailer", runThumbnailerTests},        {"worker_pool", runWorkerPoolTests},
-        {"fileops", runFileOpsTests},                {"image_ops", runImageOpsTests},
+        {"listing", runListingTests},
+        {"wire_format", runWireFormatTests},
+        {"folder_boundary", runFolderBoundaryTests},
+        {"decode", runDecodeTests},
+        {"settings", runSettingsTableTests},
+        {"filelog", runFileLogTests},
+        {"machinery", runMachineryTests},
+        {"thumbnail_store", runThumbnailStoreTests},
+        {"thumbnailer", runThumbnailerTests},
+        {"worker_pool", runWorkerPoolTests},
+        {"fileops", runFileOpsTests},
+        {"image_ops", runImageOpsTests},
         {"infra", runInfraTests},
     };
     // One process per class. Not for parallelism and not primarily for crash
@@ -104,13 +110,12 @@ int main(int argc, char **argv) {
     QStringList units;
     for(const auto &r : kRuns)
         units << r.name;
-    return slot_harness::run_units_one_process_each(
-        argc, argv, units, "engine_stack",
-        [argc, argv](const QString &unit) -> int {
-            coretest::setChildCoreLimit();
-            for(const auto &r : kRuns)
-                if(unit == r.name)
-                    return r.run(argc, argv) != 0 ? 1 : 0;
-            return 2;
-        });
+    return slot_harness::run_units_one_process_each(argc, argv, units, "engine_stack",
+                                                    [argc, argv](const QString &unit) -> int {
+                                                        coretest::setChildCoreLimit();
+                                                        for(const auto &r : kRuns)
+                                                            if(unit == r.name)
+                                                                return r.run(argc, argv) != 0 ? 1 : 0;
+                                                        return 2;
+                                                    });
 }

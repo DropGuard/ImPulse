@@ -27,7 +27,12 @@ void EngineBridge::notifyCb(void *user) {
     // QSocketNotifier for this hop; the queued invoke is the same hop in Qt's
     // own vocabulary, which is why this file carries no platform branch.)
     auto *bridge = static_cast<EngineBridge *>(user);
-    QMetaObject::invokeMethod(bridge, [bridge] { bridge->drainEvents(); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        bridge,
+        [bridge] {
+            bridge->drainEvents();
+        },
+        Qt::QueuedConnection);
 }
 
 EngineBridge &EngineBridge::instance() {
