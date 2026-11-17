@@ -501,7 +501,15 @@ class TestShortcutScope : public QObject {
         QVERIFY(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)) == "nextImage");
         QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown))));
         QVERIFY(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageUp))));
-        QVERIFY(actionManager->actionForShortcut("F13").isEmpty());
+        // an unbound token claims nothing — and ASKING must not bind it. This
+        // call used to be actionForShortcut, which answered through QMap::
+        // operator[] and so inserted a null row into the live global table on
+        // every question about an unbound key. The read side is const now, so
+        // the assertion below is "the answer is empty" AND "the table did not
+        // grow" — a query cannot be a writer.
+        const QMap<QString, QString> before = actionManager->allShortcuts();
+        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
+        QCOMPARE(actionManager->allShortcuts(), before);
     }
 
     // The one-key-one-surface law holds against the editor and the config,
@@ -903,6 +911,31 @@ class TestShortcutScope : public QObject {
         QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
         // pointer tokens never ride QShortcutMap and are exempt by design
         QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("WheelUp")).isEmpty());
+    }
+
+    // The same walk answers the GLOBAL half, which used to be stitched on by
+    // the dialog through a second reader (actionForShortcut) that saw only the
+    // global table and answered through QMap::operator[] — so a question about
+    // an unbound key inserted a null row into the live table. One call now:
+    // the answer names every holder, the global table first and labelled, and
+    // asking cannot write.
+    void globalClaimsRideTheSameWalkAndTheQuestionCannotWrite() {
+        const QMap<QString, QString> before = actionManager->allShortcuts();
+
+        // a global-only key: P opens settings and no scope table claims it
+        const QStringList p = actionManager->scopeClaimsForToken(QStringLiteral("P"));
+        QVERIFY2(!p.isEmpty(), "a global binding produced no claim at all");
+        QVERIFY2(p.first().endsWith(QStringLiteral("(global)")), qPrintable(p.join(", ")));
+        QVERIFY2(p.first().startsWith(QStringLiteral("openSettings")), qPrintable(p.join(", ")));
+
+        // a key the scopes also hold: both halves appear in one answer. Right
+        // is document + folder view, and is NOT in the global table (R12c), so
+        // this asserts the scope half was not swallowed by the global check.
+        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("Right")).size() >= 2);
+
+        // the read side cannot grow the table it reads
+        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
+        QCOMPARE(actionManager->allShortcuts(), before);
     }
 
     // The context menu prints a binding hint per item, and it reads the

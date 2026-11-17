@@ -96,7 +96,12 @@ class ActionManager : public QObject {
     void setDocumentActive(bool active);
     void addShortcut(const QString &keys, const QString &action);
     void resetDefaults();
-    QString actionForShortcut(const QString &keys);
+    // Removed: `actionForShortcut(token)` — it read the global table only, was
+    // named like the resolver's twins (actionForToken / actionForKeySequence)
+    // while ignoring every scope, and answered through QMap::operator[] so a
+    // question about an unbound key INSERTED a null row into the live table.
+    // Its one caller (the editor's conflict warning) now asks
+    // scopeClaimsForToken, which names the global table in its answer.
     // A floating surface's yield test, in one place so the doors cannot
     // drift: "does this key name a subject-changing action?" — true means the
     // surface must claim the key back from QShortcutMap (ShortcutOverride) or

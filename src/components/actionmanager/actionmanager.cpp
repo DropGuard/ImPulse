@@ -347,9 +347,20 @@ QStringList ActionManager::scopesClaiming(const QString &token) const {
 // warning: a key may legitimately live in several scopes, so the editor names
 // each table holding it. This is the ONE walk over the scope tables — the
 // hand-written three-table version it replaced had forgotten the document
-// table, which is how a document-scope collision showed no warning.
+// table, which is how a document-scope collision showed no warning. The
+// global table is part of the answer, and first: the warning's question is
+// "who else holds this key?", and a global claim is the one that lives in
+// every scope. It used to be asked by a separate `actionForShortcut` call
+// that read only that table, answered with actionForShortcut's operator[]
+// (inserting a null row into the live map as a side effect of a question),
+// and had to be stitched on by the dialog as the string "(global)". One walk,
+// one label list — the same reason the scope half was consolidated.
 QStringList ActionManager::scopeClaimsForToken(const QString &token) const {
-    return scopesClaiming(token);
+    QStringList claims = scopesClaiming(token);
+    const QString globalAction = shortcuts.value(token);
+    if(!globalAction.isEmpty())
+        claims.prepend(globalAction + QStringLiteral(" (global)"));
+    return claims;
 }
 //------------------------------------------------------------------------------
 void ActionManager::applyKeyboardProjection() {
@@ -800,10 +811,6 @@ bool isSubjectChangingAction(const QString &actionName) {
         QStringLiteral("exit"),
     };
     return subjectChanging.contains(actionName);
-}
-//------------------------------------------------------------------------------
-QString ActionManager::actionForShortcut(const QString &keys) {
-    return shortcuts[keys];
 }
 //------------------------------------------------------------------------------
 // which action the sequence claims in the effective projection: the global
