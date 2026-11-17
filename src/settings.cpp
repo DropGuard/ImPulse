@@ -158,8 +158,8 @@ Settings::Settings(QObject *parent) : QObject(parent) {
     // one ini next to the binary and the junk-vs-default pins read whatever
     // the previous unit left behind.
     const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
-        ? QApplication::applicationDirPath() + "/conf"
-        : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+                                 ? QApplication::applicationDirPath() + "/conf"
+                                 : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
     mConfDir = new QDir(confBase);
     mConfDir->mkpath(confBase);
     settingsConf =
@@ -222,8 +222,8 @@ QString Settings::resolveCacheDir() {
     // directory only where no explicit key exists, exactly as the Linux
     // branch's redirected QSettings does.
     const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
-        ? QApplication::applicationDirPath() + "/conf"
-        : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+                                 ? QApplication::applicationDirPath() + "/conf"
+                                 : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
     QSettings conf(confBase + "/" + QCoreApplication::applicationName() + ".ini", QSettings::IniFormat);
     if(conf.contains(QStringLiteral("cacheDir"))) {
         const QString explicitDir = conf.value(QStringLiteral("cacheDir")).toString();
@@ -231,8 +231,8 @@ QString Settings::resolveCacheDir() {
         return explicitDir;
     }
     QString cacheLocation = qEnvironmentVariableIsEmpty("QIMGV_CACHE_DIR")
-        ? QApplication::applicationDirPath() + "/cache"
-        : QString::fromUtf8(qgetenv("QIMGV_CACHE_DIR"));
+                                ? QApplication::applicationDirPath() + "/cache"
+                                : QString::fromUtf8(qgetenv("QIMGV_CACHE_DIR"));
     QDir(cacheLocation).mkpath(cacheLocation);
     return cacheLocation;
 #endif
@@ -593,14 +593,55 @@ void Settings::readShortcuts(QMap<QString, QString> &shortcuts, const QString &k
     settingsConf->beginGroup("Controls");
     QStringList in, pair;
     in = settingsConf->value(key).toStringList();
+    QStringList unbound;
     for(int i = 0; i < in.count(); i++) {
         pair = in[i].split("=");
-        if(!pair[0].isEmpty() && !pair[1].isEmpty()) {
+        // a tombstone is "-action": the user removed the binding a default
+        // gave this action, and the codec carries the removal. Read AFTER
+        // the inserts below (the list is one pass, and a `-x` may sit before
+        // the default it was meant to kill), which is why the tokens are
+        // collected here and applied at the end. A live entry's left side is
+        // an action name — a script is "s:<name>" — so a leading '-' cannot
+        // be one.
+        if(pair[0].startsWith(QLatin1Char('-')))
+            unbound << pair[0].mid(1);
+        else if(!pair[0].isEmpty() && !pair[1].isEmpty()) {
             if(pair[1].endsWith("eq"))
                 pair[1] = pair[1].chopped(2) + "=";
             shortcuts.insert(pair[1], pair[0]);
         }
     }
+    settingsConf->endGroup();
+    for(const QString &action : std::as_const(unbound))
+        for(auto i = shortcuts.begin(); i != shortcuts.end();) {
+            if(i.value() == action)
+                i = shortcuts.erase(i);
+            else
+                ++i;
+        }
+}
+
+void Settings::saveShortcutsWithTombstones(const QMap<QString, QString> &shortcuts,
+                                           const QMap<QString, QString> &defaults, const QString &key) {
+    saveShortcuts(shortcuts, key);
+    settingsConf->beginGroup("Controls");
+    QStringList out = settingsConf->value(key).toStringList();
+    // every default whose action the table no longer holds gets a tombstone.
+    // Scoped per action, not per token: the editor deletes a ROW, and an
+    // action may hold several keys, so "this action is unbound" is the fact
+    // that survives. An action still bound elsewhere keeps its live rows and
+    // needs no marker.
+    QSet<QString> live;
+    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it)
+        live.insert(it.value());
+    QSet<QString> marked;
+    for(auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+        if(live.contains(it.value()) || marked.contains(it.value()))
+            continue;
+        marked.insert(it.value());
+        out << QLatin1String("-") + it.value();
+    }
+    settingsConf->setValue(key, out);
     settingsConf->endGroup();
 }
 

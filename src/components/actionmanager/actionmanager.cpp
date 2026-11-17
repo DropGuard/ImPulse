@@ -750,9 +750,26 @@ void ActionManager::setInspectMode(bool inspect) {
     applyInspectProjection();
 }
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 void ActionManager::saveShortcuts() {
-    settings->saveShortcuts(shortcuts);
+    // With tombstones, not the bare map: the codec writes a `-action` for every
+    // default this table no longer holds, and the matching read pass removes
+    // it again. Without this the editor's delete was a no-op across restarts —
+    // the defaults layer re-seeded the binding on the next launch (initShortcuts
+    // copies defaults first), so "unbind" was an operation the app offered and
+    // then quietly undid.
+    settings->saveShortcutsWithTombstones(shortcuts, defaults);
+}
+//------------------------------------------------------------------------------
+void ActionManager::saveDocShortcuts() {
+    settings->saveShortcutsWithTombstones(docShortcuts, docDefaults, QStringLiteral("docShortcuts"));
+}
+//------------------------------------------------------------------------------
+void ActionManager::saveGridShortcuts() {
+    settings->saveShortcutsWithTombstones(gridShortcuts, gridDefaults, QStringLiteral("gridShortcuts"));
+}
+//------------------------------------------------------------------------------
+void ActionManager::saveInspectShortcuts() {
+    settings->saveShortcutsWithTombstones(inspectShortcuts, inspectDefaults, QStringLiteral("inspectShortcuts"));
 }
 //------------------------------------------------------------------------------
 bool isSubjectChangingAction(const QString &actionName) {
@@ -1037,10 +1054,6 @@ void ActionManager::removeAllDocShortcuts(const QString &actionName) {
     });
 }
 //------------------------------------------------------------------------------
-void ActionManager::saveDocShortcuts() {
-    settings->saveShortcuts(docShortcuts, QStringLiteral("docShortcuts"));
-}
-//------------------------------------------------------------------------------
 void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
     ActionType type = validateAction(action);
     if(type == ActionType::ACTION_INVALID)
@@ -1067,10 +1080,6 @@ void ActionManager::removeAllGridShortcuts(const QString &actionName) {
     commit(Scope::Grid, [&](QMap<QString, QString> &t) {
         eraseAction(t, actionName);
     });
-}
-
-void ActionManager::saveGridShortcuts() {
-    settings->saveShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
 }
 
 void ActionManager::addInspectShortcut(const QString &keys, const QString &action) {
@@ -1101,9 +1110,6 @@ void ActionManager::removeAllInspectShortcuts(const QString &actionName) {
     });
 }
 
-void ActionManager::saveInspectShortcuts() {
-    settings->saveShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
-}
 //------------------------------------------------------------------------------
 bool ActionManager::processEvent(QInputEvent *event) {
     return invokeActionForShortcut(ShortcutBuilder::fromEvent(event));

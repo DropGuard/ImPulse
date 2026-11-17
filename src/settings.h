@@ -141,6 +141,13 @@ class Settings : public QObject {
     bool loopSlideshow();
     void setLoopSlideshow(bool mode);
     void readShortcuts(QMap<QString, QString> &shortcuts, const QString &key = QStringLiteral("shortcuts"));
+    // The scrubber a default-unbinding rides (see ActionManager::save*): a
+    // `-action` tombstone belongs to the table that applied it and is read
+    // back by the table's own read pass, so the writer hands it over with
+    // the rows. `defaults` is that table's default layer — the tombstone is
+    // only written where it can actually suppress something.
+    void saveShortcutsWithTombstones(const QMap<QString, QString> &shortcuts, const QMap<QString, QString> &defaults,
+                                     const QString &key = QStringLiteral("shortcuts"));
     void saveShortcuts(const QMap<QString, QString> &shortcuts, const QString &key = QStringLiteral("shortcuts"));
     bool panelEnabled();
     void setPanelEnabled(bool mode);
