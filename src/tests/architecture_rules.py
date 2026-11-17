@@ -45,19 +45,42 @@ for path, rel in sources():
 # Rule 2: the FFI header has a fixed set of authorized callers. Anything else
 # including qimgv_engine.h must join this list consciously — that review is
 # the point of the rule.
+#
+# The rule used to look ONLY at #include lines, which is a check on one door
+# and not on the room: the FFI type reached other files through a PUBLIC
+# HEADER instead, as a parameter and a member of EngineHandle. R2 saw nothing,
+# because nothing included qimgv_engine.h. Two changes close that:
+#
+#   (a) the type is erased from enginebridge.h (the handle stores void* and
+#       adopts through void*, so the header names no FFI symbol and no FFI
+#       type), and
+#   (b) this rule now refuses any mention of the FFI vocabulary outside the
+#       allowlist — a qimgv_engine_* call, a qimgv_engine* type, an
+#       #include — in ANY file, header or source. A future leak through a
+#       header fails here by name instead of passing unseen.
+#
+# Comments count as mentions on purpose: a header that documents "takes a
+# qimgv_engine*" is teaching the next reader to write one.
 ALLOWED_FFI_CALLERS = {
     'main.cpp',
     'components/directorymanager/enginebridge.cpp',
     'components/directorymanager/directorymanager.cpp',
     'components/thumbnailer/thumbnailerrunnable.cpp',
 }
+# the FFI vocabulary as it appears in code or prose: the type name in any form,
+# its functions, and the header
+FFI_VOCABULARY = re.compile(r'qimgv_engine')
 for path, rel in sources():
     if rel.startswith('tests/'):
         continue # the tests audit the C ABI and must include its header
     scanned['R2'] = scanned.get('R2', 0) + 1
-    if re.search(r'#include\s+[<"]qimgv_engine\.h[">]', text_of(path)):
+    text = text_of(path)
+    if FFI_VOCABULARY.search(text):
         if rel not in ALLOWED_FFI_CALLERS:
-            failures.append(f"R2 unauthorized FFI caller: {rel} (add to ALLOWED_FFI_CALLERS only after review)")
+            hits = [i + 1 for i, line in enumerate(text.splitlines()) if 'qimgv_engine' in line]
+            failures.append(f"R2 unauthorized FFI mention: {rel}:{hits[0]} names the engine's C ABI "
+                            "(add to ALLOWED_FFI_CALLERS only after review; prefer hiding it "
+                            "behind an owner type)")
 
 # Rule 3: Rust internals are invisible to C++. The engine is reachable only
 # through its C ABI header; no source file may reach into the crate sources.
