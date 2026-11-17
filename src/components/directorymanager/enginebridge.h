@@ -5,10 +5,8 @@
 
 #include <vector>
 
-struct qimgv_engine;
-
 // The engine handle, owned by value. Its destructor is the ONLY place
-// qimgv_engine_free is called, and dropping it is what makes the ordering
+// the engine is freed, and dropping it is what makes the ordering
 // guarantee explicit: free joins the engine's loop thread, the loop joins the
 // watcher thread, and only then can EngineBridge's own destruction finish —
 // so a notify callback posted from an engine thread cannot outlive the
@@ -17,22 +15,28 @@ struct qimgv_engine;
 // tree avoids everywhere else (commit() for table writes, WorkerPool for
 // jobs).
 //
-// Non-copyable and non-movable: exactly one owner, exactly one free. It is
-// held as a by-value member and filled with reset(), so there is never a
-// second handle to move. Copied handles would be two frees.
+// The FFI type is PRIVATE TO THE .cpp, on purpose. The handle used to declare
+// reset()/get() taking the engine's C pointer here, which put the FFI type in a
+// public header and made every includer a potential FFI caller that R2 — which
+// scans #include lines — could not see. Now the header carries no mention of
+// the type at all: the engine is a pimpl, adopted with adopt(), and the raw
+// pointer never leaves the translation unit that owns it.
+//
+// Non-copyable, non-movable: exactly one owner, exactly one free.
 class EngineHandle {
   public:
-    EngineHandle() = default;
+    EngineHandle();
     ~EngineHandle();
     EngineHandle(const EngineHandle &) = delete;
     EngineHandle &operator=(const EngineHandle &) = delete;
 
-    // adopt an engine created by qimgv_engine_new; nullptr is tolerated (a
-    // failed init leaves the bridge alive but dead, which the callers test).
-    // Out of line: qimgv_engine_free is an FFI symbol, and this header is not
-    // on the R2 caller allowlist — the .cpp is.
-    void reset(qimgv_engine *adopted);
-    qimgv_engine *get() const {
+    // Takes ownership of an engine created by the FFI constructor; nullptr is a
+    // live-but-dead bridge, which the callers test through operator bool.
+    // Defined in the .cpp because its parameter and its destructor are the
+    // FFI type.
+    void adopt(void *created);
+    // the raw handle, for the .cpp's own FFI calls (never stored by callers)
+    void *raw() const {
         return engine;
     }
     explicit operator bool() const {
@@ -40,12 +44,12 @@ class EngineHandle {
     }
 
   private:
-    qimgv_engine *engine = nullptr;
+    void *engine = nullptr; // the FFI handle, erased: see the note above
 };
 
 // Owns the process-wide Rust engine instance and pumps its events into the
 // Qt event loop. The engine's notify callback queues a drain on the UI
-// thread's event loop, and the drain pulls qimgv_engine_take_event until the
+// thread's event loop, and the drain pulls the engine's events until the
 // engine is empty. Engine calls never block the UI thread, and the hop is
 // Qt's own queued-invoke vocabulary, so the file carries no platform branch.
 class EngineBridge : public QObject {
@@ -100,7 +104,7 @@ class EngineBridge : public QObject {
     // Joins the engine's extension whitelist wire format ('\n'-separated).
     // Pure: the formats come in, so tests can pin the seam where an empty
     // list once meant "accept nothing" against the documented NULL contract.
-    // An empty result means "accept everything" (qimgv_engine_new's NULL).
+    // An empty result means "accept everything" (the FFI constructor's NULL).
     static QByteArray extensionListFor(const QList<QByteArray> &formats);
 
     static bool supportsWatching();

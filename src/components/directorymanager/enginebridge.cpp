@@ -53,7 +53,7 @@ EngineBridge &EngineBridge::instance() {
 
 EngineBridge::EngineBridge(QObject *parent) : QObject(parent) {
     const QByteArray exts = settings ? extensionListFor(settings->supportedFormats()) : QByteArray();
-    engine.reset(qimgv_engine_new(&EngineBridge::notifyCb, this, 2, exts.isEmpty() ? nullptr : exts.constData()));
+    engine.adopt(qimgv_engine_new(&EngineBridge::notifyCb, this, 2, exts.isEmpty() ? nullptr : exts.constData()));
     if(!engine) {
         const char *err = qimgv_last_error();
         qWarning() << "[EngineBridge] engine init failed:" << (err ? err : "unknown");
@@ -69,18 +69,20 @@ EngineBridge::~EngineBridge() = default;
 // therefore: this object stops being reachable -> engine threads joined -> queued
 // metacalls already posted to `this` were cancelled by QObject's own destruction.
 // Nothing can call back into a half-destroyed bridge.
+EngineHandle::EngineHandle() = default;
+
 EngineHandle::~EngineHandle() {
     if(engine)
-        qimgv_engine_free(engine);
+        qimgv_engine_free(static_cast<qimgv_engine *>(engine));
 }
 
-void EngineHandle::reset(qimgv_engine *adopted) {
-    if(engine == adopted)
+void EngineHandle::adopt(void *created) {
+    if(engine == created)
         return;
-    qimgv_engine *old = engine;
-    engine = adopted;
+    void *old = engine;
+    engine = created;
     if(old)
-        qimgv_engine_free(old);
+        qimgv_engine_free(static_cast<qimgv_engine *>(old));
 }
 
 bool EngineBridge::openDir(const QString &path, int sortMode, bool showHidden) {
@@ -92,7 +94,7 @@ bool EngineBridge::openDir(const QString &path, int sortMode, bool showHidden) {
     const QByteArray utf8 = path.toUtf8();
     qDebug() << "[EngineBridge] openDir" << path;
     uint32_t epoch = 0;
-    const int rc = qimgv_engine_open_dir(engine.get(), utf8.constData(), sortMode, &epoch);
+    const int rc = qimgv_engine_open_dir(static_cast<qimgv_engine *>(engine.raw()), utf8.constData(), sortMode, &epoch);
     if(rc == QIMGV_OK)
         sessionEpoch = epoch; // events from older sessions are stale
     return rc == QIMGV_OK;
@@ -100,12 +102,12 @@ bool EngineBridge::openDir(const QString &path, int sortMode, bool showHidden) {
 
 void EngineBridge::setSort(int sortMode) {
     if(engine)
-        qimgv_engine_set_sort(engine.get(), sortMode);
+        qimgv_engine_set_sort(static_cast<qimgv_engine *>(engine.raw()), sortMode);
 }
 
 void EngineBridge::setShowHidden(bool show) {
     if(engine)
-        qimgv_engine_set_show_hidden(engine.get(), show ? 1 : 0);
+        qimgv_engine_set_show_hidden(static_cast<qimgv_engine *>(engine.raw()), show ? 1 : 0);
 }
 
 const QString &EngineBridge::listedDirectory() const {
@@ -115,14 +117,14 @@ const QString &EngineBridge::listedDirectory() const {
 int EngineBridge::fileCount() const {
     if(!engine)
         return 0;
-    const int n = qimgv_engine_file_count(engine.get());
+    const int n = qimgv_engine_file_count(static_cast<qimgv_engine *>(engine.raw()));
     return n < 0 ? 0 : n;
 }
 
 int EngineBridge::dirCount() const {
     if(!engine)
         return 0;
-    const int n = qimgv_engine_dir_count(engine.get());
+    const int n = qimgv_engine_dir_count(static_cast<qimgv_engine *>(engine.raw()));
     return n < 0 ? 0 : n;
 }
 
@@ -142,39 +144,41 @@ bool EngineBridge::traceEnabled() {
 
 void EngineBridge::stopWatch() {
     if(engine)
-        qimgv_engine_stop_watch(engine.get());
+        qimgv_engine_stop_watch(static_cast<qimgv_engine *>(engine.raw()));
 }
 
 bool EngineBridge::thumbRequest(const QString &path, int size, bool crop, bool replaceBatch) {
     if(!engine)
         return false;
     const QByteArray utf8 = path.toUtf8();
-    return qimgv_engine_thumb_request(engine.get(), utf8.constData(), static_cast<uint32_t>(size), crop ? 1 : 0,
-                                      replaceBatch ? 1 : 0) == QIMGV_OK;
+    return qimgv_engine_thumb_request(static_cast<qimgv_engine *>(engine.raw()), utf8.constData(),
+                                      static_cast<uint32_t>(size), crop ? 1 : 0, replaceBatch ? 1 : 0) == QIMGV_OK;
 }
 
 void EngineBridge::thumbDone(const QString &path, int size, bool crop) {
     if(!engine)
         return;
     const QByteArray utf8 = path.toUtf8();
-    qimgv_engine_thumb_done(engine.get(), utf8.constData(), static_cast<uint32_t>(size), crop ? 1 : 0);
+    qimgv_engine_thumb_done(static_cast<qimgv_engine *>(engine.raw()), utf8.constData(), static_cast<uint32_t>(size),
+                            crop ? 1 : 0);
 }
 
 void EngineBridge::thumbClear() {
     if(engine)
-        qimgv_engine_thumb_clear(engine.get());
+        qimgv_engine_thumb_clear(static_cast<qimgv_engine *>(engine.raw()));
 }
 
 void EngineBridge::thumbConfig(int maxInFlight) {
     if(engine)
-        qimgv_engine_thumb_config(engine.get(), static_cast<uint32_t>(maxInFlight));
+        qimgv_engine_thumb_config(static_cast<qimgv_engine *>(engine.raw()), static_cast<uint32_t>(maxInFlight));
 }
 
 bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount) {
     if(!engine)
         return false;
     uint32_t needed = 0, fc = 0, dc = 0;
-    if(qimgv_engine_export_listing(engine.get(), nullptr, 0, &needed, &fc, &dc) == QIMGV_OK) {
+    if(qimgv_engine_export_listing(static_cast<qimgv_engine *>(engine.raw()), nullptr, 0, &needed, &fc, &dc) ==
+       QIMGV_OK) {
         out.clear(); // empty listing
         fileCount = fc;
         dirCount = dc;
@@ -187,8 +191,9 @@ bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &d
     // again on the new size, bounded so a permanently racing caller cannot spin.
     for(int attempt = 0;; ++attempt) {
         out.resize(int(needed));
-        const int rc = qimgv_engine_export_listing(engine.get(), reinterpret_cast<unsigned char *>(out.data()),
-                                                   size_t(out.size()), &needed, &fc, &dc);
+        const int rc = qimgv_engine_export_listing(static_cast<qimgv_engine *>(engine.raw()),
+                                                   reinterpret_cast<unsigned char *>(out.data()), size_t(out.size()),
+                                                   &needed, &fc, &dc);
         if(rc == QIMGV_OK) {
             // A successful write fills `needed` bytes and no more, and `needed`
             // may be SMALLER than the buffer this loop grew to on a previous
@@ -283,8 +288,10 @@ bool EngineBridge::entryAt(int index, bool dirs, EngineEntry &out) const {
         return false;
     qimgv_entry_meta meta{};
     char name[512], path[4096];
-    const int r = dirs ? qimgv_engine_dir_entry_at(engine.get(), index, &meta, name, sizeof(name), path, sizeof(path))
-                       : qimgv_engine_file_entry_at(engine.get(), index, &meta, name, sizeof(name), path, sizeof(path));
+    const int r = dirs ? qimgv_engine_dir_entry_at(static_cast<qimgv_engine *>(engine.raw()), index, &meta, name,
+                                                   sizeof(name), path, sizeof(path))
+                       : qimgv_engine_file_entry_at(static_cast<qimgv_engine *>(engine.raw()), index, &meta, name,
+                                                    sizeof(name), path, sizeof(path));
     if(r != QIMGV_OK)
         return false;
     out.name = QString::fromUtf8(name);
@@ -316,8 +323,8 @@ void EngineBridge::drainEvents() {
         qimgv_thumb_req treq{};
         int r;
         for(;;) {
-            r = qimgv_engine_take_event(engine.get(), &ev, subjectBuf.data(), size_t(subjectBuf.size()), oldBuf.data(),
-                                        size_t(oldBuf.size()), &mut, &treq);
+            r = qimgv_engine_take_event(static_cast<qimgv_engine *>(engine.raw()), &ev, subjectBuf.data(),
+                                        size_t(subjectBuf.size()), oldBuf.data(), size_t(oldBuf.size()), &mut, &treq);
             if(r != QIMGV_ERR_TRUNCATED)
                 break;
             if(subjectBuf.size() >= (1 << 20)) {
