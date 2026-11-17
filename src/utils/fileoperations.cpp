@@ -312,11 +312,6 @@ void FileOperations::rename(const QString &srcFilePath, const QString &newName, 
     // forced-overwrite case this branch is in. The bytes of the name are
     // UTF-8 for the same reason saveWithBackup's rollback used them — that is
     // what the listing keys on.
-    // ::rename rather than QFile::rename because Qt's is RENAME_NOREPLACE:
-    // it answers EEXIST when the destination exists, which is exactly the
-    // forced-overwrite case this branch is in. The bytes of the name are
-    // UTF-8 for the same reason saveWithBackup's rollback used them — that is
-    // what the listing keys on.
 #ifdef Q_OS_WIN
     // mingw's rename() refuses an existing destination — it has no atomic
     // replace, and the forced-overwrite case above is exactly what this call
@@ -325,8 +320,7 @@ void FileOperations::rename(const QString &srcFilePath, const QString &newName, 
     // and the wide forms carry Unicode names directly.
     const QString fromW = srcFile.filePath();
     const QString toW = newFilePath;
-    result = MoveFileExW(reinterpret_cast<const WCHAR *>(fromW.utf16()),
-                         reinterpret_cast<const WCHAR *>(toW.utf16()),
+    result = MoveFileExW(reinterpret_cast<const WCHAR *>(fromW.utf16()), reinterpret_cast<const WCHAR *>(toW.utf16()),
                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
                  ? FileOpResult::SUCCESS
                  : FileOpResult::OTHER_ERROR;
