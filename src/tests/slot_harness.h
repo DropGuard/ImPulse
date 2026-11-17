@@ -89,9 +89,14 @@ inline int runFiltered(QObject &test, int argc, char **argv) {
         if(argv[i][0] == '-')
             continue;
         if(!owns(test, argv[i])) {
-            std::fprintf(stderr, "%s: no test named '%s' — tests:\n",
-                         test.metaObject()->className(), argv[i]);
-            for(const QString &slot : testSlots(test.metaObject()))
+            std::fprintf(stderr, "%s: no test named '%s' — tests:\n", test.metaObject()->className(), argv[i]);
+            // named first: range-for over the temporary would share its list
+            // and then detach it (clazy range-loop-detach; the lint gate is
+            // green and a new family fails it by name). NOT named `slots` —
+            // that is Qt's own keyword macro, and the obvious fix does not
+            // compile.
+            const QStringList available = testSlots(test.metaObject());
+            for(const QString &slot : available)
                 std::fprintf(stderr, "  %s\n", slot.toUtf8().constData());
             return 2;
         }
@@ -103,9 +108,7 @@ inline int runFiltered(QObject &test, int argc, char **argv) {
 // POSIX it is called in the forked child; on Windows the parent re-spawns the
 // executable with the unit name as argv[1] and the suite's own main(argc > 1)
 // branch decides what that name means.
-inline int run_units_one_process_each(int argc, char **argv,
-                                      const QStringList &units,
-                                      const char *suiteName,
+inline int run_units_one_process_each(int argc, char **argv, const QStringList &units, const char *suiteName,
                                       [[maybe_unused]] const std::function<int(const QString &)> &runUnitInChild) {
     (void)argc;
     (void)argv;
@@ -120,7 +123,8 @@ inline int run_units_one_process_each(int argc, char **argv,
                      "%s: a spawned child re-entered the unit harness "
                      "(QIMGV_TEST_HARNESS_CHILD is set) without consuming its unit "
                      "routing — refusing to spawn. This is a harness protocol break, "
-                     "not a test failure.\n", suiteName);
+                     "not a test failure.\n",
+                     suiteName);
         return 1;
     }
     int failures = 0, consecutiveAbnormal = 0;
@@ -133,8 +137,9 @@ inline int run_units_one_process_each(int argc, char **argv,
         // -o and the parent reads the file back. The pid is in the name: two
         // instances of one suite are separate trees by construction, and their
         // result files must not be one tree's leftovers read by the other.
-        const QString resultPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
-            + QString("/%1_%2_%3_result.txt").arg(QCoreApplication::applicationPid()).arg(suiteName, unit);
+        const QString resultPath =
+            QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
+            QString("/%1_%2_%3_result.txt").arg(QCoreApplication::applicationPid()).arg(suiteName, unit);
         QProcess proc;
         proc.setProgram(QCoreApplication::applicationFilePath());
         proc.setArguments({unit, "-o", resultPath + ",txt"});
@@ -182,8 +187,7 @@ inline int run_units_one_process_each(int argc, char **argv,
                     int end = logged.indexOf('\n', totalsAt);
                     if(end < 0)
                         end = logged.size();
-                    std::fprintf(stderr, "%s: unit '%s' %s\n",
-                                 suiteName, unit.toUtf8().constData(),
+                    std::fprintf(stderr, "%s: unit '%s' %s\n", suiteName, unit.toUtf8().constData(),
                                  logged.mid(totalsAt, end - totalsAt).trimmed().constData());
                 }
                 if(!ok && !logged.isEmpty())
@@ -191,14 +195,14 @@ inline int run_units_one_process_each(int argc, char **argv,
             }
         }
         if(!ok) {
-            std::fprintf(stderr, "%s: unit '%s' %s (exit=%d)\n",
-                         suiteName, unit.toUtf8().constData(),
-                         started && normalExit ? "failed" : "exited abnormally or was killed",
-                         exitCode);
+            std::fprintf(stderr, "%s: unit '%s' %s (exit=%d)\n", suiteName, unit.toUtf8().constData(),
+                         started && normalExit ? "failed" : "exited abnormally or was killed", exitCode);
             ++failures;
             if(++consecutiveAbnormal == 3) {
-                std::fprintf(stderr, "%s: three consecutive abnormal units — stopping early, "
-                                     "the remaining unit list is not run\n", suiteName);
+                std::fprintf(stderr,
+                             "%s: three consecutive abnormal units — stopping early, "
+                             "the remaining unit list is not run\n",
+                             suiteName);
                 break;
             }
             continue;
@@ -217,14 +221,15 @@ inline int run_units_one_process_each(int argc, char **argv,
         }
         const bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
         if(!ok) {
-            std::fprintf(stderr, "%s: unit '%s' exited abnormally (exit=%d, sig=%d)\n",
-                         suiteName, unit.toUtf8().constData(),
-                         WIFEXITED(status) ? WEXITSTATUS(status) : -1,
+            std::fprintf(stderr, "%s: unit '%s' exited abnormally (exit=%d, sig=%d)\n", suiteName,
+                         unit.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
                          WIFSIGNALED(status) ? WTERMSIG(status) : -1);
             ++failures;
             if(++consecutiveAbnormal == 3) {
-                std::fprintf(stderr, "%s: three consecutive abnormal units — stopping early, "
-                                     "the remaining unit list is not run\n", suiteName);
+                std::fprintf(stderr,
+                             "%s: three consecutive abnormal units — stopping early, "
+                             "the remaining unit list is not run\n",
+                             suiteName);
                 break;
             }
             continue;
