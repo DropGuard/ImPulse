@@ -489,10 +489,12 @@ void SettingsDialog::saveSettings() {
     saveShortcuts();
 
     scriptManager->saveScripts();
-    actionManager->saveShortcuts();
-    actionManager->saveGridShortcuts();
-    actionManager->saveDocShortcuts();
-    actionManager->saveInspectShortcuts();
+    // one loop over the family: the four hand-written calls were a fifth
+    // enumeration of the scopes in the same function that already loops over
+    // them to save, and an enumeration of a family goes stale (this one had
+    // the order Global, Grid, Document, Inspect — arbitrary, and unread).
+    for(Scope scope : kAllScopes)
+        actionManager->saveScope(scope);
     emit settingsChanged();
 }
 //------------------------------------------------------------------------------

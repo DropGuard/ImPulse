@@ -135,7 +135,7 @@ class TestShortcutScope : public QObject {
     // so its shortcut map is snapshotted and put back.
     void versionMigrationRecordsTheVersionFromAnInheritedPast() {
         FreshSettings fresh;
-        const QMap<QString, QString> snapshot = actionManager->allShortcuts();
+        const QMap<QString, QString> snapshot = actionManager->tableForPublic(Scope::Global);
 
         settings->setFirstRun(false);
         QVersionNumber inherited(1, 0, 3);
@@ -225,7 +225,7 @@ class TestShortcutScope : public QObject {
     // that claims two sequences — Qt reads the main-row Enter as Return and
     // keeps Enter for the keypad, and both scancodes resolve to the same token.
     void defaultKeymapProjectsOntoTheRegistry() {
-        const QMap<QString, QString> table = actionManager->allShortcuts();
+        const QMap<QString, QString> table = actionManager->tableForPublic(Scope::Global);
         QVERIFY2(!table.isEmpty(), "the global table came back empty, the sweep proves nothing");
         for(auto it = table.constBegin(); it != table.constEnd(); ++it) {
             const QString &token = it.key();
@@ -304,7 +304,7 @@ class TestShortcutScope : public QObject {
 
         // the grid's token is absent from the global table even while the
         // grid is live — disjointness is unconditional, not focus-dependent
-        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+        QVERIFY(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Right")));
         QCOMPARE(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
 
         QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
@@ -469,8 +469,8 @@ class TestShortcutScope : public QObject {
     // layer, not the seed defaults. The table is snapshotted and restored;
     // the singleton is process-wide.
     void inspectShortcutsCarryUserOverrides() {
-        const QMap<QString, QString> inspectSnapshot = actionManager->allInspectShortcuts();
-        actionManager->addInspectShortcut(QStringLiteral("Left"), QStringLiteral("nextImage"));
+        const QMap<QString, QString> inspectSnapshot = actionManager->tableForPublic(Scope::Inspect);
+        actionManager->insertShortcut(Scope::Inspect, QStringLiteral("Left"), QStringLiteral("nextImage"));
 
         QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);
         QSignalSpy scroll(actionManager->action("scrollLeft"), &QAction::triggered);
@@ -480,9 +480,9 @@ class TestShortcutScope : public QObject {
         QCOMPARE(scroll.count(), 0); // the scrollLeft default never fired
         actionManager->setInspectMode(false);
 
-        actionManager->removeAllInspectShortcuts();
+        actionManager->removeAllShortcuts(Scope::Inspect);
         for(auto it = inspectSnapshot.constBegin(); it != inspectSnapshot.constEnd(); ++it)
-            actionManager->addInspectShortcut(it.key(), it.value());
+            actionManager->insertShortcut(Scope::Inspect, it.key(), it.value());
     }
 
     void pagingKeysHaveNamesAndDefaults() {
@@ -508,9 +508,9 @@ class TestShortcutScope : public QObject {
         // every question about an unbound key. The read side is const now, so
         // the assertion below is "the answer is empty" AND "the table did not
         // grow" — a query cannot be a writer.
-        const QMap<QString, QString> before = actionManager->allShortcuts();
+        const QMap<QString, QString> before = actionManager->tableForPublic(Scope::Global);
         QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
-        QCOMPARE(actionManager->allShortcuts(), before);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), before);
     }
 
     // The one-key-one-surface law holds against the editor and the config,
@@ -521,44 +521,44 @@ class TestShortcutScope : public QObject {
     // A dropped entry must not reach the projection either — the ambiguity
     // never gets to QShortcutMap.
     void globalTableRefusesTokensOwnedByScopes() {
-        const QMap<QString, QString> before = actionManager->allShortcuts();
+        const QMap<QString, QString> before = actionManager->tableForPublic(Scope::Global);
 
         // Enter: the grid's and the doc's; Right: the doc's and the grid's
         actionManager->addShortcut(QStringLiteral("Enter"), QStringLiteral("exit"));
         actionManager->addShortcut(QStringLiteral("Right"), QStringLiteral("exit"));
-        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Enter")));
-        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+        QVERIFY(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Enter")));
+        QVERIFY(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Right")));
         QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Return)));
         QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Right)));
 
         // a token nobody scopes still lands — the door is narrow, not shut
         actionManager->addShortcut(QStringLiteral("F13"), QStringLiteral("exit"));
-        QVERIFY(actionManager->allShortcuts().contains(QStringLiteral("F13")));
+        QVERIFY(actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("F13")));
         QVERIFY(actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_F13)));
         actionManager->removeShortcut(QStringLiteral("F13"));
 
-        QCOMPARE(actionManager->allShortcuts(), before);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), before);
     }
 
     // resetDefaults restores every table — the document table joined the
     // family in the view split and the reset left it behind, so the keymap
     // editor's reset button could not undo a document-scope rebinding
     void resetDefaultsRestoresEveryTable() {
-        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
-        const QMap<QString, QString> docBefore = actionManager->allDocShortcuts();
-        const QMap<QString, QString> gridBefore = actionManager->allGridShortcuts();
-        const QMap<QString, QString> inspectBefore = actionManager->allInspectShortcuts();
+        const QMap<QString, QString> globalBefore = actionManager->tableForPublic(Scope::Global);
+        const QMap<QString, QString> docBefore = actionManager->tableForPublic(Scope::Document);
+        const QMap<QString, QString> gridBefore = actionManager->tableForPublic(Scope::Grid);
+        const QMap<QString, QString> inspectBefore = actionManager->tableForPublic(Scope::Inspect);
 
         actionManager->addShortcut(QStringLiteral("F13"), QStringLiteral("exit"));
-        actionManager->addDocShortcut(QStringLiteral("F14"), QStringLiteral("crop"));
-        actionManager->addGridShortcut(QStringLiteral("F15"), QStringLiteral("gridOpen"));
-        actionManager->addInspectShortcut(QStringLiteral("F16"), QStringLiteral("scrollLeft"));
+        actionManager->insertShortcut(Scope::Document, QStringLiteral("F14"), QStringLiteral("crop"));
+        actionManager->insertShortcut(Scope::Grid, QStringLiteral("F15"), QStringLiteral("gridOpen"));
+        actionManager->insertShortcut(Scope::Inspect, QStringLiteral("F16"), QStringLiteral("scrollLeft"));
         actionManager->resetDefaults();
 
-        QCOMPARE(actionManager->allShortcuts(), globalBefore);
-        QCOMPARE(actionManager->allDocShortcuts(), docBefore);
-        QCOMPARE(actionManager->allGridShortcuts(), gridBefore);
-        QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), globalBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Document), docBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Grid), gridBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Inspect), inspectBefore);
     }
 
     // After a user removes a default binding and saves, the NEXT process reads
@@ -570,7 +570,7 @@ class TestShortcutScope : public QObject {
     // "unbind" was an operation the app offered and then undid.
     void aRemovedDefaultBindingDoesNotComeBackOnRestart() {
         // a binding the defaults really carry, so the removal is visible
-        const QMap<QString, QString> defaults = actionManager->allShortcuts();
+        const QMap<QString, QString> defaults = actionManager->tableForPublic(Scope::Global);
         QVERIFY2(defaults.contains(QStringLiteral("F11")) || defaults.key(QStringLiteral("toggleFullscreen")).size(),
                  "the fixture assumes toggleFullscreen sits in the global defaults");
 
@@ -594,16 +594,16 @@ class TestShortcutScope : public QObject {
     // carries no default for crop, so the row it removes there is a user
     // binding, not a default — nothing should be tombstoned for it.
     void tombstonesStayInsideTheirScope() {
-        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
-        actionManager->addDocShortcut(QStringLiteral("F14"), QStringLiteral("crop"));
-        actionManager->removeAllDocShortcuts(QStringLiteral("crop"));
-        actionManager->saveDocShortcuts();
+        const QMap<QString, QString> globalBefore = actionManager->tableForPublic(Scope::Global);
+        actionManager->insertShortcut(Scope::Document, QStringLiteral("F14"), QStringLiteral("crop"));
+        actionManager->removeAllShortcuts(Scope::Document, QStringLiteral("crop"));
+        actionManager->saveScope(Scope::Document);
         actionManager->saveShortcuts();
 
-        QMap<QString, QString> docReloaded = actionManager->allDocShortcuts();
+        QMap<QString, QString> docReloaded = actionManager->tableForPublic(Scope::Document);
         settings->readShortcuts(docReloaded, QStringLiteral("docShortcuts"));
         // the global table is untouched by the document-scope removal
-        QCOMPARE(actionManager->allShortcuts(), globalBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), globalBefore);
 
         actionManager->resetDefaults();
     }
@@ -641,8 +641,8 @@ class TestShortcutScope : public QObject {
 
         // and the document table is still intact underneath — the switch
         // did not clear it (the old rebuild did clear and recreate it)
-        QVERIFY(actionManager->allDocShortcuts().values().contains(QStringLiteral("nextImage")));
-        QVERIFY(actionManager->allDocShortcuts().values().contains(QStringLiteral("folderView")));
+        QVERIFY(actionManager->tableForPublic(Scope::Document).values().contains(QStringLiteral("nextImage")));
+        QVERIFY(actionManager->tableForPublic(Scope::Document).values().contains(QStringLiteral("folderView")));
     }
 
     // commit() is the one write path: whatever door the edit came through,
@@ -652,34 +652,34 @@ class TestShortcutScope : public QObject {
     // because the old code only guarded the second direction (and only after
     // config load, not after every editor insert).
     void everyWriteDoorEnforcesDisjointness() {
-        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
-        const QMap<QString, QString> docBefore = actionManager->allDocShortcuts();
-        const QMap<QString, QString> gridBefore = actionManager->allGridShortcuts();
+        const QMap<QString, QString> globalBefore = actionManager->tableForPublic(Scope::Global);
+        const QMap<QString, QString> docBefore = actionManager->tableForPublic(Scope::Document);
+        const QMap<QString, QString> gridBefore = actionManager->tableForPublic(Scope::Grid);
 
         // direction 1: a scope insert of a token the global table holds.
         // "openSettings" is P, and P is also a document binding? — pick a
         // token known to be global-only, then bind it into the document
         // scope and watch the global copy disappear.
-        QVERIFY(actionManager->allShortcuts().contains(QStringLiteral("Del")));
-        actionManager->addDocShortcut(QStringLiteral("Del"), QStringLiteral("crop"));
-        QVERIFY2(!actionManager->allShortcuts().contains(QStringLiteral("Del")),
+        QVERIFY(actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Del")));
+        actionManager->insertShortcut(Scope::Document, QStringLiteral("Del"), QStringLiteral("crop"));
+        QVERIFY2(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Del")),
                  "a document insert left the global claim live — the pair is ambiguous");
 
         // direction 2: the reverse (the door addShortcut already had)
         actionManager->addShortcut(QStringLiteral("Right"), QStringLiteral("exit"));
-        QVERIFY(!actionManager->allShortcuts().contains(QStringLiteral("Right")));
+        QVERIFY(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Right")));
 
         // the projection agrees with the tables — no stale claim survives
         QVERIFY(!actionManager->action("moveToTrash")->shortcuts().contains(QKeySequence(Qt::Key_Delete)));
         QVERIFY(!actionManager->action("exit")->shortcuts().contains(QKeySequence(Qt::Key_Right)));
 
         // restore through the same doors
-        actionManager->removeAllDocShortcuts(QStringLiteral("crop"));
+        actionManager->removeAllShortcuts(Scope::Document, QStringLiteral("crop"));
         actionManager->removeAllShortcuts(QStringLiteral("exit"));
         actionManager->resetDefaults();
-        QCOMPARE(actionManager->allShortcuts(), globalBefore);
-        QCOMPARE(actionManager->allDocShortcuts(), docBefore);
-        QCOMPARE(actionManager->allGridShortcuts(), gridBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), globalBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Document), docBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Grid), gridBefore);
     }
 
     // The delivery leg of the inspect hand-over, which the resolver tests
@@ -826,7 +826,7 @@ class TestShortcutScope : public QObject {
     //   C/M->copyFile/moveFile  file ops that need a visible subject, now
     //                        document-scope (and everywhere reachable at all)
     void theGlobalTableKeepsOnlyStandardOrSubjectlessKeys() {
-        const QMap<QString, QString> global = actionManager->allShortcuts();
+        const QMap<QString, QString> global = actionManager->tableForPublic(Scope::Global);
 
         // the removals — one forward walk instead of QMap::keys(value), which
         // allocates a temporary list per call and tripped clazy
@@ -853,7 +853,7 @@ class TestShortcutScope : public QObject {
 
         // C/M are reachable in the document view, where their overlays have a
         // subject to act on
-        const QMap<QString, QString> doc = actionManager->allDocShortcuts();
+        const QMap<QString, QString> doc = actionManager->tableForPublic(Scope::Document);
         QCOMPARE(doc.value(QStringLiteral("C")), QStringLiteral("copyFile"));
         QCOMPARE(doc.value(QStringLiteral("M")), QStringLiteral("moveFile"));
     }
@@ -871,8 +871,8 @@ class TestShortcutScope : public QObject {
     // The global table keeps Menu -> contextMenu: a menu key is meaningful
     // wherever a menu exists, and it is a different token, not a collision.
     void documentOnlyActionsLeaveTheGlobalTable() {
-        const QMap<QString, QString> global = actionManager->allShortcuts();
-        const QMap<QString, QString> doc = actionManager->allDocShortcuts();
+        const QMap<QString, QString> global = actionManager->tableForPublic(Scope::Global);
+        const QMap<QString, QString> doc = actionManager->tableForPublic(Scope::Document);
 
         QVERIFY2(!global.contains(QStringLiteral("RMB")), "RMB claims a global context menu the grid cannot show");
         QVERIFY2(!global.contains(QStringLiteral("Ctrl+V")), "Ctrl+V reaches a document-only action from everywhere");
@@ -921,7 +921,7 @@ class TestShortcutScope : public QObject {
     // the answer names every holder, the global table first and labelled, and
     // asking cannot write.
     void globalClaimsRideTheSameWalkAndTheQuestionCannotWrite() {
-        const QMap<QString, QString> before = actionManager->allShortcuts();
+        const QMap<QString, QString> before = actionManager->tableForPublic(Scope::Global);
 
         // a global-only key: P opens settings and no scope table claims it
         const QStringList p = actionManager->scopeClaimsForToken(QStringLiteral("P"));
@@ -936,7 +936,7 @@ class TestShortcutScope : public QObject {
 
         // the read side cannot grow the table it reads
         QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
-        QCOMPARE(actionManager->allShortcuts(), before);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), before);
     }
 
     // The context menu prints a binding hint per item, and it reads the
@@ -950,7 +950,7 @@ class TestShortcutScope : public QObject {
         // commands the view split moved out of the global table
         for(const QString &action : {QStringLiteral("save"), QStringLiteral("crop"), QStringLiteral("setWallpaper"),
                                      QStringLiteral("rotateLeft"), QStringLiteral("fitWindow")}) {
-            QVERIFY2(!actionManager->allShortcuts().values().contains(action),
+            QVERIFY2(!actionManager->tableForPublic(Scope::Global).values().contains(action),
                      qPrintable(QStringLiteral("expected no global binding for ") + action +
                                 " — this action is documented as document-scope only"));
             QVERIFY2(!actionManager->shortcutForAction(action).isEmpty(),
@@ -994,10 +994,10 @@ class TestShortcutScope : public QObject {
             const QMap<QString, QString> *table;
         };
         const Live lives[] = {
-            {Scope::Global, &actionManager->allShortcuts()},
-            {Scope::Document, &actionManager->allDocShortcuts()},
-            {Scope::Grid, &actionManager->allGridShortcuts()},
-            {Scope::Inspect, &actionManager->allInspectShortcuts()},
+            {Scope::Global, &actionManager->tableForPublic(Scope::Global)},
+            {Scope::Document, &actionManager->tableForPublic(Scope::Document)},
+            {Scope::Grid, &actionManager->tableForPublic(Scope::Grid)},
+            {Scope::Inspect, &actionManager->tableForPublic(Scope::Inspect)},
         };
         QSet<QString> liveTriples;
         for(const Live &live : lives)
@@ -1058,27 +1058,35 @@ class TestShortcutScope : public QObject {
     // three-table sweep that did this forgot the document table — the same
     // shape the conflict checker had forgotten once before — so a script
     // bound in the document view survived the deletion and kept firing an
-    // action the user had just removed. The general door exists so the next
-    // scope cannot be forgotten: this pin walks kAllScopes, not a list.
+    // action the user had just removed.
+    //
+    // This drives the REAL path (SettingsDialog::removeScript, invoked by its
+    // slot name) rather than the door it uses: a pin that calls the door only
+    // proves the door works, and the bug was in the caller.
     void deletingAScriptUnbindsItFromEveryScope() {
         const QString scriptName = QStringLiteral("scope-pin-script");
         const QString action = QStringLiteral("s:") + scriptName;
-
-        // the script has to exist to be bindable (validateAction checks it)
         scriptManager->addScript(scriptName, Script(QStringLiteral("/bin/true"), false));
-        QSet<Scope> boundIn;
+
         for(Scope scope : kAllScopes) {
             // one distinct key per scope so the bindings cannot collide
             const QString key = QStringLiteral("Ctrl+Alt+F") + QString::number(static_cast<int>(scope) + 1);
             actionManager->insertShortcut(scope, key, action);
             QCOMPARE(actionManager->tableForPublic(scope).value(key), action);
-            boundIn.insert(scope);
         }
-        QCOMPARE(boundIn.size(), static_cast<size_t>(std::size(kAllScopes)));
 
-        // what the editor does when the script is deleted: every table
-        for(Scope scope : kAllScopes)
-            actionManager->removeAllShortcuts(scope, action);
+        // the editor's own removal path, with the script selected in its list
+        SettingsDialog dialog;
+        dialog.readSettings();
+        auto *scripts = dialog.findChild<QListWidget *>(QStringLiteral("scriptsListWidget"));
+        QVERIFY2(scripts, "the scripts list did not materialize");
+        int scriptRow = -1;
+        for(int r = 0; r < scripts->count(); r++)
+            if(scripts->item(r)->text() == scriptName)
+                scriptRow = r;
+        QVERIFY2(scriptRow >= 0, "the script was not listed");
+        scripts->setCurrentRow(scriptRow);
+        QVERIFY(QMetaObject::invokeMethod(&dialog, "removeScript", Qt::DirectConnection));
 
         for(Scope scope : kAllScopes) {
             const QMap<QString, QString> &table = actionManager->tableForPublic(scope);
@@ -1155,11 +1163,11 @@ class TestShortcutScope : public QObject {
     // injected grid row must land in the grid table and nowhere else, and
     // the cycle must otherwise be an identity.
     void shortcutDialogSectionsRenderAndSaveApart() {
-        const QMap<QString, QString> gridSnapshot = actionManager->allGridShortcuts();
-        const int globalBefore = actionManager->allShortcuts().size();
+        const QMap<QString, QString> gridSnapshot = actionManager->tableForPublic(Scope::Grid);
+        const int globalBefore = actionManager->tableForPublic(Scope::Global).size();
         const int gridBefore = gridSnapshot.size();
-        const int inspectBefore = actionManager->allInspectShortcuts().size();
-        const int docBefore = actionManager->allDocShortcuts().size();
+        const int inspectBefore = actionManager->tableForPublic(Scope::Inspect).size();
+        const int docBefore = actionManager->tableForPublic(Scope::Document).size();
 
         SettingsDialog dialog;
         dialog.readSettings();
@@ -1203,16 +1211,17 @@ class TestShortcutScope : public QObject {
 
         dialog.saveShortcuts();
 
-        QCOMPARE(actionManager->allShortcuts().size(), globalBefore);
-        QCOMPARE(actionManager->allInspectShortcuts().size(), inspectBefore);
-        QCOMPARE(actionManager->allDocShortcuts().size(), docBefore);
-        QCOMPARE(actionManager->allGridShortcuts().size(), gridBefore + 1);
-        QCOMPARE(actionManager->allGridShortcuts().value(QStringLiteral("F7")), QStringLiteral("gridSelectLast"));
+        QCOMPARE(actionManager->tableForPublic(Scope::Global).size(), globalBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Inspect).size(), inspectBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Document).size(), docBefore);
+        QCOMPARE(actionManager->tableForPublic(Scope::Grid).size(), gridBefore + 1);
+        QCOMPARE(actionManager->tableForPublic(Scope::Grid).value(QStringLiteral("F7")),
+                 QStringLiteral("gridSelectLast"));
 
         // put the manager back the way the rest of the suite expects it
-        actionManager->removeAllGridShortcuts();
+        actionManager->removeAllShortcuts(Scope::Grid);
         for(auto it = gridSnapshot.constBegin(); it != gridSnapshot.constEnd(); ++it)
-            actionManager->addGridShortcut(it.key(), it.value());
+            actionManager->insertShortcut(Scope::Grid, it.key(), it.value());
     }
 
     // The actions no table claims are offered, not hidden: each unbound
@@ -1221,10 +1230,10 @@ class TestShortcutScope : public QObject {
     // the empty cells (an offer is not a binding), and editing one must
     // bind into the section it sits in — placement IS the destination.
     void unboundActionsAreOfferedAndIgnoredBySave() {
-        const QMap<QString, QString> docSnapshot = actionManager->allDocShortcuts();
-        const QMap<QString, QString> gridSnapshot = actionManager->allGridShortcuts();
-        const QMap<QString, QString> globalSnapshot = actionManager->allShortcuts();
-        const QMap<QString, QString> inspectSnapshot = actionManager->allInspectShortcuts();
+        const QMap<QString, QString> docSnapshot = actionManager->tableForPublic(Scope::Document);
+        const QMap<QString, QString> gridSnapshot = actionManager->tableForPublic(Scope::Grid);
+        const QMap<QString, QString> globalSnapshot = actionManager->tableForPublic(Scope::Global);
+        const QMap<QString, QString> inspectSnapshot = actionManager->tableForPublic(Scope::Inspect);
 
         SettingsDialog dialog;
         dialog.readSettings();
@@ -1267,10 +1276,10 @@ class TestShortcutScope : public QObject {
         // the save cycle ignores the offers: an untouched dialog round-trips
         // every table unchanged
         dialog.saveShortcuts();
-        QCOMPARE(actionManager->allDocShortcuts(), docSnapshot);
-        QCOMPARE(actionManager->allGridShortcuts(), gridSnapshot);
-        QCOMPARE(actionManager->allShortcuts(), globalSnapshot);
-        QCOMPARE(actionManager->allInspectShortcuts(), inspectSnapshot);
+        QCOMPARE(actionManager->tableForPublic(Scope::Document), docSnapshot);
+        QCOMPARE(actionManager->tableForPublic(Scope::Grid), gridSnapshot);
+        QCOMPARE(actionManager->tableForPublic(Scope::Global), globalSnapshot);
+        QCOMPARE(actionManager->tableForPublic(Scope::Inspect), inspectSnapshot);
 
         // editing an offer binds it into the section it sits in. quickCopy
         // has no default key anywhere; its row lives in the document
@@ -1287,16 +1296,19 @@ class TestShortcutScope : public QObject {
         table->item(quickCopyRow, 1)->setText(QStringLiteral("F8"));
         dialog.saveShortcuts();
         if(quickCopyScope == QLatin1String("document"))
-            QCOMPARE(actionManager->allDocShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+            QCOMPARE(actionManager->tableForPublic(Scope::Document).value(QStringLiteral("F8")),
+                     QStringLiteral("quickCopy"));
         else if(quickCopyScope == QLatin1String("grid"))
-            QCOMPARE(actionManager->allGridShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+            QCOMPARE(actionManager->tableForPublic(Scope::Grid).value(QStringLiteral("F8")),
+                     QStringLiteral("quickCopy"));
         else
-            QCOMPARE(actionManager->allShortcuts().value(QStringLiteral("F8")), QStringLiteral("quickCopy"));
+            QCOMPARE(actionManager->tableForPublic(Scope::Global).value(QStringLiteral("F8")),
+                     QStringLiteral("quickCopy"));
 
         // put the manager back the way the rest of the suite expects it
-        actionManager->removeAllDocShortcuts();
+        actionManager->removeAllShortcuts(Scope::Document);
         for(auto it = docSnapshot.constBegin(); it != docSnapshot.constEnd(); ++it)
-            actionManager->addDocShortcut(it.key(), it.value());
+            actionManager->insertShortcut(Scope::Document, it.key(), it.value());
     }
 
     // The Save As prefill for an edited image: the desktop's numbered-variant

@@ -171,15 +171,12 @@ class ActionManager : public QObject {
     void saveShortcuts();
     // ---- the scope-generic doors -----------------------------------------
     //
-    // The four per-scope spellings below (addDocShortcut, saveGridShortcuts,
-    // ...) predate the scope family being ONE concept, and the editor that
-    // consumes them carried a parallel vocabulary of its own: four string
-    // tags, four render passes and a four-arm if/else that dropped an unknown
-    // tag silently. These general doors are what the editor uses; a scope is
-    // a value, not a function name, so a fifth scope reaches the editor
-    // through kAllScopes without the editor learning anything new.
-    // The per-scope spellings stay while their call sites (Core, tests,
-    // the projection) still read better that way.
+    // The per-scope spellings these replace predate the family being ONE
+    // concept, and the editor that consumed them carried a parallel
+    // vocabulary of its own: four string tags, four render passes and a
+    // four-arm if/else that dropped an unknown tag silently. A scope is a
+    // value, not a function name, so a fifth scope reaches every reader
+    // through kAllScopes without any of them learning anything new.
     const QMap<QString, QString> &tableForPublic(Scope scope) const; // read side of tableFor
     void insertShortcut(Scope scope, const QString &keys, const QString &action);
     void removeAllShortcuts(Scope scope);
@@ -188,26 +185,12 @@ class ActionManager : public QObject {
     // site had already forgotten the fourth table once.
     void removeAllShortcuts(Scope scope, const QString &actionName);
     void saveScope(Scope scope); // persists one table, tombstones included
-    // the folder grid's scope layer, same shape as the global one
-    // the document view's scope, same shape as the grid's: the table is the
-    // keymap editor's storage and the projection's source
-    void addDocShortcut(const QString &keys, const QString &action);
-    const QMap<QString, QString> &allDocShortcuts();
-    void removeAllDocShortcuts();
-    void removeAllDocShortcuts(const QString &actionName);
-    void saveDocShortcuts();
-    void addGridShortcut(const QString &keys, const QString &action);
-    const QMap<QString, QString> &allGridShortcuts();
-    void removeAllGridShortcuts();
-    void removeAllGridShortcuts(const QString &actionName);
-    void saveGridShortcuts();
-    // the inspect scope's user override layer: defaults seeded from
-    // inspectDefaults, config entries overlay them, same as the global table
-    void addInspectShortcut(const QString &keys, const QString &action);
-    const QMap<QString, QString> &allInspectShortcuts();
-    void removeAllInspectShortcuts();
-    void removeAllInspectShortcuts(const QString &actionName);
-    void saveInspectShortcuts();
+    // The per-scope spellings that used to live here — addDocShortcut,
+    // allGridShortcuts, saveInspectShortcuts and their siblings — are gone:
+    // every one of them was tableFor(scope) under a different name, and the
+    // production call sites all ask the scope-generic doors above. Two
+    // spellings of one table is how the script-removal path came to clear
+    // three tables out of four.
     // ---- the registry ----------------------------------------------------
     //
     // Every action is a QAction owned by this object's parent tree: the
