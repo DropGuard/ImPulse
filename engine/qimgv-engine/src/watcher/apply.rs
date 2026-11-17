@@ -114,16 +114,14 @@ pub fn event_is_live(wd: i32, kind: &RawWatchKind, live_wd: Option<i32>) -> bool
 /// The joined subject path, in the engine's wire form. On Windows the join
 /// would hand back mixed separators — the watch directory arrives in Qt's
 /// forward-slash form and the FFI contract hands paths to a C++ side that
-/// compares them as strings against the form it opened the directory with —
-/// so the Windows build normalizes here, at the only place subjects are born.
-/// POSIX joins are byte-exact (a backslash is a legal filename character
-/// there) and the no-op replace keeps that side identical. This is the wire
-/// form's authority: the test suites read the same rule.
+/// compares them as strings against the form it opened the directory with.
+/// The form itself is `scan::wire_path`'s, one rule for both producers: the
+/// scan baseline mints listing paths the same way, and a divergence between
+/// them would put one file in the listing twice. POSIX joins are byte-exact (a
+/// backslash is a legal filename character there) and the no-op replace keeps
+/// that side identical.
 pub fn subject_path(dir: &Path, name: &str) -> String {
-    let joined = dir.join(name).to_string_lossy().into_owned();
-    #[cfg(windows)]
-    let joined = joined.replace('\\', "/");
-    joined
+    crate::scan::wire_path(&dir.join(name))
 }
 
 /// What the engine loop should do with a parsed event.
