@@ -91,10 +91,13 @@ boundary, so remove+add remains a shape consumers must tolerate.
 per request on the UI thread and travels with the work (`LoadPolicy`); pool
 threads receive values instead of reaching for global configuration.
 
-**Quality machinery, as tests.** Fourteen structural architecture rules run as
-a ctest suite — the authoritative enumeration, with the incidents that earned
-each rule, lives in [AGENTS.md](AGENTS.md); the enforcing instrument is
-`qimgv/tests/architecture_rules.py`. A static-analysis
+**Quality machinery, as tests.** A set of structural architecture rules runs
+as a ctest suite — the authoritative enumeration, with the incidents that
+earned each rule, lives in [AGENTS.md](AGENTS.md); the enforcing instrument is
+`qimgv/tests/architecture_rules.py`, and it prints what it scanned so a rule
+that matched nothing cannot look like a passing one. No rule count is stated
+here on purpose: a number that has to be re-counted on every change is a
+number that will eventually be wrong. A static-analysis
 gate counts findings per family and pins its own instrument: the scanned
 `(file, command)` set plus the versions of the tools that judged it. A
 re-configured build tree or a compiler upgrade therefore fails the gate by name
