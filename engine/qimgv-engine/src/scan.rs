@@ -58,6 +58,26 @@ pub fn is_hidden(path: &Path, name: &str) -> bool {
     }
 }
 
+/// THE wire form of a listing path: what the FFI hands to C++, and what the
+/// listing keys its rows on. Two producers mint subjects — the scan baseline
+/// (`full_path` per entry) and the watcher (the consumed watch dir joined with
+/// a record's name) — and if the two spell one path differently, the same file
+/// arrives twice: a row the mirror cannot match, an add that removes nothing.
+/// So the rule lives here, once, and both producers call it. (It was two
+/// copies of `replace('\\', "/')` for one commit; the drift pin that would
+/// have caught a divergence watched only the watcher's copy.)
+///
+/// Qt's forward slashes on Windows, because the C++ side compares paths as
+/// strings against the form it opened the directory with. POSIX joins are
+/// byte-exact — a backslash is a legal filename character there — and the
+/// no-op replace keeps that side identical.
+pub fn wire_path(path: &Path) -> String {
+    let joined = path.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    let joined = joined.replace('\\', "/");
+    joined
+}
+
 pub fn scan_directory(path: &Path, opts: &ScanOptions) -> Result<ScanOutput, EngineError> {
     let show_hidden = opts.show_hidden.load(AtomicOrdering::Relaxed);
     let mut out = ScanOutput::default();
@@ -106,16 +126,8 @@ pub fn scan_directory(path: &Path, opts: &ScanOptions) -> Result<ScanOutput, Eng
         }
 
         let full_path = entry.path();
-        // The wire form the FFI hands to C++ is Qt's forward-slash shape on
-        // Windows (the C++ side compares paths as strings against the form it
-        // opened the directory with), so the scan's subjects are normalized
-        // here, at the only place listing paths are born. POSIX joins are
-        // byte-exact — a backslash is a legal filename character there — and
-        // the no-op replace keeps that side identical.
-        #[cfg(windows)]
-        let full_str = full_path.to_string_lossy().replace('\\', "/");
-        #[cfg(not(windows))]
-        let full_str = full_path.to_string_lossy().into_owned();
+        // one wire form, shared with the watcher (see wire_path)
+        let full_str = wire_path(&full_path);
 
         let allowed = opts.filter.matches(&name)
             || opts

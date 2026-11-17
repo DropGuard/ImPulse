@@ -8,8 +8,8 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use qimgv_engine::watcher::{
-    Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record, WatchAction,
-    apply_event, classify, event_is_live, is_dir_mask, subject_path,
+    Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record,
+    WatchAction, apply_event, classify, event_is_live, is_dir_mask, subject_path,
 };
 use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode, WatchChangeKind};
 
@@ -340,8 +340,10 @@ fn state_of(
 }
 
 // The wire form of a subject path: what apply_event hands the engine and the
-// FFI hands to C++ (Qt's forward slashes on Windows — the authority is apply's
-// subject_path; the drift pin below keeps this reading the same rule).
+// FFI hands to C++. The suite keeps its OWN spelling deliberately — if it
+// called the production helper the pin below would compare a function with
+// itself and prove nothing. Both producers (scan baseline, watcher) read the
+// one rule; this copy is the independent half of the equality.
 fn s(p: &std::path::Path) -> String {
     let joined = p.to_string_lossy().into_owned();
     #[cfg(windows)]
@@ -350,15 +352,23 @@ fn s(p: &std::path::Path) -> String {
 }
 
 #[test]
-fn the_suite_wire_form_matches_applys() {
+fn the_suite_wire_form_matches_the_producers() {
     // if either side of this equality changes its path-form rule alone, the
-    // suite's expectations drift from the wire — this is the tripwire.
+    // suite's expectations drift from the wire — this is the tripwire. It
+    // reads both producers: subject_path (watcher events) and wire_path (the
+    // scan baseline). One commit carried two copies of the rule and the pin
+    // watched only one; a baseline/watcher divergence would list a file twice.
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path().join("x.jpg");
     assert_eq!(
         s(&p),
         subject_path(dir.path(), "x.jpg"),
-        "the suite's wire form and apply's must be one rule"
+        "the suite's wire form and the watcher's must be one rule"
+    );
+    assert_eq!(
+        s(&p),
+        qimgv_engine::scan::wire_path(&p),
+        "the scan baseline's wire form must be the same rule as the watcher's"
     );
 }
 
