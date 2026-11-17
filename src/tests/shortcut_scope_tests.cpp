@@ -10,6 +10,8 @@
 #include "settings.h"
 #include "sharedresources.h"
 #include "components/actionmanager/actionmanager.h"
+#include "components/directorymanager/enginebridge.h"
+#include "components/workerpool/workerpool.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
 #include "gui/dialogs/settingsdialog.h"
@@ -1109,6 +1111,57 @@ class TestShortcutScope : public QObject {
     // question "may this be rebound without asking" is answerable without a
     // modal dialog — the confirmation itself is a QMessageBox, which no
     // headless run can dismiss.
+    // thumbnailerThreads sizes BOTH halves of the thumbnail pipeline. The
+    // setting had always sized the C++ pool; the engine's own in-flight cap
+    // stayed at its initial 2 because the only function that sets it
+    // (EngineBridge::thumbConfig) had no caller — so a slider at 16 had sixteen
+    // threads and two slots, twelve permanently idle. This pins the wiring at
+    // the seam Core owns: after readSettings, the engine admits as many
+    // thumbnails as the pool can run.
+    //
+    // The cap is observed through DISPATCH, not through a getter: request more
+    // than the cap and count what arrives before any is completed. The Core is
+    // destroyed first on purpose — its Thumbnailer consumes thumbNext and
+    // answers thumbDone, which frees slots and would let the count climb past
+    // the cap for the wrong reason (the first version of this test measured
+    // exactly that and read 12).
+    void theThumbnailThreadCountReachesTheEngine() {
+        FreshSettings fresh;
+        settings->setThumbnailerThreadCount(5);
+        const QString dir = QDir(base).filePath("capalpha");
+        QVERIFY(QDir().mkpath(dir));
+        QStringList paths;
+        for(int i = 0; i < 12; ++i) {
+            const QString path = QDir(dir).filePath(QStringLiteral("cap%1.png").arg(i));
+            QVERIFY(makeImageFile(path, QSize(4, 4)));
+            paths << path;
+        }
+
+        WorkerPool pool(5);
+        EngineBridge bridge;
+        {
+            // construction is the act under test: readSettings runs in the
+            // constructor and is what hands the pool's size to the engine
+            Core core({.pool = &pool, .bridge = &bridge});
+            Q_UNUSED(core);
+        }
+
+        QSignalSpy next(&bridge, &EngineBridge::thumbNext);
+        QVERIFY(next.isValid());
+        QVERIFY(bridge.openDir(dir, 0, false));
+        QTRY_VERIFY_WITH_TIMEOUT(bridge.fileCount() >= 12, 10000);
+        // const: a range-for over a non-const QStringList detaches it
+        const QStringList requested = paths;
+        for(const QString &path : requested)
+            QVERIFY(bridge.thumbRequest(path, 64, false, false));
+
+        // with nobody completing them, the engine admits exactly the cap —
+        // 5, the pool's size, not the engine's initial 2
+        QTRY_VERIFY_WITH_TIMEOUT(next.count() >= 1, 10000);
+        QTest::qWait(200); // let every admissible dispatch land
+        QCOMPARE(next.count(), 5);
+    }
+
     // Deleting a script must unbind it from EVERY table it lives in. The
     // three-table sweep that did this forgot the document table — the same
     // shape the conflict checker had forgotten once before — so a script

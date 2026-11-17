@@ -3,6 +3,7 @@
 WorkerPool::WorkerPool(int threadCount) {
     if(threadCount < 1)
         threadCount = 1;
+    mThreadCount = threadCount;
     for(int i = 0; i < threadCount; ++i)
         workers.emplace_back([this] {
             workerLoop();
