@@ -97,6 +97,12 @@ class PoolJob {
 class WorkerPool {
   public:
     explicit WorkerPool(int threadCount);
+    // the size it was built with. Read-only: resizing a live pool is a
+    // different question (jobs hold threads' identities), so this answers
+    // "how many executors exist" for callers that must match it.
+    int threadCount() const {
+        return mThreadCount;
+    }
     ~WorkerPool();
     WorkerPool(const WorkerPool &) = delete;
     WorkerPool &operator=(const WorkerPool &) = delete;
@@ -147,6 +153,7 @@ class WorkerPool {
     bool ownerIdle(PoolOwner owner); // mutex held
     bool allIdle();                  // mutex held
 
+    int mThreadCount = 1; // as constructed; see threadCount()
     std::vector<std::thread> workers;
     std::mutex mutex;
     std::condition_variable workAvailable; // workers wait for submissions
