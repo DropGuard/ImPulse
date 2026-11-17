@@ -338,6 +338,13 @@ bool scopeFromTag(const QString &tag, Scope &out) {
     return false;
 }
 
+Scope ActionManager::homeScopeFor(const QString &action) const {
+    for(const ActionDesc &row : ActionTable::kActions)
+        if(action == QLatin1String(row.name))
+            return row.home;
+    return Scope::Document; // an unknown name is not an action; never reached
+}
+//------------------------------------------------------------------------------
 QStringList ActionManager::scopeClaimsForToken(const QString &token) const {
     QStringList claims = scopesClaiming(token);
     const QString globalAction = shortcuts.value(token);
@@ -655,31 +662,13 @@ void ActionManager::saveInspectShortcuts() {
 bool isSubjectChangingAction(const QString &actionName) {
     // everything whose effect is "the file under the user's attention is now a
     // different one". A floating surface that yields these to the action system
-    // stops being able to say what it is acting on.
-    static const QSet<QString> subjectChanging = {
-        // the walk
-        QStringLiteral("nextImage"),
-        QStringLiteral("prevImage"),
-        QStringLiteral("nextDirectory"),
-        QStringLiteral("prevDirectory"),
-        QStringLiteral("jumpToFirst"),
-        QStringLiteral("jumpToLast"),
-        QStringLiteral("goUp"),
-        // the view the image lives in
-        QStringLiteral("folderView"),
-        QStringLiteral("documentView"),
-        QStringLiteral("toggleFolderView"),
-        // the automatic walk
-        QStringLiteral("toggleSlideshow"),
-        QStringLiteral("toggleShuffle"),
-        // the file itself
-        QStringLiteral("moveToTrash"),
-        QStringLiteral("removeFile"),
-        // and the way out
-        QStringLiteral("closeFullScreenOrExit"),
-        QStringLiteral("exit"),
-    };
-    return subjectChanging.contains(actionName);
+    // stops being able to say what it is acting on. The list is a property of
+    // what each action DOES, so it lives on the action's row (actions_table.h)
+    // next to its name — one place an action is described, not four.
+    for(const ActionDesc &row : ActionTable::kActions)
+        if(actionName == QLatin1String(row.name))
+            return row.subjectChanging;
+    return false;
 }
 //------------------------------------------------------------------------------
 // which action the sequence claims in the effective projection: the global

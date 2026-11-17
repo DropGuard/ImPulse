@@ -204,29 +204,19 @@ void SettingsDialog::addUnboundActionRow(const QString &action, Scope scope) {
     ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
 }
 
-// the actions no table claims, offered at the bottom of the section their
-// first binding belongs in. The home section is derived, not measured: a
-// command that needs "the file on screen" is a document-scope affair (the
-// same reasoning that put copy/move/crop there), a command that departs the
-// grid or arranges it sits with the grid (documentView is the mirror of the
-// doc table's Enter->folderView; the sorts are the grid's own affair).
-// Everything unbound defaults to the document section, so a future action
-// with no default key is offered somewhere by construction, not invisible.
+// The actions no table claims, offered at the bottom of the section their home
+// scope names. The home is a property of the action, not of the editor: it is
+// the row's `home` field (actions_table.h), so the 14 actions with no default
+// key are each placed explicitly instead of 10 of them falling into a default
+// branch here. The four-entry gridHome set this replaces was the same fact,
+// written in the wrong file.
 void SettingsDialog::addUnboundRows(Scope scope) {
-    static const QSet<QString> gridHome = {
-        QStringLiteral("documentView"),
-        QStringLiteral("sortByName"),
-        QStringLiteral("sortByTime"),
-        QStringLiteral("sortBySize"),
-    };
-    // every table read through the one mapping: the four hand-written .values()
-    // walks were the same vocabulary the editor used to keep for itself, and a
-    // fifth scope would have left its actions looking unbound.
+    // every table read through the one mapping, and the maps iterated rather
+    // than .values(): a temporary QList per scope is an allocation for nothing
+    // and range-for over it detaches (clazy container-anti-pattern /
+    // range-loop-detach)
     QSet<QString> bound;
     for(Scope s : kAllScopes) {
-        // iterate the map, not .values(): a temporary QList per scope is an
-        // allocation for nothing, and range-for over it detaches (clazy:
-        // container-anti-pattern / range-loop-detach)
         const QMap<QString, QString> &table = actionManager->tableForPublic(s);
         for(auto it = table.constBegin(); it != table.constEnd(); ++it)
             bound.insert(it.value());
@@ -235,7 +225,7 @@ void SettingsDialog::addUnboundRows(Scope scope) {
     for(const QString &action : registered) {
         if(bound.contains(action))
             continue;
-        const Scope home = gridHome.contains(action) ? Scope::Grid : Scope::Document;
+        const Scope home = actionManager->homeScopeFor(action);
         if(home == scope)
             addUnboundActionRow(action, scope);
     }
