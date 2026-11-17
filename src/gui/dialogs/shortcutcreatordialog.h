@@ -22,6 +22,10 @@ class ShortcutCreatorDialog : public QDialog {
     QString selectedAction();
     QString selectedShortcut();
     void setAction(const QString &);
+    // True when the caller may proceed: a User-policy action always, a System
+    // one only after the user confirms. Static because the policy question is
+    // the action table's and needs no dialog instance.
+    static bool confirmRebinding(const QString &action, QWidget *parent);
     void setShortcut(const QString &);
 
   private slots:

@@ -257,4 +257,15 @@ inline const ActionDesc *descFor(const QString &name) {
     return nullptr;
 }
 
+// Whether the editor may rebind this action freely. System means "visible,
+// but changing its key is a deliberate act": the shortcut chooser asks for a
+// confirmation before it accepts one. The question is about the ACTION — a
+// destructive verb keeps its danger whatever key it sits on — which is what
+// the token-level withhold that preceded this got wrong: it protected Del and
+// left removeFile free to be rebound to F9.
+inline ActionDesc::Policy policyFor(const QString &name) {
+    const ActionDesc *row = descFor(name);
+    return row ? row->policy : ActionDesc::Policy::User;
+}
+
 } // namespace ActionTable
