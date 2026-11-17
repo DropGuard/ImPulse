@@ -577,7 +577,14 @@ fn watcher_loop(
                     let w = watch
                         .as_ref()
                         .expect("a completed read implies a live watch");
-                    for rec in drain_records(&buffer.0, w.id, &w.path, &mut next_cookie) {
+                    // the completion's length, not the buffer's: the parser
+                    // stops at NextEntryOffset == 0, so trailing slack is
+                    // harmless today — but only because the record format
+                    // self-terminates, and that is the parser's invariant to
+                    // break, not the loop's to trust. A short completion also
+                    // leaves the tail holding the PREVIOUS read's bytes.
+                    let filled = &buffer.0[..transferred as usize];
+                    for rec in drain_records(filled, w.id, &w.path, &mut next_cookie) {
                         for out in pairer.intake(rec, dir_opt, live_wd) {
                             if !dispatch(ev_tx, out, live_wd) {
                                 return;
