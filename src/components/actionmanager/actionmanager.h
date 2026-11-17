@@ -287,6 +287,9 @@ class ActionManager : public QObject {
     // a fifth scope cannot acquire a table in one place and miss another.
     QMap<QString, QString> &tableFor(Scope scope);
     const QMap<QString, QString> &tableFor(Scope scope) const;
+    // the default layer of a scope: the hand-written base initDefaults seeds
+    // and initShortcuts copies into the live table before the config overlays.
+    QMap<QString, QString> &defaultsFor(Scope scope);
     const QMap<QString, QString> &defaultsFor(Scope scope) const;
     // the disjointness law, run by commit() after every write: a token a
     // scope table owns is removed from the global table. Returns true when

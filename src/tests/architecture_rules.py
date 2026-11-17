@@ -412,8 +412,33 @@ for path, rel in sources():
 # dynamic script actions (no QAction exists for "s:<name>"), connects by the
 # signal idiom instead of connectAction, and is expected here.
 am_text = text_of(os.path.join(SRC, 'components', 'actionmanager', 'actionmanager.cpp'))
-registered_actions = set(re.findall(r'addAction\("([^"]+)"', am_text))
 connected_actions = set(re.findall(r'connectAction\("([^"]+)"', text_of(os.path.join(SRC, 'core.cpp'))))
+
+# The action census lives in actions_table.h now (actions_table.h's own
+# census test proves it equal to the live registry at runtime). R12 reads
+# the TABLE, and — while the registry is still written out by hand — also
+# the old `addAction("...")` list, asserting the two agree. That two-source
+# window is deliberate: this rule once caught real drift, and a rule whose
+# input silently changes identity is indistinguishable from a passing one.
+# When the registry loop replaces the hand-written list, the old list parse
+# goes away WITH its assertion, and the floor below keeps the rule from
+# passing on an empty parse.
+actions_table_text = text_of(os.path.join(SRC, 'actions_table.h'))
+table_actions = set(re.findall(r'MAKE\("([^"]+)"', actions_table_text))
+registered_actions = table_actions
+R12_ACTION_FLOOR = 75  # 81 today; the floor is the "rule went blind" alarm
+if len(table_actions) < R12_ACTION_FLOOR:
+    failures.append(f"R12 cannot run: actions_table.h parsed to {len(table_actions)} actions "
+                    f"(floor {R12_ACTION_FLOOR}) — the row shape changed, fix this rule's parse "
+                    "before trusting the tree")
+hand_written = set(re.findall(r'addAction\("([^"]+)"', am_text))
+if hand_written:
+    for name in sorted(hand_written - table_actions):
+        failures.append(f"R12 registry and table disagree: addAction(\"{name}\") has no "
+                        "actions_table.h row")
+    for name in sorted(table_actions - hand_written):
+        failures.append(f"R12 registry and table disagree: actions_table.h row \"{name}\" "
+                        "is not registered")
 for name in sorted(registered_actions - connected_actions):
     failures.append(f"R12 registered action is never connected: {name} — add the connectAction "
                     "in core.cpp or remove the registration")
@@ -427,12 +452,24 @@ scanned['R12'] = scanned.get('R12', 0) + 1
 # a typo in initDefaults was a binding the settings table shows and that
 # does nothing, silently. This partially restores the compile-time check the
 # old &ActionManager::signal connects gave for free.
+# The bindings are rows now. Read them from the table, and while initDefaults
+# still spells them out, assert the two agree — the same two-source window as
+# R12, for the same reason (a typo'd default was a binding the editor showed
+# and that did nothing, silently).
+table_bindings = re.findall(r'\{"([^"]+)",\s*Scope::\w+,\s*"([^"]+)"\}', actions_table_text)
+default_actions = {m[0] for m in table_bindings}
+R12B_BINDING_FLOOR = 70  # 83 today
+if len(table_bindings) < R12B_BINDING_FLOOR:
+    failures.append(f"R12b cannot run: actions_table.h parsed to {len(table_bindings)} bindings "
+                    f"(floor {R12B_BINDING_FLOOR}) — fix the parse before trusting the tree")
+for name in sorted(default_actions - registered_actions):
+    failures.append(f"R12b default keymap names an unregistered action: {name} — fix the "
+                    "row in actions_table.h")
 init_defaults = re.search(r'void ActionManager::initDefaults\(\) \{(.*?)\n\}', am_text, re.S)
 if init_defaults:
-    default_actions = {m[1] for m in re.findall(r'\.insert\((.*),\s*"([^"]+)"\)', init_defaults.group(1))}
-    for name in sorted(default_actions - registered_actions):
-        failures.append(f"R12b default keymap names an unregistered action: {name} — fix the "
-                        "name in ActionManager::initDefaults")
+    legacy = {m[1] for m in re.findall(r'\.insert\((.*),\s*"([^"]+)"\)', init_defaults.group(1))}
+    for name in sorted(legacy - default_actions):
+        failures.append(f"R12b initDefaults names an action with no table binding: {name}")
 scanned['R12b'] = scanned.get('R12b', 0) + 1
 
 # Rule 12c: the global default table shares no live claim with any scope
@@ -459,29 +496,27 @@ def _sequences_of(token):
     return {token}
 
 
-if init_defaults:
-    table_tokens = {}
-    for m in re.finditer(r'(\w+)\.insert\(([^;]+?),\s*"([^"]+)"\);', init_defaults.group(1)):
-        table, key_expr = m.group(1), m.group(2)
-        expr = (key_expr.replace('InputMap::keyNameCtrl()', '"Ctrl"')
-                        .replace('InputMap::keyNameAlt()', '"Alt"')
-                        .replace('InputMap::keyNameShift()', '"Shift"'))
-        token = '+'.join(re.findall(r'"([^"]*)"', expr))
-        if token in POINTER_TOKENS or token.endswith('_DoubleClick'):
-            continue
-        table_tokens.setdefault(table, {})[token] = _sequences_of(token)
-    if 'defaults' not in table_tokens:
-        failures.append("R12c the global defaults table was not found — the rule is blind, "
-                        "fix the parse before trusting the tree")
-    else:
-        for scope in ('docDefaults', 'gridDefaults', 'inspectDefaults'):
-            for g_tok, g_seqs in sorted(table_tokens.get('defaults', {}).items()):
-                for s_tok, s_seqs in sorted(table_tokens.get(scope, {}).items()):
-                    if g_seqs & s_seqs:
-                        failures.append(f"R12c global table shares a live claim with {scope}: "
-                                        f"'{g_tok}' vs '{s_tok}' — two live claims of one key are "
-                                        "ambiguous and fire nothing (dispatch_probe_tests); move the "
-                                        "binding into the scope that owns it")
+# The bindings are read from actions_table.h — the declarative source both the
+# projection and the config load will use — instead of scraping initDefaults'
+# call expressions. While initDefaults still spells them out, R12b asserts the
+# two agree, so this rule is not alone in trusting the new source.
+table_tokens = {}
+for _action, _scope, _token in re.findall(r'\{"([^"]+)",\s*Scope::(\w+),\s*"([^"]+)"\}', actions_table_text):
+    if _token in POINTER_TOKENS or _token.endswith('_DoubleClick'):
+        continue
+    table_tokens.setdefault(_scope, {})[_token] = _sequences_of(_token)
+if 'Global' not in table_tokens:
+    failures.append("R12c the global bindings were not found in actions_table.h — the rule is "
+                    "blind, fix the parse before trusting the tree")
+else:
+    for scope in ('Document', 'Grid', 'Inspect'):
+        for g_tok, g_seqs in sorted(table_tokens.get('Global', {}).items()):
+            for s_tok, s_seqs in sorted(table_tokens.get(scope, {}).items()):
+                if g_seqs & s_seqs:
+                    failures.append(f"R12c global table shares a live claim with {scope}: "
+                                    f"'{g_tok}' vs '{s_tok}' — two live claims of one key are "
+                                    "ambiguous and fire nothing (dispatch_probe_tests); move the "
+                                    "binding into the scope that owns it")
 scanned['R12c'] = scanned.get('R12c', 0) + 1
 
 # Rule 13: the unit-harness protocol is closed. slot_harness re-spawns the

@@ -1,5 +1,7 @@
 #include "actionmanager.h"
 
+#include "actions_table.h"
+
 #include <QShortcut>
 #include <functional>
 #include <QWidget>
@@ -41,93 +43,13 @@ ActionManager *ActionManager::getInstance() {
     return actionManager;
 }
 //------------------------------------------------------------------------------
-// The registry, written out: one stateless QAction per name, in the order the
-// old Actions registry kept them. A name here without a connectAction in
-// core.cpp is an action the keymap can bind and invoke that does nothing —
-// exactly the silence R12 reads these two lists against each other for.
+// The registry, from the table: one stateless QAction per row, in the table's
+// order (which is the order the old hand-written list kept). A row without a
+// connectAction in core.cpp is an action the keymap can bind and invoke that
+// does nothing — exactly the silence R12 reads the table against the connects.
 void ActionManager::initActions() {
-    addAction("nextImage");
-    addAction("prevImage");
-    addAction("toggleFullscreen");
-    addAction("fitWindow");
-    addAction("fitWidth");
-    addAction("fitNormal");
-    addAction("nextFitMode");
-    addAction("toggleFitMode");
-    addAction("resize");
-    addAction("rotateRight");
-    addAction("rotateLeft");
-    addAction("scrollUp");
-    addAction("scrollDown");
-    addAction("scrollLeft");
-    addAction("scrollRight");
-    addAction("zoomIn");
-    addAction("zoomOut");
-    addAction("zoomInCursor");
-    addAction("zoomOutCursor");
-    addAction("open");
-    addAction("save");
-    addAction("saveAs");
-    addAction("setWallpaper");
-    addAction("crop");
-    addAction("removeFile");
-    addAction("copyFile");
-    addAction("moveFile");
-    addAction("jumpToFirst");
-    addAction("jumpToLast");
-    addAction("openSettings");
-    addAction("closeFullScreenOrExit");
-    addAction("exit");
-    addAction("flipH");
-    addAction("flipV");
-    addAction("folderView");
-    addAction("pauseVideo");
-    addAction("frameStep");
-    addAction("frameStepBack");
-    addAction("documentView");
-    addAction("toggleFolderView");
-    addAction("moveToTrash");
-    addAction("reloadImage");
-    addAction("copyFileClipboard");
-    addAction("copyPathClipboard");
-    addAction("renameFile");
-    addAction("contextMenu");
-    addAction("toggleTransparencyGrid");
-    addAction("sortByName");
-    addAction("sortByTime");
-    addAction("sortBySize");
-    addAction("toggleImageInfo");
-    addAction("toggleShuffle");
-    addAction("toggleScalingFilter");
-    addAction("toggleMute");
-    addAction("volumeUp");
-    addAction("volumeDown");
-    addAction("toggleSlideshow");
-    addAction("showInDirectory");
-    addAction("quickCopy");
-    addAction("goUp");
-    addAction("discardEdits");
-    addAction("nextDirectory");
-    addAction("prevDirectory");
-    addAction("seekVideoForward");
-    addAction("seekVideoBackward");
-    addAction("lockZoom");
-    addAction("lockView");
-    addAction("print");
-    addAction("toggleFullscreenInfoBar");
-    addAction("pasteFile");
-    addAction("pasteFilesHere");
-    // the folder grid's scope actions — the fork's own line
-    addAction("gridSelectNext");
-    addAction("gridSelectPrev");
-    addAction("gridSelectAbove");
-    addAction("gridSelectBelow");
-    addAction("gridPageUp");
-    addAction("gridPageDown");
-    addAction("gridSelectFirst");
-    addAction("gridSelectLast");
-    addAction("gridSelectAll");
-    addAction("gridOpen");
+    for(const ActionDesc &row : ActionTable::kActions)
+        addAction(QString::fromLatin1(row.name));
 }
 
 QAction *ActionManager::addAction(const QString &name) {
@@ -271,6 +193,16 @@ const QMap<QString, QString> &ActionManager::tableFor(Scope scope) const {
     case Scope::Inspect: return inspectShortcuts;
     }
     return shortcuts;
+}
+
+QMap<QString, QString> &ActionManager::defaultsFor(Scope scope) {
+    switch(scope) {
+    case Scope::Global: return defaults;
+    case Scope::Document: return docDefaults;
+    case Scope::Grid: return gridDefaults;
+    case Scope::Inspect: return inspectDefaults;
+    }
+    return defaults;
 }
 
 const QMap<QString, QString> &ActionManager::defaultsFor(Scope scope) const {
@@ -550,155 +482,14 @@ void ActionManager::applyInspectProjection() {
 }
 //------------------------------------------------------------------------------
 void ActionManager::initDefaults() {
-    defaults.insert("F", "toggleFullscreen");
-    defaults.insert("F11", "toggleFullscreen");
-    // A double click is a mouse GESTURE, not a key: it stays at the global
-    // level because fullscreen is the one action with no conflicting
-    // gesture-level meaning (a double click on a thumbnail opens it, which is
-    // a grid-scope affair). Kept as a token because the keymap editor shows
-    // it, but it is not a keyboard binding.
-    defaults.insert("LMB_DoubleClick", "toggleFullscreen");
-    // MiddleButton->exit is gone. Middle-click is "open in a new tab" /
-    // "autoscroll" muscle memory, and quitting the application on a mis-tap
-    // loses whatever the user had open. Exit keeps its standard chords.
-    defaults.insert(InputMap::keyNameCtrl() + "+O", "open");
-    defaults.insert(InputMap::keyNameCtrl() + "+Q", "exit");
-    defaults.insert("Esc", "closeFullScreenOrExit");
-    defaults.insert("Del", "moveToTrash");
-    defaults.insert(InputMap::keyNameShift() + "+Del", "removeFile");
-    defaults.insert(InputMap::keyNameCtrl() + "+C", "copyFileClipboard");
-    defaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+C", "copyPathClipboard");
-    defaults.insert("F2", "renameFile");
-    defaults.insert("Menu", "contextMenu");
-    defaults.insert(InputMap::keyNameCtrl() + "+D", "showInDirectory");
-    defaults.insert(InputMap::keyNameShift() + "+F", "toggleFullscreenInfoBar");
-
-#ifdef __APPLE__
-    defaults.insert(InputMap::keyNameAlt() + "+Up", "zoomIn");
-    defaults.insert(InputMap::keyNameAlt() + "+Down", "zoomOut");
-    defaults.insert(InputMap::keyNameCtrl() + "+Comma", "openSettings");
-#else
-    defaults.insert("P", "openSettings");
-#endif
-
-    // ---- the document view's keys ----------------------------------------
-    // Everything that only means something with one image on screen: the walk,
-    // zoom, fit, the edit verbs, and the commands whose result must be visible.
-    // These used to live in the global table with `if(viewMode == FOLDERVIEW)
-    // return` guards inside each command; a binding that does not exist in the
-    // folder view needs no guard, and the guard belonged to the wrong layer.
-    docDefaults.insert("Right", "nextImage");
-    docDefaults.insert("Left", "prevImage");
-    docDefaults.insert("XButton2", "nextImage");
-    docDefaults.insert("XButton1", "prevImage");
-    docDefaults.insert("WheelDown", "nextImage");
-    docDefaults.insert("WheelUp", "prevImage");
-    docDefaults.insert("PgUp", "prevImage");
-    docDefaults.insert("PgDown", "nextImage");
-    docDefaults.insert("Space", "toggleFitMode");
-    docDefaults.insert(InputMap::keyNameShift() + "+Space", "nextFitMode");
-    docDefaults.insert("1", "fitWindow");
-    docDefaults.insert("2", "fitWidth");
-    docDefaults.insert("3", "fitNormal");
-    docDefaults.insert("R", "resize");
-    docDefaults.insert("H", "flipH");
-    docDefaults.insert("V", "flipV");
-    // copy/move to a chosen directory, via the overlays. Document-scope by
-    // what the action needs, not by habit: the target overlay names the file
-    // it is about to move, and the folder view has no "the file" to name (it
-    // has a selection, and the overlay path reads selectedPath()). The runtime
-    // guard that used to skip FOLDERVIEW here is gone with the binding —
-    // OverlayHost::triggerCopyOverlay still refuses folder mode as its own
-    // contract, but the key no longer reaches it there at all.
-    docDefaults.insert("C", "copyFile");
-    docDefaults.insert("M", "moveFile");
-    // The context menu is ViewerWidget's (ContextMenu is constructed and shown
-    // there, and it refuses when the viewer is not visible). The grid's
-    // right-click is an unwritten TODO (thumbnailview.cpp: "todo: context
-    // menu maybe?"), and its options popup is opened by a toolbar button, not
-    // a gesture — so RMB here never reached anything in the folder view.
-    docDefaults.insert("RMB", "contextMenu");
-    // Ctrl+V opens what the clipboard holds — a URL, or an image buffer saved
-    // to a file first. Its effect is loadPath(), i.e. "the file on screen is
-    // now that one", which needs a document view to mean anything. In the
-    // folder view there is no "the file on screen", so the binding was a
-    // global claim reaching a document action.
-    docDefaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFile");
-    // the toggle pair: keys that LEAVE the document view for the grid. They
-    // belong here, not in the global table — the grid's own Enter/Backspace
-    // (gridOpen/goUp) are live exactly while the grid holds focus, and a
-    // global claim of the same key would be ambiguous there with NEITHER
-    // firing (dispatch_probe_tests). R12c holds the tables disjoint; a key
-    // belongs to the surface it departs, not the surface it points to.
-    docDefaults.insert("Enter", "folderView");
-    docDefaults.insert("Backspace", "folderView");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+R", "rotateRight");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+L", "rotateLeft");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+WheelUp", "zoomInCursor");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+WheelDown", "zoomOutCursor");
-    docDefaults.insert("=", "zoomIn"); // [=+] key on the number row
-    docDefaults.insert(InputMap::keyNameCtrl() + "+=", "zoomIn");
-    docDefaults.insert("+", "zoomIn");
-    docDefaults.insert(InputMap::keyNameCtrl() + "++", "zoomIn");
-    docDefaults.insert("-", "zoomOut");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+-", "zoomOut");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+Down", "zoomOut");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+Up", "zoomIn");
-    docDefaults.insert("Up", "scrollUp");
-    docDefaults.insert("Down", "scrollDown");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+S", "save");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+" + InputMap::keyNameShift() + "+S", "saveAs");
-    // W, not Ctrl+W: the mass-standard close-window chord must not carry a
-    // desktop-wide side effect. The context menu keeps the command reachable
-    // (contextmenu.cpp), so the default chord only decides what the keyboard
-    // does — and bare W sits with the view's other single-letter verbs
-    // (R resize, H flip, V flip, X crop, I info).
-    docDefaults.insert("W", "setWallpaper");
-    docDefaults.insert("X", "crop");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+P", "print");
-    docDefaults.insert("Home", "jumpToFirst");
-    docDefaults.insert("End", "jumpToLast");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+Right", "seekVideoForward");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+Left", "seekVideoBackward");
-    docDefaults.insert(",", "frameStepBack");
-    docDefaults.insert(".", "frameStep");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+Z", "discardEdits");
-    docDefaults.insert(InputMap::keyNameShift() + "+Right", "nextDirectory");
-    docDefaults.insert(InputMap::keyNameShift() + "+Left", "prevDirectory");
-    docDefaults.insert("`", "toggleSlideshow");
-    docDefaults.insert(InputMap::keyNameCtrl() + "+`", "toggleShuffle");
-    docDefaults.insert("I", "toggleImageInfo");
-    docDefaults.insert("F5", "reloadImage");
-
-    // the inspect scope's defaults are platform-neutral: the arrows are the
-    // canvas keys while fit original / free zoom declare an inspection
-    inspectDefaults.insert("Left", "scrollLeft");
-    inspectDefaults.insert("Right", "scrollRight");
-
-    // the folder grid's scope defaults are the navigation the grid hardcoded
-    // before the scope system existed — one translation of that switch, so
-    // the default grid behaves byte-identically to the hardcoded era. goUp
-    // is the action the switch used to invoke directly; Enter opens the
-    // selection rather than toggling the view — the toggle lives in the
-    // DOCUMENT table (the view it departs), so neither table carries the
-    // other's key: a shared token would be ambiguous while the grid holds
-    // focus, with neither claim firing (R12c).
-    gridDefaults.insert("Left", "gridSelectPrev");
-    gridDefaults.insert("Right", "gridSelectNext");
-    gridDefaults.insert("Up", "gridSelectAbove");
-    gridDefaults.insert("Down", "gridSelectBelow");
-    gridDefaults.insert("PgUp", "gridPageUp");
-    gridDefaults.insert("PgDown", "gridPageDown");
-    gridDefaults.insert("Home", "gridSelectFirst");
-    gridDefaults.insert("End", "gridSelectLast");
-    gridDefaults.insert("Enter", "gridOpen");
-    gridDefaults.insert("Backspace", "goUp");
-    gridDefaults.insert(InputMap::keyNameCtrl() + "+A", "gridSelectAll");
-    // Ctrl+V in the folder view places the clipboard's files in the directory
-    // being browsed. The document view's Ctrl+V (pasteFile) shows the
-    // clipboard's image instead — same key, two meanings, which the scope
-    // system exists for: each table declares its own kind of "paste".
-    gridDefaults.insert(InputMap::keyNameCtrl() + "+V", "pasteFilesHere");
+    // The default keymaps, generated from the declarations: one triple per
+    // binding, into the table its scope names. The three facts that used to
+    // live in comments here survive as data and as the census test —
+    // toggleFullscreen's double-click is a GESTURE kept as a pointer token,
+    // the scopes are disjoint by construction (R12c reads the table now), and
+    // the modifier names are the platform's (pinned in shortcut_scope_tests).
+    for(const DefaultBinding &binding : ActionTable::kDefaultBindings)
+        defaultsFor(binding.scope).insert(QString::fromLatin1(binding.token), QString::fromLatin1(binding.action));
 }
 
 //------------------------------------------------------------------------------
