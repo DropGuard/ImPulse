@@ -250,6 +250,16 @@ bool ActionManager::enforceDisjointness() {
     bool removed = false;
     for(auto i = shortcuts.begin(); i != shortcuts.end();) {
         bool claimed = false;
+        // Pointer tokens stay exempt HERE, and the reason is not "they are
+        // not part of the family" (scopesClaiming answers for them now): the
+        // global table is not projected onto QShortcutMap for any token, but
+        // for KEYBOARD tokens it is the ApplicationShortcut set, live in every
+        // scope — a scope claim beside it means two live claims and neither
+        // fires. A pointer token reaches the funnel only after the inspect and
+        // document checks (actionForToken), so a global entry beside a scope
+        // claim is an ORDERED fallback, not an ambiguity: it fires in the
+        // folder view, where documentActive is false and the scope key is not
+        // live either. Erasing it would delete a working binding.
         if(!isPointerToken(i.key()))
             claimed = !scopesClaiming(i.key()).isEmpty();
         if(claimed) {
@@ -269,9 +279,17 @@ bool ActionManager::enforceDisjointness() {
 // to all of them by construction.
 QStringList ActionManager::scopesClaiming(const QString &token) const {
     QStringList claims;
-    if(isPointerToken(token))
+    if(token.isEmpty())
         return claims;
-    const QList<QKeySequence> seqs = sequencesForToken(token);
+    // Pointer tokens are matched by EXACT TOKEN, never by expansion:
+    // QKeySequence::fromString answers an invalid sequence (count 1, empty
+    // string) for every one of them, so expanding would make WheelUp, RMB and
+    // XButton1 all compare equal to each other. They do have claims worth
+    // reporting — this used to return nothing for them, which is what made
+    // the editor's conflict warning silent about a wheel button the document
+    // view already owns.
+    const bool pointer = isPointerToken(token);
+    const QList<QKeySequence> seqs = pointer ? QList<QKeySequence>() : sequencesForToken(token);
     // the scope-vs-global tables, read through the one mapping. Global is not
     // here: enforceDisjointness calls this to ask what a scope holds, and a
     // global answer would make every global token "claimed" and erase itself.
@@ -279,6 +297,13 @@ QStringList ActionManager::scopesClaiming(const QString &token) const {
         const QMap<QString, QString> &table = tableFor(scope);
         bool found = false;
         for(auto it = table.constBegin(); it != table.constEnd() && !found; ++it) {
+            if(pointer) {
+                found = it.key() == token;
+                continue;
+            }
+            // a pointer entry in a scope table has no sequence to compare
+            // against; skipping it is what keeps a wheel claim from matching
+            // every keyboard token through the shared invalid sequence
             if(isPointerToken(it.key()))
                 continue;
             const QList<QKeySequence> tokenSeqs = sequencesForToken(it.key());
