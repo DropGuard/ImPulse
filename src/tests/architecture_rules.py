@@ -431,14 +431,13 @@ if len(table_actions) < R12_ACTION_FLOOR:
     failures.append(f"R12 cannot run: actions_table.h parsed to {len(table_actions)} actions "
                     f"(floor {R12_ACTION_FLOOR}) — the row shape changed, fix this rule's parse "
                     "before trusting the tree")
-hand_written = set(re.findall(r'addAction\("([^"]+)"', am_text))
-if hand_written:
-    for name in sorted(hand_written - table_actions):
-        failures.append(f"R12 registry and table disagree: addAction(\"{name}\") has no "
-                        "actions_table.h row")
-    for name in sorted(table_actions - hand_written):
-        failures.append(f"R12 registry and table disagree: actions_table.h row \"{name}\" "
-                        "is not registered")
+# initActions is a loop over the table now, so a hand-written list here would
+# be a second registry — the exact shape this rule exists to prevent. Assert
+# the loop is what the file has, not only that some list agrees with the table.
+if not re.search(r'void ActionManager::initActions\(\) \{\s*for\(const ActionDesc &row : ActionTable::kActions\)',
+                 am_text):
+    failures.append("R12 initActions is no longer the table loop — a second registry has "
+                    "appeared; the table is the only place an action may be declared")
 for name in sorted(registered_actions - connected_actions):
     failures.append(f"R12 registered action is never connected: {name} — add the connectAction "
                     "in core.cpp or remove the registration")
@@ -465,11 +464,14 @@ if len(table_bindings) < R12B_BINDING_FLOOR:
 for name in sorted(default_actions - registered_actions):
     failures.append(f"R12b default keymap names an unregistered action: {name} — fix the "
                     "row in actions_table.h")
-init_defaults = re.search(r'void ActionManager::initDefaults\(\) \{(.*?)\n\}', am_text, re.S)
-if init_defaults:
-    legacy = {m[1] for m in re.findall(r'\.insert\((.*),\s*"([^"]+)"\)', init_defaults.group(1))}
-    for name in sorted(legacy - default_actions):
-        failures.append(f"R12b initDefaults names an action with no table binding: {name}")
+# same for the bindings: initDefaults is the table loop, or it is a second
+# keymap. The floor above already proved the table parses; this proves the
+# code reads it.
+if not re.search(r'void ActionManager::initDefaults\(\) \{[^}]*for\(const DefaultBinding &binding : '
+                 r'ActionTable::kDefaultBindings\)',
+                 am_text, re.S):
+    failures.append("R12b initDefaults is no longer the bindings loop — a second default keymap "
+                    "has appeared; the table is the only place a default may be declared")
 scanned['R12b'] = scanned.get('R12b', 0) + 1
 
 # Rule 12c: the global default table shares no live claim with any scope
