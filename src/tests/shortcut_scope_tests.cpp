@@ -552,6 +552,53 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->allInspectShortcuts(), inspectBefore);
     }
 
+    // After a user removes a default binding and saves, the NEXT process reads
+    // the same tables — that is the whole test for a restart. In-process there
+    // is no second ActionManager, so the two halves the restart consists of are
+    // pinned separately and together here: the write path through the real
+    // editor save, then a real config read into a defaults-seeded map (exactly
+    // initShortcuts' order). Without the tombstone the default came back and
+    // "unbind" was an operation the app offered and then undid.
+    void aRemovedDefaultBindingDoesNotComeBackOnRestart() {
+        // a binding the defaults really carry, so the removal is visible
+        const QMap<QString, QString> defaults = actionManager->allShortcuts();
+        QVERIFY2(defaults.contains(QStringLiteral("F11")) || defaults.key(QStringLiteral("toggleFullscreen")).size(),
+                 "the fixture assumes toggleFullscreen sits in the global defaults");
+
+        // what the editor does: drop the row, then save the table
+        actionManager->removeAllShortcuts(QStringLiteral("toggleFullscreen"));
+        actionManager->saveShortcuts();
+
+        // what the next launch does: defaults as the base layer, config overlay
+        QMap<QString, QString> asReloaded = defaults;
+        settings->readShortcuts(asReloaded);
+        QVERIFY2(!asReloaded.key(QStringLiteral("toggleFullscreen")).size(),
+                 "the removed binding came back from the default layer on reload");
+
+        // resetDefaults is the documented undo for removals and rebindings
+        actionManager->resetDefaults();
+    }
+
+    // The tombstone must not swallow a scope's own table: the four tables save
+    // to separate Controls/ keys, and a removal in the document scope must not
+    // leak into the global one (or the other way round). The document table
+    // carries no default for crop, so the row it removes there is a user
+    // binding, not a default — nothing should be tombstoned for it.
+    void tombstonesStayInsideTheirScope() {
+        const QMap<QString, QString> globalBefore = actionManager->allShortcuts();
+        actionManager->addDocShortcut(QStringLiteral("F14"), QStringLiteral("crop"));
+        actionManager->removeAllDocShortcuts(QStringLiteral("crop"));
+        actionManager->saveDocShortcuts();
+        actionManager->saveShortcuts();
+
+        QMap<QString, QString> docReloaded = actionManager->allDocShortcuts();
+        settings->readShortcuts(docReloaded, QStringLiteral("docShortcuts"));
+        // the global table is untouched by the document-scope removal
+        QCOMPARE(actionManager->allShortcuts(), globalBefore);
+
+        actionManager->resetDefaults();
+    }
+
     // Liveness flags are consumed by the resolver only — no projection
     // function reads gridActive/documentActive (grid is gated by Qt's
     // WidgetWithChildrenShortcut context on the focused subtree, the document
@@ -1063,8 +1110,7 @@ int main(int argc, char **argv) {
         return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
-        argc, argv, slot_harness::testSlots(&TestShortcutScope::staticMetaObject),
-        "shortcut_scope_tests",
+        argc, argv, slot_harness::testSlots(&TestShortcutScope::staticMetaObject), "shortcut_scope_tests",
         [argv](const QString &slot) -> int {
             coretest::setChildCoreLimit();
             QByteArray nameBytes = slot.toUtf8();

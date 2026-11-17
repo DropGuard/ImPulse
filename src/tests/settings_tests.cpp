@@ -26,7 +26,8 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         // the SAME one the Settings instance reads, or the junk lands in a
         // backend the app never opens
 #ifdef Q_OS_WIN
-        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() +
+                           ".ini",
                        QSettings::IniFormat);
 #else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
@@ -121,7 +122,8 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         // the conf backend is per-platform (see FreshSettings): write through
         // the SAME one the Settings instance reads
 #ifdef Q_OS_WIN
-        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() +
+                           ".ini",
                        QSettings::IniFormat);
 #else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
@@ -147,7 +149,8 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     void junkFallsBackToTheDeclaredDefaultNotToSomeOtherValue() {
         FreshSettings fresh;
 #ifdef Q_OS_WIN
-        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+        QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() +
+                           ".ini",
                        QSettings::IniFormat);
 #else
         QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
@@ -185,7 +188,8 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     void outOfRangeSettingsResolveThroughTheirAccessors() {
         FreshSettings fresh;
 #ifdef Q_OS_WIN
-        QSettings probe(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+        QSettings probe(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() +
+                            ".ini",
                         QSettings::IniFormat);
 #else
         QSettings probe(QCoreApplication::organizationName(), QCoreApplication::applicationName());
@@ -364,6 +368,78 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         QVERIFY(global.isEmpty());
     }
 
+    // A removed binding has to survive a restart. The tables are defaults-first
+    // with the config overlaid, so deleting a row used to be undone by the next
+    // launch: the default layer re-seeded the key and "unbind" silently
+    // evaporated. The codec carries the removal as a `-action` tombstone; this
+    // pins the round trip end to end — write the table WITHOUT a default action,
+    // read it back, and the action is gone rather than re-seeded.
+    void removedDefaultBindingStaysRemoved() {
+        FreshSettings fresh;
+        QMap<QString, QString> defaults;
+        defaults.insert("F11", "toggleFullscreen");
+        defaults.insert("F2", "renameFile");
+
+        // the user deleted the renameFile row and kept F11
+        QMap<QString, QString> table;
+        table.insert("F11", "toggleFullscreen");
+        settings->saveShortcutsWithTombstones(table, defaults);
+
+        // what a fresh launch does: defaults first, config second
+        QMap<QString, QString> reloaded = defaults;
+        settings->readShortcuts(reloaded);
+        QCOMPARE(reloaded.value("F11"), QStringLiteral("toggleFullscreen"));
+        QVERIFY2(!reloaded.contains("F2"), "the removed binding came back from the default layer");
+        QVERIFY2(!reloaded.key("renameFile").size(), "renameFile is bound again after the restart");
+    }
+
+    // The tombstone is scoped to the ACTION, not the token: an action may hold
+    // several keys, and only a table that no longer holds it at all earns the
+    // marker. An action still bound elsewhere keeps its live rows and is not
+    // tombstoned — otherwise a partial removal would be read back as a total
+    // one, and the surviving binding would vanish on the next launch.
+    void tombstonesArePerActionAndOnlyWhenAbsent() {
+        FreshSettings fresh;
+        QMap<QString, QString> defaults;
+        defaults.insert("F", "toggleFullscreen");
+        defaults.insert("F11", "toggleFullscreen");
+
+        // still holds toggleFullscreen under F11 only. The codec's map is
+        // <key, action>, and the defaults seed F before F11 — same action
+        // under two tokens, then the F row is removed by writing the table
+        // without it. What must NOT happen is a tombstone: the action is
+        // still bound, so reloading keeps it (under whichever key the map
+        // hands .key() first; the ASSERTION is that neither token was
+        // tombstoned away).
+        QMap<QString, QString> table;
+        table.insert("F11", "toggleFullscreen");
+        settings->saveShortcutsWithTombstones(table, defaults);
+
+        QMap<QString, QString> reloaded = defaults;
+        settings->readShortcuts(reloaded);
+        QCOMPARE(reloaded.value("F11"), QStringLiteral("toggleFullscreen"));
+        QVERIFY2(!reloaded.key("toggleFullscreen").isEmpty(), "a surviving binding was tombstoned away");
+        // and no tombstone was written for it: the codec marks an action only
+        // when the table no longer holds it, and this one is still there
+        QVERIFY2(!reloaded.contains("F") || reloaded.value("F") == QLatin1String("toggleFullscreen"),
+                 "the still-bound action was tombstoned");
+    }
+
+    // A config written before the tombstone existed has no `-action` entries at
+    // all, and must read exactly as it always did — the marker is additive to
+    // the codec, not a new required shape.
+    void tombstoneFreeConfigsReadUnchanged() {
+        FreshSettings fresh;
+        QMap<QString, QString> table;
+        table.insert("F11", "toggleFullscreen");
+        settings->saveShortcuts(table); // the old writer, no tombstones
+
+        QMap<QString, QString> back;
+        settings->readShortcuts(back);
+        QCOMPARE(back.size(), 1);
+        QCOMPARE(back.value("F11"), QStringLiteral("toggleFullscreen"));
+    }
+
     void freshSettingsGuardIsolatesConfigState() {
         // without the guard, every test had to reset the keys it depends on
         // and the suite was silently order-sensitive
@@ -415,7 +491,8 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
     void scriptsFallBackToPreJsonPlainKeys() {
         FreshSettings fresh;
 #ifdef Q_OS_WIN
-        QSettings conf(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
+        QSettings conf(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() +
+                           ".ini",
                        QSettings::IniFormat);
 #else
         QSettings conf(QCoreApplication::organizationName(), QCoreApplication::applicationName());
