@@ -140,6 +140,10 @@ class ActionManager : public QObject {
     // logical key only (nativeScanCode is 0 by construction), and a delivered
     // event answers through the same projected tables the map matched against.
     bool keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const;
+    // The scope an unbound action is offered in — the editor's section
+    // placement, which is a property of the action (actions_table.h's home
+    // field), not of the editor that renders it.
+    Scope homeScopeFor(const QString &action) const;
     // Which scope tables already claim this token, by display name ("document",
     // "folder view", "inspect"), empty when none does. The conflict checker
     // asks this instead of walking the tables itself — the four-table walk it
