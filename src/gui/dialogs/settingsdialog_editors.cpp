@@ -164,9 +164,11 @@ void SettingsDialog::removeScript() {
         QString scriptName = ui->scriptsListWidget->currentItem()->text();
         delete ui->scriptsListWidget->takeItem(row);
         saveShortcuts();
-        actionManager->removeAllShortcuts("s:" + scriptName);
-        actionManager->removeAllGridShortcuts("s:" + scriptName);
-        actionManager->removeAllInspectShortcuts("s:" + scriptName);
+        // every table, through one door. The three hand-written calls this
+        // replaces had already forgotten the DOCUMENT table — a script bound
+        // in the document view outlived its own deletion and kept firing.
+        for(Scope scope : kAllScopes)
+            actionManager->removeAllShortcuts(scope, QStringLiteral("s:") + scriptName);
         readShortcuts();
         scriptManager->removeScript(scriptName);
     }

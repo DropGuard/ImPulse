@@ -183,6 +183,10 @@ class ActionManager : public QObject {
     const QMap<QString, QString> &tableForPublic(Scope scope) const; // read side of tableFor
     void insertShortcut(Scope scope, const QString &keys, const QString &action);
     void removeAllShortcuts(Scope scope);
+    // erase every binding of one action from one table (the script-removal
+    // path). The per-scope spellings were three calls at that site and the
+    // site had already forgotten the fourth table once.
+    void removeAllShortcuts(Scope scope, const QString &actionName);
     void saveScope(Scope scope); // persists one table, tombstones included
     // the folder grid's scope layer, same shape as the global one
     // the document view's scope, same shape as the grid's: the table is the

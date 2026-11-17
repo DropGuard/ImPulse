@@ -1054,6 +1054,41 @@ class TestShortcutScope : public QObject {
     // question "may this be rebound without asking" is answerable without a
     // modal dialog — the confirmation itself is a QMessageBox, which no
     // headless run can dismiss.
+    // Deleting a script must unbind it from EVERY table it lives in. The
+    // three-table sweep that did this forgot the document table — the same
+    // shape the conflict checker had forgotten once before — so a script
+    // bound in the document view survived the deletion and kept firing an
+    // action the user had just removed. The general door exists so the next
+    // scope cannot be forgotten: this pin walks kAllScopes, not a list.
+    void deletingAScriptUnbindsItFromEveryScope() {
+        const QString scriptName = QStringLiteral("scope-pin-script");
+        const QString action = QStringLiteral("s:") + scriptName;
+
+        // the script has to exist to be bindable (validateAction checks it)
+        scriptManager->addScript(scriptName, Script(QStringLiteral("/bin/true"), false));
+        QSet<Scope> boundIn;
+        for(Scope scope : kAllScopes) {
+            // one distinct key per scope so the bindings cannot collide
+            const QString key = QStringLiteral("Ctrl+Alt+F") + QString::number(static_cast<int>(scope) + 1);
+            actionManager->insertShortcut(scope, key, action);
+            QCOMPARE(actionManager->tableForPublic(scope).value(key), action);
+            boundIn.insert(scope);
+        }
+        QCOMPARE(boundIn.size(), static_cast<size_t>(std::size(kAllScopes)));
+
+        // what the editor does when the script is deleted: every table
+        for(Scope scope : kAllScopes)
+            actionManager->removeAllShortcuts(scope, action);
+
+        for(Scope scope : kAllScopes) {
+            const QMap<QString, QString> &table = actionManager->tableForPublic(scope);
+            for(auto it = table.constBegin(); it != table.constEnd(); ++it)
+                QVERIFY2(it.value() != action,
+                         qPrintable(QStringLiteral("a deleted script is still bound in scope ") + scopeTag(scope)));
+        }
+        scriptManager->removeScript(scriptName);
+    }
+
     void protectedActionsAskBeforeRebinding() {
         // the destructive verbs and the way out
         for(const char *name : {"moveToTrash", "removeFile", "exit", "closeFullScreenOrExit"})
