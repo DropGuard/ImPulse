@@ -719,9 +719,8 @@ class TestCoreNav : public QObject {
         // lives, and it stays a visible, existing refusal.
         const QString longFile = QDir(alpha).filePath(QStringLiteral("locked.png"));
         writeImage(longFile);
-        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()),
-                                  GENERIC_READ | GENERIC_WRITE, 0 /* no sharing */, nullptr,
-                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
+                                  0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         QVERIFY2(held != INVALID_HANDLE_VALUE, "the lock fixture failed to open the refusable subject");
 #else
         // 250 'l' + ".png" fits the source directory (254 <= NAME_MAX) but
@@ -823,8 +822,7 @@ int main(int argc, char **argv) {
         return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
-        argc, argv, slot_harness::testSlots(&TestCoreNav::staticMetaObject),
-        "core_nav",
+        argc, argv, slot_harness::testSlots(&TestCoreNav::staticMetaObject), "core_nav",
         [argv](const QString &slot) -> int {
             coretest::setChildCoreLimit();
             QByteArray nameBytes = slot.toUtf8();

@@ -418,15 +418,14 @@ int main(int argc, char **argv) {
         DispatchProbe t;
         return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
-    return slot_harness::run_units_one_process_each(
-        argc, argv, slot_harness::testSlots(&DispatchProbe::staticMetaObject),
-        "dispatch_probe_tests",
-        [argv](const QString &slot) -> int {
-            QByteArray nameBytes = slot.toUtf8();
-            char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
-            DispatchProbe t; // this child's own fixture
-            return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        });
+    return slot_harness::run_units_one_process_each(argc, argv,
+                                                    slot_harness::testSlots(&DispatchProbe::staticMetaObject),
+                                                    "dispatch_probe_tests", [argv](const QString &slot) -> int {
+                                                        QByteArray nameBytes = slot.toUtf8();
+                                                        char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
+                                                        DispatchProbe t; // this child's own fixture
+                                                        return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
+                                                    });
 }
 
 #include "dispatch_probe_tests.moc"

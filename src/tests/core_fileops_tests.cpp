@@ -942,16 +942,15 @@ int main(int argc, char **argv) {
         TestCoreFileOps t;
         return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
-    return slot_harness::run_units_one_process_each(
-        argc, argv, slot_harness::testSlots(&TestCoreFileOps::staticMetaObject),
-        "core_fileops",
-        [argv](const QString &slot) -> int {
-            coretest::setChildCoreLimit();
-            QByteArray nameBytes = slot.toUtf8();
-            char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
-            TestCoreFileOps t;
-            return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        });
+    return slot_harness::run_units_one_process_each(argc, argv,
+                                                    slot_harness::testSlots(&TestCoreFileOps::staticMetaObject),
+                                                    "core_fileops", [argv](const QString &slot) -> int {
+                                                        coretest::setChildCoreLimit();
+                                                        QByteArray nameBytes = slot.toUtf8();
+                                                        char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
+                                                        TestCoreFileOps t;
+                                                        return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
+                                                    });
 }
 
 #include "core_fileops_tests.moc"

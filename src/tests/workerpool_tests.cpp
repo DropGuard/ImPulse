@@ -165,7 +165,7 @@ void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
 
         gate = true; // the running job finishes normally
         pool.waitForOwner(PoolOwner::Loader);
-        QCOMPARE(runs.load(), 0);   // drained jobs never ran
+        QCOMPARE(runs.load(), 0); // drained jobs never ran
         // the gated job was pool-deleted. The destructor lands on the worker
         // thread right after run() returns — the documented order — but
         // waitForOwner's guarantee is run() completion, not the destructor's

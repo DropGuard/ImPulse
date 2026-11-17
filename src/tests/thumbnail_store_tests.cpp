@@ -183,9 +183,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // true for anything that exists. The platform's denial channel is
         // sharing: a file held open with no sharing cannot be opened for read
         // by anyone, and the cache's open-probe is what refuses.
-        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(source.utf16()),
-                                  GENERIC_READ | GENERIC_WRITE, 0 /* no sharing */, nullptr,
-                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(source.utf16()), GENERIC_READ | GENERIC_WRITE,
+                                  0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         QVERIFY2(held != INVALID_HANDLE_VALUE, "the lock fixture failed to open the source");
 #else
         QVERIFY(::chmod(source.toLocal8Bit().constData(), 0) == 0);
@@ -296,7 +295,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         // entry look like OUR orphan (same Keys, our Software, original gone)
         // and require the sweep to delete it: only a correct chunk walk can see
         // the URI, and only a seen URI can be declared orphaned.
-        QVERIFY2(QFile::remove(source), qPrintable(QStringLiteral("fixture broken: the source must be removable: ") + source));
+        QVERIFY2(QFile::remove(source),
+                 qPrintable(QStringLiteral("fixture broken: the source must be removable: ") + source));
         QImage orphan(256, 192, QImage::Format_ARGB32);
         orphan.fill(Qt::red);
         orphan.setText(QStringLiteral("Thumb::URI"), ThumbnailCache::uriFor(source));
@@ -306,7 +306,8 @@ class TestThumbnailStore : public QObject, protected EngineStackFixture {
         {
             QFile raw(path);
             QVERIFY(raw.open(QIODevice::ReadOnly));
-            QVERIFY2(raw.readAll().contains("zTXt"), "fixture degenerate: this entry must exercise the compressed path");
+            QVERIFY2(raw.readAll().contains("zTXt"),
+                     "fixture degenerate: this entry must exercise the compressed path");
         }
         // the probe's handle closes above, before the sweep: Windows refuses
         // DeleteFile on an open handle (QFile shares read+write but never
