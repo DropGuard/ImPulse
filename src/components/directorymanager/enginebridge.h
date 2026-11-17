@@ -7,6 +7,42 @@
 
 struct qimgv_engine;
 
+// The engine handle, owned by value. Its destructor is the ONLY place
+// qimgv_engine_free is called, and dropping it is what makes the ordering
+// guarantee explicit: free joins the engine's loop thread, the loop joins the
+// watcher thread, and only then can EngineBridge's own destruction finish —
+// so a notify callback posted from an engine thread cannot outlive the
+// receiving QObject. Holding the handle by value means that ordering cannot
+// be skipped by forgetting a line in a destructor, which is the shape this
+// tree avoids everywhere else (commit() for table writes, WorkerPool for
+// jobs).
+//
+// Non-copyable and non-movable: exactly one owner, exactly one free. It is
+// held as a by-value member and filled with reset(), so there is never a
+// second handle to move. Copied handles would be two frees.
+class EngineHandle {
+  public:
+    EngineHandle() = default;
+    ~EngineHandle();
+    EngineHandle(const EngineHandle &) = delete;
+    EngineHandle &operator=(const EngineHandle &) = delete;
+
+    // adopt an engine created by qimgv_engine_new; nullptr is tolerated (a
+    // failed init leaves the bridge alive but dead, which the callers test).
+    // Out of line: qimgv_engine_free is an FFI symbol, and this header is not
+    // on the R2 caller allowlist — the .cpp is.
+    void reset(qimgv_engine *adopted);
+    qimgv_engine *get() const {
+        return engine;
+    }
+    explicit operator bool() const {
+        return engine != nullptr;
+    }
+
+  private:
+    qimgv_engine *engine = nullptr;
+};
+
 // Owns the process-wide Rust engine instance and pumps its events into the
 // Qt event loop. The engine's notify callback queues a drain on the UI
 // thread's event loop, and the drain pulls qimgv_engine_take_event until the
@@ -97,7 +133,7 @@ class EngineBridge : public QObject {
     void drainEvents();
 
   private:
-    qimgv_engine *engine = nullptr;
+    EngineHandle engine;
     quint32 sessionEpoch = 0;
     QString mListedDir;
 };
