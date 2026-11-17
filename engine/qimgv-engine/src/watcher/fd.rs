@@ -16,7 +16,7 @@ use inotify::{Inotify, WatchMask};
 
 // the shared glue lives with the contract it serves: the command vocabulary,
 // the stream dispatch, the baseline enumeration (see the watcher module doc)
-use super::{dispatch, enumerate_and_report, WatchCmd};
+use super::{WatchCmd, dispatch, enumerate_and_report};
 
 /// A handle to the watcher thread: sends commands, wakes the poll, joins on
 /// shutdown. (Events are tagged with the generation they belong to, so
