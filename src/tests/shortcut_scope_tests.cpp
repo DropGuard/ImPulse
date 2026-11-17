@@ -963,6 +963,36 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->shortcutForAction(QStringLiteral("openSettings")), QStringLiteral("P"));
     }
 
+    // The scope vocabulary is ONE vocabulary: the enum ActionManager commits
+    // with, the tag a saved row carries, and the label the conflict warning
+    // prints all come from the same four values. This is what the editor used
+    // to keep for itself — four function-local strings and a four-arm if/else
+    // with no else, so a row carrying a tag it did not name was dropped in
+    // silence. A fifth scope added to kAllScopes must render, save and be
+    // named without the editor changing.
+    void theScopeVocabularyIsOne() {
+        QCOMPARE(static_cast<int>(std::size(kAllScopes)), 4);
+        QSet<QString> tags, labels;
+        for(Scope scope : kAllScopes) {
+            const QString tag = scopeTag(scope);
+            const QString label = scopeLabel(scope);
+            QVERIFY2(!tag.isEmpty() && !label.isEmpty(), "a scope with no tag or label");
+            QVERIFY2(!tags.contains(tag), qPrintable(QStringLiteral("duplicate scope tag: ") + tag));
+            QVERIFY2(!labels.contains(label), qPrintable(QStringLiteral("duplicate scope label: ") + label));
+            tags.insert(tag);
+            labels.insert(label);
+            // the tag round-trips through the parser a saved row is read with
+            Scope back = Scope::Global;
+            QVERIFY2(scopeFromTag(tag, back) && back == scope,
+                     qPrintable(QStringLiteral("tag did not round-trip: ") + tag));
+        }
+        // an unknown tag is refused, not silently mapped to Global — that
+        // silent mapping is how a newer scope's rows would land in the wrong
+        // table instead of being reported
+        Scope ignored = Scope::Global;
+        QVERIFY(!scopeFromTag(QStringLiteral("no-such-scope"), ignored));
+    }
+
     // The keymap page renders as scenarios: one section per scope under a
     // header row, and a row saves into the table its section stands for.
     // The render half is pinned through readSettings (a public slot); the
@@ -999,7 +1029,7 @@ class TestShortcutScope : public QObject {
             else if(tag == QLatin1String("inspect"))
                 inspect++;
         }
-        QCOMPARE(headers, 4); // global, document, folder view, inspect
+        QCOMPARE(headers, static_cast<int>(std::size(kAllScopes))); // one section per scope
         QCOMPARE(global, globalBefore);
         QCOMPARE(grid, gridBefore);
         QCOMPARE(document, docBefore);
