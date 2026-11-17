@@ -82,6 +82,49 @@ class TestShortcutScope : public QObject {
         QCOMPARE(scroll.count(), 1);
     }
 
+    // Pointer tokens never ride QShortcutMap, so they have no projection to
+    // prove: what can be wrong is the RESOLUTION ORDER, which is code and was
+    // pinned by nothing. The order is inspect -> document -> global, and the
+    // last step is not decoration: the global table is the folder view's
+    // fallback for a pointer token (documentActive is false there), which is
+    // why enforceDisjointness deliberately does NOT erase a global entry a
+    // scope also holds. Both halves are asserted here — the ordering, and the
+    // fallback existing at all.
+    void pointerTokensResolveInOrderAndKeepTheirGlobalFallback() {
+        const QString token = QStringLiteral("WheelUp");
+        QVERIFY2(actionManager->tableForPublic(Scope::Document).value(token) == QLatin1String("prevImage"),
+                 "the fixture assumes the document table owns WheelUp");
+
+        // 1. the document scope answers while the document view is live
+        actionManager->setInspectMode(false);
+        actionManager->setDocumentActive(true);
+        QCOMPARE(actionManager->actionForToken(token), QStringLiteral("prevImage"));
+
+        // 2. the global table is the fallback when no scope is live — the
+        // binding this test plants exists only for the duration of the test
+        actionManager->insertShortcut(Scope::Global, token, QStringLiteral("exit"));
+        actionManager->setDocumentActive(false);
+        QCOMPARE(actionManager->actionForToken(token), QStringLiteral("exit"));
+        // and it did not have to be erased to coexist with the scope claim
+        QCOMPARE(actionManager->tableForPublic(Scope::Global).value(token), QStringLiteral("exit"));
+        QCOMPARE(actionManager->tableForPublic(Scope::Document).value(token), QStringLiteral("prevImage"));
+
+        // 3. the armed inspect layer outranks the document table
+        actionManager->setDocumentActive(true);
+        actionManager->insertShortcut(Scope::Inspect, token, QStringLiteral("scrollLeft"));
+        actionManager->setInspectMode(true);
+        QCOMPARE(actionManager->actionForToken(token), QStringLiteral("scrollLeft"));
+        actionManager->setInspectMode(false);
+        QCOMPARE(actionManager->actionForToken(token), QStringLiteral("prevImage"));
+
+        // restore the family to its defaults for the rest of the suite
+        actionManager->removeAllShortcuts(Scope::Global, QStringLiteral("exit"));
+        actionManager->removeAllShortcuts(Scope::Inspect, QStringLiteral("scrollLeft"));
+        actionManager->resetDefaults();
+        actionManager->setDocumentActive(true);
+        actionManager->setInspectMode(false);
+    }
+
     // the crop action wiring is live from initActions, but the crop panel is
     // built in setupFullUi — which runs on the window's own first show
     // (MW::shownOnce). showCropPanel used to dereference the not-yet-created
@@ -910,8 +953,20 @@ class TestShortcutScope : public QObject {
         QVERIFY2(enter.contains(QStringLiteral("folder view")), qPrintable(enter.join(", ")));
         // a key nobody scopes claims nothing
         QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("F13")).isEmpty());
-        // pointer tokens never ride QShortcutMap and are exempt by design
-        QVERIFY(actionManager->scopeClaimsForToken(QStringLiteral("WheelUp")).isEmpty());
+        // Pointer tokens DO answer now. They used to return empty here, and
+        // that silence was the lie: WheelUp is bound in the document table, so
+        // the editor's "this shortcut is used for …" line said nothing about a
+        // bind the user was about to shadow. Exact-token matching is what makes
+        // this safe — every pointer token expands to the same invalid sequence,
+        // so an expansion-based walk would report all of them for any of them.
+        const QStringList wheel = actionManager->scopeClaimsForToken(QStringLiteral("WheelUp"));
+        QVERIFY2(wheel.contains(QStringLiteral("document")), qPrintable(wheel.join(", ")));
+        // and the expansion trap itself: RMB and XButton1 must NOT claim each
+        // other's scopes, which is what they would do if compared as sequences
+        QVERIFY(!actionManager->scopeClaimsForToken(QStringLiteral("RMB")).contains(QStringLiteral("folder view")));
+        const QStringList x1 = actionManager->scopeClaimsForToken(QStringLiteral("XButton1"));
+        QVERIFY2(x1.contains(QStringLiteral("document")), qPrintable(x1.join(", ")));
+        QVERIFY2(!x1.contains(QStringLiteral("inspect")), qPrintable(x1.join(", ")));
     }
 
     // The same walk answers the GLOBAL half, which used to be stitched on by
