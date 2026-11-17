@@ -1123,7 +1123,10 @@ class TestShortcutScope : public QObject {
         // an injected row in the grid section saves into the grid table only
         const int injectRow = table->rowCount();
         table->insertRow(injectRow);
-        QTableWidgetItem *actionItem = new QTableWidgetItem(QStringLiteral("gridSelectLast"));
+        QTableWidgetItem *actionItem = new QTableWidgetItem(QStringLiteral("Select last"));
+        // the row's identity is the tooltip (the registry name); the visible
+        // cell is a display name, which a translated UI changes
+        actionItem->setToolTip(QStringLiteral("gridSelectLast"));
         actionItem->setData(Qt::UserRole, QStringLiteral("grid"));
         table->setItem(injectRow, 0, actionItem);
         table->setItem(injectRow, 1, new QTableWidgetItem(QStringLiteral("F7")));
@@ -1168,7 +1171,11 @@ class TestShortcutScope : public QObject {
             QTableWidgetItem *actionItem = table->item(r, 0);
             if(!actionItem || actionItem->data(Qt::UserRole).toString().isEmpty())
                 continue; // a header
-            const QString action = actionItem->text();
+            // the registry name lives in the tooltip; the cell shows the
+            // display name and may be translated — a sweep that read the text
+            // would compare display names against registry names
+            const QString action = actionItem->toolTip();
+            QVERIFY2(!action.isEmpty(), "a bound or offered row carries no registry name");
             const QString shortcut = table->item(r, 1)->text();
             if(shortcut.isEmpty()) {
                 unboundRows++;
@@ -1176,6 +1183,9 @@ class TestShortcutScope : public QObject {
                 QVERIFY2(actionItem->foreground().color() == Qt::gray,
                          qPrintable(QStringLiteral("the unbound row for ") + action + " does not read as an offer"));
             }
+            QVERIFY2(actionItem->text() != action || !ActionTable::descFor(action),
+                     qPrintable(QStringLiteral("the row still shows the registry name instead of a display name: ") +
+                                action));
             seen.insert(action);
         }
         QVERIFY2(unboundRows > 0, "no unbound actions were offered — the orphans are still invisible");
@@ -1198,7 +1208,7 @@ class TestShortcutScope : public QObject {
         int quickCopyRow = -1;
         for(int r = 0; r < table->rowCount(); r++) {
             QTableWidgetItem *actionItem = table->item(r, 0);
-            if(actionItem && actionItem->text() == QLatin1String("quickCopy") &&
+            if(actionItem && actionItem->toolTip() == QLatin1String("quickCopy") &&
                !actionItem->data(Qt::UserRole).toString().isEmpty())
                 quickCopyRow = r;
         }
