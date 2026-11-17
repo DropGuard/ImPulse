@@ -142,6 +142,14 @@ target_link_libraries(dispatch_probe_tests PRIVATE Qt6::Test Qt6::Widgets)
 add_test(NAME DISPATCH_PROBE COMMAND dispatch_probe_tests)
 set_tests_properties(DISPATCH_PROBE PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
+# the tree's style, as a test rather than only as a pre-commit stage: a
+# skipped hook leaves no trace in the history (that is how the Windows port's
+# fifteen hand-formatted files arrived), while a skip here is recorded in the
+# run and a pass here covers the whole tree, not the staged subset.
+add_test(NAME FORMAT_RULES
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/format_rules.py)
+set_tests_properties(FORMAT_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
+
 # lint cache contract: cold==warm, header fan-out, include shadowing. Skips
 # (77) where the lint tools are not installed — the gate itself needs them,
 # but a bare configure-and-test should not fail on their absence.
