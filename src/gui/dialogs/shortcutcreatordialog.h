@@ -21,7 +21,7 @@ class ShortcutCreatorDialog : public QDialog {
     ~ShortcutCreatorDialog() override;
     QString selectedAction();
     QString selectedShortcut();
-    void setAction(QString);
+    void setAction(const QString &);
     void setShortcut(const QString &);
 
   private slots:
@@ -30,4 +30,5 @@ class ShortcutCreatorDialog : public QDialog {
   private:
     Ui::ShortcutCreatorDialog *ui;
     QList<QString> actionList, scriptList;
+    QString lastCategory; // the chooser's grouping cursor
 };

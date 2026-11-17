@@ -8,6 +8,7 @@
 
 #include "settingsdialog.h"
 #include "appversion.h"
+#include "actions_table.h"
 
 #include <QFileInfo>
 #include <QMessageBox>
@@ -172,12 +173,17 @@ void SettingsDialog::removeScript() {
 }
 //------------------------------------------------------------------------------
 // does not check if the shortcut already there
+// The action cell shows the DISPLAY name; the registry name — the stable
+// identity every table and config keys on — rides Qt::ToolTipRole. The row's
+// Scope is Qt::UserRole. Sweeps therefore read the name from the role, never
+// from the visible text: a translated UI must not change what a row means.
 void SettingsDialog::addShortcutToTable(const QString &action, const QString &shortcut, Scope scope) {
     if(action.isEmpty() || shortcut.isEmpty())
         return;
 
     ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
-    QTableWidgetItem *actionItem = new QTableWidgetItem(action);
+    QTableWidgetItem *actionItem = new QTableWidgetItem(actionDisplayName(action));
+    actionItem->setToolTip(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
     actionItem->setData(Qt::UserRole, scopeTag(scope)); // which table this row saves into
     ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
@@ -193,7 +199,8 @@ void SettingsDialog::addShortcutToTable(const QString &action, const QString &sh
 // destination, the same "section = table" rule every bound row follows.
 void SettingsDialog::addUnboundActionRow(const QString &action, Scope scope) {
     ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
-    QTableWidgetItem *actionItem = new QTableWidgetItem(action);
+    QTableWidgetItem *actionItem = new QTableWidgetItem(actionDisplayName(action));
+    actionItem->setToolTip(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
     actionItem->setData(Qt::UserRole, scopeTag(scope));
     actionItem->setForeground(QBrush(Qt::gray));
@@ -256,6 +263,26 @@ void SettingsDialog::addSectionHeader(const QString &title) {
     header->setFlags(Qt::ItemIsEnabled);
     ui->shortcutsTableWidget->setItem(row, 0, header);
     ui->shortcutsTableWidget->setSpan(row, 0, 1, 2);
+}
+
+// The action a row stands for, by its stable registry name. The visible cell
+// is the display name (and a translated UI can change it), so every reader
+// that feeds a table or a dialog asks this, never the cell's text.
+QString SettingsDialog::rowAction(int row) const {
+    QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(row, 0);
+    if(!actionItem)
+        return QString();
+    return actionItem->toolTip();
+}
+
+// What the UI calls an action: the table's display string, translated at the
+// point of display. An unknown name (a script "s:…", or a row from a newer
+// config) falls back to the name itself rather than showing nothing.
+QString SettingsDialog::actionDisplayName(const QString &action) const {
+    if(action.startsWith(QLatin1String("s:")))
+        return action.mid(2);
+    const ActionDesc *row = ActionTable::descFor(action);
+    return row ? tr(row->display) : action;
 }
 
 // the scope a row belongs to. False for the section headers (no tag), which
@@ -325,7 +352,7 @@ void SettingsDialog::editShortcut(int row) {
         return; // headers open a section, they are not editable bindings
     ShortcutCreatorDialog w;
     w.setWindowTitle(tr("Edit shortcut"));
-    w.setAction(ui->shortcutsTableWidget->item(row, 0)->text());
+    w.setAction(rowAction(row));
     w.setShortcut(ui->shortcutsTableWidget->item(row, 1)->text());
     if(!w.exec())
         return;
@@ -382,7 +409,7 @@ void SettingsDialog::saveShortcuts() {
         const QString shortcut = shortcutItem->text();
         if(shortcut.isEmpty())
             continue; // an unbound-action row: offered, never bound
-        actionManager->insertShortcut(scope, shortcut, actionItem->text());
+        actionManager->insertShortcut(scope, shortcut, rowAction(i));
     }
 }
 //------------------------------------------------------------------------------

@@ -52,6 +52,10 @@ class SettingsDialog : public QDialog {
     Ui::SettingsDialog *ui;
 
     void addShortcutToTable(const QString &action, const QString &shortcut, Scope scope);
+    // the stable registry name a row stands for (the cell shows a display name)
+    QString rowAction(int row) const;
+    // display name for an action, translated; the raw name for scripts/unknowns
+    QString actionDisplayName(const QString &action) const;
     void addSectionHeader(const QString &title);
     // the section title for a scope (the editor's own prose, not the label the
     // conflict warning uses)

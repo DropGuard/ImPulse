@@ -243,4 +243,18 @@ constexpr DefaultBinding kDefaultBindings[] = {
     {"scrollRight", Scope::Inspect, "Right"},
 };
 
+// ---- derived views ----------------------------------------------------------
+//
+// The rows are the data; these are the three questions the UI asks of them.
+// They live beside the table rather than in ActionManager so that any reader
+// (the settings editor, the shortcut chooser, a future command palette) asks
+// the same source — and so actionmanager.h does not have to know ActionDesc.
+
+inline const ActionDesc *descFor(const QString &name) {
+    for(const ActionDesc &row : kActions)
+        if(name == QLatin1String(row.name))
+            return &row;
+    return nullptr;
+}
+
 } // namespace ActionTable
