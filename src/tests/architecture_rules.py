@@ -241,15 +241,27 @@ else:
 TABLE_KEYS = set()
 table_path = os.path.join(SRC, 'settings_table.h')
 if os.path.exists(table_path):
-    TABLE_KEYS = set(re.findall(r'=\s*(?:INT|INT_RESET|REAL|BOOL|STR)\("([^"]+)"', text_of(table_path)))
+    # The factory NAME is not part of the contract: a row is
+    # `<anything>("key", ...)` assigned into a SettingDesc. Matching a fixed
+    # name list made this rule go blind without saying so when the factories
+    # were renamed off the Win32 BOOL/INT typedef collision (2026-11-18):
+    # twelve of the nineteen rows still parsed (REAL/STR kept their names),
+    # so the "parsed to zero" guard below stayed quiet while 56 keys dropped
+    # out of the set — and an injected raw read of confirmTrash/JPEGSaveQuality
+    # passed green. Match the shape, and hold a floor so the next rename is a
+    # red by name instead of a silent half-scan.
+    TABLE_KEYS = set(re.findall(r'=\s*[A-Za-z_]\w*\(\s*"([^"]+)"', text_of(table_path)))
+R8_KEY_FLOOR = 50  # 63 rows today; the floor is the blindness alarm, not a count
 RAW_BYPASS = re.compile(r'(?:settingsConf|stateConf|themeConf)->(?:value|setValue)\(\s*"([^"]+)"')
 MAPPING_EXEMPT = {
     'mpvBinary',      # resolves to a fallback binary by file existence
     'panelPosition',  # maps a string to an enum member, else-branch is the default
 }
 settings_path = os.path.join(SRC, 'settings.cpp')
-if not TABLE_KEYS:
-    failures.append("R8 cannot run: settings_table.h keys parsed to zero — update this rule, do not let it scan nothing")
+if len(TABLE_KEYS) < R8_KEY_FLOOR:
+    failures.append(f"R8 cannot run: settings_table.h parsed to {len(TABLE_KEYS)} keys "
+                    f"(floor {R8_KEY_FLOOR}) — the row shape changed, fix this rule's parse "
+                    "before trusting the tree; a half-scanned table passes raw reads")
 elif os.path.exists(settings_path):
     scanned['R8'] = scanned.get('R8', 0) + 1
     for lineno, line in enumerate(text_of(settings_path).splitlines(), 1):
