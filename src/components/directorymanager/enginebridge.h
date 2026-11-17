@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 
+#include <memory>
 #include <vector>
 
 // The engine handle, owned by value. Its destructor is the ONLY place
@@ -15,12 +16,14 @@
 // tree avoids everywhere else (commit() for table writes, WorkerPool for
 // jobs).
 //
-// The FFI type is PRIVATE TO THE .cpp, on purpose. The handle used to declare
-// reset()/get() taking the engine's C pointer here, which put the FFI type in a
-// public header and made every includer a potential FFI caller that R2 — which
-// scans #include lines — could not see. Now the header carries no mention of
-// the type at all: the engine is a pimpl, adopted with adopt(), and the raw
-// pointer never leaves the translation unit that owns it.
+// TRUE PIMPL here, for a specific reason: the engine's C type must not appear
+// in a public header at all. It used to, through reset()/get() parameters, and
+// R2 — which scans for the FFI vocabulary — then could not see the leak. An
+// erased void* fixed the symptom and cost compile-time type safety for no
+// gain; a private implementation struct keeps both. The cost is a constructor
+// and a destructor out of line, and it is the whole cost: the handle stays
+// non-copyable and non-movable (both are deleted below, and the unique_ptr
+// would not have made it movable on its own).
 //
 // Non-copyable, non-movable: exactly one owner, exactly one free.
 class EngineHandle {
@@ -29,22 +32,27 @@ class EngineHandle {
     ~EngineHandle();
     EngineHandle(const EngineHandle &) = delete;
     EngineHandle &operator=(const EngineHandle &) = delete;
+    EngineHandle(EngineHandle &&) = delete;
+    EngineHandle &operator=(EngineHandle &&) = delete;
 
     // Takes ownership of an engine created by the FFI constructor; nullptr is a
     // live-but-dead bridge, which the callers test through operator bool.
-    // Defined in the .cpp because its parameter and its destructor are the
-    // FFI type.
+    // The parameter is void* only because the FFI type is not nameable here —
+    // the definition casts once, in the translation unit that owns the type.
     void adopt(void *created);
-    // the raw handle, for the .cpp's own FFI calls (never stored by callers)
-    void *raw() const {
-        return engine;
-    }
-    explicit operator bool() const {
-        return engine != nullptr;
-    }
+    explicit operator bool() const;
+    // the .cpp's own FFI calls need the typed handle; nothing outside this
+    // translation unit may ask for it, so it is not declared here — the .cpp
+    // reads d->engine directly.
 
   private:
-    void *engine = nullptr; // the FFI handle, erased: see the note above
+    struct Impl;
+    // Defined in the .cpp: Impl is incomplete here, so this is also what makes
+    // the destructor's ordering (see above) stay out of the header.
+    std::unique_ptr<Impl> d;
+    // EngineBridge issues the FFI calls; it reads d->engine and nothing else.
+    // A narrower door than a public accessor: no other type can reach it.
+    friend class EngineBridge;
 };
 
 // Owns the process-wide Rust engine instance and pumps its events into the
