@@ -51,12 +51,17 @@ class SettingsDialog : public QDialog {
     void readScripts();
     Ui::SettingsDialog *ui;
 
-    void addShortcutToTable(const QString &action, const QString &shortcut, const QString &scope);
+    void addShortcutToTable(const QString &action, const QString &shortcut, Scope scope);
     void addSectionHeader(const QString &title);
-    void addUnboundActionRow(const QString &action, const QString &scope);
-    void addUnboundRows(const QString &scope);
-    QString rowScope(int row) const;
-    QString selectedScope() const;
+    // the section title for a scope (the editor's own prose, not the label the
+    // conflict warning uses)
+    QString sectionTitle(Scope scope) const;
+    void addUnboundActionRow(const QString &action, Scope scope);
+    void addUnboundRows(Scope scope);
+    // false for a section header (no tag) and for a tag this build does not
+    // name — both are "not a binding", never a silent drop
+    bool rowScope(int row, Scope &out) const;
+    Scope selectedScope() const;
     void addScriptToList(const QString &name);
 
     void setupSidebar();

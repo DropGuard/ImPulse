@@ -253,20 +253,46 @@ void ActionManager::eraseAction(QMap<QString, QString> &table, const QString &ac
     }
 }
 
+QMap<QString, QString> &ActionManager::tableFor(Scope scope) {
+    switch(scope) {
+    case Scope::Global: return shortcuts;
+    case Scope::Document: return docShortcuts;
+    case Scope::Grid: return gridShortcuts;
+    case Scope::Inspect: return inspectShortcuts;
+    }
+    return shortcuts; // unreachable: the switch is exhaustive
+}
+
+const QMap<QString, QString> &ActionManager::tableFor(Scope scope) const {
+    switch(scope) {
+    case Scope::Global: return shortcuts;
+    case Scope::Document: return docShortcuts;
+    case Scope::Grid: return gridShortcuts;
+    case Scope::Inspect: return inspectShortcuts;
+    }
+    return shortcuts;
+}
+
+const QMap<QString, QString> &ActionManager::defaultsFor(Scope scope) const {
+    switch(scope) {
+    case Scope::Global: return defaults;
+    case Scope::Document: return docDefaults;
+    case Scope::Grid: return gridDefaults;
+    case Scope::Inspect: return inspectDefaults;
+    }
+    return defaults;
+}
+
 void ActionManager::commit(Scope scope, const TableMutator &mutate) {
     // the mutable table reference never leaves this function: it is created,
     // handed to the mutator, and gone. There is no accessor returning a
     // writable table, so a writer cannot edit a table and skip the law or
     // the projection rebuild — that combination is unwritable, not just
     // discouraged.
-    QMap<QString, QString> *table = &shortcuts;
-    switch(scope) {
-    case Scope::Global: table = &shortcuts; break;
-    case Scope::Document: table = &docShortcuts; break;
-    case Scope::Grid: table = &gridShortcuts; break;
-    case Scope::Inspect: table = &inspectShortcuts; break;
-    }
-    mutate(*table);
+    // one table mapping for the whole class: this switch used to be the only
+    // one, so a second consumer (the editor's save path) grew its own copy
+    // of the same four names and could disagree with it.
+    mutate(tableFor(scope));
     // the law applies to every commit: a global edit can introduce a token a
     // scope owns, and a scope edit can introduce a token the global table
     // still holds — either direction is the same ambiguity
@@ -314,19 +340,13 @@ QStringList ActionManager::scopesClaiming(const QString &token) const {
     if(isPointerToken(token))
         return claims;
     const QList<QKeySequence> seqs = sequencesForToken(token);
-    struct ScopeTable {
-        Scope scope;
-        const QMap<QString, QString> *table;
-        const char *label;
-    };
-    const ScopeTable tables[] = {
-        {Scope::Document, &docShortcuts, "document"},
-        {Scope::Grid, &gridShortcuts, "folder view"},
-        {Scope::Inspect, &inspectShortcuts, "inspect"},
-    };
-    for(const ScopeTable &entry : tables) {
+    // the scope-vs-global tables, read through the one mapping. Global is not
+    // here: enforceDisjointness calls this to ask what a scope holds, and a
+    // global answer would make every global token "claimed" and erase itself.
+    for(Scope scope : {Scope::Document, Scope::Grid, Scope::Inspect}) {
+        const QMap<QString, QString> &table = tableFor(scope);
         bool found = false;
-        for(auto it = entry.table->constBegin(); it != entry.table->constEnd() && !found; ++it) {
+        for(auto it = table.constBegin(); it != table.constEnd() && !found; ++it) {
             if(isPointerToken(it.key()))
                 continue;
             const QList<QKeySequence> tokenSeqs = sequencesForToken(it.key());
@@ -338,7 +358,7 @@ QStringList ActionManager::scopesClaiming(const QString &token) const {
             }
         }
         if(found)
-            claims << QString::fromLatin1(entry.label);
+            claims << scopeLabel(scope);
     }
     return claims;
 }
@@ -355,6 +375,37 @@ QStringList ActionManager::scopesClaiming(const QString &token) const {
 // (inserting a null row into the live map as a side effect of a question),
 // and had to be stitched on by the dialog as the string "(global)". One walk,
 // one label list — the same reason the scope half was consolidated.
+//------------------------------------------------------------------------------
+QString scopeLabel(Scope scope) {
+    switch(scope) {
+    case Scope::Global: return QStringLiteral("global");
+    case Scope::Document: return QStringLiteral("document");
+    case Scope::Grid: return QStringLiteral("folder view");
+    case Scope::Inspect: return QStringLiteral("inspect");
+    }
+    return QString();
+}
+
+QString scopeTag(Scope scope) {
+    switch(scope) {
+    case Scope::Global: return QStringLiteral("all");
+    case Scope::Document: return QStringLiteral("document");
+    case Scope::Grid: return QStringLiteral("grid");
+    case Scope::Inspect: return QStringLiteral("inspect");
+    }
+    return QString();
+}
+
+bool scopeFromTag(const QString &tag, Scope &out) {
+    for(Scope scope : kAllScopes) {
+        if(scopeTag(scope) == tag) {
+            out = scope;
+            return true;
+        }
+    }
+    return false;
+}
+
 QStringList ActionManager::scopeClaimsForToken(const QString &token) const {
     QStringList claims = scopesClaiming(token);
     const QString globalAction = shortcuts.value(token);
@@ -761,6 +812,33 @@ void ActionManager::setInspectMode(bool inspect) {
     applyInspectProjection();
 }
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// The editor's doors: a Scope VALUE, not a per-scope function name. Every one
+// of these delegates to the machinery the named spellings already use — the
+// point is that the editor (and any future reader) never carries a second
+// copy of the four-name vocabulary.
+const QMap<QString, QString> &ActionManager::tableForPublic(Scope scope) const {
+    return tableFor(scope);
+}
+
+void ActionManager::insertShortcut(Scope scope, const QString &keys, const QString &action) {
+    if(validateAction(action) == ActionType::ACTION_INVALID)
+        return;
+    commit(scope, [&](QMap<QString, QString> &t) {
+        t.insert(keys, action);
+    });
+}
+
+void ActionManager::removeAllShortcuts(Scope scope) {
+    commit(scope, [](QMap<QString, QString> &t) {
+        t.clear();
+    });
+}
+
+void ActionManager::saveScope(Scope scope) {
+    settings->saveShortcutsWithTombstones(tableFor(scope), defaultsFor(scope), scopeTag(scope));
+}
+
 void ActionManager::saveShortcuts() {
     // With tombstones, not the bare map: the codec writes a `-action` for every
     // default this table no longer holds, and the matching read pass removes

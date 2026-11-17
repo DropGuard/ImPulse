@@ -60,6 +60,37 @@ enum ActionType {
 // action does, not of the state the app is in.
 bool isSubjectChangingAction(const QString &actionName);
 
+// The binding tables' four scopes. Public because it is a FACT ABOUT THE
+// KEYMAP, not an implementation detail of this class: the settings editor
+// renders and saves scopes, its rows carry one as their identity, and the
+// tree used to spell the same four concepts three ways — this enum, the
+// editor's function-local "all"/"document"/"grid"/"inspect" strings, and a
+// separate if/else chain in the save path. A fifth scope added to the family
+// used to be silently droppable by the chain's missing else.
+//   Global   — live everywhere (ApplicationShortcut projection)
+//   Document — while one image is on screen
+//   Grid     — while the folder view holds keyboard focus
+//   Inspect  — the document table's variant while fit-original/free-zoom arms
+enum class Scope {
+    Global,
+    Document,
+    Grid,
+    Inspect
+};
+// Every scope, in the order the editor renders them. ONE enumeration point:
+// the editors that draw sections, the writers that save them, and any census
+// that must cover the family all read this, so a scope cannot be added to
+// one reader and forgotten by another.
+constexpr Scope kAllScopes[] = {Scope::Global, Scope::Document, Scope::Grid, Scope::Inspect};
+// The display name each table answers with (the conflict warning's labels and
+// the editor's section titles both come from here).
+QString scopeLabel(Scope scope);
+// The stable tag a saved row carries (Qt::UserRole) and a config section keys
+// on — the codec's spelling, not the display name.
+QString scopeTag(Scope scope);
+// Parse a tag back; an unknown tag is the caller's error to handle.
+bool scopeFromTag(const QString &tag, Scope &out);
+
 class ActionManager : public QObject {
     Q_OBJECT
   public:
@@ -134,6 +165,21 @@ class ActionManager : public QObject {
     void removeAllShortcuts(const QString &actionName);
     QString keyForNativeScancode(quint32 scanCode);
     void saveShortcuts();
+    // ---- the scope-generic doors -----------------------------------------
+    //
+    // The four per-scope spellings below (addDocShortcut, saveGridShortcuts,
+    // ...) predate the scope family being ONE concept, and the editor that
+    // consumes them carried a parallel vocabulary of its own: four string
+    // tags, four render passes and a four-arm if/else that dropped an unknown
+    // tag silently. These general doors are what the editor uses; a scope is
+    // a value, not a function name, so a fifth scope reaches the editor
+    // through kAllScopes without the editor learning anything new.
+    // The per-scope spellings stay while their call sites (Core, tests,
+    // the projection) still read better that way.
+    const QMap<QString, QString> &tableForPublic(Scope scope) const; // read side of tableFor
+    void insertShortcut(Scope scope, const QString &keys, const QString &action);
+    void removeAllShortcuts(Scope scope);
+    void saveScope(Scope scope); // persists one table, tombstones included
     // the folder grid's scope layer, same shape as the global one
     // the document view's scope, same shape as the grid's: the table is the
     // keymap editor's storage and the projection's source
@@ -231,16 +277,17 @@ class ActionManager : public QObject {
     // The map is passed as a MUTABLE REFERENCE inside the lambda, so the
     // lambda body is ordinary QMap code; what it cannot do is forget the
     // follow-up, because it never gets a chance to run one.
-    enum class Scope {
-        Global,
-        Document,
-        Grid,
-        Inspect
-    };
     using TableMutator = std::function<void(QMap<QString, QString> &)>;
     void commit(Scope scope, const TableMutator &mutate);
     // the shared erase-all-by-action loop the four removeAll* doors use
     static void eraseAction(QMap<QString, QString> &table, const QString &actionName);
+    // The table a scope names, and its default layer. ONE mapping: every
+    // consumer that used to reach for `&shortcuts`/`&docShortcuts` by hand
+    // (the commit switch, the editor's save/persist paths) now asks here, so
+    // a fifth scope cannot acquire a table in one place and miss another.
+    QMap<QString, QString> &tableFor(Scope scope);
+    const QMap<QString, QString> &tableFor(Scope scope) const;
+    const QMap<QString, QString> &defaultsFor(Scope scope) const;
     // the disjointness law, run by commit() after every write: a token a
     // scope table owns is removed from the global table. Returns true when
     // it removed something (commit ignores the result; it exists for tests).

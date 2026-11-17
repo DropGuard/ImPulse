@@ -17,30 +17,13 @@
 #include <utility>
 #include "ui_settingsdialog.h"
 
-// the shortcut table's scope tags, carried as Qt::UserRole on the action
-// item. Section headers carry no tag, which is what every sweep uses to
+// The shortcut table's scope identity rides each row as Qt::UserRole, using
+// the SAME Scope enum ActionManager commits with (scopeTag / scopeFromTag are
+// the codec's spelling). This file used to carry its own four function-local
+// strings for the same concepts — a parallel vocabulary that had to be kept in
+// sync by hand, and a save path whose if/else chain dropped an unknown tag in
+// silence. Section headers carry no tag, which is what every sweep uses to
 // skip them: a header is prose about a scenario, not a binding.
-// Function-local statics on purpose: a namespace-scope QString is a
-// non-POD global with a static-init order, which is exactly what clazy's
-// non-pod-global-static exists to name.
-namespace {
-const QString &scopeGlobal() {
-    static const QString s = QStringLiteral("all");
-    return s;
-}
-const QString &scopeGrid() {
-    static const QString s = QStringLiteral("grid");
-    return s;
-}
-const QString &scopeInspect() {
-    static const QString s = QStringLiteral("inspect");
-    return s;
-}
-const QString &scopeDocument() {
-    static const QString s = QStringLiteral("document");
-    return s;
-}
-} // namespace
 
 //------------------------------------------------------------------------------
 void SettingsDialog::readColorScheme() {
@@ -97,44 +80,26 @@ void SettingsDialog::readShortcuts() {
     ui->shortcutsTableWidget->setRowCount(0);
     ui->shortcutsTableWidget->setSortingEnabled(false);
 
-    addSectionHeader(tr("Global — everywhere else"));
-    QList<QPair<QString, QString>> rows;
-    const QMap<QString, QString> shortcuts = actionManager->allShortcuts();
-    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it)
-        rows.append({it.value(), it.key()});
-    std::sort(rows.begin(), rows.end());
-    for(const auto &row : rows)
-        addShortcutToTable(row.first, row.second, scopeGlobal());
-
-    addSectionHeader(tr("Document view — while one image is on screen"));
-    rows.clear();
-    const QMap<QString, QString> docShortcuts = actionManager->allDocShortcuts();
-    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
-        rows.append({it.value(), it.key()});
-    std::sort(rows.begin(), rows.end());
-    for(const auto &row : rows)
-        addShortcutToTable(row.first, row.second, scopeDocument());
-    addUnboundRows(scopeDocument());
-
-    addSectionHeader(tr("Folder view — while the thumbnail grid holds focus"));
-    rows.clear();
-    const QMap<QString, QString> gridShortcuts = actionManager->allGridShortcuts();
-    for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it)
-        rows.append({it.value(), it.key()});
-    std::sort(rows.begin(), rows.end());
-    for(const auto &row : rows)
-        addShortcutToTable(row.first, row.second, scopeGrid());
-    addUnboundRows(scopeGrid());
-
-    addSectionHeader(tr("Inspect — while fit original / free zoom is armed"));
-    rows.clear();
-    const QMap<QString, QString> inspectShortcuts = actionManager->allInspectShortcuts();
-    for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
-        rows.append({it.value(), it.key()});
-    std::sort(rows.begin(), rows.end());
-    for(const auto &row : rows)
-        addShortcutToTable(row.first, row.second, scopeInspect());
+    // one section per scope, in kAllScopes order — the section title and the
+    // table it saves into are the same Scope, so a fifth scope renders and
+    // saves without this function learning its name.
+    for(Scope scope : kAllScopes) {
+        addSectionHeader(sectionTitle(scope));
+        QList<QPair<QString, QString>> rows;
+        const QMap<QString, QString> table = actionManager->tableForPublic(scope);
+        for(auto it = table.constBegin(); it != table.constEnd(); ++it)
+            rows.append({it.value(), it.key()});
+        std::sort(rows.begin(), rows.end());
+        for(const auto &row : rows)
+            addShortcutToTable(row.first, row.second, scope);
+        // the global section offers no orphans: an unbound action's home is a
+        // view scope, and offering it in "everywhere else" would suggest a
+        // meaning it does not have.
+        if(scope != Scope::Global)
+            addUnboundRows(scope);
+    }
 }
+
 //------------------------------------------------------------------------------
 void SettingsDialog::readScripts() {
     ui->scriptsListWidget->clear();
@@ -207,14 +172,14 @@ void SettingsDialog::removeScript() {
 }
 //------------------------------------------------------------------------------
 // does not check if the shortcut already there
-void SettingsDialog::addShortcutToTable(const QString &action, const QString &shortcut, const QString &scope) {
+void SettingsDialog::addShortcutToTable(const QString &action, const QString &shortcut, Scope scope) {
     if(action.isEmpty() || shortcut.isEmpty())
         return;
 
     ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
     QTableWidgetItem *actionItem = new QTableWidgetItem(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
-    actionItem->setData(Qt::UserRole, scope); // which table this row saves into
+    actionItem->setData(Qt::UserRole, scopeTag(scope)); // which table this row saves into
     ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
     QTableWidgetItem *shortcutItem = new QTableWidgetItem(shortcut);
     shortcutItem->setTextAlignment(Qt::AlignCenter);
@@ -226,11 +191,11 @@ void SettingsDialog::addShortcutToTable(const QString &action, const QString &sh
 // invitation, not a binding. The scope tag still rides the action item, so
 // editing the row binds into the section it sits in — placement IS the
 // destination, the same "section = table" rule every bound row follows.
-void SettingsDialog::addUnboundActionRow(const QString &action, const QString &scope) {
+void SettingsDialog::addUnboundActionRow(const QString &action, Scope scope) {
     ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
     QTableWidgetItem *actionItem = new QTableWidgetItem(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
-    actionItem->setData(Qt::UserRole, scope);
+    actionItem->setData(Qt::UserRole, scopeTag(scope));
     actionItem->setForeground(QBrush(Qt::gray));
     ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
     QTableWidgetItem *shortcutItem = new QTableWidgetItem();
@@ -247,34 +212,47 @@ void SettingsDialog::addUnboundActionRow(const QString &action, const QString &s
 // doc table's Enter->folderView; the sorts are the grid's own affair).
 // Everything unbound defaults to the document section, so a future action
 // with no default key is offered somewhere by construction, not invisible.
-void SettingsDialog::addUnboundRows(const QString &scope) {
+void SettingsDialog::addUnboundRows(Scope scope) {
     static const QSet<QString> gridHome = {
         QStringLiteral("documentView"),
         QStringLiteral("sortByName"),
         QStringLiteral("sortByTime"),
         QStringLiteral("sortBySize"),
     };
+    // every table read through the one mapping: the four hand-written .values()
+    // walks were the same vocabulary the editor used to keep for itself, and a
+    // fifth scope would have left its actions looking unbound.
     QSet<QString> bound;
-    const QList<QString> globalValues = actionManager->allShortcuts().values();
-    for(const QString &action : globalValues)
-        bound.insert(action);
-    const QList<QString> docValues = actionManager->allDocShortcuts().values();
-    for(const QString &action : docValues)
-        bound.insert(action);
-    const QList<QString> gridValues = actionManager->allGridShortcuts().values();
-    for(const QString &action : gridValues)
-        bound.insert(action);
-    const QList<QString> inspectValues = actionManager->allInspectShortcuts().values();
-    for(const QString &action : inspectValues)
-        bound.insert(action);
+    for(Scope s : kAllScopes) {
+        // iterate the map, not .values(): a temporary QList per scope is an
+        // allocation for nothing, and range-for over it detaches (clazy:
+        // container-anti-pattern / range-loop-detach)
+        const QMap<QString, QString> &table = actionManager->tableForPublic(s);
+        for(auto it = table.constBegin(); it != table.constEnd(); ++it)
+            bound.insert(it.value());
+    }
     const QStringList registered = actionManager->actionList();
     for(const QString &action : registered) {
         if(bound.contains(action))
             continue;
-        const QString &home = gridHome.contains(action) ? scopeGrid() : scopeDocument();
+        const Scope home = gridHome.contains(action) ? Scope::Grid : Scope::Document;
         if(home == scope)
             addUnboundActionRow(action, scope);
     }
+}
+
+// The section titles the keymap page renders — the editor's prose about WHEN
+// a scope is live, distinct from scopeLabel's short name (which the conflict
+// warning's "used for: ..." line needs). Keeping both here means a fifth
+// scope adds one string, not a render pass.
+QString SettingsDialog::sectionTitle(Scope scope) const {
+    switch(scope) {
+    case Scope::Global: return tr("Global — everywhere else");
+    case Scope::Document: return tr("Document view — while one image is on screen");
+    case Scope::Grid: return tr("Folder view — while the thumbnail grid holds focus");
+    case Scope::Inspect: return tr("Inspect — while fit original / free zoom is armed");
+    }
+    return QString();
 }
 
 // a scenario opener, not a binding: no scope tag, so every sweep skips it
@@ -290,26 +268,34 @@ void SettingsDialog::addSectionHeader(const QString &title) {
     ui->shortcutsTableWidget->setSpan(row, 0, 1, 2);
 }
 
-// the scope a row belongs to; empty for the section headers
-QString SettingsDialog::rowScope(int row) const {
+// the scope a row belongs to. False for the section headers (no tag), which
+// is the "a header is prose, not a binding" rule every sweep rests on.
+bool SettingsDialog::rowScope(int row, Scope &out) const {
     QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(row, 0);
     if(!actionItem)
-        return QString();
-    return actionItem->data(Qt::UserRole).toString();
+        return false;
+    const QString tag = actionItem->data(Qt::UserRole).toString();
+    if(tag.isEmpty())
+        return false;
+    // a tag this build cannot name is a row from a NEWER config: treat it as
+    // untagged (header-like) so the save path cannot drop it silently — the
+    // unknown tag reaches the user as "not saved" only if a future scope's
+    // rows actually reach here, and scopeFromTag is the one place to extend.
+    return scopeFromTag(tag, out);
 }
 
 // where a freshly added binding lands: the section the user is looking at —
 // a header row or no selection means the global table
-QString SettingsDialog::selectedScope() const {
+Scope SettingsDialog::selectedScope() const {
     const int row = ui->shortcutsTableWidget->currentRow();
-    if(row < 0 || row >= ui->shortcutsTableWidget->rowCount())
-        return scopeGlobal();
-    const QString scope = rowScope(row);
-    return scope.isEmpty() ? scopeGlobal() : scope;
+    Scope scope = Scope::Global;
+    if(row >= 0 && row < ui->shortcutsTableWidget->rowCount() && rowScope(row, scope))
+        return scope;
+    return Scope::Global;
 }
 
 void SettingsDialog::addShortcut() {
-    const QString scope = selectedScope();
+    const Scope scope = selectedScope();
     ShortcutCreatorDialog w;
     if(!w.exec())
         return;
@@ -318,7 +304,9 @@ void SettingsDialog::addShortcut() {
     // sweep re-examines the index it just removed at.
     for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
         QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
-        if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i) == scope)
+        Scope rowScopeValue = Scope::Global;
+        if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i, rowScopeValue) &&
+           rowScopeValue == scope)
             removeShortcutAt(i--);
     }
     addShortcutToTable(w.selectedAction(), w.selectedShortcut(), scope);
@@ -333,7 +321,8 @@ void SettingsDialog::addShortcut() {
 void SettingsDialog::removeShortcutAt(int row) {
     if(row < 0 || row >= ui->shortcutsTableWidget->rowCount())
         return;
-    if(rowScope(row).isEmpty())
+    Scope ignored;
+    if(!rowScope(row, ignored))
         return; // a section header is not a binding
     ui->shortcutsTableWidget->removeRow(row);
 }
@@ -341,8 +330,8 @@ void SettingsDialog::removeShortcutAt(int row) {
 void SettingsDialog::editShortcut(int row) {
     if(row < 0 || row >= ui->shortcutsTableWidget->rowCount())
         return;
-    const QString scope = rowScope(row);
-    if(scope.isEmpty())
+    Scope scope = Scope::Global;
+    if(!rowScope(row, scope))
         return; // headers open a section, they are not editable bindings
     ShortcutCreatorDialog w;
     w.setWindowTitle(tr("Edit shortcut"));
@@ -355,7 +344,9 @@ void SettingsDialog::editShortcut(int row) {
     // remove anything we are replacing in the same scope
     for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
         QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
-        if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i) == scope)
+        Scope rowScopeValue = Scope::Global;
+        if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i, rowScopeValue) &&
+           rowScopeValue == scope)
             removeShortcutAt(i--);
     }
     // re-add
@@ -376,31 +367,32 @@ void SettingsDialog::removeShortcut() {
     removeShortcutAt(ui->shortcutsTableWidget->currentRow());
 }
 //------------------------------------------------------------------------------
-// each row saves into the table its section stands for; headers carry no
-// scope and are skipped
+// Each row saves into the table its section stands for; headers carry no
+// scope and are skipped. The four-way if/else this replaces named the scopes
+// one at a time and had no else: a row whose tag it did not recognize was
+// dropped in silence — the shape commit() exists to make unwritable, one
+// layer up. A scope is now a value the row carries, and the save is one loop.
 void SettingsDialog::saveShortcuts() {
-    actionManager->removeAllShortcuts();
-    actionManager->removeAllGridShortcuts();
-    actionManager->removeAllDocShortcuts();
-    actionManager->removeAllInspectShortcuts();
+    // The tables are replaced wholesale from the rendered rows, so the default
+    // layer has to be re-applied first: a row the user deleted must not be
+    // resurrected by the defaults that were merged into the map at load time.
+    // (That is the in-memory form of "removed" — the persisted form is the
+    // tombstone ActionManager writes; the two are separate facts and both
+    // must hold across the dialog's save/close cycle.)
+    for(Scope scope : kAllScopes)
+        actionManager->removeAllShortcuts(scope);
     for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
         QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(i, 0);
         QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
         if(!actionItem || !shortcutItem)
             continue; // a header spans column 0 and has no shortcut twin
-        const QString scope = rowScope(i);
+        Scope scope = Scope::Global;
+        if(!rowScope(i, scope))
+            continue; // a header: prose about a scenario, not a binding
         const QString shortcut = shortcutItem->text();
-        const QString action = actionItem->text();
         if(shortcut.isEmpty())
             continue; // an unbound-action row: offered, never bound
-        if(scope == scopeGrid())
-            actionManager->addGridShortcut(shortcut, action);
-        else if(scope == scopeInspect())
-            actionManager->addInspectShortcut(shortcut, action);
-        else if(scope == scopeDocument())
-            actionManager->addDocShortcut(shortcut, action);
-        else if(scope == scopeGlobal())
-            actionManager->addShortcut(shortcut, action);
+        actionManager->insertShortcut(scope, shortcut, actionItem->text());
     }
 }
 //------------------------------------------------------------------------------
