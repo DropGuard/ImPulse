@@ -32,15 +32,13 @@ QString ShortcutCreatorDialog::selectedShortcut() {
 void ShortcutCreatorDialog::onShortcutEdited() {
     // one key may legitimately live in several scopes — the warning names
     // each table that already holds it, so "replace?" is an informed click.
-    // The scope walk is actionManager's, not this dialog's: the hand-written
-    // three-table version here had forgotten the document table, so a
-    // document-scope collision produced no warning at all.
+    // ONE call answers it: the walk is actionManager's, and its answer
+    // includes the global table (labelled "(global)") alongside the scoped
+    // ones. The dialog used to stitch that half on itself through a separate
+    // reader that saw only the global table, which is exactly how the
+    // three-table hand-written version forgot the document table once.
     const QString sequence = ui->sequenceEdit->sequence();
-    QStringList held;
-    const QString global = actionManager->actionForShortcut(sequence);
-    if(!global.isEmpty())
-        held << global + " (global)";
-    held << actionManager->scopeClaimsForToken(sequence);
+    const QStringList held = actionManager->scopeClaimsForToken(sequence);
     if(!held.isEmpty())
         ui->warningLabel->setText("This shortcut is used for: " + held.join(QStringLiteral(", ")) + ". Replace?");
     else
