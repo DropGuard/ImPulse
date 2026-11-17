@@ -633,6 +633,14 @@ void ActionManager::removeAllShortcuts(Scope scope) {
     });
 }
 
+void ActionManager::removeAllShortcuts(Scope scope, const QString &actionName) {
+    if(validateAction(actionName) == ActionType::ACTION_INVALID)
+        return;
+    commit(scope, [&](QMap<QString, QString> &t) {
+        eraseAction(t, actionName);
+    });
+}
+
 void ActionManager::saveScope(Scope scope) {
     settings->saveShortcutsWithTombstones(tableFor(scope), defaultsFor(scope), scopeTag(scope));
 }
