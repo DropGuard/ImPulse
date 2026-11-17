@@ -13,6 +13,7 @@
 #include "components/scriptmanager/scriptmanager.h"
 #include "utils/inputmap.h"
 #include "gui/dialogs/settingsdialog.h"
+#include "actions_table.h"
 
 class TestShortcutScope : public QObject {
     Q_OBJECT
@@ -961,6 +962,90 @@ class TestShortcutScope : public QObject {
         QCOMPARE(actionManager->shortcutForAction(QStringLiteral("save")), QStringLiteral("Ctrl+S"));
         // a global-table action still answers from there
         QCOMPARE(actionManager->shortcutForAction(QStringLiteral("openSettings")), QStringLiteral("P"));
+    }
+
+    // The action table is the keymap's census, and this test is the guard that
+    // makes adopting it a no-op: every fact it states must agree with the live
+    // registry and the live default tables TODAY. Stage 1 ships the table
+    // without wiring it in; if any row disagrees with the code that still owns
+    // the truth, this fails by name before the switch-over can hide the drift.
+    // Once the code reads the table instead (the next stage), the same test
+    // becomes the cross-check in the other direction.
+    void theActionTableAgreesWithTheLiveRegistry() {
+        // 1. names: exactly the registry, no extras, no misses
+        QSet<QString> tableNames;
+        for(const ActionDesc &row : ActionTable::kActions) {
+            const QString name = QString::fromLatin1(row.name);
+            QVERIFY2(!name.isEmpty(), "a table row has no name");
+            QVERIFY2(!tableNames.contains(name), qPrintable(QStringLiteral("duplicate row: ") + name));
+            tableNames.insert(name);
+            QVERIFY2(row.display && *row.display, qPrintable(QStringLiteral("no display name: ") + name));
+            QVERIFY2(row.category && *row.category, qPrintable(QStringLiteral("no category: ") + name));
+        }
+        const QStringList registered = actionManager->actionList();
+        QCOMPARE(tableNames.size(), registered.size());
+        for(const QString &name : registered)
+            QVERIFY2(tableNames.contains(name),
+                     qPrintable(QStringLiteral("registered action missing from the table: ") + name));
+
+        // 2. default bindings: (action, scope, token) triples agree exactly
+        struct Live {
+            Scope scope;
+            const QMap<QString, QString> *table;
+        };
+        const Live lives[] = {
+            {Scope::Global, &actionManager->allShortcuts()},
+            {Scope::Document, &actionManager->allDocShortcuts()},
+            {Scope::Grid, &actionManager->allGridShortcuts()},
+            {Scope::Inspect, &actionManager->allInspectShortcuts()},
+        };
+        QSet<QString> liveTriples;
+        for(const Live &live : lives)
+            for(auto it = live.table->constBegin(); it != live.table->constEnd(); ++it)
+                liveTriples.insert(QStringLiteral("%1|%2|%3").arg(scopeTag(live.scope), it.key(), it.value()));
+
+        QSet<QString> tableTriples;
+        for(const DefaultBinding &b : ActionTable::kDefaultBindings) {
+            const QString triple =
+                QStringLiteral("%1|%2|%3")
+                    .arg(scopeTag(b.scope), QString::fromLatin1(b.token), QString::fromLatin1(b.action));
+            QVERIFY2(!tableTriples.contains(triple), qPrintable(QStringLiteral("duplicate binding: ") + triple));
+            tableTriples.insert(triple);
+        }
+        // named, not inline: range-for over the difference temporary shares and
+        // detaches it (clazy range-loop-detach)
+        const QSet<QString> missingFromTable = liveTriples - tableTriples;
+        const QSet<QString> extrasInTable = tableTriples - liveTriples;
+        for(const QString &t : missingFromTable)
+            QFAIL(qPrintable(QStringLiteral("live default binding is not in the table: ") + t));
+        for(const QString &t : extrasInTable)
+            QFAIL(qPrintable(QStringLiteral("table binding does not exist in the defaults: ") + t));
+
+        // 3. the predicates the table will replace
+        for(const ActionDesc &row : ActionTable::kActions) {
+            const QString name = QString::fromLatin1(row.name);
+            QCOMPARE(row.subjectChanging, isSubjectChangingAction(name));
+        }
+
+        // 4. every action's home scope is one the editor can show
+        for(const ActionDesc &row : ActionTable::kActions) {
+            bool known = false;
+            for(Scope scope : kAllScopes)
+                known = known || scope == row.home;
+            QVERIFY2(known,
+                     qPrintable(QStringLiteral("home scope is not in kAllScopes: ") + QString::fromLatin1(row.name)));
+        }
+    }
+
+    // The table writes modifier names as literals (it is constexpr, so no
+    // runtime keyNameCtrl()). That is only honest while the platform agrees:
+    // this pins the agreement, so a platform whose InputMap answers other
+    // names fails HERE, by name, instead of shipping a table that describes
+    // keys nobody can press.
+    void theActionTablesModifierNamesAreThePlatforms() {
+        QCOMPARE(InputMap::keyNameCtrl(), QStringLiteral("Ctrl"));
+        QCOMPARE(InputMap::keyNameAlt(), QStringLiteral("Alt"));
+        QCOMPARE(InputMap::keyNameShift(), QStringLiteral("Shift"));
     }
 
     // The scope vocabulary is ONE vocabulary: the enum ActionManager commits
