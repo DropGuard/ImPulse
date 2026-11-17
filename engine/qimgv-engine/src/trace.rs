@@ -36,12 +36,15 @@ fn file_sink() -> Option<&'static Mutex<File>> {
     static SINK: OnceLock<Option<Mutex<File>>> = OnceLock::new();
     SINK.get_or_init(|| {
         let prefix = env::var_os("QIMGV_ENGINE_TRACE_FILE")?;
-        let path = std::path::PathBuf::from(prefix)
-            .with_extension(format!("{}.log", std::process::id()));
+        let path =
+            std::path::PathBuf::from(prefix).with_extension(format!("{}.log", std::process::id()));
         match OpenOptions::new().create(true).append(true).open(&path) {
             Ok(f) => Some(Mutex::new(f)),
             Err(e) => {
-                eprintln!("[engine trace] cannot open {:?}: {e} — falling back to stderr", path);
+                eprintln!(
+                    "[engine trace] cannot open {:?}: {e} — falling back to stderr",
+                    path
+                );
                 None
             }
         }
