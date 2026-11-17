@@ -655,17 +655,8 @@ void ActionManager::saveShortcuts() {
     settings->saveShortcutsWithTombstones(shortcuts, defaults);
 }
 //------------------------------------------------------------------------------
-void ActionManager::saveDocShortcuts() {
-    settings->saveShortcutsWithTombstones(docShortcuts, docDefaults, QStringLiteral("docShortcuts"));
-}
 //------------------------------------------------------------------------------
-void ActionManager::saveGridShortcuts() {
-    settings->saveShortcutsWithTombstones(gridShortcuts, gridDefaults, QStringLiteral("gridShortcuts"));
-}
 //------------------------------------------------------------------------------
-void ActionManager::saveInspectShortcuts() {
-    settings->saveShortcutsWithTombstones(inspectShortcuts, inspectDefaults, QStringLiteral("inspectShortcuts"));
-}
 //------------------------------------------------------------------------------
 bool isSubjectChangingAction(const QString &actionName) {
     // everything whose effect is "the file under the user's attention is now a
@@ -902,87 +893,12 @@ void ActionManager::readInspectShortcuts() {
 }
 
 //------------------------------------------------------------------------------
-void ActionManager::addDocShortcut(const QString &keys, const QString &action) {
-    ActionType type = validateAction(action);
-    if(type == ActionType::ACTION_INVALID)
-        return;
-    commit(Scope::Document, [&](QMap<QString, QString> &t) {
-        t.insert(keys, action);
-    });
-}
 //------------------------------------------------------------------------------
-const QMap<QString, QString> &ActionManager::allDocShortcuts() {
-    return docShortcuts;
-}
 //------------------------------------------------------------------------------
-void ActionManager::removeAllDocShortcuts() {
-    commit(Scope::Document, [](QMap<QString, QString> &t) {
-        t.clear();
-    });
-}
 //------------------------------------------------------------------------------
-void ActionManager::removeAllDocShortcuts(const QString &actionName) {
-    commit(Scope::Document, [&](QMap<QString, QString> &t) {
-        eraseAction(t, actionName);
-    });
-}
 //------------------------------------------------------------------------------
-void ActionManager::addGridShortcut(const QString &keys, const QString &action) {
-    ActionType type = validateAction(action);
-    if(type == ActionType::ACTION_INVALID)
-        return;
-    commit(Scope::Grid, [&](QMap<QString, QString> &t) {
-        t.insert(keys, action);
-    });
-}
-
-const QMap<QString, QString> &ActionManager::allGridShortcuts() {
-    return gridShortcuts;
-}
-
-void ActionManager::removeAllGridShortcuts() {
-    commit(Scope::Grid, [](QMap<QString, QString> &t) {
-        t.clear();
-    });
-}
-
 // Removes all grid shortcuts for specified action. Slow (reverse map lookup).
-void ActionManager::removeAllGridShortcuts(const QString &actionName) {
-    if(validateAction(actionName) == ActionType::ACTION_INVALID)
-        return;
-    commit(Scope::Grid, [&](QMap<QString, QString> &t) {
-        eraseAction(t, actionName);
-    });
-}
-
-void ActionManager::addInspectShortcut(const QString &keys, const QString &action) {
-    ActionType type = validateAction(action);
-    if(type == ActionType::ACTION_INVALID)
-        return;
-    commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
-        t.insert(keys, action);
-    });
-}
-
-const QMap<QString, QString> &ActionManager::allInspectShortcuts() {
-    return inspectShortcuts;
-}
-
-void ActionManager::removeAllInspectShortcuts() {
-    commit(Scope::Inspect, [](QMap<QString, QString> &t) {
-        t.clear();
-    });
-}
-
 // Removes all inspect shortcuts for specified action. Slow (reverse map lookup).
-void ActionManager::removeAllInspectShortcuts(const QString &actionName) {
-    if(validateAction(actionName) == ActionType::ACTION_INVALID)
-        return;
-    commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
-        eraseAction(t, actionName);
-    });
-}
-
 //------------------------------------------------------------------------------
 bool ActionManager::processEvent(QInputEvent *event) {
     return invokeActionForShortcut(ShortcutBuilder::fromEvent(event));
