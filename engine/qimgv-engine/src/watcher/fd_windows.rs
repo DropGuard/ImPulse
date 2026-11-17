@@ -52,7 +52,7 @@ use crossbeam_channel::{Receiver, Sender};
 
 // the shared glue lives with the contract it serves: the command vocabulary,
 // the stream dispatch, the baseline enumeration (see the watcher module doc)
-use super::{dispatch, enumerate_and_report, WatchCmd};
+use super::{WatchCmd, dispatch, enumerate_and_report};
 
 // --- the Win32 surface this file is allowed to touch (bounded: no -sys crate
 // --- — the whole kernel32 contract is the list below, reviewable at once) ---
@@ -111,12 +111,7 @@ mod mask {
 }
 
 unsafe extern "system" {
-    fn CreateEventW(
-        attrs: *mut c_void,
-        manual: i32,
-        initial: i32,
-        name: *const u16,
-    ) -> HANDLE;
+    fn CreateEventW(attrs: *mut c_void, manual: i32, initial: i32, name: *const u16) -> HANDLE;
     fn SetEvent(event: HANDLE) -> i32;
     fn ResetEvent(event: HANDLE) -> i32;
     fn CloseHandle(object: HANDLE) -> i32;
@@ -161,9 +156,7 @@ unsafe impl Send for OsEvent {}
 
 impl OsEvent {
     fn new(manual: bool) -> Option<OsEvent> {
-        let h = unsafe {
-            CreateEventW(std::ptr::null_mut(), manual as i32, 0, std::ptr::null())
-        };
+        let h = unsafe { CreateEventW(std::ptr::null_mut(), manual as i32, 0, std::ptr::null()) };
         if h == 0 || h == INVALID_HANDLE_VALUE {
             None
         } else {
@@ -223,9 +216,7 @@ impl WatcherHandle {
 
         let join = std::thread::Builder::new()
             .name("qimgv-watch".into())
-            .spawn(move || {
-                watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, wake_raw, running_flag)
-            })
+            .spawn(move || watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, wake_raw, running_flag))
             .expect("spawn watcher thread");
 
         (
@@ -397,9 +388,7 @@ fn drain_records(
             let mut words = Vec::with_capacity(units);
             for k in 0..units {
                 words.push(unsafe {
-                    core::ptr::read_unaligned(
-                        buffer.as_ptr().add(off + 12 + k * 2) as *const u16,
-                    )
+                    core::ptr::read_unaligned(buffer.as_ptr().add(off + 12 + k * 2) as *const u16)
                 });
             }
             String::from_utf16_lossy(&words)
@@ -533,10 +522,7 @@ fn watcher_loop(
         if waited == WAIT_OBJECT_0 {
             if armed {
                 armed = false;
-                let dir_handle = watch
-                    .as_ref()
-                    .map(|w| w.dir)
-                    .unwrap_or(0);
+                let dir_handle = watch.as_ref().map(|w| w.dir).unwrap_or(0);
                 let mut transferred: u32 = 0;
                 let completed = unsafe {
                     GetOverlappedResult(dir_handle, &mut overlapped, &mut transferred, 0)
@@ -544,8 +530,7 @@ fn watcher_loop(
                 let live_wd = watch.as_ref().map(|w| w.id);
                 let dir_opt: Option<&Path> = watch.as_ref().map(|w| w.path.as_path());
                 if completed == 0 {
-                    let err =
-                        std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32;
+                    let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32;
                     match err {
                         // a cancel of our own (retarget or shutdown); its
                         // completion is normally drained inside retire_watch,
@@ -571,10 +556,7 @@ fn watcher_loop(
                             retire_gone(&mut watch, &mut overlapped, ev_tx, &mut pairer);
                         }
                         _ => {
-                            log::warn!(
-                                "watcher: read failed: {}",
-                                std::io::Error::last_os_error()
-                            );
+                            log::warn!("watcher: read failed: {}", std::io::Error::last_os_error());
                             return;
                         }
                     }
@@ -642,26 +624,33 @@ fn watcher_loop(
                         retire_watch(watch.take(), &mut overlapped, armed);
                         return;
                     }
-                    WatchCmd::Enumerate { path, session, dispatch } => {
+                    WatchCmd::Enumerate {
+                        path,
+                        session,
+                        dispatch,
+                    } => {
                         enumerate_and_report(&path, session, dispatch, res_tx, options);
                     }
                     WatchCmd::Unwatch => {
                         retire_watch(watch.take(), &mut overlapped, armed);
                         armed = false;
                     }
-                    WatchCmd::Watch { path, session, dispatch } => {
+                    WatchCmd::Watch {
+                        path,
+                        session,
+                        dispatch,
+                    } => {
                         retire_watch(watch.take(), &mut overlapped, armed);
                         armed = false;
                         match open_dir(&path) {
                             Ok(dir) => {
                                 next_id += 1;
-                                let w = Watch { dir, path: path.clone(), id: next_id };
-                                if arm_read(
-                                    w.dir,
-                                    completion.raw(),
-                                    &mut buffer,
-                                    &mut overlapped,
-                                ) {
+                                let w = Watch {
+                                    dir,
+                                    path: path.clone(),
+                                    id: next_id,
+                                };
+                                if arm_read(w.dir, completion.raw(), &mut buffer, &mut overlapped) {
                                     armed = true;
                                     watch = Some(w);
                                 } else {
