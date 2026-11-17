@@ -316,6 +316,11 @@ void SettingsDialog::addShortcut() {
     ShortcutCreatorDialog w;
     if(!w.exec())
         return;
+    // a System action is rebindable, but deliberately: the confirmation names
+    // what is being moved and onto what. Reserved actions never reach here —
+    // the chooser does not offer them.
+    if(!ShortcutCreatorDialog::confirmRebinding(w.selectedAction(), this))
+        return;
     // same key, same scope: a replacement. The same key in ANOTHER scope is
     // the whole point of scopes and survives. Rows shift on removal, so the
     // sweep re-examines the index it just removed at.
@@ -355,6 +360,8 @@ void SettingsDialog::editShortcut(int row) {
     w.setAction(rowAction(row));
     w.setShortcut(ui->shortcutsTableWidget->item(row, 1)->text());
     if(!w.exec())
+        return;
+    if(!ShortcutCreatorDialog::confirmRebinding(w.selectedAction(), this))
         return;
     // remove itself
     removeShortcutAt(row);

@@ -3,6 +3,8 @@
 
 #include "actions_table.h"
 #include <QStandardItemModel>
+#include <QMessageBox>
+#include <QCoreApplication>
 
 ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) : QDialog(parent), ui(new Ui::ShortcutCreatorDialog) {
     ui->setupUi(this);
@@ -101,4 +103,24 @@ void ShortcutCreatorDialog::setAction(const QString &action) {
 
 void ShortcutCreatorDialog::setShortcut(const QString &shortcut) {
     ui->sequenceEdit->setText(shortcut);
+}
+
+// The confirmation a System action's rebinding needs. The dialog does not
+// want the policy itself: it asks the action table, which is the one place
+// the question "may this be rebound freely" is answered. Static and public so
+// the decision — not just the call site — is testable without a modal.
+bool ShortcutCreatorDialog::confirmRebinding(const QString &action, QWidget *parent) {
+    if(ActionTable::policyFor(action) != ActionDesc::Policy::System)
+        return true;
+    const ActionDesc *row = ActionTable::descFor(action);
+    const QString display = row ? QCoreApplication::translate("ShortcutCreatorDialog", row->display) : action;
+    return QMessageBox::question(parent,
+                                 QCoreApplication::translate("ShortcutCreatorDialog", "Rebind a protected action"),
+                                 QCoreApplication::translate(
+                                     "ShortcutCreatorDialog",
+                                     "\"%1\" is one of the actions the app protects by default: it deletes, exits, "
+                                     "or is the way out. Rebinding it moves that danger onto a key you choose, where a "
+                                     "mis-tap costs whatever that key used to do.\n\nRebind it anyway?")
+                                     .arg(display),
+                                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes;
 }

@@ -1048,6 +1048,41 @@ class TestShortcutScope : public QObject {
         QCOMPARE(InputMap::keyNameShift(), QStringLiteral("Shift"));
     }
 
+    // The rebinding policy is per ACTION, which is the correction to the
+    // token-level withhold that came before it: that protected the Del key and
+    // left removeFile free to sit on F9. The policy is data now, so the
+    // question "may this be rebound without asking" is answerable without a
+    // modal dialog — the confirmation itself is a QMessageBox, which no
+    // headless run can dismiss.
+    void protectedActionsAskBeforeRebinding() {
+        // the destructive verbs and the way out
+        for(const char *name : {"moveToTrash", "removeFile", "exit", "closeFullScreenOrExit"})
+            QCOMPARE(ActionTable::policyFor(QString::fromLatin1(name)), ActionDesc::Policy::System);
+        // everything else is free
+        for(const char *name : {"nextImage", "zoomIn", "fitWindow", "save", "quickCopy"})
+            QCOMPARE(ActionTable::policyFor(QString::fromLatin1(name)), ActionDesc::Policy::User);
+        // an unknown name (a script, a stale row) is not protected
+        QCOMPARE(ActionTable::policyFor(QStringLiteral("s:myscript")), ActionDesc::Policy::User);
+        // and the policy is on the action, not on a key: the same action under
+        // two of its bindings answers the same way
+        QCOMPARE(ActionTable::policyFor(QStringLiteral("removeFile")),
+                 ActionTable::policyFor(QStringLiteral("removeFile")));
+        // the chooser withholds Reserved actions and offers the rest, so the
+        // two policies that matter reach the editor at all
+        int offered = 0, reserved = 0;
+        for(const ActionDesc &row : ActionTable::kActions) {
+            if(row.policy == ActionDesc::Policy::Reserved)
+                reserved++;
+            else
+                offered++;
+        }
+        QCOMPARE(offered + reserved, static_cast<int>(std::size(ActionTable::kActions)));
+        QVERIFY2(offered > 0, "no action is offered by the chooser at all");
+        // System actions must be among the offered ones — hiding them was the
+        // old model, and it is what let a rebind happen with nobody asked
+        QVERIFY(ActionTable::policyFor(QStringLiteral("removeFile")) == ActionDesc::Policy::System);
+    }
+
     // The scope vocabulary is ONE vocabulary: the enum ActionManager commits
     // with, the tag a saved row carries, and the label the conflict warning
     // prints all come from the same four values. This is what the editor used
