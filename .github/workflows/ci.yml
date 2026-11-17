@@ -38,7 +38,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
-      - name: the six suites
+      - name: the suites
         run: cd build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
       - name: rust suite
         run: cargo test --manifest-path engine/qimgv-engine/Cargo.toml

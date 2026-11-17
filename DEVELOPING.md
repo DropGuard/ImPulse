@@ -91,7 +91,7 @@ boundary, so remove+add remains a shape consumers must tolerate.
 per request on the UI thread and travels with the work (`LoadPolicy`); pool
 threads receive values instead of reaching for global configuration.
 
-**Quality machinery, as tests.** Eleven structural architecture rules run as
+**Quality machinery, as tests.** Fourteen structural architecture rules run as
 a ctest suite — the authoritative enumeration, with the incidents that earned
 each rule, lives in [AGENTS.md](AGENTS.md); the enforcing instrument is
 `qimgv/tests/architecture_rules.py`. A static-analysis

@@ -1,7 +1,8 @@
 # ImPulse
 
-A high-performance Qt6 image viewer for Linux — a ground-up modernization fork
-of [qimgv](https://github.com/easymodo/qimgv). GPL-3.0 · v0.1.0
+A high-performance Qt6 image viewer for Linux and Windows — a ground-up
+modernization fork of [qimgv](https://github.com/easymodo/qimgv).
+GPL-3.0 · v0.1.0
 
 ## What changed from upstream
 
@@ -41,9 +42,9 @@ To build from source instead, see [DEVELOPING.md](DEVELOPING.md).
 
 ## For developers and contributors
 
-The platform contract (Linux only), the architecture behind the three points
-above, the build instructions, the five test suites (ctest, ASan/UBSan, TSan,
-Miri) and the static-analysis gate are documented in
+The platform contract (Linux and Windows/msys2), the architecture behind the
+three points above, the build instructions, the test suites (ctest,
+ASan/UBSan, TSan, Miri) and the static-analysis gate are documented in
 [DEVELOPING.md](DEVELOPING.md).
 
 ## License

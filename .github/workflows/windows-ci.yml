@@ -8,7 +8,8 @@ name: windows-ci
 # the aqt-based Linux jobs face in constrained networks — pacman walks its
 # own mirrors.
 #
-# Trigger policy: workflow_dispatch and windows-port pushes only. The
+# Trigger policy: workflow_dispatch and pushes to the integration trunk (and
+# to windows-port while that branch is still the port's workbench). The
 # per-push iteration loop is the local pre-commit gate — the machine that
 # owns the code runs the full build and suite set in ~2 minutes — so CI here
 # is not the dev loop, it is the fresh-clone confirmation: it catches what a
@@ -19,7 +20,7 @@ name: windows-ci
 on:
   workflow_dispatch:
   push:
-    branches: [windows-port]
+    branches: [rustcore, windows-port]
 jobs:
   windows-ucrt64:
     runs-on: windows-latest

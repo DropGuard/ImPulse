@@ -5,15 +5,18 @@ the worst place to store rules. Read it before editing it.
 
 ## What this repo is
 
-ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux-only). The binary is `impulse`. `rustcore` is the integration trunk. The architecture law — the Rust engine owns the directory listing and the decode schedule, the C++ side is a read-only mirror that only splices — is stated once in [DEVELOPING.md](DEVELOPING.md), and enforced mechanically by
+ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. `rustcore` is the integration trunk. The architecture law — the Rust engine owns the directory listing and the decode schedule, the C++ side is a read-only mirror that only splices — is stated once in [DEVELOPING.md](DEVELOPING.md), and enforced mechanically by
 `qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
-single-Thumbnailer owner, R10 fd-shell purity, R11 key-door whitelist, R11b
+single-Thumbnailer owner, R10 fd-shell purity (both shells: `fd.rs`,
+`fd_windows.rs`), R11 key-door whitelist, R11b
 ShortcutOverride-claim whitelist, R12 action-connect completeness (addAction ↔
 connectAction), R12b default-keymap completeness, R12c global-table/scope
 claim disjointness — two live claims of one key are ambiguous and fire
-nothing, so the global table owns no token a scope table claims)
+nothing, so the global table owns no token a scope table claims, R13 unit-
+harness protocol — the re-entry guard that keeps a suite run from becoming a
+self-relaunching process tree)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree
@@ -107,13 +110,21 @@ baselines). What remains here is the part needing judgment.
 3. **No implicit context**: cwd dependencies, singleton ordering, uninitialized
    members, protocols that only work in a call order — each already cost one
    fix.
-4. **Fix only paths that compile; the only fact platform is Linux.** The
-   engine watcher is inotify, the event channel is `never()` elsewhere, the
-   C++ fallback watcher was deleted — other platforms do not build. An agent
-   once "fixed a missing import" in a `cfg(windows)` branch unreachable at
-   crate level. To touch another platform, get facts first: `rustup target add
-   x86_64-pc-windows-gnu` + `cargo check --target ...` (check compiles; only
-   runtime stays unverifiable).
+4. **Fix only paths that compile; the platform facts are the two the tree
+   builds on.** Linux (inotify through `watcher/fd.rs`) and Windows
+   (ReadDirectoryChangesW through `watcher/fd_windows.rs`) each have a real
+   toolchain and a real suite run; every other target compiles to `never()`
+   and is not a fact you may assert. An agent once "fixed a missing import"
+   in a `cfg(windows)` branch that was unreachable at crate level and called
+   it done — and the Windows port later found five real divergences the
+   Linux-green suites could not see (case-collation, `rename` without atomic
+   replace, sharing-as-denial, `SetFileTime` needing write attributes, an
+   NTFS mtime that collides inside its ~10 ms tick). So: touch a platform
+   only with evidence from that platform — `rustup target add
+   x86_64-pc-windows-gnu` + `cargo check --target ...` for the Rust half
+   (it compiles here, so run it, and the port's CI job for the C++ half) —
+   and when a fixture leans on a platform fact, make the fact explicit in
+   DEVELOPING.md and pin it on both sides.
 5. **State locks never span waits.** Guards live to block end, not semicolon;
    sleeping under a read lock starves the engine writer (std RwLock has no
    writer preference). Reference pattern: `wait_for` in the same file.
