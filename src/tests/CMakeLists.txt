@@ -156,3 +156,11 @@ set_tests_properties(FORMAT_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETU
 add_test(NAME LINT_CACHE
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/lint_cache_test.py)
 set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
+
+# The flip-flight instrument: manual measurement, never a gate. Drives real
+# navigation over a large-image directory at keyboard rate and prints
+# stop-point latency plus delivery classification — the numbers the
+# velocity-window and decode-seam candidates in notes/hardening.md wait on.
+# Not a test: it asserts nothing, and its runtime is fixture-generation bound.
+add_executable(flipbench EXCLUDE_FROM_ALL flipbench.cpp)
+target_link_libraries(flipbench PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
