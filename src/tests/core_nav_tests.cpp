@@ -401,6 +401,70 @@ class TestCoreNav : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->isLoaded(files.at(1)), 10000);
     }
 
+    // The full-res upgrade is a dwell decision, not a reflex: a file that
+    // holds the view gets its full-res pass after the dwell, and a file the
+    // flight left behind never starts one. Before the dwell, every
+    // intermediate file of a flight queued an upgrade the next flip made
+    // stale — measured at 5-19 zombies per flight, each burning 150-250ms of
+    // decode on exactly the cores the flight's own decodes need (flipbench on
+    // taskset-constrained cores, 2026-11-19: per-flip display latency ran to
+    // ~1s at 2 cores).
+    void theFullResUpgradeWaitsForTheDwell() {
+        settings->setUsePreloader(true);
+        QString dir = QDir(base).filePath("dwell");
+        QVERIFY(QDir().mkpath(dir));
+        QStringList files;
+        for(const char *n : {"a", "b", "c"}) {
+            const QString path = QDir(dir).filePath(QString(n) + ".jpg");
+            QVERIFY(makeImageFile(path, QSize(3000, 2000), "JPG"));
+            files << path;
+        }
+
+        EngineBridge bridge;
+        QSignalSpy listed(&bridge, &EngineBridge::dirListed);
+        Core core({.bridge = &bridge});
+        QVERIFY(core.loadPath(files.at(0)));
+        QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, dir), 10000);
+
+        QElapsedTimer clock;
+        clock.start();
+        qint64 scaledAt = -1, fullAt = -1;
+        QObject::connect(core.directoryModel().get(), &DirectoryModel::imageReady,
+                         [&](std::shared_ptr<Image>, const QString &path, bool scaled) {
+                             if(path != files.at(2))
+                                 return;
+                             if(scaled)
+                                 scaledAt = clock.elapsed();
+                             else
+                                 fullAt = clock.elapsed();
+                         });
+
+        // b is left behind mid-flight (its tier-1 may or may not land before
+        // the flip away — either way the dwell decides its upgrade), and c
+        // holds the view
+        actionManager->action("nextImage")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(1), 10000);
+        actionManager->action("nextImage")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), files.at(2), 10000);
+
+        // the deterministic contract of the dwell: the full-res pass of the
+        // file that holds the view starts no earlier than the dwell after its
+        // tier-1 landed. The old code fired the upgrade in the same dispatch
+        // as the tier-1 delivery, so its gap was one decode (~35ms here); the
+        // dwell makes the gap dwell+decode. The "left-behind file never
+        // upgrades" half is NOT pinned here: its broken-code redness depends
+        // on a microsecond pickup-vs-clearPool race (the worker's job-destruction
+        // window), which would make this pin flaky in both directions.
+        QTest::qWait(2000); // let both deliveries land
+        QVERIFY2(scaledAt >= 0 && fullAt >= 0, "c's two tiers never both arrived");
+        const qint64 dwellGap = fullAt - scaledAt;
+        QVERIFY2(
+            dwellGap >= 300,
+            qPrintable(QStringLiteral("the full-res pass started before the dwell elapsed (gap %1ms)").arg(dwellGap)));
+        QVERIFY2(dwellGap <= 10000, "the full-res pass took absurdly long");
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+    }
+
     // 14a61f7a armed the cold open to the listing landing but left main's
     // unconditional showGui in place: the window appeared empty first and the
     // image arrived after. The reveal belongs to the first ready frame.
