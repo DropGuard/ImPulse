@@ -122,8 +122,9 @@ class WorkerPool {
     // Which of the two reporting rules a marked job follows is the owner's
     // business, not the pool's, and the two are not interchangeable: a
     // Thumbnailer job reports SOMETHING either way — taskEnd with a picture, or
-    // abandoned with none — because Thumbnailer::submitted is cleared only by
-    // a report and a silent stop would strand the entry. It does not send an
+    // abandoned with none — because Thumbnailer's request counts are settled
+    // by reports, and a silent stop would leave a count high enough to
+    // swallow the file's re-request. It does not send an
     // empty picture down taskEnd: the presenter would overwrite a good
     // thumbnail with it; a Loader job that never started
     // its decode reports nothing and Loader::clearTasks() drops the task entry
