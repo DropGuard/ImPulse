@@ -248,10 +248,6 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
              [] {
                  return double(settings->slideshowInterval());
              }},
-            {&K_ThumbnailerThreads,
-             [] {
-                 return double(settings->thumbnailerThreadCount());
-             }},
         };
 
         QStringList wrong;

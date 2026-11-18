@@ -108,7 +108,6 @@ class SettingsDialog : public QDialog {
     // shared the "qimgv/qimgv" identity, so the directory may belong to an
     // upstream installation. The user asks, the dialog reports what happened.
     void onBgOpacitySliderChanged(int value);
-    void onThumbnailerThreadsSliderChanged(int value);
     void onExpandLimitSliderChanged(int value);
     void onZoomStepSliderChanged(int value);
     void onJPEGQualitySliderChanged(int value);

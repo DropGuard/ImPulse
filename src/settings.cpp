@@ -795,14 +795,6 @@ int Settings::slideshowInterval() {
     return load<int>(K_SlideshowInterval);
 }
 //------------------------------------------------------------------------------
-int Settings::thumbnailerThreadCount() {
-    return load<int>(K_ThumbnailerThreads);
-}
-
-void Settings::setThumbnailerThreadCount(int count) {
-    store(K_ThumbnailerThreads, count);
-}
-//------------------------------------------------------------------------------
 bool Settings::smoothUpscaling() {
     return load<bool>(K_SmoothUpscaling);
 }

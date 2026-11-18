@@ -1111,32 +1111,17 @@ class TestShortcutScope : public QObject {
     // question "may this be rebound without asking" is answerable without a
     // modal dialog — the confirmation itself is a QMessageBox, which no
     // headless run can dismiss.
-    // thumbnailerThreads sizes the executor pool: qBound(2, setting, hardware).
-    // It used to size BOTH halves of the thumbnail pipeline — the pool AND the
-    // engine's in-flight cap — back when the engine scheduled thumbnails; that
-    // scheduler is gone and the pool is the only executor, so the formula is
-    // the whole story. Pinned at the seam Core owns: construction reads the
-    // setting and sizes the owned pool by it.
-    void theThumbnailThreadCountSizesThePool() {
+    // The executor pool sizes itself from the hardware: decode, scale and
+    // thumbnails share one pool, and no knob divides them anymore — the
+    // thumbnailerThreads slider is gone (upstream never needed this much
+    // concurrency, and the knob's name stopped being true the day the pool
+    // went shared). Pinned at the seam Core owns: construction sizes the
+    // owned pool. Never below 2, so a stuck mpv frame grab cannot starve
+    // decoding.
+    void thePoolIsSizedByTheHardware() {
         FreshSettings fresh;
-        settings->setThumbnailerThreadCount(5);
-        {
-            Core core;
-            QCOMPARE(core.executor().threadCount(), 5);
-        }
-        // below the floor: a pool of one would let a single long decode starve
-        // every other owner of the shared executor
-        settings->setThumbnailerThreadCount(1);
-        {
-            Core core;
-            QCOMPARE(core.executor().threadCount(), 2);
-        }
-        // never above the hardware: extra threads only contend
-        settings->setThumbnailerThreadCount(4096);
-        {
-            Core core;
-            QCOMPARE(core.executor().threadCount(), qMax(2, QThread::idealThreadCount()));
-        }
+        Core core;
+        QCOMPARE(core.executor().threadCount(), qMax(2, QThread::idealThreadCount()));
     }
 
     // Deleting a script must unbind it from EVERY table it lives in. The
