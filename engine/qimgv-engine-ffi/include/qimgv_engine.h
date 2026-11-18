@@ -43,7 +43,6 @@ typedef struct qimgv_engine qimgv_engine;
 #define QIMGV_EVENT_DIR_LISTED  1
 #define QIMGV_EVENT_OPEN_FAILED 2
 #define QIMGV_EVENT_DIR_MUTATED 3
-#define QIMGV_EVENT_THUMB_NEXT  4
 
 /* mutation kinds (qimgv_mutation.kind) */
 #define QIMGV_MUT_ADDED    1
@@ -105,11 +104,6 @@ typedef struct qimgv_mutation {
     int32_t index;
 } qimgv_mutation;
 
-typedef struct qimgv_thumb_req {
-    uint32_t size;
-    int32_t crop;
-} qimgv_thumb_req;
-
 typedef struct qimgv_probe_result {
     int32_t format;      /* QIMGV_FMT_* */
     int32_t animated;    /* 0/1 */
@@ -158,11 +152,6 @@ QIMGV_PIN("qimgv_mutation.is_dir", offsetof(qimgv_mutation, is_dir) == 4);
 QIMGV_PIN("qimgv_mutation.size", offsetof(qimgv_mutation, size) == 8);
 QIMGV_PIN("qimgv_mutation.mtime_ms", offsetof(qimgv_mutation, mtime_ms) == 16);
 QIMGV_PIN("qimgv_mutation.index", offsetof(qimgv_mutation, index) == 24);
-
-/* (u32,i32) */
-QIMGV_PIN("qimgv_thumb_req", sizeof(qimgv_thumb_req) == 8);
-QIMGV_PIN("qimgv_thumb_req.size", offsetof(qimgv_thumb_req, size) == 0);
-QIMGV_PIN("qimgv_thumb_req.crop", offsetof(qimgv_thumb_req, crop) == 4);
 
 /* 5 x int32 */
 QIMGV_PIN("qimgv_probe_result", sizeof(qimgv_probe_result) == 20);
@@ -239,10 +228,8 @@ int qimgv_engine_prev_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
  *   QIMGV_EVENT_OPEN_FAILED    the directory whose open failed
  *   QIMGV_EVENT_DIR_MUTATED    the FULL PATH of the changed entry (never a
  *                              directory; the directory it lives in is not sent)
- *   QIMGV_EVENT_THUMB_NEXT     the FULL PATH of the file to render
  *
- * mutation is filled for DIR_MUTATED and may be NULL otherwise. thumb is filled
- * for THUMB_NEXT.
+ * mutation is filled for DIR_MUTATED and may be NULL otherwise.
  *
  * old_buf is written for exactly ONE mutation kind and left untouched for every
  * other event, so it must be read only after checking mutation->kind:
@@ -256,8 +243,8 @@ int qimgv_engine_prev_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
  * exists under that name.
  *
  * Two more fields are only meaningful in context:
- *   out->epoch == 0    the event belongs to no open session (THUMB_NEXT), so a
- *                      receiver must not filter it against the current one.
+ *   out->epoch         the session the event belongs to; a receiver filters
+ *                      events older than its own open_dir epoch.
  *   mutation->index    a position in the engine's listing at the instant the
  *                      event was emitted — not a stable id. Consumers splice at
  *                      it; none may re-derive an order of its own.
@@ -265,8 +252,7 @@ int qimgv_engine_prev_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
 int qimgv_engine_take_event(qimgv_engine *engine, qimgv_event *out,
                             char *subject_buf, size_t subject_cap,
                             char *old_buf, size_t old_cap,
-                            qimgv_mutation *mutation,
-                            qimgv_thumb_req *thumb);
+                            qimgv_mutation *mutation);
 
 /* Bulk listing export: serializes the current listing in ONE lock pass
  * (little-endian: u32 file_count, u32 dir_count, then per entry
@@ -276,19 +262,6 @@ int qimgv_engine_take_event(qimgv_engine *engine, qimgv_event *out,
 int qimgv_engine_export_listing(qimgv_engine *engine, unsigned char *buf,
                                 size_t cap, uint32_t *needed_out,
                                 uint32_t *file_count_out, uint32_t *dir_count_out);
-
-/* Thumbnail scheduling: the engine holds the priority queue; the caller
- * executes dispatched requests (QIMGV_EVENT_THUMB_NEXT) and reports
- * completion. replace_batch=1 on the FIRST request of a fresh viewport
- * batch drops every still-pending request from the previous batch. */
-int qimgv_engine_thumb_request(qimgv_engine *engine, const char *path_utf8,
-                               uint32_t size, int crop, int replace_batch);
-int qimgv_engine_thumb_done(qimgv_engine *engine, const char *path_utf8,
-                            uint32_t size, int crop);
-/* Drops all pending thumbnail requests. */
-int qimgv_engine_thumb_clear(qimgv_engine *engine);
-/* Caps thumbnails in flight. */
-int qimgv_engine_thumb_config(qimgv_engine *engine, uint32_t max_in_flight);
 
 /* Pure function — thread-safe, does not touch the engine instance. One file
  * open, header-only parse. Parse failures are QIMGV_OK with FMT_UNKNOWN and

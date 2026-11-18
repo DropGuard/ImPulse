@@ -74,10 +74,14 @@ redirect — logs and temp frames must follow the same directory the app picks.
 ## Architecture: what changed underneath
 
 **One writer for the listing.** The Rust engine (`engine/qimgv-engine`) owns the
-directory listing and the decode schedule — it decides which decode runs next;
-the C++ side submits the requests and executes the work. The C++ side is
-otherwise a read-only mirror plus Qt rendering: mutation events carry
-engine-side indices and watcher-statted data, and C++ only splices. The
+directory listing — the one order decision, handed to the mirror as engine-side
+indices so C++ never re-derives it. Decode execution and its scheduling live on
+the C++ side: the shared WorkerPool runs the work, and each owner carries its
+own staleness policy (the Scaler coalesces to the latest request, the
+Thumbnailer invalidates per batch, the Loader drains its queue on a priority
+submit).
+The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
+carry engine-side indices and watcher-statted data, and C++ only splices. The
 monopoly is enforced by a test, not by convention.
 
 **A rename is one event, end to end.** The engine pairs the kernel's inotify

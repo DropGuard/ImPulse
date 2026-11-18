@@ -139,13 +139,6 @@ void Core::readSettings() {
     // drains it. What remains here is the running job, so a thumbnail callback
     // cannot land mid-repopulation.
     pool.waitForOwner(PoolOwner::Thumbnailer);
-    // The engine decides WHICH thumbnails run; the pool executes them. Both
-    // halves need the same concurrency or the knob only moves one of them:
-    // the pool had `thumbnailerThreads` threads while the engine admitted a
-    // hardcoded 2, so a slider at 16 left twelve threads permanently idle.
-    // thumbConfig existed for this and had no caller — the engine's in-flight
-    // cap is now the pool's own size, so one number sizes both.
-    mBridge.thumbConfig(pool.threadCount());
     nav_->applySlideshowSettings(settings->slideshowInterval(), settings->loopSlideshow());
     nav_->setFolderEndAction(settings->folderEndAction());
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);

@@ -67,7 +67,7 @@ int main() {
     qimgv_mutation mut{};
     char dirbuf[512];
     char oldbuf[512];
-    CHECK(qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr) == 0);
+    CHECK(qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut) == 0);
 
     // error paths leave a readable diagnostic
     CHECK(qimgv_engine_set_sort(engine, 99) == QIMGV_ERR_BAD_SORT);
@@ -82,7 +82,7 @@ int main() {
 
     int got = 0;
     for(int i = 0; i < 1000; ++i) {
-        got = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr);
+        got = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut);
         if(got != 0)
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -145,7 +145,7 @@ int main() {
         // mutation struct again, believing the rename had arrived.
         int refused = 0;
         for(int i = 0; i < 1000; ++i) {
-            const int r = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), nullptr, 0, &mut, nullptr);
+            const int r = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), nullptr, 0, &mut);
             if(r != 0 && r != 1) {
                 refused = r;
                 break;
@@ -159,7 +159,7 @@ int main() {
         // and the same event, now that both subjects have somewhere to go
         int took = 0;
         for(int i = 0; i < 200; ++i) {
-            took = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut, nullptr);
+            took = qimgv_engine_take_event(engine, &ev, dirbuf, sizeof(dirbuf), oldbuf, sizeof(oldbuf), &mut);
             if(took == 1)
                 break;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -192,11 +192,6 @@ int main() {
     }
 
     CHECK(qimgv_engine_stop_watch(engine) == QIMGV_OK);
-
-    CHECK(qimgv_engine_thumb_config(engine, 2) == QIMGV_OK);
-    CHECK(qimgv_engine_thumb_request(engine, (fixture + "/a.jpg").c_str(), 128, 1, 1) == QIMGV_OK);
-    CHECK(qimgv_engine_thumb_done(engine, (fixture + "/a.jpg").c_str(), 128, 1) == QIMGV_OK);
-    CHECK(qimgv_engine_thumb_clear(engine) == QIMGV_OK);
 
     // bulk export: the cap=0 probe must report the size, then fit exactly
     uint32_t needed = 0, fc = 0, dc = 0;
