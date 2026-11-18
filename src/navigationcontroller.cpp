@@ -31,6 +31,7 @@
 #include "gui/crop/cropcontroller.h"
 
 #include <QThread>
+#include <QTimer>
 #include <QDrag>
 #include <QFileInfo>
 #include <QTemporaryFile>
@@ -43,6 +44,12 @@
 #ifdef __WIN32
 #include <tchar.h>
 #endif
+
+// How long a file must hold the view before its full-res upgrade starts. The
+// dwell is the structural fix for flight-time upgrade zombies (see
+// onModelItemReady): a flip inside the window means the upgrade never starts,
+// rather than starting and being cancelled.
+inline constexpr int UpgradeDwellMs = 400;
 
 NavigationController::NavigationController(State *stateArg, INavigationHost *hostArg, ICoreView *viewArg,
                                            IOverlayHost *overlaysArg, DirectoryPresenter &thumbPresenterArg,
@@ -616,10 +623,21 @@ void NavigationController::onModelItemReady(std::shared_ptr<Image> img, const QS
             state->delayModel = false;
         }
         model->unloadExcept(state->currentFilePath, settings->usePreloader());
-        // two-tier: a scaled image on screen schedules the full-res upgrade.
-        // The next flip's clearPool kills it if the user moved on.
+        // two-tier: a scaled image on screen schedules the full-res upgrade —
+        // but only after the file has held the view for the dwell. Starting it
+        // immediately made every intermediate file of a flight queue an
+        // upgrade the next flip renders stale: measured at 5-19 zombies per
+        // flight, each burning 150-250ms of decode on exactly the cores the
+        // flight's own decodes need (flipbench on taskset-constrained cores,
+        // 2026-11-19 — per-flip display latency ran to ~1s at 2 cores). The
+        // timer's currency check makes a superseded file drop out without
+        // ever starting a decode; at rest the dwell is the only cost, and it
+        // is invisible behind the tier-1 image already on screen.
         if(scaled)
-            model->upgradeToFull(path);
+            QTimer::singleShot(UpgradeDwellMs, this, [this, path] {
+                if(state->currentFilePath == path)
+                    model->upgradeToFull(path);
+            });
     }
 }
 
