@@ -5,8 +5,6 @@
 #include <QThread>
 #include <QTimer>
 
-#include "../directorymanager/enginebridge.h"
-
 namespace {
 
 // The sweep as a pool job. It owns nothing but the arguments: the store object
@@ -32,8 +30,7 @@ class CacheSweepJob : public PoolJob {
 
 } // namespace
 
-Thumbnailer::Thumbnailer(WorkerPool &_pool, EngineBridge &bridge) : mBridge(bridge), pool(_pool) {
-    connect(&mBridge, &EngineBridge::thumbNext, this, &Thumbnailer::onThumbNext);
+Thumbnailer::Thumbnailer(WorkerPool &_pool) : pool(_pool) {
     // the shared freedesktop store, not an app-private directory: this is the
     // whole point of the format — a thumbnail Dolphin already made is a hit
     cache = new ThumbnailCache(ThumbnailCache::rootDir());
@@ -50,11 +47,11 @@ void Thumbnailer::scheduleSweep(int idleDays, qint64 byteCap, std::atomic<Qt::HA
 }
 
 Thumbnailer::~Thumbnailer() {
-    auto dropped = pool.drain(PoolOwner::Thumbnailer);
+    pool.drain(PoolOwner::Thumbnailer); // the queued jobs die with the returned vector
     // A frame extraction in progress would otherwise be waited out for its whole
-    // 8 s timeout while the app sits in a destructor. A job stopped by that mark
-    // leaves its request in the engine's in-flight set, which is moot here: the
-    // bridge that holds it belongs to a process that is already going away.
+    // 8 s timeout while the app sits in a destructor. Marking it frees the worker
+    // within a poll slice; the job's abandoned report settles its submission
+    // entry, and no picture is delivered to a view that is going away anyway.
     pool.cancel(PoolOwner::Thumbnailer);
     pool.waitForOwner(PoolOwner::Thumbnailer);
     // A sweep still running holds `cache`, which is deleted below. It is the one
@@ -74,68 +71,63 @@ void Thumbnailer::waitForDone() {
 }
 
 void Thumbnailer::clearTasks() {
-    // drain() kills queued jobs whose taskEnd will never fire — report every
-    // dispatched request as done so the engine's in-flight accounting doesn't
-    // leak, then drop the pending batch
-    auto &bridge = mBridge;
-    for(auto it = dispatched.begin(); it != dispatched.end(); ++it)
-        bridge.thumbDone(it.key(), it.value().first, it.value().second);
-    dispatched.clear();
-    bridge.thumbClear();
-    auto dropped = pool.drain(PoolOwner::Thumbnailer);
+    // The batch is whatever the pool still holds. Those jobs are destroyed
+    // without ever reporting — their taskEnd never fires — so the submission
+    // set has to forget each one by name. Clearing the whole set instead would
+    // also drop entries for jobs the pool is still RUNNING (cancel() marks
+    // them, it does not stop them), and those will report back later; forgetting
+    // them early would let a re-request slip past the dedup while the original
+    // is still decoding.
+    for(const auto &job : pool.drain(PoolOwner::Thumbnailer)) {
+        auto *thumbJob = static_cast<ThumbnailerRunnable *>(job.get());
+        submitted.remove(requestKey(thumbJob->requestedPath(), thumbJob->requestedSize(), thumbJob->requestedCrop()));
+    }
     // The queued half is gone with the drain; the running half is a frame
     // extraction that will otherwise occupy a worker for up to its 8 s timeout
     // and then report a picture nobody asked for any more. Marking it costs one
     // store and frees the worker within a poll slice, and a job that had already
-    // announced itself still reports, so dispatched, runningTasks and the
-    // engine's count stay balanced without anything here knowing which jobs
-    // were marked.
+    // announced itself still reports, so submitted stays balanced without
+    // anything here knowing which jobs were marked.
     pool.cancel(PoolOwner::Thumbnailer);
-    // the force flags belong to requests this clear just killed: with the
-    // batch gone, a stale true here would force a decode into a later batch
-    // that never asked for one (and both presenters submit into this one map)
-    mPendingForce.clear();
-    mBatchStart = true;
 }
 
 std::shared_ptr<Thumbnail> Thumbnailer::getThumbnail(QString filePath, int size) {
     return ThumbnailerRunnable::generate(nullptr, std::move(filePath), size, false, false, LoadPolicy::fromSettings());
 }
 
+QString Thumbnailer::requestKey(const QString &path, int size, bool crop) {
+    // one spelling, used by the insert, the removal and the dedup check.
+    // Identity is the full triple: a path may repeat at different sizes/crops.
+    return path + QLatin1Char('|') + QString::number(size) + QLatin1Char('|') +
+           (crop ? QLatin1Char('1') : QLatin1Char('0'));
+}
+
 void Thumbnailer::getThumbnailAsync(const QString &path, int size, bool crop, bool force) {
-    const QString key = path + QString("|%1|%2").arg(size).arg(crop);
-    if(runningTasks.contains(path, size) || dispatched.contains(path, qMakePair(size, crop)))
+    // Straight into the pool. Dedup lives here (one request per triple across
+    // queued AND running); batch invalidation lives in clearTasks().
+    const QString key = requestKey(path, size, crop);
+    if(submitted.contains(key))
         return;
-    // viewport priority lives in the engine; the runnable starts on ThumbNext.
-    // `force` (cache bypass) is C++-side state — it only matters at decode time.
-    mPendingForce.insert(key, force);
-    mBridge.thumbRequest(path, size, crop, mBatchStart);
-    mBatchStart = false;
-    dispatched.insert(path, qMakePair(size, crop));
+    submitted.insert(key);
+    startThumbnailerThread(path, size, crop, force);
 }
 
 void Thumbnailer::startThumbnailerThread(QString filePath, int size, bool crop, bool force) {
     auto job =
         std::make_unique<ThumbnailerRunnable>(settings->useThumbnailCache() ? cache : nullptr, std::move(filePath),
                                               size, crop, force, LoadPolicy::fromSettings());
-    connect(job.get(), &ThumbnailerRunnable::taskStart, this, &Thumbnailer::onTaskStart);
     connect(job.get(), &ThumbnailerRunnable::taskEnd, this, &Thumbnailer::onTaskEnd);
+    // a job marked before it started reports nothing to the view, but its
+    // submission entry still has to go or the file is never requested again
+    connect(job.get(), &ThumbnailerRunnable::abandoned, this, &Thumbnailer::onTaskAbandoned);
     pool.submit(PoolOwner::Thumbnailer, 0, std::move(job));
 }
 
-void Thumbnailer::onTaskStart(const QString &filePath, int size) {
-    runningTasks.insert(filePath, size);
+void Thumbnailer::onTaskAbandoned(const QString &filePath, int size, bool crop) {
+    submitted.remove(requestKey(filePath, size, crop));
 }
 
 void Thumbnailer::onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath, bool crop) {
-    runningTasks.remove(filePath, thumbnail->size());
-    dispatched.remove(filePath, qMakePair(thumbnail->size(), crop));
-    mBridge.thumbDone(filePath, thumbnail->size(), crop);
+    submitted.remove(requestKey(filePath, thumbnail->size(), crop));
     emit thumbnailReady(thumbnail, filePath);
-}
-
-void Thumbnailer::onThumbNext(const QString &filePath, int size, bool crop) {
-    const QString key = filePath + QString("|%1|%2").arg(size).arg(crop);
-    const bool force = mPendingForce.take(key);
-    startThumbnailerThread(filePath, size, crop, force);
 }
