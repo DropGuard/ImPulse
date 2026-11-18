@@ -21,8 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use qimgv_engine::{
-    Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode, ThumbCommand,
-    ThumbReq,
+    Command, Engine, EngineConfig, EngineError, Event, NameFilter, Notify, SortMode,
 };
 
 // --- status codes (mirror include/qimgv_engine.h) ---------------------------
@@ -49,9 +48,6 @@ pub const QIMGV_MUT_REMOVED: c_int = 3;
 // One entry, a new path. `subject_buf` holds the path it has now; the path it
 // had is the event's second subject and rides in `old_buf` (see take_event).
 pub const QIMGV_MUT_RENAMED: c_int = 4;
-
-// --- events (continued) ------------------------------------------------------
-pub const QIMGV_EVENT_THUMB_NEXT: c_int = 4;
 
 // --- image formats (mirror meta::ImageFormat) -------------------------------
 pub const QIMGV_FMT_UNKNOWN: c_int = 0;
@@ -136,12 +132,6 @@ pub struct QimgvMutation {
     pub index: c_int,
 }
 
-#[repr(C)]
-pub struct QimgvThumbReq {
-    pub size: u32,
-    pub crop: c_int,
-}
-
 // ABI layout pins. The C header asserts the same numbers
 // (qimgv_engine.h, "Compile-time layout pinning") and tests/architecture_rules.py
 // R5 fails if the two literals disagree. This side needs its own assert because
@@ -166,9 +156,6 @@ const _: () = {
     assert!(offset_of!(QimgvMutation, size) == 8);
     assert!(offset_of!(QimgvMutation, mtime_ms) == 16);
     assert!(offset_of!(QimgvMutation, index) == 24);
-    assert!(size_of::<QimgvThumbReq>() == 8);
-    assert!(offset_of!(QimgvThumbReq, size) == 0);
-    assert!(offset_of!(QimgvThumbReq, crop) == 4);
     assert!(size_of::<QimgvProbeResult>() == 20);
     assert!(offset_of!(QimgvProbeResult, format) == 0);
     assert!(offset_of!(QimgvProbeResult, animated) == 4);
@@ -650,123 +637,6 @@ pub unsafe extern "C" fn qimgv_engine_prev_dir(
     neighbor(engine, handle, true, false, out)
 }
 
-// --- thumbnail scheduling -----------------------------------------------------
-
-/// Schedules a thumbnail decode. `replace_batch` nonzero clears all pending-
-/// /// not-yet-dispatched requests first — the caller sends it on the FIRST
-/// /// request of a fresh viewport batch, so an older batch dies structurally.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_thumb_request(
-    engine: *mut QimgvEngine,
-    path: *const c_char,
-    size: u32,
-    crop: c_int,
-    replace_batch: c_int,
-) -> c_int {
-    let attempt = || -> Result<c_int, c_int> {
-        let path = read_path(path)?;
-        with_engine(engine, |e| {
-            e.send(Command::Thumb(ThumbCommand::Request {
-                req: ThumbReq {
-                    path,
-                    size,
-                    crop: crop != 0,
-                },
-                replace_batch: replace_batch != 0,
-            }))
-            .map(|_| QIMGV_OK)
-            .map_err(|er| map_engine_error(&er))
-        })
-    };
-    match catch_unwind(AssertUnwindSafe(attempt)) {
-        Ok(Ok(code)) => code,
-        Ok(Err(code)) => {
-            set_last_error_by_code(code);
-            code
-        }
-        Err(_) => {
-            set_last_error("panic in qimgv_engine_thumb_request");
-            QIMGV_ERR_PANIC
-        }
-    }
-}
-
-/// Reports the app-side completion (or failure) of one THUMB_NEXT grant —
-/// /// frees its in-flight slot.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_thumb_done(
-    engine: *mut QimgvEngine,
-    path: *const c_char,
-    size: u32,
-    crop: c_int,
-) -> c_int {
-    let attempt = || -> Result<c_int, c_int> {
-        let path = read_path(path)?;
-        with_engine(engine, |e| {
-            e.send(Command::Thumb(ThumbCommand::Done {
-                req: ThumbReq {
-                    path,
-                    size,
-                    crop: crop != 0,
-                },
-            }))
-            .map(|_| QIMGV_OK)
-            .map_err(|er| map_engine_error(&er))
-        })
-    };
-    match catch_unwind(AssertUnwindSafe(attempt)) {
-        Ok(Ok(code)) => code,
-        Ok(Err(code)) => code,
-        Err(_) => {
-            set_last_error("panic in qimgv_engine_thumb_done");
-            QIMGV_ERR_PANIC
-        }
-    }
-}
-
-/// Drops every pending thumbnail request.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_thumb_clear(engine: *mut QimgvEngine) -> c_int {
-    let attempt = || -> Result<c_int, c_int> {
-        with_engine(engine, |e| {
-            e.send(Command::Thumb(ThumbCommand::Clear))
-                .map(|_| QIMGV_OK)
-                .map_err(|er| map_engine_error(&er))
-        })
-    };
-    match catch_unwind(AssertUnwindSafe(attempt)) {
-        Ok(Ok(code)) => code,
-        Ok(Err(code)) => code,
-        Err(_) => {
-            set_last_error("panic in qimgv_engine_thumb_clear");
-            QIMGV_ERR_PANIC
-        }
-    }
-}
-
-/// Caps the thumbnails in flight.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_thumb_config(
-    engine: *mut QimgvEngine,
-    max_in_flight: u32,
-) -> c_int {
-    let attempt = || -> Result<c_int, c_int> {
-        with_engine(engine, |e| {
-            e.send(Command::Thumb(ThumbCommand::Config { max_in_flight }))
-                .map(|_| QIMGV_OK)
-                .map_err(|er| map_engine_error(&er))
-        })
-    };
-    match catch_unwind(AssertUnwindSafe(attempt)) {
-        Ok(Ok(code)) => code,
-        Ok(Err(code)) => code,
-        Err(_) => {
-            set_last_error("panic in qimgv_engine_thumb_config");
-            QIMGV_ERR_PANIC
-        }
-    }
-}
-
 // --- bulk listing export ------------------------------------------------------
 
 /// Serializes the current listing into `buf` in one lock pass (LE wire format,
@@ -928,9 +798,9 @@ pub extern "C" fn qimgv_engine_supports_watching() -> c_int {
 /// a positive `QIMGV_ERR_*` code (the codes are enum values, not negated — so
 /// compare against 1, and treat anything else as "wrote nothing"). `subject_buf`
 /// receives the event's subject, which is the directory for DIR_LISTED and
-/// OPEN_FAILED and the *full path* for DIR_MUTATED and
-/// THUMB_NEXT (the table lives in qimgv_engine.h next to the declaration);
-/// `mutation` is filled for DIR_MUTATED, `thumb` for THUMB_NEXT.
+/// OPEN_FAILED and the *full path* for DIR_MUTATED (the table lives in
+/// qimgv_engine.h next to the declaration); `mutation` is filled for
+/// DIR_MUTATED.
 ///
 /// `old_buf` is written for ONE mutation kind, QIMGV_MUT_RENAMED, and holds the
 /// path the entry had. A rename has two subjects and one slot, so the second
@@ -948,7 +818,6 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
     old_buf: *mut c_char,
     old_cap: usize,
     mutation: *mut QimgvMutation,
-    thumb: *mut QimgvThumbReq,
 ) -> c_int {
     if engine.is_null() || out.is_null() {
         set_last_error("invalid argument");
@@ -991,26 +860,6 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 kind: QIMGV_EVENT_OPEN_FAILED,
                                 code,
                                 epoch: *epoch as u32,
-                                seq: 0,
-                            };
-                        }
-                        Ok(1)
-                    }
-                    Event::ThumbNext { req } => {
-                        write_str(subject_buf, subject_cap, &req.path.to_string_lossy())?;
-                        if !thumb.is_null() {
-                            unsafe {
-                                *thumb = QimgvThumbReq {
-                                    size: req.size,
-                                    crop: req.crop as c_int,
-                                };
-                            }
-                        }
-                        unsafe {
-                            *out = QimgvEvent {
-                                kind: QIMGV_EVENT_THUMB_NEXT,
-                                code: QIMGV_OK,
-                                epoch: 0,
                                 seq: 0,
                             };
                         }

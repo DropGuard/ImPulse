@@ -14,9 +14,7 @@ pub mod trace;
 #[cfg(any(target_os = "linux", windows))]
 pub mod watcher;
 
-pub use engine::{
-    Command, Engine, EngineConfig, Event, Notify, ThumbCommand, ThumbReq, WatchChangeKind,
-};
+pub use engine::{Command, Engine, EngineConfig, Event, Notify, WatchChangeKind};
 pub use error::EngineError;
 pub use filter::NameFilter;
 pub use meta::{ImageFormat, MetaInfo};

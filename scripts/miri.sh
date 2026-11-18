@@ -4,7 +4,7 @@
 #   2. the armed race test FAILS with the expected "Data race detected" report —
 #      a passing armed run means the instrument is dead, and any other failure
 #      mode means it is broken; both are red here.
-# Excluded by design, not skipped quietly: engine_tests and thumb_tests drive
+# Excluded by design, not skipped quietly: engine_tests drives
 # the real fd machinery (inotify FFI) whole-file; watcher_tests' five
 # engine-spawning tests carry #[cfg_attr(miri, ignore)] in place, so the skip is
 # visible in the run output. Reach and the fd-machinery named gap:

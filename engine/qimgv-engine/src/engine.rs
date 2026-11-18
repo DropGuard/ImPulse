@@ -43,37 +43,7 @@ pub enum Command {
     /// that was interrupted mid-flight; addressable from a test for the same reason
     /// it is needed in production: both are "the answer I have is not stable".
     Rescan(PathBuf),
-    /// Thumbnail scheduling. The four live and die with the thumbnail
-    /// viewport and none of them touch the listing — they are one family
-    /// with one scheduler behind it, so they ride one variant.
-    Thumb(ThumbCommand),
     Shutdown,
-}
-
-/// The thumbnail-scheduling family of `Command`. The C++ side owns decode
-/// execution; these drive the engine's scheduler for it.
-#[derive(Debug, Clone)]
-pub enum ThumbCommand {
-    /// Submit one request. `replace_batch` clears all pending (not yet
-    /// dispatched) requests first — the caller sends it on the FIRST request
-    /// of a fresh viewport batch, so an older batch dies structurally
-    /// (requests that were never dispatched never decode).
-    Request { req: ThumbReq, replace_batch: bool },
-    /// The C++ executor finished (or failed) one dispatched request.
-    Done { req: ThumbReq },
-    /// Drop all pending requests (directory switch).
-    Clear,
-    /// How many decodes may run concurrently on the C++ side.
-    Config { max_in_flight: u32 },
-}
-
-/// A decode request; identity is the full tuple (path may repeat at
-/// different sizes/crops).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ThumbReq {
-    pub path: PathBuf,
-    pub size: u32,
-    pub crop: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -117,8 +87,6 @@ pub enum Event {
         index: u32,
         epoch: u64,
     },
-    /// Scheduler dispatches the next decode (C++ pool executes it).
-    ThumbNext { req: ThumbReq },
 }
 
 #[derive(Clone)]
@@ -195,64 +163,6 @@ fn fire_notify(notify: &Notify) {
     let _ = catch_unwind(AssertUnwindSafe(|| notify()));
 }
 
-/// Viewport-aware thumbnail scheduling policy. The C++ pool executes; this
-/// decides WHAT decodes next and lets stale batches die structurally.
-#[derive(Default)]
-struct ThumbScheduler {
-    pending: std::collections::VecDeque<ThumbReq>,
-    in_flight: HashSet<ThumbReq>,
-    max_in_flight: u32,
-}
-
-impl ThumbScheduler {
-    fn request(&mut self, req: ThumbReq, replace_batch: bool) {
-        if replace_batch {
-            self.pending.clear();
-        }
-        if !self.in_flight.contains(&req) && !self.pending.contains(&req) {
-            self.pending.push_back(req);
-        }
-    }
-
-    fn done(&mut self, req: &ThumbReq) {
-        self.in_flight.remove(req);
-    }
-
-    /// A rename rekeys the requests that have not been dispatched yet: left
-    /// holding the old path, the scheduler would decode a file that no longer
-    /// exists and never decode the one the listing now names. `in_flight` is
-    /// deliberately not touched — the C++ side answers with the request it was
-    /// handed, so an entry renamed there could never be removed by `done` and
-    /// the window would fill with ghosts that block every later pump.
-    fn rename(&mut self, from: &std::path::Path, to: &std::path::Path) {
-        let mut next: std::collections::VecDeque<ThumbReq> = Default::default();
-        for mut req in std::mem::take(&mut self.pending) {
-            if req.path == from {
-                req.path = to.to_path_buf();
-            }
-            // two requests that differed only by the renamed path are one
-            // request now, and the queue holds each identity once
-            if !next.contains(&req) {
-                next.push_back(req);
-            }
-        }
-        self.pending = next;
-    }
-
-    fn pump(&mut self, ev_tx: &Sender<Event>, notify: &Notify) {
-        while self.in_flight.len() < self.max_in_flight as usize {
-            let Some(req) = self.pending.pop_front() else {
-                break;
-            };
-            if !self.in_flight.insert(req.clone()) {
-                continue;
-            }
-            let _ = ev_tx.send(Event::ThumbNext { req });
-            fire_notify(notify);
-        }
-    }
-}
-
 impl Engine {
     /// Starts the engine loop thread, the scan worker pool and the platform
     /// watcher thread (inotify on Linux, ReadDirectoryChangesW on Windows).
@@ -305,10 +215,6 @@ impl Engine {
                 // mirror identify the same event, which is what makes the two
                 // halves of a trace comparable when one of them is missing a line.
                 let mut next_mutation: u64 = 0;
-                let mut thumbs = ThumbScheduler {
-                    max_in_flight: 2,
-                    ..Default::default()
-                };
                 loop {
                     crossbeam_channel::select! {
                         recv(cmd_rx) -> cmd => {
@@ -385,21 +291,6 @@ impl Engine {
                                         let _ = ev_tx.send(Event::DirListed { dir, epoch: epoch_at() });
                                         fire_notify(&notify);
                                     }
-                                }
-                                Ok(Command::Thumb(ThumbCommand::Request { req, replace_batch })) => {
-                                    thumbs.request(req, replace_batch);
-                                    thumbs.pump(&ev_tx, &notify);
-                                }
-                                Ok(Command::Thumb(ThumbCommand::Done { req })) => {
-                                    thumbs.done(&req);
-                                    thumbs.pump(&ev_tx, &notify);
-                                }
-                                Ok(Command::Thumb(ThumbCommand::Clear)) => {
-                                    thumbs.pending.clear();
-                                }
-                                Ok(Command::Thumb(ThumbCommand::Config { max_in_flight })) => {
-                                    thumbs.max_in_flight = max_in_flight.max(1);
-                                    thumbs.pump(&ev_tx, &notify);
                                 }
                                 Ok(Command::StopWatch) => {
                                     listing = None;
@@ -502,10 +393,9 @@ impl Engine {
                                             watcher::Applied::Renamed { from } => {
                                                 // Everything the engine keys by path has to
                                                 // follow the entry, before the event goes out:
-                                                // a queued decode or an include-path override
-                                                // still naming the old path is a claim about a
-                                                // file that no longer exists.
-                                                thumbs.rename(Path::new(&from), Path::new(&path));
+                                                // an include-path override still naming the
+                                                // old path is a claim about a file that no
+                                                // longer exists.
                                                 {
                                                     let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
                                                     if ov.remove(Path::new(&from)) {

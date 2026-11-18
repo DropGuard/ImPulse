@@ -162,31 +162,6 @@ void EngineBridge::stopWatch() {
         qimgv_engine_stop_watch(engine.d->engine);
 }
 
-bool EngineBridge::thumbRequest(const QString &path, int size, bool crop, bool replaceBatch) {
-    if(!engine)
-        return false;
-    const QByteArray utf8 = path.toUtf8();
-    return qimgv_engine_thumb_request(engine.d->engine, utf8.constData(), static_cast<uint32_t>(size), crop ? 1 : 0,
-                                      replaceBatch ? 1 : 0) == QIMGV_OK;
-}
-
-void EngineBridge::thumbDone(const QString &path, int size, bool crop) {
-    if(!engine)
-        return;
-    const QByteArray utf8 = path.toUtf8();
-    qimgv_engine_thumb_done(engine.d->engine, utf8.constData(), static_cast<uint32_t>(size), crop ? 1 : 0);
-}
-
-void EngineBridge::thumbClear() {
-    if(engine)
-        qimgv_engine_thumb_clear(engine.d->engine);
-}
-
-void EngineBridge::thumbConfig(int maxInFlight) {
-    if(engine)
-        qimgv_engine_thumb_config(engine.d->engine, static_cast<uint32_t>(maxInFlight));
-}
-
 bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount) {
     if(!engine)
         return false;
@@ -331,11 +306,10 @@ void EngineBridge::drainEvents() {
     for(;;) {
         qimgv_event ev{};
         qimgv_mutation mut{};
-        qimgv_thumb_req treq{};
         int r;
         for(;;) {
             r = qimgv_engine_take_event(engine.d->engine, &ev, subjectBuf.data(), size_t(subjectBuf.size()),
-                                        oldBuf.data(), size_t(oldBuf.size()), &mut, &treq);
+                                        oldBuf.data(), size_t(oldBuf.size()), &mut);
             if(r != QIMGV_ERR_TRUNCATED)
                 break;
             if(subjectBuf.size() >= (1 << 20)) {
@@ -365,8 +339,8 @@ void EngineBridge::drainEvents() {
             continue; // event from an older session (dead receiver) — drop
         }
         // One string, two subjects: a directory for DIR_LISTED/OPEN_FAILED and a
-        // full file path for DIR_MUTATED/THUMB_NEXT. Named for the ambiguity on
-        // purpose — the kind decides which it is, and the value cannot say so.
+        // full file path for DIR_MUTATED. Named for the ambiguity on purpose —
+        // the kind decides which it is, and the value cannot say so.
         // See the table at qimgv_engine_take_event in qimgv_engine.h.
         const QString subject = QString::fromUtf8(subjectBuf.constData());
         // Read only for the one kind that writes it: for every other event
@@ -385,8 +359,6 @@ void EngineBridge::drainEvents() {
             emit dirListed(subject);
         } else if(ev.kind == QIMGV_EVENT_DIR_MUTATED) {
             emit dirMutated(mut.kind, subject, mut.is_dir != 0, mut.size, mut.mtime_ms, mut.index, oldPath);
-        } else if(ev.kind == QIMGV_EVENT_THUMB_NEXT) {
-            emit thumbNext(subject, static_cast<int>(treq.size), treq.crop != 0);
         } else if(ev.kind == QIMGV_EVENT_OPEN_FAILED) {
             qWarning() << "[EngineBridge] open failed:" << subject << "code" << ev.code
                        << (qimgv_last_error() ? qimgv_last_error() : "");

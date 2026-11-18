@@ -43,57 +43,56 @@ class TestInfra : public QObject, protected EngineStackFixture {
         QCOMPARE(bridgeB.fileCount(), 1);
     }
 
-    // The wake hop: every notification must turn into exactly one delivery of
-    // the event behind it. The eventfd era got this for free (writes coalesce,
-    // one drain empties the queue); the queued-invoke era relies on drainEvents
-    // being idempotent instead, and that is a property nobody had pinned. It
-    // matters because the engine fires one notify per thumb DISPATCHED, and the
-    // number dispatched depends on the in-flight cap — a fact the window is
-    // allowed to change.
+    // The wake hop: every notification must turn into a delivery of the events
+    // queued behind it, and no event may be lost between rounds. The eventfd
+    // era got this for free (writes coalesce, one drain empties the queue); the
+    // queued-invoke era relies on drainEvents being idempotent instead, and
+    // that is a property nobody had pinned. The engine fires one notify per
+    // event it emits, so watcher churn under one watch is the many-rounds
+    // shape: each apply fires its own notify, and the drain runs whenever one
+    // lands.
     //
-    // The cap is 2 and a slot frees only on thumbDone, so this drives the pump
-    // through several notify rounds rather than one burst, which is the case
-    // where a coalescing bug would show as a stuck queue.
-    void everyThumbNotificationDeliversExactlyOnce() {
+    // The exactness half of the old pump-era pin ("exactly one delivery per
+    // event") died with its driver: a created file can legitimately produce
+    // more than one mutation (a create and a modify in separate poll batches),
+    // so per-path once-ness is not a property mutations have. What stays
+    // pinnable and matters is the loss half — every file's arrival survives
+    // however many notify rounds the churn produces.
+    void everyMutationIsDeliveredAcrossManyNotifyRounds() {
         resetFixture();
         EngineBridge bridge;
-        QSignalSpy next(&bridge, &EngineBridge::thumbNext);
-        QVERIFY(next.isValid());
+        QSignalSpy listed(&bridge, &EngineBridge::dirListed);
+        QVERIFY(listed.isValid());
+        QSignalSpy mutated(&bridge, &EngineBridge::dirMutated);
+        QVERIFY(mutated.isValid());
         QVERIFY(bridge.openDir(fixtureDir, 0, false));
+        // settle the initial listing first: a file created before it lands
+        // becomes part of the listing, not a mutation of it
+        QTRY_COMPARE_WITH_TIMEOUT(listed.count(), 1, 10000);
+        mutated.clear();
 
-        QStringList asked;
-        for(int i = 0; i < 6; ++i) {
-            const QString name = QStringLiteral("wake%1.jpg").arg(i);
-            makeFile(name);
-            const QString path = fixtureDir + "/" + name;
-            QVERIFY(bridge.thumbRequest(path, 128, false, false));
-            asked << path;
-        }
+        const int fileCount = 6;
+        for(int i = 0; i < fileCount; ++i)
+            makeFile(QStringLiteral("wake%1.jpg").arg(i));
 
-        // consume as the real Thumbnailer does: free a slot for each delivery,
-        // so the pump keeps dispatching. Every delivery is accounted for.
+        // every file must arrive, however many rounds the churn takes
         QSet<QString> seen;
         QElapsedTimer deadline;
         deadline.start();
-        while(seen.size() < asked.size() && deadline.elapsed() < 15000) {
-            if(!next.wait(100))
+        while(seen.size() < fileCount && deadline.elapsed() < 15000) {
+            if(!mutated.wait(100))
                 continue;
-            for(const auto &args : next) {
-                const QString path = args.at(0).toString();
-                QVERIFY2(!seen.contains(path), qPrintable(QStringLiteral("thumbnail announced twice: ") + path));
-                seen.insert(path);
-                bridge.thumbDone(path, 128, false);
-            }
-            next.clear();
+            for(const auto &args : mutated)
+                seen.insert(args.at(1).toString());
+            mutated.clear();
         }
-        // each of the six was announced, once — and the last batch could not
-        // have arrived without the previous done() calls, which is the
-        // ordering the in-flight cap exists to enforce
-        QCOMPARE(seen.size(), asked.size());
         // const so the range-for does not detach (clazy range-loop-detach)
-        const QStringList requested = asked;
-        for(const QString &path : requested)
-            QVERIFY2(seen.contains(path), qPrintable(QStringLiteral("thumbnail never announced: ") + path));
+        QStringList built;
+        for(int i = 0; i < fileCount; ++i)
+            built << fixtureDir + QStringLiteral("/wake%1.jpg").arg(i);
+        const QStringList expected = built;
+        for(const QString &path : expected)
+            QVERIFY2(seen.contains(path), qPrintable(QStringLiteral("mutation never delivered: ") + path));
     }
 
     // Destruction must stop the engine's threads before this object is gone.
@@ -107,13 +106,11 @@ class TestInfra : public QObject, protected EngineStackFixture {
         {
             EngineBridge bridge;
             QVERIFY(bridge.openDir(fixtureDir, 0, false));
-            // leave requests in flight: no drain turn is awaited before the
-            // object goes out of scope
-            for(int i = 0; i < 3; ++i) {
-                const QString name = QStringLiteral("busy%1.jpg").arg(i);
-                makeFile(name);
-                bridge.thumbRequest(fixtureDir + "/" + name, 128, false, false);
-            }
+            // leave the watcher mid-churn: files created after the watch is
+            // installed arrive as mutations, and nothing drains them before
+            // the object goes out of scope
+            for(int i = 0; i < 20; ++i)
+                makeFile(QStringLiteral("busy%1.jpg").arg(i));
         } // ~EngineBridge -> ~EngineHandle -> qimgv_engine_free (joins)
         // reaching here without a crash or a hang is the assertion; a second
         // bridge must still work, which proves the free did not poison state
