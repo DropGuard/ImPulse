@@ -1,5 +1,7 @@
 #include "loader.h"
 
+#include <vector>
+
 Loader::Loader(WorkerPool &_pool) : pool(_pool) {
 }
 
@@ -53,15 +55,45 @@ void Loader::loadAsyncFull(const QString &path, const LoadPolicy &policy) {
     doLoadAsync(path, 0, false, policy); // tier-2 full-res upgrade
 }
 
+void Loader::loadWindow(const QString &target, const QSet<QString> &window, const LoadPolicy &policy) {
+    auto dropped = pool.drain(PoolOwner::Loader);
+    std::unique_ptr<LoaderRunnable> promote;
+    std::vector<std::unique_ptr<LoaderRunnable>> kept;
+    for(auto &job : dropped) {
+        auto *runnable = static_cast<LoaderRunnable *>(job.get());
+        tasks.remove(runnable->loadPath());
+        if(runnable->loadPath() == target)
+            promote.reset(static_cast<LoaderRunnable *>(job.release()));
+        else if(window.contains(runnable->loadPath()))
+            kept.emplace_back(static_cast<LoaderRunnable *>(job.release()));
+        // else: outside the window, dies with the vector
+    }
+    // the target goes last: its 2 outranks whatever the flight left queued,
+    // and submission order cannot weaken that
+    for(auto &job : kept)
+        resubmit(std::move(job), 0);
+    if(promote)
+        resubmit(std::move(promote), 2);
+    else
+        doLoadAsync(target, 2, true, policy);
+}
+
+void Loader::resubmit(std::unique_ptr<LoaderRunnable> job, int priority) {
+    const QString path = job->loadPath();
+    if(tasks.contains(path))
+        return;
+    tasks.insert(path, job.get());
+    connect(job.get(), &LoaderRunnable::finished, this, &Loader::onLoadFinished, Qt::UniqueConnection);
+    pool.submit(PoolOwner::Loader, priority, std::move(job));
+}
+
 void Loader::doLoadAsync(const QString &path, int priority, bool scaled, const LoadPolicy &policy) {
     if(tasks.contains(path)) {
         return;
     }
 
     auto job = std::make_unique<LoaderRunnable>(path, scaled, policy);
-    tasks.insert(path, job.get());
-    connect(job.get(), &LoaderRunnable::finished, this, &Loader::onLoadFinished, Qt::UniqueConnection);
-    pool.submit(PoolOwner::Loader, priority, std::move(job));
+    resubmit(std::move(job), priority);
 }
 
 void Loader::onLoadFinished(std::optional<std::shared_ptr<Image>> image, const QString &path, bool scaled) {

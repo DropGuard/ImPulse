@@ -23,6 +23,12 @@ class DirectoryModel : public QObject {
 
     void load(const QString &filePath, bool asyncHint);
     void load(const QString &filePath, bool asyncHint, bool scaled);
+    // The flip: one drain pass maintains the flight window — the target
+    // promotes to priority 2, the direction neighbor survives at 0, everything
+    // else queued dies (queued jobs have not started, so dropping them costs
+    // nothing decoded) — and the display follows load()'s rules: a cache hit
+    // shows instantly, a queued or running decode delivers when it lands.
+    void loadFocused(const QString &filePath, bool forward, bool withPreload);
     void preload(const QString &filePath);
     void upgradeToFull(const QString &filePath);
 
