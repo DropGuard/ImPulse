@@ -59,7 +59,12 @@ namespace coretest {
 // setChildCoreLimit(): each slot child caps its own RLIMIT_CORE — the burst's
 // write-through is bounded, and the notes-first core layout keeps backtraces
 // intact under truncation. QIMGV_TEST_CORE_UNLIMITED removes the cap when a
-// fresh crash needs the full image.
+// fresh crash needs the full image. The cap's design assumption is that crash
+// evidence lives in stacks and notes; a diagnosis-driven abort (a test that
+// aborts on a shortfall to name a live lock or a lost delivery) needs the
+// heap itself — thread stacks sit in mappings the truncation drops first, so
+// such hunts run with the variable set (2026-11-19: the 64MB core of a 2.2GB
+// process named no frame, the unlimited one named the whole picture).
 //
 // The parent-side burst counter lives in each main's loop: three consecutive
 // abnormal slots abort the rest — a fixture-wide failure carries no new
