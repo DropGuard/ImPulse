@@ -173,8 +173,6 @@ class Settings : public QObject {
     // this change removes.
     static void retirePrivateThumbnailStores(const QString &cacheRoot);
 
-    int thumbnailerThreadCount();
-    void setThumbnailerThreadCount(int count);
     bool smoothUpscaling();
     void setSmoothUpscaling(bool mode);
     void setExpandImage(bool mode);

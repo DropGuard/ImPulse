@@ -175,7 +175,6 @@ inline constexpr SettingDesc K_ImageScrolling = IntReset("imageScrolling", 1, 0,
 inline constexpr SettingDesc K_ZoomIndicatorMode = IntReset("zoomIndicatorMode", 0, 0, 2);
 inline constexpr SettingDesc K_MemoryAllocationLimit = Int("memoryAllocationLimit", 1024, 512, 8192);
 inline constexpr SettingDesc K_SlideshowInterval = IntReset("slideshowInterval", 3000, 1);
-inline constexpr SettingDesc K_ThumbnailerThreads = IntReset("thumbnailerThreads", 4, 1);
 inline constexpr SettingDesc K_PanelPreviewsSize = Int("panelPreviewsSize", 140, 100, 250);
 inline constexpr SettingDesc K_AutoResizeLimit = IntReset("autoResizeLimit", 90, 30, 100);
 inline constexpr SettingDesc K_JPEGSaveQuality = Int("JPEGSaveQuality", 95, 0, 100);
@@ -237,7 +236,6 @@ inline constexpr const SettingDesc *kAllSettings[] = {
     &K_ZoomIndicatorMode,
     &K_MemoryAllocationLimit,
     &K_SlideshowInterval,
-    &K_ThumbnailerThreads,
     &K_PanelPreviewsSize,
     &K_AutoResizeLimit,
     &K_JPEGSaveQuality,

@@ -28,12 +28,11 @@
 #include <tchar.h>
 #endif
 
-// the shared pool's size: the old thumbnailerThreads knob now means "the
-// pipeline's threads". Never below 2, so a stuck mpv frame grab cannot starve
-// decoding; never above the hardware
+// the shared pool's size: decode, scale and thumbnails all run here, so the
+// pool follows the hardware. Never below 2, so a stuck mpv frame grab cannot
+// starve decoding.
 static int workerPoolThreadCount() {
-    const int hw = qMax(2, QThread::idealThreadCount());
-    return qBound(2, settings->thumbnailerThreadCount(), hw);
+    return qMax(2, QThread::idealThreadCount());
 }
 
 Core::Core() : Core(Deps{}) {

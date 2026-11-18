@@ -346,10 +346,6 @@ void SettingsDialog::readSettings() {
     ui->expandLimitSlider->setValue(settings->expandLimit());
     onExpandLimitSliderChanged(ui->expandLimitSlider->value());
 
-    // thumbnailer threads
-    ui->thumbnailerThreadsSlider->setValue(settings->thumbnailerThreadCount());
-    onThumbnailerThreadsSliderChanged(ui->thumbnailerThreadsSlider->value());
-
     ui->memoryLimitSpinBox->setValue(settings->memoryAllocationLimit());
 
     // ##### fit mode #####
@@ -480,7 +476,6 @@ void SettingsDialog::saveSettings() {
     settings->setMouseScrollingSpeed(static_cast<qreal>(0.5f + (ui->mouseScrollingSpeedSlider->value() * 0.25f)));
     settings->setAutoResizeLimit(ui->autoResizeLimitSlider->value() * 5);
     settings->setExpandLimit(ui->expandLimitSlider->value());
-    settings->setThumbnailerThreadCount(ui->thumbnailerThreadsSlider->value());
     settings->setMemoryAllocationLimit(ui->memoryLimitSpinBox->value());
 
     settings->setUseSystemColorScheme(ui->useSystemColorsCheckBox->isChecked());
@@ -533,10 +528,6 @@ void SettingsDialog::onZoomStepSliderChanged(int value) {
 //------------------------------------------------------------------------------
 void SettingsDialog::onMouseScrollingSpeedSliderChanged(int value) {
     ui->mouseScrollingSpeedLabel->setText(QString::number(0.5f + (value * 0.25f), 'f', 2) + "x");
-}
-//------------------------------------------------------------------------------
-void SettingsDialog::onThumbnailerThreadsSliderChanged(int value) {
-    ui->thumbnailerThreadsLabel->setText(QString::number(value));
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onBgOpacitySliderChanged(int value) {
