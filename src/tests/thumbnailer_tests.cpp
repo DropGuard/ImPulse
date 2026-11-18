@@ -20,6 +20,25 @@
 
 #include <atomic>
 
+// Occupies a worker until released, so a test can put the thumbnailer's job in
+// a state the scheduler would otherwise make racy: queued behind a running job.
+// Local rather than shared with workerpool_tests: each suite owns its fixtures
+// (the same reason the engine_stack units are separate binaries).
+class ThumbnailGateJob : public PoolJob {
+  public:
+    ThumbnailGateJob(std::atomic_bool *_gate, std::atomic_int *_starts) : gate(_gate), starts(_starts) {
+    }
+    void run() override {
+        starts->fetch_add(1);
+        while(!gate->load())
+            QThread::msleep(1);
+    }
+
+  private:
+    std::atomic_bool *gate;
+    std::atomic_int *starts;
+};
+
 class TestThumbnailer : public QObject, protected EngineStackFixture {
     Q_OBJECT
   public:
@@ -154,7 +173,7 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
     void theStoreSweepRunsOnAWorkerNotOnTheCallingThread() {
         resetFixture();
         WorkerPool pool(1);
-        Thumbnailer thumb(pool, EngineBridge::instance());
+        Thumbnailer thumb(pool);
         const Qt::HANDLE caller = QThread::currentThreadId();
 
         std::atomic<Qt::HANDLE> ranOn{nullptr};
@@ -181,7 +200,7 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
         resetFixture();
         for(int i = 0; i < 3; ++i) {
             WorkerPool pool(2);
-            Thumbnailer thumb(pool, EngineBridge::instance());
+            Thumbnailer thumb(pool);
             thumb.scheduleSweep(15, ThumbnailCache::cacheMaxBytes);
             // no wait here: the destructor has to do it
         }
@@ -191,11 +210,12 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
     void thumbnailerAccountingSurvivesAClearMidFlight() {
         resetFixture();
         WorkerPool pool(2);
-        Thumbnailer thumb(pool, EngineBridge::instance());
+        Thumbnailer thumb(pool);
         QSignalSpy ready(&thumb, &Thumbnailer::thumbnailReady);
         QVERIFY(ready.isValid());
 
-        // every request must come back through the engine's scheduler
+        // every request goes straight into the pool; the engine no longer
+        // schedules thumbnails
         thumb.getThumbnailAsync(fixtureDir + "/img1.jpg", 32, false, false);
         thumb.getThumbnailAsync(fixtureDir + "/img2.jpg", 32, false, false);
         // a duplicate collapses instead of double-dispatching
@@ -204,10 +224,9 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
         coretest::drainEvents();
         QCOMPARE(ready.count(), 2);
 
-        // the clear happens before the event loop drains anything, so the
-        // third request is provably still in flight: clearTasks must report
-        // it back to the engine as done, or its slot leaks and the pipeline
-        // silently stalls forever after
+        // the clear happens while the third request is still queued: it is
+        // drained and never reports, so clearTasks must forget it by name —
+        // a set that kept it would dedup every later request for that file
         thumb.getThumbnailAsync(fixtureDir + "/img10.jpg", 32, false, false);
         thumb.clearTasks();
 
@@ -220,30 +239,72 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
     }
 
     // The presenter-level shape of the shared instance, pinned at the unit the
-    // presenters share: one wave's clearTasks kills the other wave's
-    // still-pending requests (the engine's pending queue is process-wide,
-    // which predates the shared instance), and the recovery is the next wave
-    // re-requesting the same files. This pins the recovery: every file of a
-    // killed batch arrives after the re-request, whichever fate its first job
-    // met — dispatched and delivered, canceled before its checkpoint and
-    // re-requested fresh, or canceled inside generate and delivered by the
-    // survivor. Narrowing the kill window needs engine batch ids; while this
-    // recovery holds, that protocol change buys nothing worth its pin tax.
+    // presenters share: one wave's clearTasks kills the other wave's queued
+    // requests (the pool is process-wide, which predates the shared instance),
+    // and the recovery is the next wave re-requesting the same files. This pins
+    // the recovery: every file of a killed batch arrives after the re-request,
+    // whichever fate its first job met — ran and delivered, drained before it
+    // started and re-requested fresh, or canceled inside generate and delivered
+    // by the survivor.
+    // The submission set is the only thing that dedups a request now that the
+    // engine's queue is gone, so every way a request can end must remove it.
+    // Three ways: it decodes (taskEnd), it is drained while queued (clearTasks
+    // removes it by name), or it is marked BEFORE it starts (abandoned). The
+    // last is the subtle one: such a job has no picture, and must not send an
+    // empty one down taskEnd, because the presenter would overwrite a good
+    // thumbnail with it. Without its own report the entry strands and the file
+    // can never be requested again for the life of the process.
+    //
+    // The third path needs a mark that lands while the job is QUEUED, and a
+    // start that happens after it. Without a gate that is a race — the worker
+    // may pass the entry checkpoint before cancel() marks it. The gate pins the
+    // only worker, so the mark provably precedes the start: the mark is set
+    // while the job sits in the queue, and run() is entered only after the
+    // gate releases the worker.
+    void aJobMarkedBeforeItStartsForgetsItsRequest() {
+        resetFixture();
+        const QString path = fixtureDir + "/cancelme.png";
+        QVERIFY(makeImageFile(path, QSize(64, 64)));
 
-    // The presenter-level shape of the shared instance, pinned at the unit the
-    // presenters share: one wave's clearTasks kills the other wave's
-    // still-pending requests (the engine's pending queue is process-wide,
-    // which predates the shared instance), and the recovery is the next wave
-    // re-requesting the same files. This pins the recovery: every file of a
-    // killed batch arrives after the re-request, whichever fate its first job
-    // met — dispatched and delivered, canceled before its checkpoint and
-    // re-requested fresh, or canceled inside generate and delivered by the
-    // survivor. Narrowing the kill window needs engine batch ids; while this
-    // recovery holds, that protocol change buys nothing worth its pin tax.
+        std::atomic_bool gate{false};
+        std::atomic_int starts{0};
+        WorkerPool pool(1);
+        Thumbnailer thumb(pool);
+        QSet<QString> arrived;
+        QObject::connect(&thumb, &Thumbnailer::thumbnailReady, &thumb,
+                         [&arrived](std::shared_ptr<Thumbnail>, const QString &filePath) {
+                             arrived.insert(filePath);
+                         });
+
+        // the only worker is busy in the gate, so the thumbnail job is queued
+        pool.submit(PoolOwner::Maintenance, 0, std::make_unique<ThumbnailGateJob>(&gate, &starts));
+        QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+
+        thumb.getThumbnailAsync(path, 128, false, false);
+        // mark WITHOUT draining — clearTasks() would remove the queued job
+        // outright (path 2, pinned by the clear-mid-flight test above). cancel()
+        // marks queued jobs too, which is the only way to reach path 3 at all:
+        pool.cancel(PoolOwner::Thumbnailer);
+        // release the gate; the worker picks up the marked job, run() sees the
+        // mark at its entry checkpoint and abandons — no picture may reach the
+        // view, not even an empty one
+        gate.store(true);
+        pool.waitForOwner(PoolOwner::Maintenance);
+        thumb.waitForDone();
+        coretest::drainEvents();
+        QCOMPARE(arrived.size(), 0);
+
+        // the request must be forgotten — a stranded entry would dedup every
+        // later request for this file for the life of the process
+        thumb.getThumbnailAsync(path, 128, false, false);
+        QTRY_COMPARE_WITH_TIMEOUT(arrived.size(), 1, 15000);
+        thumb.waitForDone();
+    }
+
     void aClearedBatchIsRecoveredByTheNextWave() {
         resetFixture();
         WorkerPool pool(2);
-        Thumbnailer thumb(pool, EngineBridge::instance());
+        Thumbnailer thumb(pool);
         QSet<QString> ready;
         QObject::connect(&thumb, &Thumbnailer::thumbnailReady, &thumb,
                          [&ready](std::shared_ptr<Thumbnail>, const QString &path) {

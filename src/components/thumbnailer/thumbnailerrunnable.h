@@ -18,6 +18,17 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
   public:
     ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
                         const LoadPolicy &_policy);
+    // What this job was asked for. A drained job is destroyed without ever
+    // reporting, so the owner has to be able to ask it what to forget.
+    const QString &requestedPath() const {
+        return path;
+    }
+    int requestedSize() const {
+        return size;
+    }
+    bool requestedCrop() const {
+        return crop;
+    }
     ~ThumbnailerRunnable() override;
     void run() override;
     static std::shared_ptr<Thumbnail> generate(ThumbnailCache *cache, const QString &path, int size, bool crop,
@@ -65,6 +76,10 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     ThumbnailCache *cache = nullptr;
 
   signals:
-    void taskStart(QString, int);
     void taskEnd(std::shared_ptr<Thumbnail>, QString, bool crop);
+    // A job that was marked before it ever started. It reports NOTHING on
+    // taskEnd (there is no picture, and the consumers would overwrite a good
+    // thumbnail with an empty one), but the owner still has to forget the
+    // request — otherwise the file could never be requested again.
+    void abandoned(QString path, int size, bool crop);
 };

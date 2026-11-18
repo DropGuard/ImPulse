@@ -24,14 +24,10 @@ ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, 
 }
 
 void ThumbnailerRunnable::run() {
-    // Before taskStart there is nothing to settle: runningTasks, dispatched and
-    // the engine's in-flight count all key off the reports, so a job that stops
-    // here makes none of them and leaves no entry behind. After taskStart the
-    // rules reverse — the job has announced itself, so it reports taskEnd like
-    // any other, and the only thing cancellation can still save is the work.
-    if(cancelRequested())
+    if(cancelRequested()) {
+        emit abandoned(path, size, crop);
         return;
-    emit taskStart(path, size);
+    }
     std::shared_ptr<Thumbnail> thumbnail = generate(cache, path, size, crop, force, policy, &cancelToken());
     emit taskEnd(thumbnail, path, crop);
 }

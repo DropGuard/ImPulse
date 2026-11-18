@@ -843,7 +843,7 @@ class TestCoreFileOps : public QObject, protected EngineStackFixture {
     void navigationControllerConstructsAndWalksStandalone() {
         WorkerPool pool(2);
         EngineBridge &bridge = EngineBridge::instance();
-        Thumbnailer thumbnailer(pool, bridge);
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter thumbPresenter(thumbnailer);
         DirectoryPresenter folderPresenter(thumbnailer);
 

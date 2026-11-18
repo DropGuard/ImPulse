@@ -50,7 +50,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
 
         presenter.setView(&proxy);
@@ -66,7 +66,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy first, second;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
 
         presenter.setView(&first);
@@ -84,7 +84,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&proxy);
         proxy.show(); // materialize the strip so the forwarding path is the real one
@@ -104,7 +104,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy first, second;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&first);
         presenter.setModel(model);
@@ -132,7 +132,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&proxy);
         proxy.show();
@@ -167,7 +167,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         coretest::CountingStripProxy view;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&view);
         view.show(); // materialize so the forwarding path is the real one
@@ -219,7 +219,7 @@ class TestPresenter : public QObject {
         QVERIFY(model->setDirectory(alpha));
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 1, 10000);
         ThumbnailStripProxy proxy;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&proxy);
         proxy.show(); // materialize so the forwarding path is the real one
@@ -268,7 +268,7 @@ class TestPresenter : public QObject {
         QVERIFY2(dirCount > 0, "precondition broken: no directories to offset by");
 
         coretest::CountingStripProxy view;
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&view);
         presenter.setModel(model);
@@ -336,7 +336,7 @@ class TestPresenter : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(model->fileCount(), 3, 10000);
 
         coretest::CountingStripProxy view; // never shown: the buffer is all there is
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         presenter.setView(&view);
         presenter.setModel(model); // populate + select(0)
@@ -354,7 +354,7 @@ class TestPresenter : public QObject {
 
     void disconnectViewAfterTheViewDiedIsSafe() {
         WorkerPool pool(2);
-        Thumbnailer thumbnailer(pool, EngineBridge::instance());
+        Thumbnailer thumbnailer(pool);
         DirectoryPresenter presenter(thumbnailer);
         {
             auto *proxy = new ThumbnailStripProxy();

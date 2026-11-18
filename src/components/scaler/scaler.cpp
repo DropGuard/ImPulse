@@ -24,7 +24,7 @@ Scaler::~Scaler() {
     // and dies with the vector; a running one the pool destroys on its worker
     // thread when run() returns. Reservations still held at this point are not
     // released — moot, since the Cache that owns them dies right after.
-    auto dropped = pool.drain(PoolOwner::Scaler);
+    pool.drain(PoolOwner::Scaler); // the queued jobs die with the returned vector
     pool.waitForOwner(PoolOwner::Scaler);
 }
 

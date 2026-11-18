@@ -1,21 +1,20 @@
 #pragma once
 
-#include "components/directorymanager/enginebridge.h"
 #include "components/thumbnailer/thumbnailerrunnable.h"
 #include "components/cache/thumbnailcache.h"
 #include "components/workerpool/workerpool.h"
 #include "settings.h"
 
+#include <QSet>
 #include <atomic>
 
 class Thumbnailer : public QObject {
     Q_OBJECT
   public:
-    // The pool and the bridge are required, not defaulted: production names
-    // the shared pool and the process-wide bridge at the construction site,
-    // tests name their isolated ones. A default lets every call site keep the
-    // hidden choice (00cf517e's rule).
-    explicit Thumbnailer(WorkerPool &_pool, EngineBridge &bridge);
+    // The pool is required, not defaulted: production names the shared pool at
+    // the construction site, tests name their isolated ones. A default lets
+    // every call site keep the hidden choice (00cf517e's rule).
+    explicit Thumbnailer(WorkerPool &_pool);
     ~Thumbnailer() override;
     static std::shared_ptr<Thumbnail> getThumbnail(QString filePath, int size);
     void clearTasks();
@@ -33,21 +32,26 @@ class Thumbnailer : public QObject {
     void scheduleSweep(int idleDays, qint64 byteCap, std::atomic<Qt::HANDLE> *ranOn = nullptr);
 
   private:
-    EngineBridge &mBridge;
     WorkerPool &pool;
     ThumbnailCache *cache;
     void startThumbnailerThread(QString filePath, int size, bool crop, bool force);
-    QMultiMap<QString, int> runningTasks;
-    // engine-dispatched requests (path -> {size, crop}); cleared entries are
-    // reported as done so the scheduler's in-flight accounting doesn't leak
-    QMultiHash<QString, QPair<int, bool>> dispatched;
-    QHash<QString, bool> mPendingForce;
-    bool mBatchStart = true;
+    // Every request handed to the pool and not yet reported back. This is the
+    // dedup the engine used to provide across both of its own states (queued
+    // and in flight) — with the engine's queue gone, the pool is the only queue
+    // and this is the only record of what is in it.
+    //
+    // Keyed through requestKey() and NOT by a hand-written concatenation: the
+    // three places that used to spell "path|size|crop" themselves (insert,
+    // remove, and the dedup test) could drift, and a removal whose key missed
+    // would leak an entry permanently — the file would never be requested
+    // again. It also subsumes the runningTasks map this replaced: a job is
+    // submitted before it starts, so "in flight" is a subset of "in the set".
+    QSet<QString> submitted;
+    static QString requestKey(const QString &path, int size, bool crop);
 
   private slots:
-    void onTaskStart(const QString &filePath, int size);
     void onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath, bool crop);
-    void onThumbNext(const QString &filePath, int size, bool crop);
+    void onTaskAbandoned(const QString &filePath, int size, bool crop);
 
   signals:
     void thumbnailReady(std::shared_ptr<Thumbnail> thumbnail, QString filePath);

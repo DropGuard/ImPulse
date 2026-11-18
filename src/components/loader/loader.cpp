@@ -8,7 +8,7 @@ Loader::~Loader() {
     // from drain() and die here, running ones the pool destroys on the worker
     // thread when run() returns. The task table is bookkeeping — an entry for
     // a finished-but-undelivered job points at memory the pool already freed.
-    auto dropped = pool.drain(PoolOwner::Loader);
+    pool.drain(PoolOwner::Loader); // the queued jobs die with the returned vector
     pool.cancel(PoolOwner::Loader);
     pool.waitForOwner(PoolOwner::Loader);
     tasks.clear();

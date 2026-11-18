@@ -46,7 +46,7 @@ Core::Core(const Deps &deps)
       // the member it points at outlives the reference's users.
       ownedPool(deps.pool ? nullptr : std::make_unique<WorkerPool>(workerPoolThreadCount())),
       pool(deps.pool ? *deps.pool : *ownedPool), mBridge(deps.bridge ? *deps.bridge : EngineBridge::instance()),
-      thumbnailer(pool, mBridge), thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
+      thumbnailer(pool), thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
     loadTranslation();
     if(deps.headless) {
         // no window tree at all: the three seams are the whole surface. Their
