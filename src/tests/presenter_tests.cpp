@@ -393,14 +393,7 @@ int main(int argc, char **argv) {
         return slot_harness::runFiltered(t, argc, argv) != 0 ? 1 : 0;
     }
     return slot_harness::run_units_one_process_each(
-        argc, argv, slot_harness::testSlots(&TestPresenter::staticMetaObject), "presenter_tests",
-        [argv](const QString &slot) -> int {
-            coretest::setChildCoreLimit();
-            QByteArray nameBytes = slot.toUtf8();
-            char *childArgv[] = {argv[0], nameBytes.data(), nullptr};
-            TestPresenter t; // this child's own fixture, its own temp tree and settings
-            return QTest::qExec(&t, 2, childArgv) != 0 ? 1 : 0;
-        });
+        argc, argv, slot_harness::testSlots(&TestPresenter::staticMetaObject), "presenter_tests");
 }
 
 #include "presenter_tests.moc"

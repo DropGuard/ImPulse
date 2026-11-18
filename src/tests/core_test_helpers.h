@@ -70,22 +70,6 @@ namespace coretest {
 // abnormal slots abort the rest — a fixture-wide failure carries no new
 // evidence per slot, and twenty identical reds carry less than three.
 
-inline void setChildCoreLimit() {
-#ifdef Q_OS_WIN
-    // no RLIMIT_CORE here: crash capture is WER's, and the core-file
-    // write-through the cap exists to bound does not happen on this platform
-#else
-    if(qEnvironmentVariableIsSet("QIMGV_TEST_CORE_UNLIMITED"))
-        return; // chasing fresh evidence: the full image is the evidence
-    rlimit rl{};
-    if(getrlimit(RLIMIT_CORE, &rl) != 0)
-        return;                     // best-effort: the guard never breaks a working harness
-    const rlim_t cap = 64ULL << 20; // stacks + notes + some heap
-    rl.rlim_cur = (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < cap) ? rl.rlim_max : cap;
-    setrlimit(RLIMIT_CORE, &rl);
-#endif
-}
-
 // The process-wide singletons a GUI suite needs, initialized by construction.
 //
 // Why a member and not an initTestCase line:

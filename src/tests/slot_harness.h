@@ -2,7 +2,7 @@
 // shares. A red or crashing unit must name itself, not take the suite with it;
 // three consecutive abnormal units stop the run before the burst outlives its
 // evidence (the parent-side counter lives in this loop, the per-child core cap
-// in core_test_helpers.h).
+// in the spawn modifier below).
 //
 // The routing contract, one sentence: the unit label rides argv[1], and every
 // suite main dispatches on it itself — `suite.exe someUnit` (or a single test
@@ -13,38 +13,61 @@
 // fork bomb (see the re-entry guard below, which converts the next protocol
 // break into a loud red instead of a process tree).
 //
-// POSIX forks; Windows has no fork, and QProcess is the faithful translation:
-// the parent re-launches THIS executable once per unit and reads the exit code
-// where waitpid stood. The child's QTest log rides a per-unit result file
-// (named with this process's pid — two instances of one suite must not
-// trample each other); the parent prints each unit's Totals line so a run is
-// readable while it happens, and surfaces a red unit's whole log. The
-// child-side fixture construction stays where it belongs: in each suite's
-// lambda (the fork child) and main argc>1 branch (the re-spawned child).
-// Nothing about the units' semantics lives here.
+// One process per unit means SPAWN, not fork, on every platform: a fork of the
+// suite parent would inherit whatever its threads hold at fork time — a lock
+// taken by a pre-fork thread stays taken in the child forever, and the parent
+// carries QtGui's own pooled threads. The 2026-11-19 stranded-entry hunt
+// burned real effort on exactly this suspect before exonerating it (the
+// minimal repro hung zero times in 3000 forks); the class stays eliminated
+// rather than trusted. QProcess re-launches THIS executable once per unit and
+// reads the exit code where waitpid stood. The child's QTest log rides a
+// per-unit result file (named with this process's pid — two instances of one
+// suite must not trample each other); the parent prints each unit's Totals
+// line so a run is readable while it happens, and surfaces a red unit's whole
+// log. The child-side fixture construction stays where it belongs: in each
+// suite main's argc>1 branch, which the spawned child enters like any human
+// single-unit invocation. Nothing about the units' semantics lives here.
 #pragma once
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QMetaMethod>
-#include <QStandardPaths>
-#include <QMetaObject>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QString>
 #include <QStringList>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
 
 #ifndef Q_OS_WIN
-#include <sys/wait.h>
-#include <unistd.h>
+#include <sys/resource.h>
 #endif
 
 namespace slot_harness {
+
+// The per-child core cap, set inside the spawned child through
+// QProcess::childProcessModifier (POSIX-only hook; on Windows the cap is
+// WER's business and the function is a no-op). Lives here because it is the
+// harness's own guard, and the spawned child is the only process it applies
+// to — a cap set in the parent would bound the parent's own crash dumps.
+inline void setChildCoreLimit() {
+#ifdef Q_OS_WIN
+    // no RLIMIT_CORE here: crash capture is WER's, and the core-file
+    // write-through the cap exists to bound does not happen on this platform
+#else
+    if(qEnvironmentVariableIsSet("QIMGV_TEST_CORE_UNLIMITED"))
+        return; // chasing fresh evidence: the full image is the evidence
+    rlimit rl{};
+    if(getrlimit(RLIMIT_CORE, &rl) != 0)
+        return;                     // best-effort: the guard never breaks a working harness
+    const rlim_t cap = 64ULL << 20; // stacks + notes + some heap
+    rl.rlim_cur = (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < cap) ? rl.rlim_max : cap;
+    setrlimit(RLIMIT_CORE, &rl);
+#endif
+}
 
 // QTest slots of one fixture class, in declaration order, minus the framework
 // slots — the enumeration every suite main carried inline, identical in each.
@@ -104,12 +127,7 @@ inline int runFiltered(QObject &test, int argc, char **argv) {
     return QTest::qExec(&test, argc, argv);
 }
 
-// runUnitInChild(unit) runs one unit and returns its process exit code. On
-// POSIX it is called in the forked child; on Windows the parent re-spawns the
-// executable with the unit name as argv[1] and the suite's own main(argc > 1)
-// branch decides what that name means.
-inline int run_units_one_process_each(int argc, char **argv, const QStringList &units, const char *suiteName,
-                                      [[maybe_unused]] const std::function<int(const QString &)> &runUnitInChild) {
+inline int run_units_one_process_each(int argc, char **argv, const QStringList &units, const char *suiteName) {
     (void)argc;
     (void)argv;
     // The re-entry guard. A child spawned by this harness carries the
@@ -129,8 +147,7 @@ inline int run_units_one_process_each(int argc, char **argv, const QStringList &
     }
     int failures = 0, consecutiveAbnormal = 0;
     for(const QString &unit : units) {
-        std::fflush(nullptr); // fork would duplicate whatever is buffered in stdout
-#ifdef Q_OS_WIN
+        std::fflush(nullptr); // keep the parent's own output ahead of the child's forwarded channels
         // The child writes its QTest log to a per-unit result file: the default
         // stdout logger is not reliably visible across these redirected
         // spawns (even passing units print nothing), so every unit runs with
@@ -151,6 +168,11 @@ inline int run_units_one_process_each(int argc, char **argv, const QStringList &
         proc.setProcessEnvironment(childEnv);
         // the child's own stderr (engine trace, crashes) still forwards live
         proc.setProcessChannelMode(QProcess::ForwardedChannels);
+#ifndef Q_OS_WIN
+        proc.setChildProcessModifier([] {
+            setChildCoreLimit();
+        });
+#endif
         proc.start();
         const bool started = proc.waitForStarted(10000);
         bool normalExit = false;
@@ -208,34 +230,6 @@ inline int run_units_one_process_each(int argc, char **argv, const QStringList &
             continue;
         }
         consecutiveAbnormal = 0;
-#else
-        const pid_t pid = fork();
-        if(pid == 0) {
-            // the child: run this unit and exit with its code — exit, not a
-            // return through the parent's stack, whose destructors were built
-            // for the parent's lifetime
-            std::exit(runUnitInChild(unit));
-        }
-        int status = 0;
-        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) {
-        }
-        const bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
-        if(!ok) {
-            std::fprintf(stderr, "%s: unit '%s' exited abnormally (exit=%d, sig=%d)\n", suiteName,
-                         unit.toUtf8().constData(), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-                         WIFSIGNALED(status) ? WTERMSIG(status) : -1);
-            ++failures;
-            if(++consecutiveAbnormal == 3) {
-                std::fprintf(stderr,
-                             "%s: three consecutive abnormal units — stopping early, "
-                             "the remaining unit list is not run\n",
-                             suiteName);
-                break;
-            }
-            continue;
-        }
-        consecutiveAbnormal = 0;
-#endif
     }
     return failures;
 }

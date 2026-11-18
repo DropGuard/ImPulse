@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     if(argc > 1) {
         for(const auto &r : kRuns)
             if(std::strcmp(argv[1], r.name) == 0) {
-                coretest::setChildCoreLimit();
+                slot_harness::setChildCoreLimit();
                 std::vector<char *> unitArgv;
                 unitArgv.push_back(argv[0]);
                 for(int i = 2; i < argc; ++i)
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
                 return r.run(unitArgc, unitArgv.data()) != 0 ? 1 : 0;
             }
         for(const auto &r : kRuns) {
-            coretest::setChildCoreLimit();
+            slot_harness::setChildCoreLimit();
             const int rc = r.run(argc, argv);
             if(rc >= 0)
                 return rc != 0 ? 1 : 0;
@@ -110,12 +110,5 @@ int main(int argc, char **argv) {
     QStringList units;
     for(const auto &r : kRuns)
         units << r.name;
-    return slot_harness::run_units_one_process_each(argc, argv, units, "engine_stack",
-                                                    [argc, argv](const QString &unit) -> int {
-                                                        coretest::setChildCoreLimit();
-                                                        for(const auto &r : kRuns)
-                                                            if(unit == r.name)
-                                                                return r.run(argc, argv) != 0 ? 1 : 0;
-                                                        return 2;
-                                                    });
+    return slot_harness::run_units_one_process_each(argc, argv, units, "engine_stack");
 }
