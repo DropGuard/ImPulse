@@ -71,24 +71,26 @@ void Thumbnailer::waitForDone() {
 }
 
 void Thumbnailer::clearTasks() {
-    // The batch is whatever the pool still holds. Those jobs are destroyed
-    // without ever reporting — their taskEnd never fires — so the submission
-    // set has to forget each one by name. Clearing the whole set instead would
-    // also drop entries for jobs the pool is still RUNNING (cancel() marks
-    // them, it does not stop them), and those will report back later; forgetting
-    // them early would let a re-request slip past the dedup while the original
-    // is still decoding.
-    for(const auto &job : pool.drain(PoolOwner::Thumbnailer)) {
-        auto *thumbJob = static_cast<ThumbnailerRunnable *>(job.get());
-        submitted.remove(requestKey(thumbJob->requestedPath(), thumbJob->requestedSize(), thumbJob->requestedCrop()));
-    }
-    // The queued half is gone with the drain; the running half is a frame
-    // extraction that will otherwise occupy a worker for up to its 8 s timeout
-    // and then report a picture nobody asked for any more. Marking it costs one
-    // store and frees the worker within a poll slice, and a job that had already
-    // announced itself still reports, so submitted stays balanced without
-    // anything here knowing which jobs were marked.
+    // The batch is whatever the pool still holds. Queued jobs are drained —
+    // they die without ever reporting — and running jobs are marked, so the
+    // ones still before their entry checkpoint abandon (no picture) while the
+    // ones past it deliver normally. Every report decrements its own count,
+    // and a count whose job was drained or cleared away settles at zero
+    // through the clear below.
+    pool.drain(PoolOwner::Thumbnailer); // the queued jobs die with the returned vector
     pool.cancel(PoolOwner::Thumbnailer);
+    // Forget the whole batch NOW, not report-by-report: the reports travel as
+    // queued signals, and the caller's next line is typically a re-request of
+    // the same visible files. An entry kept for a marked job would swallow
+    // that re-request — the mark is only observed at the job's entry
+    // checkpoint, its abandonment travels asynchronously, and under load the
+    // wave's request lands inside that window (2026-11-19, named from a core:
+    // a marked-before-start job's stranded entry ate the recovery wave's
+    // re-request). The accepted cost: a job past its checkpoint when the clear
+    // marks it may decode alongside its re-request, and the picture is set
+    // twice — bounded, idempotent, and cheaper than a thumbnail that never
+    // arrives.
+    submitted.clear();
 }
 
 std::shared_ptr<Thumbnail> Thumbnailer::getThumbnail(QString filePath, int size) {
@@ -108,7 +110,7 @@ void Thumbnailer::getThumbnailAsync(const QString &path, int size, bool crop, bo
     const QString key = requestKey(path, size, crop);
     if(submitted.contains(key))
         return;
-    submitted.insert(key);
+    ++submitted[key];
     startThumbnailerThread(path, size, crop, force);
 }
 
@@ -124,10 +126,14 @@ void Thumbnailer::startThumbnailerThread(QString filePath, int size, bool crop, 
 }
 
 void Thumbnailer::onTaskAbandoned(const QString &filePath, int size, bool crop) {
-    submitted.remove(requestKey(filePath, size, crop));
+    const auto it = submitted.find(requestKey(filePath, size, crop));
+    if(it != submitted.end() && --it.value() <= 0)
+        submitted.erase(it);
 }
 
 void Thumbnailer::onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath, bool crop) {
-    submitted.remove(requestKey(filePath, thumbnail->size(), crop));
+    const auto it = submitted.find(requestKey(filePath, thumbnail->size(), crop));
+    if(it != submitted.end() && --it.value() <= 0)
+        submitted.erase(it);
     emit thumbnailReady(thumbnail, filePath);
 }

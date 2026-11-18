@@ -327,6 +327,46 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
         QTRY_COMPARE_WITH_TIMEOUT(ready.count(), batch.count(), 10000);
         thumb.waitForDone();
     }
+
+    // The strand the counted set exists to prevent, injected deterministically:
+    // a job decoding inside generate() when clearTasks marks it is past its
+    // entry checkpoint, so it delivers — and the same wave immediately
+    // re-requests the same file. A set that kept the marked job's entry
+    // swallowed that re-request for exactly as long as the doomed job's
+    // abandonment took to arrive, and the thumbnail never arrived at all
+    // (2026-11-19: one missing thumbnail per wave under load, named from a
+    // core). The image is big enough that its decode outlasts the wait below,
+    // making "running when cleared" a fact rather than a race; both deliveries
+    // are then guaranteed by construction — the marked job's own report, plus
+    // the re-request's.
+    void aMarkedRunningJobDoesNotSwallowTheReRequest() {
+        resetFixture();
+        QVERIFY(writeBigImage(fixtureDir + "/slow.png", "png", QSize(5000, 4000)));
+        std::atomic_bool gate{false};
+        std::atomic_int holds{0};
+        WorkerPool pool(2);
+        pool.submit(PoolOwner::Scaler, 0, std::make_unique<ThumbnailGateJob>(&gate, &holds));
+        QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 1, 10000);
+        Thumbnailer thumb(pool);
+        int delivered = 0;
+        QObject::connect(&thumb, &Thumbnailer::thumbnailReady, &thumb,
+                         [&delivered](std::shared_ptr<Thumbnail>, const QString &) {
+                             delivered++;
+                         });
+        const QString path = fixtureDir + "/slow.png";
+        thumb.getThumbnailAsync(path, 128, false, false);
+        // the second worker is free: the job is picked up immediately and
+        // spends its long decode inside generate() — the wait below is a
+        // fraction of that decode, so "running when cleared" holds under any
+        // scheduler, and both deliveries are then guaranteed by construction:
+        // the marked job's own report, plus the re-request's
+        QTest::qWait(60);
+        thumb.clearTasks();                               // marks the running job; it is past its checkpoint
+        thumb.getThumbnailAsync(path, 128, false, false); // the same wave's re-request
+        QTRY_COMPARE_WITH_TIMEOUT(delivered, 2, 15000);
+        gate.store(true); // release the gate worker so the pool can be joined
+        thumb.waitForDone();
+    }
 };
 
 #include "thumbnailer_tests.moc"

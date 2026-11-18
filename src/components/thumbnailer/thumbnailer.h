@@ -5,7 +5,7 @@
 #include "components/workerpool/workerpool.h"
 #include "settings.h"
 
-#include <QSet>
+#include <QHash>
 #include <atomic>
 
 class Thumbnailer : public QObject {
@@ -35,18 +35,27 @@ class Thumbnailer : public QObject {
     WorkerPool &pool;
     ThumbnailCache *cache;
     void startThumbnailerThread(QString filePath, int size, bool crop, bool force);
-    // Every request handed to the pool and not yet reported back. This is the
-    // dedup the engine used to provide across both of its own states (queued
-    // and in flight) — with the engine's queue gone, the pool is the only queue
-    // and this is the only record of what is in it.
+    // Live requests, counted: each getThumbnailAsync increments the key, each
+    // report (taskEnd or abandoned) decrements it, clearTasks zeroes it. The
+    // count matters because a report travels from a worker thread as a queued
+    // signal: between "clearTasks marked the running job" and "the UI thread
+    // processed its abandoned report" there is a window in which the entry
+    // must not swallow the re-request the same wave is about to make — the
+    // presenters' waves re-request the same visible files immediately after
+    // clearing, and under load that window is hit for real (2026-11-19, named
+    // from a core: one thumbnail per wave went missing in the strip). A plain
+    // set strands the entry for exactly that window; a count lets the wave's
+    // own request coexist with the doomed job, and the two reports each
+    // settle their own half. The accepted cost: only a job already past its
+    // entry checkpoint when the clear marks it can decode alongside its
+    // re-request, and the picture is then set twice — bounded, idempotent,
+    // and cheaper than a thumbnail that never arrives.
     //
     // Keyed through requestKey() and NOT by a hand-written concatenation: the
-    // three places that used to spell "path|size|crop" themselves (insert,
-    // remove, and the dedup test) could drift, and a removal whose key missed
-    // would leak an entry permanently — the file would never be requested
-    // again. It also subsumes the runningTasks map this replaced: a job is
-    // submitted before it starts, so "in flight" is a subset of "in the set".
-    QSet<QString> submitted;
+    // three places that touch the key (increment, decrement, dedup test)
+    // could drift, and a decrement whose key missed would leak the count
+    // permanently — the file would never be requested again.
+    QHash<QString, int> submitted;
     static QString requestKey(const QString &path, int size, bool crop);
 
   private slots:
