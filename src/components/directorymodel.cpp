@@ -2,6 +2,8 @@
 
 #include "components/directorymanager/enginebridge.h"
 
+#include <QSet>
+
 DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
     : QObject(parent), dirManager(bridge), loader(pool) {
     scaler = new Scaler(&cache, pool);
@@ -345,6 +347,29 @@ void DirectoryModel::reload(const QString &filePath) {
     if(cache.contains(filePath)) {
         cache.remove(filePath);
         load(filePath, false);
+    }
+}
+
+void DirectoryModel::loadFocused(const QString &filePath, bool forward, bool withPreload) {
+    if(!containsFile(filePath))
+        return;
+    QSet<QString> window;
+    window.insert(filePath);
+    QString neighbor;
+    if(withPreload) {
+        neighbor = forward ? nextOf(filePath) : prevOf(filePath);
+        if(!neighbor.isEmpty())
+            window.insert(neighbor);
+    }
+    loader.loadWindow(filePath, window, LoadPolicy::fromSettings());
+    // the direction neighbor no earlier flip submitted
+    if(!neighbor.isEmpty())
+        preload(neighbor);
+    if(cache.contains(filePath)) {
+        bool cachedScaled = mScaledCache.contains(filePath);
+        if(cachedScaled)
+            loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
+        emit imageReady(cache.get(filePath), filePath, cachedScaled);
     }
 }
 

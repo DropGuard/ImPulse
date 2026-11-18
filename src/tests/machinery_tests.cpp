@@ -375,6 +375,85 @@ class TestMachinery : public QObject, protected EngineStackFixture {
         QCOMPARE(failed.load(), 0);
     }
 
+    // The flight window's whole point, deterministically: the stop point
+    // outranks the kept neighbor, and the passed files' queued decodes die for
+    // nothing. One worker held by a gate makes the queue a fact instead of a
+    // race; that single worker then serves the survivors in priority order,
+    // so the finished sequence IS the queue order.
+    void loadWindowPromotesTheTargetAndDropsThePassedFiles() {
+        resetFixture();
+        const QString a = fixtureDir + "/w-a.png";
+        const QString b = fixtureDir + "/w-b.png";
+        const QString c = fixtureDir + "/w-c.png";
+        QVERIFY(writeBigImage(a, "png", QSize(8, 8)));
+        QVERIFY(writeBigImage(b, "png", QSize(8, 8)));
+        QVERIFY(writeBigImage(c, "png", QSize(8, 8)));
+        std::atomic_bool gate{false};
+        std::atomic_int holds{0};
+        WorkerPool pool(1);
+        pool.submit(PoolOwner::Scaler, 0, std::make_unique<HoldJob>(&gate, &holds));
+        QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 1, 10000);
+        Loader loader(pool);
+        QStringList order;
+        QObject::connect(&loader, &Loader::loadFinished, &loader,
+                         [&](std::shared_ptr<Image>, const QString &path, bool) {
+                             order << path;
+                         });
+        // the flight: three queued preloads, provably none started
+        loader.loadAsync(a, loadPolicy());
+        loader.loadAsync(b, loadPolicy());
+        loader.loadAsync(c, loadPolicy());
+        QVERIFY(loader.isBusy());
+
+        // the stop on c: a and b are behind us and die in the drain, c's
+        // queued job is promoted rather than re-created
+        QSet<QString> window{c};
+        loader.loadWindow(c, window, loadPolicy());
+        QVERIFY(loader.isLoading(c));
+        QVERIFY(!loader.isLoading(a));
+        QVERIFY(!loader.isLoading(b));
+
+        gate.store(true);
+        pool.waitForOwner(PoolOwner::Loader);
+        QTRY_COMPARE_WITH_TIMEOUT(order.size(), 1, 10000);
+        QCOMPARE(order.first(), c);
+    }
+
+    // Promotion reuses the drained job object, tier included: a tier-2
+    // upgrade queued behind a flight must come back as tier-2, not be
+    // re-created as the tier-1 a fresh submit would have built. The JPEG is
+    // big enough for the screen, which makes the tier visible in the finished
+    // report — resultScaled is true only for a tier-1 decode.
+    void loadWindowPromotionKeepsTheTier() {
+        resetFixture();
+        QVERIFY(writeBigImage(fixtureDir + "/big.jpg", "jpg", offscreenScreenPixels() * 2));
+        std::atomic_bool gate{false};
+        std::atomic_int holds{0};
+        WorkerPool pool(1);
+        pool.submit(PoolOwner::Scaler, 0, std::make_unique<HoldJob>(&gate, &holds));
+        QTRY_COMPARE_WITH_TIMEOUT(holds.load(), 1, 10000);
+        Loader loader(pool);
+        QString finishedPath;
+        bool finishedScaled = true;
+        QObject::connect(&loader, &Loader::loadFinished, &loader,
+                         [&](std::shared_ptr<Image>, const QString &path, bool scaled) {
+                             finishedPath = path;
+                             finishedScaled = scaled;
+                         });
+        const QString path = fixtureDir + "/big.jpg";
+        loader.loadAsyncFull(path, loadPolicy()); // tier-2, queued behind the gate
+        QVERIFY(loader.isLoading(path));
+
+        loader.loadWindow(path, QSet<QString>{path}, loadPolicy());
+        QVERIFY(loader.isLoading(path));
+
+        gate.store(true);
+        pool.waitForOwner(PoolOwner::Loader);
+        QTRY_COMPARE_WITH_TIMEOUT(!finishedPath.isEmpty(), true, 10000);
+        QCOMPARE(finishedPath, path);
+        QVERIFY2(!finishedScaled, "a promoted tier-2 job arrived dressed as tier-1");
+    }
+
     // The checkpoint contract's other half: a thumbnail job canceled before
     // its decode still produces the report object taskEnd dereferences — an
     // empty QImage becomes the error thumbnail, never a null Thumbnail, and a

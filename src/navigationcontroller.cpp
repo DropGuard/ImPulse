@@ -418,12 +418,19 @@ bool NavigationController::loadFileIndex(int index, bool async, bool preload) {
     bool movingForward = (oldIndex == -1) ? true : (index >= oldIndex);
     state->currentFilePath = entry.path;
     model->unloadExcept(entry.path, preload);
-    model->load(entry.path, async);
-    if(preload) {
-        if(movingForward)
-            model->preload(model->nextOf(entry.path));
-        else
-            model->preload(model->prevOf(entry.path));
+    if(async) {
+        // the flip window: the stop point promotes over everything the flight
+        // left queued, the direction neighbor survives, the rest dies — a
+        // queued job has not started, so dropping it costs nothing decoded
+        model->loadFocused(entry.path, movingForward, preload);
+    } else {
+        model->load(entry.path, false);
+        if(preload) {
+            if(movingForward)
+                model->preload(model->nextOf(entry.path));
+            else
+                model->preload(model->prevOf(entry.path));
+        }
     }
     thumbPanelPresenter.selectAndFocus(entry.path);
     folderViewPresenter.selectAndFocus(entry.path);
