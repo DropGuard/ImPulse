@@ -73,6 +73,10 @@ redirect — logs and temp frames must follow the same directory the app picks.
 
 ## Architecture: what changed underneath
 
+The law below is the single statement of who owns what; other documents point
+here rather than restating it, because a fact written twice is a fact that will
+disagree with itself.
+
 **One writer for the listing.** The Rust engine (`engine/qimgv-engine`) owns the
 directory listing — the one order decision, handed to the mirror as engine-side
 indices so C++ never re-derives it. Decode execution and its scheduling live on
