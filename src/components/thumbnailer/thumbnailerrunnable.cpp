@@ -25,13 +25,11 @@ ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, 
 }
 
 void ThumbnailerRunnable::run() {
-    // A job marked before it started decodes nothing and reports nothing: there
-    // is no picture, and an empty one would overwrite a good thumbnail on the
-    // view. Nothing in the owner is waiting on a report — the pool's own
-    // queued/running record is the dedup's source of truth, and the job leaves
-    // it the moment this returns.
-    if(cancelRequested())
-        return;
+    // Past the pop there is no checkpoint: a job that reached run() was
+    // unmarked when the worker took it, so it decodes and delivers — an empty
+    // picture would overwrite a good thumbnail on the view, and nothing in the
+    // owner is waiting on a report (the pool's own queued/running record is
+    // the dedup's source of truth).
     std::shared_ptr<Thumbnail> thumbnail = generate(cache, path, size, crop, force, policy, &cancelToken());
     emit taskEnd(thumbnail, path, crop);
 }

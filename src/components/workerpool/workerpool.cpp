@@ -103,6 +103,23 @@ void WorkerPool::workerLoop() {
         Entry entry = std::move(*best);
         queue.erase(best);
         PoolJob *job = entry.job.get();
+        // THE POP CHECKPOINT: a job marked while queued dies here, before it can
+        // enter `running` — same observable as the old run()-entry checkpoint
+        // (no decode, no report), minus the strand window: the dedup query reads
+        // this pool's queued/running lists, so a job that was installed but
+        // would return silently at its entry checkpoint answered "yes" to a
+        // re-request the wave makes immediately after the clear, and the silent
+        // return swallowed it. Evaluated at pop, a mark can only land before
+        // this check (discard — the wave's re-request submits fresh) or after
+        // the job is past it (it runs to completion and delivers). No third
+        // outcome, no window.
+        if(job->cancelRequested()) {
+            idle.notify_all(); // the queue just shrank: waiters re-check
+            lock.unlock();
+            entry.job.reset(); // destroyed outside the lock, like every job
+            lock.lock();
+            continue;
+        }
         running.push_back(Running{entry.owner, job});
         lock.unlock(); // the lock never spans run()
         job->run();    // queued signal delivery needs nothing from us
