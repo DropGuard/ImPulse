@@ -50,8 +50,9 @@ Thumbnailer::~Thumbnailer() {
     pool.drain(PoolOwner::Thumbnailer); // the queued jobs die with the returned vector
     // A frame extraction in progress would otherwise be waited out for its whole
     // 8 s timeout while the app sits in a destructor. Marking it frees the worker
-    // within a poll slice; the job's abandoned report settles its submission
-    // entry, and no picture is delivered to a view that is going away anyway.
+    // within a poll slice, and no picture is delivered to a view that is going
+    // away anyway — there is no report to settle, because the pool's own
+    // queued/running record is the only accounting.
     pool.cancel(PoolOwner::Thumbnailer);
     pool.waitForOwner(PoolOwner::Thumbnailer);
     // A sweep still running holds `cache`, which is deleted below. It is the one
