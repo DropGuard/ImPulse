@@ -59,6 +59,19 @@ void WorkerPool::cancel(PoolOwner owner) {
     // that wants to know the marked jobs are gone calls waitForOwner().
 }
 
+bool WorkerPool::hasQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const {
+    // mutex is mutable so this const query can read the two state lists under
+    // the same lock every writer takes
+    std::lock_guard<std::mutex> lock(mutex);
+    for(const Entry &e : queue)
+        if(e.owner == owner && match(*e.job))
+            return true;
+    for(const Running &r : running)
+        if(r.owner == owner && match(*r.job))
+            return true;
+    return false;
+}
+
 void WorkerPool::waitForOwner(PoolOwner owner) {
     std::unique_lock<std::mutex> lock(mutex);
     // the wait releases the lock while blocked — no state lock spans a wait

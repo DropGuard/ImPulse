@@ -71,46 +71,31 @@ void Thumbnailer::waitForDone() {
 }
 
 void Thumbnailer::clearTasks() {
-    // The batch is whatever the pool still holds. Queued jobs are drained —
-    // they die without ever reporting — and running jobs are marked, so the
-    // ones still before their entry checkpoint abandon (no picture) while the
-    // ones past it deliver normally. Every report decrements its own count,
-    // and a count whose job was drained or cleared away settles at zero
-    // through the clear below.
+    // Invalidate the batch: queued jobs are drained (destroyed without ever
+    // running) and running ones are marked, so those still before their entry
+    // checkpoint abandon instead of decoding. Nothing else is bookkeeping —
+    // the pool is the only record of what is pending, so there is no index
+    // here that a later report could corrupt.
     pool.drain(PoolOwner::Thumbnailer); // the queued jobs die with the returned vector
     pool.cancel(PoolOwner::Thumbnailer);
-    // Forget the whole batch NOW, not report-by-report: the reports travel as
-    // queued signals, and the caller's next line is typically a re-request of
-    // the same visible files. An entry kept for a marked job would swallow
-    // that re-request — the mark is only observed at the job's entry
-    // checkpoint, its abandonment travels asynchronously, and under load the
-    // wave's request lands inside that window (2026-11-19, named from a core:
-    // a marked-before-start job's stranded entry ate the recovery wave's
-    // re-request). The accepted cost: a job past its checkpoint when the clear
-    // marks it may decode alongside its re-request, and the picture is set
-    // twice — bounded, idempotent, and cheaper than a thumbnail that never
-    // arrives.
-    submitted.clear();
 }
 
 std::shared_ptr<Thumbnail> Thumbnailer::getThumbnail(QString filePath, int size) {
     return ThumbnailerRunnable::generate(nullptr, std::move(filePath), size, false, false, LoadPolicy::fromSettings());
 }
 
-QString Thumbnailer::requestKey(const QString &path, int size, bool crop) {
-    // one spelling, used by the insert, the removal and the dedup check.
-    // Identity is the full triple: a path may repeat at different sizes/crops.
-    return path + QLatin1Char('|') + QString::number(size) + QLatin1Char('|') +
-           (crop ? QLatin1Char('1') : QLatin1Char('0'));
-}
-
 void Thumbnailer::getThumbnailAsync(const QString &path, int size, bool crop, bool force) {
-    // Straight into the pool. Dedup lives here (one request per triple across
-    // queued AND running); batch invalidation lives in clearTasks().
-    const QString key = requestKey(path, size, crop);
-    if(submitted.contains(key))
+    // Dedup asked of the pool, not of an index beside it: the pool already
+    // tracks both states a request can be in (queued, inside run()), and a
+    // caller-side copy has to be corrected on every exit — completion, drain,
+    // cancel, and a report arriving after the next wave already re-requested.
+    // Each missed exit was a duplicate decode or a file that could never be
+    // requested again (2026-11-19).
+    if(pool.hasQueuedOrRunning(PoolOwner::Thumbnailer, [&](const PoolJob &job) {
+           const auto &thumb = static_cast<const ThumbnailerRunnable &>(job);
+           return thumb.requestedPath() == path && thumb.requestedSize() == size && thumb.requestedCrop() == crop;
+       }))
         return;
-    ++submitted[key];
     startThumbnailerThread(path, size, crop, force);
 }
 
@@ -119,21 +104,9 @@ void Thumbnailer::startThumbnailerThread(QString filePath, int size, bool crop, 
         std::make_unique<ThumbnailerRunnable>(settings->useThumbnailCache() ? cache : nullptr, std::move(filePath),
                                               size, crop, force, LoadPolicy::fromSettings());
     connect(job.get(), &ThumbnailerRunnable::taskEnd, this, &Thumbnailer::onTaskEnd);
-    // a job marked before it started reports nothing to the view, but its
-    // submission entry still has to go or the file is never requested again
-    connect(job.get(), &ThumbnailerRunnable::abandoned, this, &Thumbnailer::onTaskAbandoned);
     pool.submit(PoolOwner::Thumbnailer, 0, std::move(job));
 }
 
-void Thumbnailer::onTaskAbandoned(const QString &filePath, int size, bool crop) {
-    const auto it = submitted.find(requestKey(filePath, size, crop));
-    if(it != submitted.end() && --it.value() <= 0)
-        submitted.erase(it);
-}
-
-void Thumbnailer::onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath, bool crop) {
-    const auto it = submitted.find(requestKey(filePath, thumbnail->size(), crop));
-    if(it != submitted.end() && --it.value() <= 0)
-        submitted.erase(it);
+void Thumbnailer::onTaskEnd(const std::shared_ptr<Thumbnail> &thumbnail, const QString &filePath) {
     emit thumbnailReady(thumbnail, filePath);
 }

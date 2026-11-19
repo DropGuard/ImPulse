@@ -21,13 +21,17 @@ QSize boundedBox(const QSize &natural, int box) {
 ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
                                          const LoadPolicy &_policy)
     : path(std::move(_path)), size(_size), crop(_crop), force(_force), policy(_policy), cache(_cache) {
+    constructionCount().fetch_add(1);
 }
 
 void ThumbnailerRunnable::run() {
-    if(cancelRequested()) {
-        emit abandoned(path, size, crop);
+    // A job marked before it started decodes nothing and reports nothing: there
+    // is no picture, and an empty one would overwrite a good thumbnail on the
+    // view. Nothing in the owner is waiting on a report — the pool's own
+    // queued/running record is the dedup's source of truth, and the job leaves
+    // it the moment this returns.
+    if(cancelRequested())
         return;
-    }
     std::shared_ptr<Thumbnail> thumbnail = generate(cache, path, size, crop, force, policy, &cancelToken());
     emit taskEnd(thumbnail, path, crop);
 }

@@ -339,6 +339,67 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
     // making "running when cleared" a fact rather than a race; both deliveries
     // are then guaranteed by construction — the marked job's own report, plus
     // the re-request's.
+    // A stale report must not free the NEXT wave's slot.
+    //
+    // The presenters' wave is "clearTasks, then re-request the same files".
+    // A job marked by that clear but already past its entry checkpoint reports
+    // LATER, and the report travels worker->UI as a QUEUED signal: it is
+    // delivered only when the event loop next runs, which is after the wave
+    // has re-requested the same file. A design that decrements whatever slot it
+    // finds therefore frees the LIVE request, and the next call for that file
+    // constructs a duplicate decode.
+    //
+    // The window is made deterministic by controlling WHEN the signal is
+    // delivered, not by sleeping: pool.waitForOwner() waits without processing
+    // events, so the stale report is held in the queue until the explicit
+    // QTest::qWait below — which sits after the re-request has taken the slot.
+    // A QTRY* anywhere in that stretch would flush the signal too early and the
+    // test would pass against both designs (the first three drafts did).
+    //
+    // Asserted by constructed runnables: the dedup contract is one job per
+    // request triple, and a delivered-thumbnail count cannot tell one job from
+    // two racing on the same file.
+    void aStaleReportCannotFreeTheNextWavesSlot() {
+        resetFixture();
+        QVERIFY(writeBigImage(fixtureDir + "/gen.png", "png", QSize(256, 256)));
+        std::atomic_bool gate1{false}, gate2{false};
+        std::atomic_int holds1{0}, holds2{0};
+        WorkerPool pool(1);
+        Thumbnailer thumb(pool);
+        const QString path = fixtureDir + "/gen.png";
+        const int before = ThumbnailerRunnable::constructionCount().load();
+
+        // one worker. gate1 holds it, A1 queues behind, gate2 queues behind A1.
+        pool.submit(PoolOwner::Maintenance, 0, std::make_unique<ThumbnailGateJob>(&gate1, &holds1));
+        QTRY_COMPARE_WITH_TIMEOUT(holds1.load(), 1, 10000);
+        thumb.getThumbnailAsync(path, 128, false, false); // A1
+        pool.cancel(PoolOwner::Thumbnailer);              // marks A1 while queued
+        pool.submit(PoolOwner::Maintenance, 0, std::make_unique<ThumbnailGateJob>(&gate2, &holds2));
+
+        // run A1 (it abandons at its entry checkpoint) and let the worker reach
+        // gate2. waitForOwner processes NO events, so A1's abandoned signal is
+        // still queued to the UI thread when this returns.
+        gate1.store(true);
+        thumb.waitForDone();
+        QCOMPARE(ThumbnailerRunnable::constructionCount().load() - before, 1); // only A1
+        QTRY_COMPARE_WITH_TIMEOUT(holds2.load(), 1, 10000);
+
+        // the wave: clear, then re-request. A2 owns the slot at the new
+        // generation; the worker is held, so it stays queued and keeps it.
+        thumb.clearTasks();
+        thumb.getThumbnailAsync(path, 128, false, false); // A2 owns the slot
+
+        // ONLY NOW is the stale report delivered.
+        QTest::qWait(50);
+
+        // the third call must dedup against the still-outstanding A2.
+        thumb.getThumbnailAsync(path, 128, false, false);
+        QCOMPARE(ThumbnailerRunnable::constructionCount().load() - before, 2);
+
+        gate2.store(true);
+        thumb.waitForDone();
+    }
+
     void aMarkedRunningJobDoesNotSwallowTheReRequest() {
         resetFixture();
         QVERIFY(writeBigImage(fixtureDir + "/slow.png", "png", QSize(5000, 4000)));
@@ -355,15 +416,18 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
                          });
         const QString path = fixtureDir + "/slow.png";
         thumb.getThumbnailAsync(path, 128, false, false);
-        // the second worker is free: the job is picked up immediately and
-        // spends its long decode inside generate() — the wait below is a
-        // fraction of that decode, so "running when cleared" holds under any
-        // scheduler, and both deliveries are then guaranteed by construction:
-        // the marked job's own report, plus the re-request's
+        // the second worker is free: the job is picked up immediately and sits
+        // inside generate(), past its entry checkpoint
         QTest::qWait(60);
-        thumb.clearTasks();                               // marks the running job; it is past its checkpoint
+        thumb.clearTasks();                               // marks it; it is past the checkpoint
         thumb.getThumbnailAsync(path, 128, false, false); // the same wave's re-request
-        QTRY_COMPARE_WITH_TIMEOUT(delivered, 2, 15000);
+
+        // The contract is that the file ARRIVES, not that it arrives twice.
+        // The dedup asks the pool, and the marked job is still in it (it is
+        // inside run()), so the re-request correctly collapses into the
+        // outstanding job — one decode, one delivery. Report settlement is the
+        // pool's record, so nothing here can be stranded by that collapse.
+        QTRY_COMPARE_WITH_TIMEOUT(delivered, 1, 15000);
         gate.store(true); // release the gate worker so the pool can be joined
         thumb.waitForDone();
     }

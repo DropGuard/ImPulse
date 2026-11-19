@@ -2,6 +2,7 @@
 
 #include <QtGlobal>
 #include <atomic>
+#include <functional>
 #include <condition_variable>
 #include <deque>
 #include <iterator>
@@ -121,16 +122,27 @@ class WorkerPool {
     //
     // Which of the two reporting rules a marked job follows is the owner's
     // business, not the pool's, and the two are not interchangeable: a
-    // Thumbnailer job reports SOMETHING either way — taskEnd with a picture, or
-    // abandoned with none — because Thumbnailer's request counts are settled
-    // by reports, and a silent stop would leave a count high enough to
-    // swallow the file's re-request. It does not send an
-    // empty picture down taskEnd: the presenter would overwrite a good
-    // thumbnail with it; a Loader job that never started
+    // Thumbnailer job that never started reports nothing, and needs to: its
+    // owner keeps no index that a report would settle — the pool's own
+    // queued/running record IS the dedup, and this job leaves it when run()
+    // returns. It also must not send an empty picture down taskEnd, or the
+    // presenter would overwrite a good thumbnail with it; a Loader job that never started
     // its decode reports nothing and Loader::clearTasks() drops the task entry
     // itself, because reporting a failure for a file the user already left
     // would turn "no longer wanted" into "this file is broken".
     void cancel(PoolOwner owner);
+    // Is any job of `owner` still queued or inside run() right now? The pool
+    // is the only queue, so this is the question a dedup asks: "would
+    // submitting this again add a second copy of work already pending?"
+    // `match` receives the job and answers per job (it runs under the pool's
+    // mutex, so it must not call back into the pool).
+    //
+    // Owning this fact here rather than mirroring it in the caller is the
+    // point: a caller-side index has to be updated on every exit — completion,
+    // drain, cancel, and a queued report arriving a wave too late — and each
+    // missed exit is a duplicate decode or a request that can never be made
+    // again. The pool already tracks all three states; asking it cannot drift.
+    bool hasQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const;
     // blocks until `owner` has nothing queued and nothing inside run()
     void waitForOwner(PoolOwner owner);
     void waitForAll();
@@ -158,7 +170,7 @@ class WorkerPool {
 
     int mThreadCount = 1; // as constructed; see threadCount()
     std::vector<std::thread> workers;
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::condition_variable workAvailable; // workers wait for submissions
     std::condition_variable idle;          // waitForOwner/waitForAll wait here
     std::deque<Entry> queue;
