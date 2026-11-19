@@ -6,11 +6,12 @@ GPL-3.0 · v0.1.0
 
 ## What changed from upstream
 
-- **A Rust engine owns the backend.** Directory watching, the decode
-  schedule and the listing live in Rust; the C++ side renders and executes.
-  The multithreading crash class and the directory-update races of the
-  original watcher are structurally gone, not patched over — the
-  architecture story is in [DEVELOPING.md](DEVELOPING.md).
+- **A Rust engine owns the listing.** Directory watching and the listing live
+  in Rust, which also hands the order decision over as indices so the C++ side
+  never re-derives it; the C++ side renders, decodes and executes. The
+  multithreading crash class and the directory-update races of the original
+  watcher are structurally gone, not patched over — the architecture story is
+  in [DEVELOPING.md](DEVELOPING.md).
 - **Renames are atomic.** The engine pairs the kernel's inotify cookies
   natively: when another program renames a file, the thumbnail survives and
   the selection stays put — no lost focus, no reloaded rows.

@@ -29,6 +29,14 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     bool requestedCrop() const {
         return crop;
     }
+    // Test-only observation: how many runnables have been constructed. The
+    // dedup contract is "one job per request triple", and the only honest way
+    // to assert it from outside is to count the jobs — a delivered-thumbnail
+    // count cannot tell one job from three racing on the same file.
+    static std::atomic_int &constructionCount() {
+        static std::atomic_int count{0};
+        return count;
+    }
     ~ThumbnailerRunnable() override;
     void run() override;
     static std::shared_ptr<Thumbnail> generate(ThumbnailCache *cache, const QString &path, int size, bool crop,
@@ -77,9 +85,4 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
 
   signals:
     void taskEnd(std::shared_ptr<Thumbnail>, QString, bool crop);
-    // A job that was marked before it ever started. It reports NOTHING on
-    // taskEnd (there is no picture, and the consumers would overwrite a good
-    // thumbnail with an empty one), but the owner still has to forget the
-    // request — otherwise the file could never be requested again.
-    void abandoned(QString path, int size, bool crop);
 };
