@@ -59,7 +59,7 @@ void WorkerPool::cancel(PoolOwner owner) {
     // that wants to know the marked jobs are gone calls waitForOwner().
 }
 
-bool WorkerPool::hasQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const {
+bool WorkerPool::anyQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const {
     // mutex is mutable so this const query can read the two state lists under
     // the same lock every writer takes
     std::lock_guard<std::mutex> lock(mutex);
