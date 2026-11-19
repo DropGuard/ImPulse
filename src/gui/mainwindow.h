@@ -93,7 +93,35 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     // the keymap's inspect scope follows the viewer's fit mode
     QPropertyNotifier fitModeObserver;
     WindowShell *windowShell = nullptr;
-    void setupUi();
+    // The window's children, produced as a value instead of assigned to
+    // members from inside a setup function. The point is that the creation order lives in ONE function
+    // and that a missing field is caught before the window exists — by the
+    // compiler for an out-of-order dependency (a local named before it is
+    // declared), by -Wmissing-field-initializers for an omission (this build
+    // holds zero warnings). An explicit nullptr still compiles; the
+    // constructor's runtime census covers that case. The members below remain
+    // the long-lived owners, filled in one place by adoptUi().
+    struct Ui {
+        // No default initializers on purpose: with them an omitted field is
+        // indistinguishable from a deliberate null, and -Wmissing-field-
+        // initializers stays quiet. Without them, leaving one out is the
+        // warning that this tree's zero-warning contract turns into a failure.
+        ViewerWidget *viewer;
+        InfoBarProxy *infoBarWindowed;
+        DocumentWidget *doc;
+        DialogHost *dialog;
+        FolderViewProxy *folderView;
+        CentralWidget *central;
+        FullscreenInfoOverlayProxy *infoBarFullscreen;
+        SidePanel *sidePanel;
+    };
+    // Creates every child in dependency order and wires the ones that only
+    // need what it created. The order lives HERE and nowhere else.
+    Ui createUi();
+    // The single place the members are filled from the struct, plus the two
+    // steps that need `this` in a state createUi cannot see (appState's view
+    // mode) or that must run after every child exists (the layout).
+    void adoptUi(const Ui &ui);
 
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
