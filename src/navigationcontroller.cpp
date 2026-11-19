@@ -272,7 +272,10 @@ bool NavigationController::navigationDenied() {
     // the current image's uncommitted edits — the save prompt may be
     // settings-off, but the work exists regardless of its rendering
     const bool pending = overlays_->hasPendingSurface() || [&] {
-        if(!model)
+        // no file under attention yet (the first load): nothing can be edited,
+        // and getImage() would decode whatever path it was handed — an empty
+        // one, which logs "cannot open" on every startup
+        if(!model || state->currentFilePath.value().isEmpty())
             return false;
         auto img = model->getImage(state->currentFilePath);
         return img && img->isEdited();

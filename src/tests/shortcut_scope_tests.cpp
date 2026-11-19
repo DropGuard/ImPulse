@@ -16,6 +16,9 @@
 #include "utils/inputmap.h"
 #include "gui/dialogs/settingsdialog.h"
 #include "actions_table.h"
+#include "gui/folderview/folderview.h"
+#include "gui/folderview/folderviewproxy.h"
+#include "gui/customwidgets/iconbutton.h"
 
 class TestShortcutScope : public QObject {
     Q_OBJECT
@@ -305,6 +308,35 @@ class TestShortcutScope : public QObject {
     // ones) and the resolver asks the focused grid's table first. This pins
     // the resolver's ranking; the delivery leg lives in
     // returnKeyMeansFolderViewInTheDocumentAndGridOpenInTheGrid.
+    // The folder view's home button is wired end to end: the grid's
+    // directorySelected reaches DialogHost::opened, which reaches
+    // NavigationController::loadPath. It did not — MainWindow created
+    // DialogHost AFTER setupUi, so the connect inside setupUi bound a null
+    // receiver and both the home and root buttons did nothing for the life of
+    // the feature. Qt said so on every start ("connect(FolderViewProxy,
+    // Unknown): invalid nullptr parameter") into a log nobody read; this pin
+    // is what says it in a suite.
+    void theFolderViewsHomeButtonReachesTheNavigator() {
+        const QString start = QDir(alpha).filePath("a.png");
+        Core core;
+        QVERIFY(core.loadPath(start));
+        QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+
+        auto *proxy = core.mainWindow()->getFolderView();
+        proxy->init();
+        auto *folderView = proxy->findChild<FolderView *>();
+        QVERIFY2(folderView, "no FolderView under the proxy");
+        auto *homeBtn = folderView->findChild<IconButton *>(QStringLiteral("homeButton"));
+        QVERIFY2(homeBtn, "the folder view has no home button");
+
+        // the navigator's own report of where it ended up, not a guess about
+        // the model: the button's whole job is to move the listing
+        // IconButton is a QWidget with its own clicked() signal, not a
+        // QAbstractButton: drive the same signal a click would emit
+        emit homeBtn->clicked();
+        QTRY_VERIFY_WITH_TIMEOUT(core.directoryModel()->directoryPath() == QDir::homePath(), 10000);
+    }
+
     void gridFocusAnswersThroughTheGridsTable() {
         Core core;
         QVERIFY(core.loadPath(QDir(alpha).filePath("a.png")));
