@@ -82,10 +82,6 @@ void Thumbnailer::clearTasks() {
     pool.cancel(PoolOwner::Thumbnailer);
 }
 
-std::shared_ptr<Thumbnail> Thumbnailer::getThumbnail(QString filePath, int size) {
-    return ThumbnailerRunnable::generate(nullptr, std::move(filePath), size, false, false, LoadPolicy::fromSettings());
-}
-
 void Thumbnailer::getThumbnailAsync(const QString &path, int size, bool crop, bool force) {
     // Dedup asked of the pool, not of an index beside it: the pool already
     // tracks both states a request can be in (queued, inside run()), and a

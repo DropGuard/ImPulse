@@ -172,7 +172,6 @@ QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {
 void Core::onDraggedOut(const QList<QString> &paths) {
     if(paths.isEmpty())
         return;
-    //auto thumb = Thumbnailer::getThumbnail(paths.last(), 100);
     // exec() blocks for the whole gesture, so the drag handle is scoped to this
     // call: the QMimeData it owns goes with it. A member here would leave every
     // past drag's payload parented to Core for the life of the session.

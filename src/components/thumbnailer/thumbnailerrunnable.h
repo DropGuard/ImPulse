@@ -53,9 +53,8 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     static QString videoFrameTempPath(const QString &tmpDir, const QString &path, int size, bool crop);
     // Waits for the frame extractor the way a cancellable job has to: in slices,
     // so a job that is no longer wanted can stop a wait that would otherwise hold
-    // a worker for the whole timeout. A null cancel waits in one call, which is
-    // what the synchronous Thumbnailer::getThumbnail does. Public static for the
-    // same reason as above — a test pins it against a real process.
+    // a worker for the whole timeout. A null cancel waits in one call. Public
+    // static for the same reason as above — a test pins it against a real process.
     static void waitForProcess(QProcess &process, const CancelToken *cancel, int timeoutMs);
 
   private:
