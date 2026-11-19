@@ -5,7 +5,7 @@ the worst place to store rules. Read it before editing it.
 
 ## What this repo is
 
-ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. `rustcore` is the integration trunk. The architecture law is stated once in [DEVELOPING.md](DEVELOPING.md) and enforced mechanically by
+ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. the Rust trunk is `engine/`. The architecture law is stated once in [DEVELOPING.md](DEVELOPING.md) and enforced mechanically by
 `qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
@@ -76,8 +76,9 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 # and its noise baseline lives in qimgv/tests/tsan-noise.supp: out of the gate
 # on enumerated third-party internals (QtGui's own pooled threads racing the
 # QArrayData region around image save/read), with any report naming one of our
-# frames still a failure. The harness forks per class / per test function so
-# every QTest watchdog gets a private TSan registry. The Rust pure layer is
+# frames still a failure. The harness spawns one process per class / per test
+# function so every QTest watchdog gets a private TSan registry. The Rust pure
+# layer is
 # Miri-checked — reach, command and the fd-machinery named gap are in the
 # same block.
 ```
@@ -160,22 +161,22 @@ baselines). What remains here is the part needing judgment.
    SettingsDialog .ui reference and declared a live class dead (caught before
    the deletion landed), and the same trap bit the census constructions. The
    class was renamed SettingsSidebar to bury the trap itself.
-11. **A suspicious failure gets the determinism test first.** Known flake
+10. **A suspicious failure gets the determinism test first.** Known flake
     families (cargo lock, -j4 watcher latency) prime pattern-matching — the
     nav_-null incident presented as 512-871 s suite hangs and was misread as
     one for the better part of an hour. One standalone single-slot run with a
     timeout settles it in a minute: reproducible means not a flake.
-12. **When a check goes red, read the full failure output before any
+11. **When a check goes red, read the full failure output before any
     filter.** The grep pipe that shows only `Failed|tests passed` discarded
     the slot-level evidence the harness had already written; the incident was
     diagnosable from the first full log and unreadable from the filtered one.
-13. **Anchor edits to a constructor need a branch recon first.** The census
+12. **Anchor edits to a constructor need a branch recon first.** The census
     in Core's ctor (qFatal, Release-surviving) now mechanically checks every
     seam in both branches — but it exists because an anchor anchored in the
     headless branch alone shipped a null seam to every windowed suite, and
     the crash site was the silent triple: Release NDEBUG, fork-lost output,
     constructor-before-QTest.
-10. **A signal census that reads only .cpp/.h is not a census.** Designer
+13. **A signal census that reads only .cpp/.h is not a census.** Designer
     `<connections>` blocks compile into `ui_*.h` under `*_autogen`, never into
     hand-written code, so a sweep for `&Class::signal` cannot see them: of the
     six orphan signals one such sweep produced, two
