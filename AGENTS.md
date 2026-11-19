@@ -5,7 +5,7 @@ the worst place to store rules. Read it before editing it.
 
 ## What this repo is
 
-ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. `rustcore` is the integration trunk. The architecture law — the Rust engine owns the directory listing, the C++ side is a read-only mirror that only splices, and decode execution plus its scheduling live on the C++ side (one WorkerPool, per-owner staleness policy) — is stated once in [DEVELOPING.md](DEVELOPING.md), and enforced mechanically by
+ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. `rustcore` is the integration trunk. The architecture law is stated once in [DEVELOPING.md](DEVELOPING.md) and enforced mechanically by
 `qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
