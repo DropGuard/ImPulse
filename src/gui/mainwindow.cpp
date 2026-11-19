@@ -25,7 +25,8 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     this->setAcceptDrops(true);
     this->setAccessibleName("mainwindow");
     windowShell = new WindowShell(this);
-    setupUi();
+    Ui ui = createUi();
+    adoptUi(ui);
     // the keymap's inspect scope follows the viewer's fit mode: fit original
     // / free zoom declare "I am inspecting this image" — the arrows pan and
     // never change images until the user leaves the mode
@@ -117,16 +118,60 @@ MW::~MW() {
     delete infoBarFullscreen;
 }
 
-void MW::setupUi() {
-    viewerWidget = new ViewerWidget(this);
-    infoBarWindowed = new InfoBarProxy(this);
-    docWidget = new DocumentWidget(viewerWidget, infoBarWindowed);
-    // Before the connect that hands it to FolderViewProxy: setupUi ran first
-    // and this object was created after it, so the grid's directorySelected
-    // was bound to a null receiver — the home and root buttons in the folder
-    // view did nothing, and Qt said so on every startup ("connect(FolderViewProxy,
-    // Unknown): invalid nullptr parameter") to a log nobody read.
-    dialogHost = new DialogHost(this, docWidget);
+MW::Ui MW::createUi() {
+    // Everything this window owns, in the one order the dependencies allow:
+    // the creation order used to be interleaved with the wiring across forty
+    // lines of the constructor, and that is where DialogHost came to be created
+    // after the connect that handed it out.
+    //
+    // What the return value buys is correctness under this tree's contract,
+    // not a hard error: an omitted field is -Wmissing-field-initializers (in
+    // -Wextra, and the build holds zero warnings), and a dependency written in
+    // the wrong order names a local that does not exist yet, which IS a hard
+    // error. Passing an explicit nullptr to one of them still compiles, and
+    // that is what the constructor's runtime census remains for.
+    auto *uiViewer = new ViewerWidget(this);
+    auto *uiInfoBarWindowed = new InfoBarProxy(this);
+    auto *uiDoc = new DocumentWidget(uiViewer, uiInfoBarWindowed);
+    auto *uiDialog = new DialogHost(this, uiDoc);
+    auto *uiFolderView = new FolderViewProxy(this);
+    auto *uiCentral = new CentralWidget(uiDoc, uiFolderView, this);
+    auto *uiInfoBarFullscreen = new FullscreenInfoOverlayProxy(uiViewer);
+    auto *uiSidePanel = new SidePanel(this);
+
+    // the wires that only need what this function built. The ones that
+    // involve `this` as a signal's receiver and `uiDialog`/`uiViewer` as senders
+    // live here too — they are part of the same graph.
+    connect(uiFolderView, &FolderViewProxy::sortingSelected, this, &MW::sortingSelected);
+    connect(uiFolderView, &FolderViewProxy::directorySelected, uiDialog, &DialogHost::opened);
+    connect(uiFolderView, &FolderViewProxy::copyUrlsRequested, this, &MW::copyUrlsRequested);
+    connect(uiFolderView, &FolderViewProxy::moveUrlsRequested, this, &MW::moveUrlsRequested);
+    connect(uiFolderView, &FolderViewProxy::showFoldersChanged, this, &MW::showFoldersChanged);
+    connect(uiViewer, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
+    connect(uiViewer, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
+    connect(uiViewer, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
+    connect(this, &MW::setLoopPlayback, uiViewer, &ViewerWidget::setLoopPlayback);
+    // the heavy panels ride the window's own first show; queued, so the setup
+    // runs after the show and layout pass have completed
+    connect(this, &MW::shownOnce, this, &MW::setupFullUi, Qt::QueuedConnection);
+    // every field named at one site, in dependency order
+    return Ui{uiViewer, uiInfoBarWindowed, uiDoc, uiDialog, uiFolderView, uiCentral, uiInfoBarFullscreen, uiSidePanel};
+}
+
+void MW::adoptUi(const Ui &ui) {
+    // the single place the members are filled. The parent tree owns every
+    // widget; these observe (see the rule comment in the header).
+    viewerWidget = ui.viewer;
+    infoBarWindowed = ui.infoBarWindowed;
+    docWidget = ui.doc;
+    dialogHost = ui.dialog;
+    folderView = ui.folderView;
+    centralWidget = ui.central;
+    infoBarFullscreen = ui.infoBarFullscreen;
+    sidePanel = ui.sidePanel;
+
+    layout.addWidget(centralWidget);
+    layout.addWidget(sidePanel);
     // the document view's keys are its own, not the global table's: they ride
     // QShortcuts parented here, active exactly while this subtree is visible
     // and focused (CentralWidget shows page 0 and focuses the focusProxy, so
@@ -135,25 +180,6 @@ void MW::setupUi() {
     // the notifier below only fires on CHANGE; the initial mode is a state
     // too, and the resolver needs to agree with it from the first keystroke
     actionManager->setDocumentActive(appState->viewMode.value() != MODE_FOLDERVIEW);
-    folderView = new FolderViewProxy(this);
-    connect(folderView, &FolderViewProxy::sortingSelected, this, &MW::sortingSelected);
-    connect(folderView, &FolderViewProxy::directorySelected, dialogHost, &DialogHost::opened);
-    connect(folderView, &FolderViewProxy::copyUrlsRequested, this, &MW::copyUrlsRequested);
-    connect(folderView, &FolderViewProxy::moveUrlsRequested, this, &MW::moveUrlsRequested);
-    connect(folderView, &FolderViewProxy::showFoldersChanged, this, &MW::showFoldersChanged);
-
-    centralWidget = new CentralWidget(docWidget, folderView, this);
-    layout.addWidget(centralWidget);
-    infoBarFullscreen = new FullscreenInfoOverlayProxy(viewerWidget);
-    sidePanel = new SidePanel(this);
-    layout.addWidget(sidePanel);
-    connect(viewerWidget, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
-    connect(viewerWidget, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
-    connect(viewerWidget, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
-    connect(this, &MW::setLoopPlayback, viewerWidget, &ViewerWidget::setLoopPlayback);
-    // the heavy panels ride the window's own first show; queued, so the setup
-    // runs after the show and layout pass have completed
-    connect(this, &MW::shownOnce, this, &MW::setupFullUi, Qt::QueuedConnection);
 }
 
 // The heavy-UI trigger: fired exactly once, from the first show. The flag
