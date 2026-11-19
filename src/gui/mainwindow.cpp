@@ -35,7 +35,6 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     });
     overlayHost = new OverlayHost(this, viewerWidget, docWidget);
     cropController = new CropController(this, state, viewerWidget, sidePanel, docWidget);
-    dialogHost = new DialogHost(this, docWidget);
     connect(viewerWidget, &ViewerWidget::showScriptSettings, dialogHost, &DialogHost::showScriptSettings);
 
     connect(settings, &Settings::settingsChanged, this, &MW::readSettings);
@@ -104,6 +103,12 @@ void MW::setupUi() {
     viewerWidget = new ViewerWidget(this);
     infoBarWindowed = new InfoBarProxy(this);
     docWidget = new DocumentWidget(viewerWidget, infoBarWindowed);
+    // Before the connect that hands it to FolderViewProxy: setupUi ran first
+    // and this object was created after it, so the grid's directorySelected
+    // was bound to a null receiver — the home and root buttons in the folder
+    // view did nothing, and Qt said so on every startup ("connect(FolderViewProxy,
+    // Unknown): invalid nullptr parameter") to a log nobody read.
+    dialogHost = new DialogHost(this, docWidget);
     // the document view's keys are its own, not the global table's: they ride
     // QShortcuts parented here, active exactly while this subtree is visible
     // and focused (CentralWidget shows page 0 and focuses the focusProxy, so

@@ -101,7 +101,9 @@ int main(int argc, char **argv) {
              << gen.elapsed() << "ms";
 
     EngineBridge bridge;
-    Core core({.bridge = &bridge});
+    Core::Deps deps;
+    deps.bridge = &bridge;
+    Core core(deps);
 
     // the delivery ledger, reset per flight
     QElapsedTimer roundClock;

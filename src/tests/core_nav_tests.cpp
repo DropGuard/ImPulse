@@ -371,7 +371,9 @@ class TestCoreNav : public QObject {
         QSignalSpy listed(&bridge, &EngineBridge::dirListed);
         QVERIFY(listed.isValid());
 
-        Core core({.bridge = &bridge});
+        Core::Deps deps;
+        deps.bridge = &bridge;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, seq), 10000);
         // the cold-open load rides whenListed: it fires against a landed
@@ -422,7 +424,9 @@ class TestCoreNav : public QObject {
 
         EngineBridge bridge;
         QSignalSpy listed(&bridge, &EngineBridge::dirListed);
-        Core core({.bridge = &bridge});
+        Core::Deps deps;
+        deps.bridge = &bridge;
+        Core core(deps);
         QVERIFY(core.loadPath(files.at(0)));
         QTRY_VERIFY_WITH_TIMEOUT(sawDir(listed, dir), 10000);
 
