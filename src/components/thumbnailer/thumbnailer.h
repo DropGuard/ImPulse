@@ -15,7 +15,6 @@ class Thumbnailer : public QObject {
     // every call site keep the hidden choice (00cf517e's rule).
     explicit Thumbnailer(WorkerPool &_pool);
     ~Thumbnailer() override;
-    static std::shared_ptr<Thumbnail> getThumbnail(QString filePath, int size);
     void clearTasks();
     void waitForDone();
 
