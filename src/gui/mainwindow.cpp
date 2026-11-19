@@ -80,6 +80,24 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
         actionManager->setDocumentActive(!folder);
         folder ? enableFolderView() : enableDocumentView();
     });
+    // The seam census, the same shape Core's constructor carries and for the
+    // same reason: this constructor is a forty-line hand-written dependency
+    // sequence, and nothing but the census checks that every step produced
+    // what the next one assumes. It exists because one did not — DialogHost
+    // was created after the connect that handed it out, which bound a null
+    // receiver and left the folder view's home and root buttons inert for the
+    // life of the feature (01e704f3's era; named from a startup warning nobody
+    // read). qFatal, not Q_ASSERT: the Release build this tree ships must also
+    // fail loudly.
+    //
+    // This catches the "forgot to create it" half only. Sequencing and
+    // wiring-the-wrong-object are still the author's judgment — see the
+    // create/wire split this constructor is a step toward.
+    if(!windowShell || !viewerWidget || !infoBarWindowed || !docWidget || !dialogHost || !folderView ||
+       !centralWidget || !infoBarFullscreen || !sidePanel || !overlayHost || !cropController)
+        qFatal("MW construction left a child null — the census checks windowShell, viewerWidget, "
+               "infoBarWindowed, docWidget, dialogHost, folderView, centralWidget, infoBarFullscreen, "
+               "sidePanel, overlayHost and cropController");
 }
 
 /*                                                             |--[ImageViewer]
