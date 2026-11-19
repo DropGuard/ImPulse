@@ -95,26 +95,6 @@ class OrderJob : public PoolJob {
     int *order;
 };
 
-// records whether the cancel mark was already set when run() began: the
-// queued half of cancel()'s contract — the mark travels with the job, so the
-// entry checkpoint a consumer keeps sees it whenever the job eventually starts
-class MarkedJob : public PoolJob {
-  public:
-    MarkedJob(std::atomic_int *_sawMark, std::atomic_int *_deaths) : sawMark(_sawMark), deaths(_deaths) {
-    }
-    ~MarkedJob() override {
-        deaths->fetch_add(1);
-    }
-    void run() override {
-        if(cancelRequested())
-            sawMark->fetch_add(1);
-    }
-
-  private:
-    std::atomic_int *sawMark;
-    std::atomic_int *deaths;
-};
-
 // spins inside run() until the cancel mark arrives — the deterministic
 // stand-in for "cancel() fired while this job was running"
 class CancelGatedJob : public PoolJob {
@@ -299,23 +279,25 @@ void TestWorkerPool::waitForAllWaitsForEveryOwner() {
     QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
 }
 
-// cancel() marks; it never stops anything by itself. What the pool owes its
-// callers is exactly three facts: the mark reaches queued jobs and jobs
-// inside run(), it reaches nothing outside the owner it was given, and it
-// satisfies no waiter — only a retire does. Everything on top (the entry
-// checkpoint, the silent drop, the still-reports rule) is the consumer's
-// half, pinned where the consumers live.
+// cancel() marks; what the pool does with the mark is exactly three facts: a
+// job marked while queued is discarded at the worker's pop and never starts,
+// a job marked inside run() observes the mark at its own seam, the mark
+// reaches nothing outside the owner it was given, and it satisfies no waiter
+// — only a retire does.
 void TestWorkerPool::cancelReachesQueuedJobs() {
     std::atomic_bool gate{false};
-    std::atomic_int starts{0}, marked{0}, deaths{0};
+    std::atomic_int starts{0}, runs{0}, deaths{0};
     WorkerPool pool(1);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
     QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
-    pool.submit(PoolOwner::Loader, 0, std::make_unique<MarkedJob>(&marked, &deaths));
+    pool.submit(PoolOwner::Loader, 0, std::make_unique<CountingJob>(&runs, &deaths));
     pool.cancel(PoolOwner::Loader);
     gate = true;
     pool.waitForOwner(PoolOwner::Loader);
-    QCOMPARE(marked.load(), 1);
+    // the pop checkpoint is where cancel reaches a queued job: the marked job
+    // is discarded there, so it never runs — cancel reaches queued jobs by
+    // making sure they never start
+    QCOMPARE(runs.load(), 0);
     QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
 }
 

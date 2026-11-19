@@ -73,8 +73,9 @@ void Thumbnailer::waitForDone() {
 
 void Thumbnailer::clearTasks() {
     // Invalidate the batch: queued jobs are drained (destroyed without ever
-    // running) and running ones are marked, so those still before their entry
-    // checkpoint abandon instead of decoding. Nothing else is bookkeeping —
+    // running) and running ones are marked — those past their pop decode to
+    // completion and deliver, and any not yet popped is discarded at the pop
+    // checkpoint instead of decoding. Nothing else is bookkeeping —
     // the pool is the only record of what is pending, so there is no index
     // here that a later report could corrupt.
     pool.drain(PoolOwner::Thumbnailer); // the queued jobs die with the returned vector

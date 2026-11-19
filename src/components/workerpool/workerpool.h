@@ -79,14 +79,14 @@ class PoolJob {
     void requestCancel() {
         mCancel.request();
     }
-
-  protected:
-    // The cooperative half: a job decides for itself where it can still be
-    // dropped, and the answer is only ever "not yet started" or "not yet at the
-    // seam". Nothing here unwinds a call that is already inside a library.
+    // The read side is public because the pool's worker loop evaluates the mark
+    // at the pop: a job marked while queued is discarded there, before it can
+    // enter the running record that the dedup query reads.
     bool cancelRequested() const {
         return mCancel.requested();
     }
+
+  protected:
     // for the static helpers a run() body hands its work to, which cannot reach
     // a member of an object they were never given
     const CancelToken &cancelToken() const {
@@ -150,17 +150,12 @@ class WorkerPool {
     // missed exit is a duplicate decode or a request that can never be made
     // again. The pool already tracks all three states; asking it cannot drift.
     //
-    // One accepted residual: a job the worker has popped and installed into
-    // `running` but not yet walked to its entry checkpoint answers "yes" to
-    // this query, and if the mark lands in that microsecond gap the job
-    // returns silently — a re-request that collapsed into it is swallowed
-    // until the next wave re-requests the file. The presenters re-request
-    // their visible set every wave, so the miss self-heals within one
-    // interaction; the count-based dedup this replaced had no such window but
-    // needed a correction at every exit, and that is where its strand came
-    // from. The window itself is the price of cooperative cancellation — the
-    // worker must observe the mark on its own thread, and settling it from the
-    // caller's side would put a state lock across a wait.
+    // There is no strand window: a job marked while queued is discarded at the
+    // worker's pop (before it enters `running`), and a job already past the pop
+    // runs to completion and delivers — so a collapse can only land on a job
+    // that will arrive. The check that makes this true is the worker loop's pop
+    // checkpoint; the count-based dedup this replaced had to be corrected at
+    // every exit instead, and the exit it missed was its strand.
     template <typename Job, typename Match> bool hasQueuedOrRunning(PoolOwner owner, Match &&match) const {
         static_assert(std::is_base_of_v<PoolJob, Job>, "hasQueuedOrRunning: ask about a PoolJob subclass");
         return anyQueuedOrRunning(owner, [&](const PoolJob &job) {
