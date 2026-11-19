@@ -149,6 +149,18 @@ class WorkerPool {
     // drain, cancel, and a queued report arriving a wave too late — and each
     // missed exit is a duplicate decode or a request that can never be made
     // again. The pool already tracks all three states; asking it cannot drift.
+    //
+    // One accepted residual: a job the worker has popped and installed into
+    // `running` but not yet walked to its entry checkpoint answers "yes" to
+    // this query, and if the mark lands in that microsecond gap the job
+    // returns silently — a re-request that collapsed into it is swallowed
+    // until the next wave re-requests the file. The presenters re-request
+    // their visible set every wave, so the miss self-heals within one
+    // interaction; the count-based dedup this replaced had no such window but
+    // needed a correction at every exit, and that is where its strand came
+    // from. The window itself is the price of cooperative cancellation — the
+    // worker must observe the mark on its own thread, and settling it from the
+    // caller's side would put a state lock across a wait.
     template <typename Job, typename Match> bool hasQueuedOrRunning(PoolOwner owner, Match &&match) const {
         static_assert(std::is_base_of_v<PoolJob, Job>, "hasQueuedOrRunning: ask about a PoolJob subclass");
         return anyQueuedOrRunning(owner, [&](const PoolJob &job) {

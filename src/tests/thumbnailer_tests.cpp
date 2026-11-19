@@ -376,20 +376,18 @@ class TestThumbnailer : public QObject, protected EngineStackFixture {
         pool.cancel(PoolOwner::Thumbnailer);              // marks A1 while queued
         pool.submit(PoolOwner::Maintenance, 0, std::make_unique<ThumbnailGateJob>(&gate2, &holds2));
 
-        // run A1 (it abandons at its entry checkpoint) and let the worker reach
-        // gate2. waitForOwner processes NO events, so A1's abandoned signal is
-        // still queued to the UI thread when this returns.
+        // run A1 (it returns silently at its entry checkpoint — no report, the
+        // pool's record is the only accounting) and let the worker reach gate2.
         gate1.store(true);
         thumb.waitForDone();
         QCOMPARE(ThumbnailerRunnable::constructionCount().load() - before, 1); // only A1
         QTRY_COMPARE_WITH_TIMEOUT(holds2.load(), 1, 10000);
 
-        // the wave: clear, then re-request. A2 owns the slot at the new
-        // generation; the worker is held, so it stays queued and keeps it.
+        // the wave: clear, then re-request. A2 owns the slot; the worker is
+        // held, so it stays queued and keeps it.
         thumb.clearTasks();
         thumb.getThumbnailAsync(path, 128, false, false); // A2 owns the slot
 
-        // ONLY NOW is the stale report delivered.
         QTest::qWait(50);
 
         // the third call must dedup against the still-outstanding A2.
