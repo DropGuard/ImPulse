@@ -3,6 +3,8 @@
 #include <QtGlobal>
 #include <atomic>
 #include <functional>
+#include <type_traits>
+#include <typeinfo>
 #include <condition_variable>
 #include <deque>
 #include <iterator>
@@ -134,15 +136,36 @@ class WorkerPool {
     // Is any job of `owner` still queued or inside run() right now? The pool
     // is the only queue, so this is the question a dedup asks: "would
     // submitting this again add a second copy of work already pending?"
-    // `match` receives the job and answers per job (it runs under the pool's
-    // mutex, so it must not call back into the pool).
+    //
+    // Typed by the job class the caller owns: every owner submits one kind of
+    // job, and the pool asserts that rather than trusting a cast. A second
+    // kind appearing under the same owner fails HERE, by name, instead of
+    // reaching the caller's lambda as a mis-typed reference and reading
+    // garbage out of an unrelated vtable. `match` runs under the pool's mutex,
+    // so it must not call back into the pool.
     //
     // Owning this fact here rather than mirroring it in the caller is the
     // point: a caller-side index has to be updated on every exit — completion,
     // drain, cancel, and a queued report arriving a wave too late — and each
     // missed exit is a duplicate decode or a request that can never be made
     // again. The pool already tracks all three states; asking it cannot drift.
-    bool hasQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const;
+    template <typename Job, typename Match> bool hasQueuedOrRunning(PoolOwner owner, Match &&match) const {
+        static_assert(std::is_base_of_v<PoolJob, Job>, "hasQueuedOrRunning: ask about a PoolJob subclass");
+        return anyQueuedOrRunning(owner, [&](const PoolJob &job) {
+            const auto *typed = dynamic_cast<const Job *>(&job);
+            if(!typed) {
+                // A second kind of job under one owner is a programming error,
+                // not a state. Answer "no match" rather than aborting — a
+                // QUERY must not take the process down — and say so by name so
+                // the mistake is visible where the query runs. Under
+                // QT_FATAL_WARNINGS=1 (the dev tripwire) this is still fatal.
+                qWarning("hasQueuedOrRunning: owner %d holds a job that is not a %s", static_cast<int>(owner),
+                         typeid(Job).name());
+                return false;
+            }
+            return match(*typed);
+        });
+    }
     // blocks until `owner` has nothing queued and nothing inside run()
     void waitForOwner(PoolOwner owner);
     void waitForAll();
@@ -164,6 +187,9 @@ class WorkerPool {
         PoolJob *job;
     };
 
+    // the untyped half: the template above supplies the type check, this owns
+    // the lock and the two-list walk
+    bool anyQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const;
     void workerLoop();
     bool ownerIdle(PoolOwner owner); // mutex held
     bool allIdle();                  // mutex held

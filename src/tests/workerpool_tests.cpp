@@ -21,6 +21,7 @@ class TestWorkerPool : public QObject, protected EngineStackFixture {
     }
 
     void persistentWorkersSurviveSubmitAndDrainWaves();
+    void typedQueryRejectsAForeignJob();
     void drainReturnsExactlyTheUnstartedJobs();
     void priorityOrderIsHonoredWithinASharedPool();
     void waitForOwnerWaitsOnlyForItsOwner();
@@ -68,6 +69,16 @@ class GatedJob : public PoolJob {
     std::atomic_bool *gate;
     std::atomic_int *starts;
     std::atomic_int *deaths;
+};
+
+// A job type that must never appear under PoolOwner::Thumbnailer. It pins the
+// type guard in hasQueuedOrRunning<Job>: the pool asserts that an owner holds
+// one kind of job, so a second kind fails by name at the query instead of
+// reaching the caller's lambda as a mis-typed reference.
+class ForeignJob : public PoolJob {
+  public:
+    void run() override {
+    }
 };
 
 class OrderJob : public PoolJob {
@@ -175,6 +186,49 @@ void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
         QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 4, 10000);
     }
     QCOMPARE(deaths.load(), 4);
+}
+
+// The typed query refuses to reinterpret a job it does not own. An owner holds
+// one kind of job by construction; a second kind is a programming error, and
+// the query answers "no match" with a warning naming both, instead of handing
+// the caller a mis-typed reference. Observed through the return value rather
+// than a death test, so a query can never take the process down.
+void TestWorkerPool::typedQueryRejectsAForeignJob() {
+    std::atomic_bool gate{false};
+    std::atomic_int starts{0}, deaths{0};
+    WorkerPool pool(1);
+    // RAII: a failing QVERIFY returns from the function, and the gate must
+    // still open or waitForOwner below would block forever (this hung the
+    // suite once already).
+    struct Release {
+        std::atomic_bool &gate;
+        ~Release() {
+            gate.store(true);
+        }
+    } release{gate};
+
+    // hold the only worker with a Maintenance job so the foreign one stays
+    // QUEUED — a queued job is what the query walks first
+    pool.submit(PoolOwner::Maintenance, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
+    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+
+    // the only job under Thumbnailer is the foreign type
+    pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<ForeignJob>());
+
+    bool reached = false;
+    // typeid(...).name() is the mangled spelling ("N12_GLOBAL__N_1..."), so the
+    // regex anchors on the message's own words, not the type's
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("hasQueuedOrRunning: owner .* holds a job")));
+    const bool found = pool.hasQueuedOrRunning<GatedJob>(PoolOwner::Thumbnailer, [&](const GatedJob &) {
+        reached = true;
+        return true;
+    });
+    QVERIFY2(!found, "the query reported a match for a job it could not type");
+    QVERIFY2(!reached, "the caller's lambda ran on a job of the wrong type");
+
+    gate.store(true);
+    pool.waitForOwner(PoolOwner::Thumbnailer);
+    pool.waitForOwner(PoolOwner::Maintenance);
 }
 
 void TestWorkerPool::priorityOrderIsHonoredWithinASharedPool() {

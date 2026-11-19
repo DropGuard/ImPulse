@@ -91,9 +91,8 @@ void Thumbnailer::getThumbnailAsync(const QString &path, int size, bool crop, bo
     // cancel, and a report arriving after the next wave already re-requested.
     // Each missed exit was a duplicate decode or a file that could never be
     // requested again (2026-11-19).
-    if(pool.hasQueuedOrRunning(PoolOwner::Thumbnailer, [&](const PoolJob &job) {
-           const auto &thumb = static_cast<const ThumbnailerRunnable &>(job);
-           return thumb.requestedPath() == path && thumb.requestedSize() == size && thumb.requestedCrop() == crop;
+    if(pool.hasQueuedOrRunning<ThumbnailerRunnable>(PoolOwner::Thumbnailer, [&](const ThumbnailerRunnable &job) {
+           return job.requestedPath() == path && job.requestedSize() == size && job.requestedCrop() == crop;
        }))
         return;
     startThumbnailerThread(path, size, crop, force);
