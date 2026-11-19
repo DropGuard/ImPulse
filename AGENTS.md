@@ -83,11 +83,11 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 ```
 
 The pre-commit hook checks staged C++ against `.clang-format`, then runs
-incremental build + 6 suites + `lint --gate`
+incremental build + the full ctest set + `lint --gate`
 (~14 s measured end to end warm), plus Miri
 (~2 min) whenever the engine's pure layer is staged — the trigger is a
-mechanical staged-path check, with watcher/fd.rs and engine.rs excluded
-because their tests are the ones Miri refuses. The hook is **CMake
+mechanical staged-path check, with watcher/fd.rs, watcher/fd_windows.rs and
+engine.rs excluded because their tests are the ones Miri refuses. The hook is **CMake
 self-installing**: every configure points `core.hooksPath` at
 `scripts/hooks` — clone → configure → build is itself the install step.
 The lint gate used to be a manual ritual, and the stretch it stayed a
