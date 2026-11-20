@@ -11,55 +11,56 @@
 #include <KWindowEffects>
 #endif
 
-WindowShell::WindowShell(MW *windowArg) : QObject(windowArg), window(windowArg), currentDisplay(0), maximized(false) {
-    window->installEventFilter(this);
-    geometryChangeTimer.setSingleShot(true);
-    geometryChangeTimer.setInterval(30);
-    connect(&geometryChangeTimer, &QTimer::timeout, this, &WindowShell::saveWindowGeometry);
-    connect(&geometryChangeTimer, &QTimer::timeout, this, &WindowShell::updateCurrentDisplay);
-    currentDisplay = settings->lastDisplay();
-    maximized = settings->maximizedWindow();
+WindowShell::WindowShell(MW *windowArg)
+    : QObject(windowArg), m_window(windowArg), m_currentDisplay(0), m_maximized(false) {
+    m_window->installEventFilter(this);
+    m_geometryChangeTimer.setSingleShot(true);
+    m_geometryChangeTimer.setInterval(30);
+    connect(&m_geometryChangeTimer, &QTimer::timeout, this, &WindowShell::saveWindowGeometry);
+    connect(&m_geometryChangeTimer, &QTimer::timeout, this, &WindowShell::updateCurrentDisplay);
+    m_currentDisplay = settings->lastDisplay();
+    m_maximized = settings->maximizedWindow();
 }
 
 bool WindowShell::eventFilter(QObject *watched, QEvent *event) {
     // only save maximized state if we are already visible
     // this filters out events while the window is still being set up
-    if(event->type() == QEvent::WindowStateChange && window->isVisible() && !window->isFullScreen())
-        maximized = window->isMaximized();
+    if(event->type() == QEvent::WindowStateChange && m_window->isVisible() && !m_window->isFullScreen())
+        m_maximized = m_window->isMaximized();
     if(event->type() == QEvent::Move || event->type() == QEvent::Resize)
-        geometryChangeTimer.start();
+        m_geometryChangeTimer.start();
     return QObject::eventFilter(watched, event);
 }
 
 void WindowShell::saveWindowGeometry() {
-    if(window->windowState() == Qt::WindowNoState)
-        settings->setWindowGeometry(window->geometry());
-    settings->setMaximizedWindow(maximized);
+    if(m_window->windowState() == Qt::WindowNoState)
+        settings->setWindowGeometry(m_window->geometry());
+    settings->setMaximizedWindow(m_maximized);
 }
 
 // does not apply fullscreen; window size / maximized state only
 void WindowShell::restoreWindowGeometry() {
-    window->setGeometry(settings->windowGeometry());
+    m_window->setGeometry(settings->windowGeometry());
     if(settings->maximizedWindow())
-        window->setWindowState(Qt::WindowMaximized);
+        m_window->setWindowState(Qt::WindowMaximized);
     updateCurrentDisplay();
 }
 
 void WindowShell::updateCurrentDisplay() {
-    currentDisplay = qApp->screens().indexOf(window->window()->screen());
+    m_currentDisplay = qApp->screens().indexOf(m_window->window()->screen());
 }
 
 void WindowShell::saveCurrentDisplay() {
-    settings->setLastDisplay(qApp->screens().indexOf(window->window()->screen()));
+    settings->setLastDisplay(qApp->screens().indexOf(m_window->window()->screen()));
 }
 
 void WindowShell::preShowResize(QSize sz) {
     auto screens = qApp->screens();
-    if(window->windowState() != Qt::WindowNoState || !screens.count() || screens.count() <= currentDisplay)
+    if(m_window->windowState() != Qt::WindowNoState || !screens.count() || screens.count() <= m_currentDisplay)
         return;
-    int decorationSize = window->frameGeometry().height() - window->height();
+    int decorationSize = m_window->frameGeometry().height() - m_window->height();
     float maxSzMulti = settings->autoResizeLimit() / 100.f;
-    QRect availableGeom = screens.at(currentDisplay)->availableGeometry();
+    QRect availableGeom = screens.at(m_currentDisplay)->availableGeometry();
     QSize maxSz = availableGeom.size() * maxSzMulti;
     maxSz.setHeight(maxSz.height() - decorationSize);
     if(!sz.isEmpty()) {
@@ -72,15 +73,15 @@ void WindowShell::preShowResize(QSize sz) {
     newGeom.moveCenter(availableGeom.center());
     newGeom.translate(0, decorationSize / 2);
 
-    if(window->isVisible())
-        window->setGeometry(newGeom);
+    if(m_window->isVisible())
+        m_window->setGeometry(newGeom);
     else // setGeometry wont work on hidden windows, so we just save for it to be restored later
         settings->setWindowGeometry(newGeom);
     qApp->processEvents(); // not needed anymore with patched qt?
 }
 
 void WindowShell::showDefault() {
-    if(!window->isVisible()) {
+    if(!m_window->isVisible()) {
         if(settings->fullscreenMode())
             showFullScreen();
         else
@@ -89,7 +90,7 @@ void WindowShell::showDefault() {
 }
 
 void WindowShell::triggerFullScreen() {
-    if(!window->isFullScreen()) {
+    if(!m_window->isFullScreen()) {
         showFullScreen();
     } else {
         showWindowed();
@@ -98,33 +99,33 @@ void WindowShell::triggerFullScreen() {
 
 void WindowShell::showFullScreen() {
     // do not save immediately on application start
-    if(!window->isHidden())
+    if(!m_window->isHidden())
         saveWindowGeometry();
     auto screens = qApp->screens();
     // todo: why check the screen again?
-    int _currentDisplay = screens.indexOf(window->window()->screen());
+    int _currentDisplay = screens.indexOf(m_window->window()->screen());
     // move to target screen
-    if(screens.count() > currentDisplay && currentDisplay != _currentDisplay) {
-        window->move(screens.at(currentDisplay)->geometry().x(), screens.at(currentDisplay)->geometry().y());
+    if(screens.count() > m_currentDisplay && m_currentDisplay != _currentDisplay) {
+        m_window->move(screens.at(m_currentDisplay)->geometry().x(), screens.at(m_currentDisplay)->geometry().y());
     }
-    window->showFullScreen();
+    m_window->showFullScreen();
     // try to repaint sooner
     qApp->processEvents();
     emit fullscreenStateChanged(true);
 }
 
 void WindowShell::showWindowed() {
-    if(window->isFullScreen())
-        window->showNormal();
+    if(m_window->isFullScreen())
+        m_window->showNormal();
     restoreWindowGeometry();
-    window->show();
+    m_window->show();
     // try to repaint sooner
     qApp->processEvents();
     emit fullscreenStateChanged(false);
 }
 
 void WindowShell::closeFullScreenOrExit() {
-    if(window->isFullScreen()) {
+    if(m_window->isFullScreen()) {
         showWindowed();
     } else {
         actionManager->invokeAction("exit");

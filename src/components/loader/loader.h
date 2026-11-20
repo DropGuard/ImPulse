@@ -38,8 +38,8 @@ class Loader : public QObject {
   private:
     // bookkeeping only: submitted jobs belong to the pool, which destroys them
     // on the worker thread once run() returns
-    QHash<QString, LoaderRunnable *> tasks;
-    WorkerPool &pool;
+    QHash<QString, LoaderRunnable *> m_tasks;
+    WorkerPool &m_pool;
     void clearPool();
     // the one submission seam: dedup by task entry, connect, submit. Both the
     // fresh path (a new job) and the window path (a drained job kept alive)

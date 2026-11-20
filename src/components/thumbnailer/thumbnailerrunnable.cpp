@@ -20,7 +20,7 @@ QSize boundedBox(const QSize &natural, int box) {
 
 ThumbnailerRunnable::ThumbnailerRunnable(ThumbnailCache *_cache, QString _path, int _size, bool _crop, bool _force,
                                          const LoadPolicy &_policy)
-    : path(std::move(_path)), size(_size), crop(_crop), force(_force), policy(_policy), cache(_cache) {
+    : m_path(std::move(_path)), m_size(_size), m_crop(_crop), m_force(_force), m_policy(_policy), m_cache(_cache) {
     constructionCount().fetch_add(1);
 }
 
@@ -30,8 +30,8 @@ void ThumbnailerRunnable::run() {
     // picture would overwrite a good thumbnail on the view, and nothing in the
     // owner is waiting on a report (the pool's own queued/running record is
     // the dedup's source of truth).
-    std::shared_ptr<Thumbnail> thumbnail = generate(cache, path, size, crop, force, policy, &cancelToken());
-    emit taskEnd(thumbnail, path, crop);
+    std::shared_ptr<Thumbnail> thumbnail = generate(m_cache, m_path, m_size, m_crop, m_force, m_policy, &cancelToken());
+    emit taskEnd(thumbnail, m_path, m_crop);
 }
 
 QString ThumbnailerRunnable::videoFrameTempPath(const QString &tmpDir, const QString &path, int size, bool crop) {

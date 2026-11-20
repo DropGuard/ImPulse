@@ -6,14 +6,14 @@ Video::Video(std::unique_ptr<DocumentInfo> _info) : Image(std::move(_info)) {
 }
 
 void Video::load() {
-    if(mLoadAttempted)
+    if(m_loadAttempted)
         return;
 
     // the ffmpeg/mpv resolution probe that used to live here is retired:
     // it never ran (commented out), and video metadata comes from the
     // container via DocumentInfo
 
-    mLoadAttempted = true;
+    m_loadAttempted = true;
 }
 
 bool Video::save(QString destPath, int) {
@@ -29,13 +29,13 @@ std::shared_ptr<const QImage> Video::getImage() {
 }
 
 int Video::height() {
-    return srcHeight;
+    return m_srcHeight;
 }
 
 int Video::width() {
-    return srcWidth;
+    return m_srcWidth;
 }
 
 QSize Video::size() {
-    return QSize(srcWidth, srcHeight);
+    return QSize(m_srcWidth, m_srcHeight);
 }

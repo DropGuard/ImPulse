@@ -4,12 +4,13 @@
 #include "components/actionmanager/actionmanager.h"
 #include "shortcutbuilder.h"
 
-ChangelogWindow::ChangelogWindow(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::ChangelogWindow) {
-    ui->setupUi(this);
+ChangelogWindow::ChangelogWindow(FloatingWidgetContainer *parent)
+    : OverlayWidget(parent), m_ui(new Ui::ChangelogWindow) {
+    m_ui->setupUi(this);
     hide();
     setPosition(FloatingWidgetPosition::CENTER);
-    connect(ui->closeButton, &QPushButton::pressed, this, &ChangelogWindow::hide);
-    connect(ui->shutUpButton, &QPushButton::pressed, this, &ChangelogWindow::hideAndShutUp);
+    connect(m_ui->closeButton, &QPushButton::pressed, this, &ChangelogWindow::hide);
+    connect(m_ui->shutUpButton, &QPushButton::pressed, this, &ChangelogWindow::hideAndShutUp);
 
     if(parent)
         setContainerSize(parent->size());
@@ -21,11 +22,11 @@ void ChangelogWindow::hideAndShutUp() {
 }
 
 ChangelogWindow::~ChangelogWindow() {
-    delete ui;
+    delete m_ui;
 }
 
 void ChangelogWindow::setText(const QString &text) {
-    ui->textBrowser->setText(text);
+    m_ui->textBrowser->setText(text);
 }
 
 void ChangelogWindow::paintEvent(QPaintEvent *) {
@@ -64,13 +65,13 @@ void ChangelogWindow::keyPressEvent(QKeyEvent *event) {
 void ChangelogWindow::show() {
     OverlayWidget::show();
     // the veto filter rides the buttons: they are what holds focus here
-    ui->closeButton->installEventFilter(this);
-    ui->shutUpButton->installEventFilter(this);
-    ui->closeButton->setFocus();
+    m_ui->closeButton->installEventFilter(this);
+    m_ui->shutUpButton->installEventFilter(this);
+    m_ui->closeButton->setFocus();
 }
 
 void ChangelogWindow::hide() {
-    ui->closeButton->clearFocus();
-    ui->shutUpButton->clearFocus();
+    m_ui->closeButton->clearFocus();
+    m_ui->shutUpButton->clearFocus();
     OverlayWidget::hide();
 }

@@ -45,8 +45,8 @@ class ThumbnailStripProxy : public QWidget, public IDirectoryView {
     void draggedOver(int) override;
 
   private:
-    ThumbnailStrip *thumbnailStrip = nullptr;
-    QVBoxLayout layout;
-    ThumbnailStripStateBuffer stateBuf;
-    QMutex m;
+    ThumbnailStrip *m_thumbnailStrip = nullptr;
+    QVBoxLayout m_layout;
+    ThumbnailStripStateBuffer m_stateBuf;
+    QMutex m_m;
 };

@@ -21,8 +21,8 @@ ScriptManager *ScriptManager::getInstance() {
 }
 
 void ScriptManager::runScript(const QString &scriptName, std::shared_ptr<Image> img) {
-    if(scripts.contains(scriptName)) {
-        Script script = scripts.value(scriptName);
+    if(m_scripts.contains(scriptName)) {
+        Script script = m_scripts.value(scriptName);
         if(script.command.isEmpty())
             return;
         QProcess exec(this);
@@ -137,38 +137,38 @@ QStringList ScriptManager::splitCommandLine(const QString &cmdLine) {
 }
 
 bool ScriptManager::scriptExists(const QString &scriptName) {
-    return scripts.contains(scriptName);
+    return m_scripts.contains(scriptName);
 }
 
 void ScriptManager::readScripts() {
-    settings->readScripts(scripts);
+    settings->readScripts(m_scripts);
 }
 
 void ScriptManager::saveScripts() {
-    settings->saveScripts(scripts);
+    settings->saveScripts(m_scripts);
 }
 
 // replaces if it already exists
 void ScriptManager::addScript(const QString &scriptName, const Script &script) {
-    if(scripts.contains(scriptName)) {
+    if(m_scripts.contains(scriptName)) {
         qDebug() << "[ScriptManager] Replacing script" << scriptName;
-        scripts.remove(scriptName);
+        m_scripts.remove(scriptName);
     }
-    scripts.insert(scriptName, script);
+    m_scripts.insert(scriptName, script);
 }
 
 void ScriptManager::removeScript(const QString &scriptName) {
-    scripts.remove(scriptName);
+    m_scripts.remove(scriptName);
 }
 
 const QMap<QString, Script> &ScriptManager::allScripts() {
-    return scriptManager->scripts;
+    return scriptManager->m_scripts;
 }
 
 QList<QString> ScriptManager::scriptNames() {
-    return scriptManager->scripts.keys();
+    return scriptManager->m_scripts.keys();
 }
 
 Script ScriptManager::getScript(const QString &scriptName) {
-    return scripts.value(scriptName);
+    return m_scripts.value(scriptName);
 }

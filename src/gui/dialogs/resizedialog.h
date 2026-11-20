@@ -31,10 +31,10 @@ class ResizeDialog : public QDialog {
     void keyPressEvent(QKeyEvent *event) override;
 
   private:
-    Ui::ResizeDialog *ui;
-    QSize originalSize, targetSize, desktopSize;
+    Ui::ResizeDialog *m_ui;
+    QSize m_originalSize, m_targetSize, m_desktopSize;
     void updateToTargetValues();
-    int lastEdited; // 0 - width, 1 - height
+    int m_lastEdited; // 0 - width, 1 - height
     void resetResCheckBox();
 
   private slots:

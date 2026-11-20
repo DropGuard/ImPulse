@@ -33,9 +33,9 @@ class TreeViewCustom : public QTreeView {
     void updateScrollbarStyle();
 
   private:
-    QScrollBar overlayScrollbar;
+    QScrollBar m_overlayScrollbar;
 
-    const int SCROLLBAR_WIDTH = 12;
+    const int m_scrollbarWidth = 12;
 };
 
 #endif // TREEVIEWCUSTOM_H

@@ -1,7 +1,7 @@
 #include "fullscreeninfooverlayproxy.h"
 
 FullscreenInfoOverlayProxy::FullscreenInfoOverlayProxy(FloatingWidgetContainer *parent)
-    : container(parent), infoOverlay(nullptr) {
+    : m_container(parent), m_infoOverlay(nullptr) {
 }
 
 FullscreenInfoOverlayProxy::~FullscreenInfoOverlayProxy() {
@@ -9,39 +9,39 @@ FullscreenInfoOverlayProxy::~FullscreenInfoOverlayProxy() {
 }
 
 void FullscreenInfoOverlayProxy::show() {
-    stateBuf.showImmediately = true;
+    m_stateBuf.showImmediately = true;
     init();
 }
 
 void FullscreenInfoOverlayProxy::showWhenReady() {
-    if(!infoOverlay)
-        stateBuf.showImmediately = true;
+    if(!m_infoOverlay)
+        m_stateBuf.showImmediately = true;
     else
-        infoOverlay->show();
+        m_infoOverlay->show();
 }
 
 void FullscreenInfoOverlayProxy::hide() {
-    stateBuf.showImmediately = false;
-    if(infoOverlay)
-        infoOverlay->hide();
+    m_stateBuf.showImmediately = false;
+    if(m_infoOverlay)
+        m_infoOverlay->hide();
 }
 
 void FullscreenInfoOverlayProxy::setInfo(const QString &_position, const QString &_fileName, const QString &_info) {
-    if(infoOverlay) {
-        infoOverlay->setInfo(_position, _fileName, _info);
+    if(m_infoOverlay) {
+        m_infoOverlay->setInfo(_position, _fileName, _info);
     } else {
-        stateBuf.position = _position;
-        stateBuf.fileName = _fileName;
-        stateBuf.info = _info;
+        m_stateBuf.position = _position;
+        m_stateBuf.fileName = _fileName;
+        m_stateBuf.info = _info;
     }
 }
 
 void FullscreenInfoOverlayProxy::init() {
-    if(infoOverlay)
+    if(m_infoOverlay)
         return;
-    infoOverlay = new FullscreenInfoOverlay(container);
-    if(!stateBuf.fileName.isEmpty())
-        setInfo(stateBuf.position, stateBuf.fileName, stateBuf.info);
-    if(stateBuf.showImmediately)
-        infoOverlay->show();
+    m_infoOverlay = new FullscreenInfoOverlay(m_container);
+    if(!m_stateBuf.fileName.isEmpty())
+        setInfo(m_stateBuf.position, m_stateBuf.fileName, m_stateBuf.info);
+    if(m_stateBuf.showImmediately)
+        m_infoOverlay->show();
 }

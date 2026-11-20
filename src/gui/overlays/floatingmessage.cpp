@@ -4,12 +4,12 @@
 #include "ui_floatingmessage.h"
 
 FloatingMessage::FloatingMessage(FloatingWidgetContainer *parent)
-    : OverlayWidget(parent), preferredPosition(FloatingWidgetPosition::BOTTOM), ui(new Ui::FloatingMessage) {
-    ui->setupUi(this);
-    hideDelay = 700;
+    : OverlayWidget(parent), m_preferredPosition(FloatingWidgetPosition::BOTTOM), m_ui(new Ui::FloatingMessage) {
+    m_ui->setupUi(this);
+    m_hideDelay = 700;
 
-    visibilityTimer.setSingleShot(true);
-    visibilityTimer.setInterval(hideDelay);
+    m_visibilityTimer.setSingleShot(true);
+    m_visibilityTimer.setInterval(m_hideDelay);
 
     setFadeEnabled(true);
     setFadeDuration(300);
@@ -17,7 +17,7 @@ FloatingMessage::FloatingMessage(FloatingWidgetContainer *parent)
     setIcon(FloatingMessageIcon::NO_ICON);
 
     this->setAccessibleName("FloatingMessage");
-    connect(&visibilityTimer, &QTimer::timeout, this, &FloatingMessage::hideAnimated);
+    connect(&m_visibilityTimer, &QTimer::timeout, this, &FloatingMessage::hideAnimated);
 
     readSettings();
 
@@ -28,7 +28,7 @@ FloatingMessage::FloatingMessage(FloatingWidgetContainer *parent)
 }
 
 FloatingMessage::~FloatingMessage() {
-    delete ui;
+    delete m_ui;
 }
 
 void FloatingMessage::readSettings() {
@@ -48,20 +48,20 @@ void FloatingMessage::showMessage(QString text, FloatingWidgetPosition anchor, F
 }
 
 void FloatingMessage::showMessage(QString text, FloatingMessageIcon icon, int duration) {
-    setPosition(preferredPosition);
+    setPosition(m_preferredPosition);
     doShowMessage(std::move(text), icon, duration);
 }
 
 void FloatingMessage::doShowMessage(QString text, FloatingMessageIcon icon, int duration) {
-    hideDelay = duration;
+    m_hideDelay = duration;
     setIcon(icon);
     setText(std::move(text));
     show();
 }
 
 void FloatingMessage::setText(const QString &text) {
-    ui->textLabel->setText(text);
-    text.isEmpty() ? ui->textLabel->hide() : ui->textLabel->show();
+    m_ui->textLabel->setText(text);
+    text.isEmpty() ? m_ui->textLabel->hide() : m_ui->textLabel->show();
     recalculateGeometry();
     update();
 }
@@ -72,23 +72,23 @@ void FloatingMessage::setIcon(FloatingMessageIcon icon) {
     case FloatingMessageIcon::ICON_WARNING:
     case FloatingMessageIcon::ICON_ERROR:
         //ui->iconLabel->setIconPath(":/res/icons/common/notifications/error16.png");
-        ui->iconLabel->hide();
+        m_ui->iconLabel->hide();
         break;
     case FloatingMessageIcon::ICON_DIRECTORY:
-        ui->iconLabel->show();
-        ui->iconLabel->setIconPath(":/res/icons/common/buttons/panel/folder16.png");
+        m_ui->iconLabel->show();
+        m_ui->iconLabel->setIconPath(":/res/icons/common/buttons/panel/folder16.png");
         break;
     case FloatingMessageIcon::ICON_LEFT_EDGE:
-        ui->iconLabel->show();
-        ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_start20.png");
+        m_ui->iconLabel->show();
+        m_ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_start20.png");
         break;
     case FloatingMessageIcon::ICON_RIGHT_EDGE:
-        ui->iconLabel->show();
-        ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_end20.png");
+        m_ui->iconLabel->show();
+        m_ui->iconLabel->setIconPath(":/res/icons/common/notifications/dir_end20.png");
         break;
     case FloatingMessageIcon::ICON_SUCCESS:
-        ui->iconLabel->show();
-        ui->iconLabel->setIconPath(":/res/icons/common/notifications/success16.png");
+        m_ui->iconLabel->show();
+        m_ui->iconLabel->setIconPath(":/res/icons/common/notifications/success16.png");
         break;
     }
 }
@@ -99,9 +99,9 @@ void FloatingMessage::mousePressEvent(QMouseEvent *event) {
 
 // "blink" the widget; show then fade out immediately
 void FloatingMessage::show() {
-    visibilityTimer.stop();
+    m_visibilityTimer.stop();
     OverlayWidget::show();
     // fade out after delay
-    visibilityTimer.setInterval(hideDelay);
-    visibilityTimer.start();
+    m_visibilityTimer.setInterval(m_hideDelay);
+    m_visibilityTimer.start();
 }

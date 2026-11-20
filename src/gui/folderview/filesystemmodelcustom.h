@@ -16,7 +16,7 @@ class FileSystemModelCustom : public QFileSystemModel {
     Qt::ItemFlags flags(const QModelIndex &index) const override;
 
   private:
-    QPixmap folderIcon;
+    QPixmap m_folderIcon;
 };
 
 #endif // FILESYSTEMMODELCUSTOM_H

@@ -44,8 +44,8 @@ class WindowShell : public QObject {
   private:
     void updateCurrentDisplay();
 
-    MW *window;
-    QTimer geometryChangeTimer;
-    int currentDisplay;
-    bool maximized;
+    MW *m_window;
+    QTimer m_geometryChangeTimer;
+    int m_currentDisplay;
+    bool m_maximized;
 };

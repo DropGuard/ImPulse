@@ -110,16 +110,16 @@ class DirectoryModel : public QObject {
     void imageUpdated(const QString &filePath);
 
   private:
-    DirectoryManager dirManager;
-    Loader loader;
-    QSet<QString> mScaledCache; // paths whose cached image is tier-1 (scaled)
-    Cache cache;
+    DirectoryManager m_dirManager;
+    Loader m_loader;
+    QSet<QString> m_scaledCache; // paths whose cached image is tier-1 (scaled)
+    Cache m_cache;
 
     // the disk mtime the last divergence announcement was made for, per path:
     // one external save surfaces as several wire/mirror cycles, and each must
     // not re-announce. Keyed by path and overwritten per divergence — bounded
     // by the listing, stale entries are harmless (mtimes only move forward).
-    QHash<QString, QDateTime> announcedDivergences;
+    QHash<QString, QDateTime> m_announcedDivergences;
 
   private slots:
     void onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled);

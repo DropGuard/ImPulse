@@ -39,8 +39,8 @@ class FloatingWidget : public QWidget {
 
   private:
     // size of whatever widget we are overlayed on
-    QSize container;
-    bool mAcceptKeyboardFocus;
+    QSize m_container;
+    bool m_acceptKeyboardFocus;
 
   private slots:
     void onContainerResized(QSize container);

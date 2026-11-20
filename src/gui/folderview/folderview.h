@@ -100,8 +100,8 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     void onTreeViewTabOut();
 
   private:
-    Ui::FolderView *ui;
-    FileSystemModelCustom *dirModel;
-    FVOptionsPopup *optionsPopup;
-    QElapsedTimer popupTimerClutch;
+    Ui::FolderView *m_ui;
+    FileSystemModelCustom *m_dirModel;
+    FVOptionsPopup *m_optionsPopup;
+    QElapsedTimer m_popupTimerClutch;
 };

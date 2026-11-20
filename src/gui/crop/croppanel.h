@@ -52,8 +52,8 @@ class CropPanel : public SidePanelWidget {
     void setFocusCropSaveBtn();
 
   private:
-    Ui::CropPanel *ui;
-    QRect cropRect;
-    CropOverlay *overlay;
-    QSize realSize;
+    Ui::CropPanel *m_ui;
+    QRect m_cropRect;
+    CropOverlay *m_overlay;
+    QSize m_realSize;
 };

@@ -14,18 +14,18 @@ class MenuItem : public QWidget {
     Q_OBJECT
   public:
     MenuItem(QWidget *parent = nullptr);
-    void setText(const QString &mTextLabel);
+    void setText(const QString &m_textLabel);
     QString text();
-    void setShortcutText(const QString &mTextLabel);
+    void setShortcutText(const QString &m_textLabel);
     QString shortcut();
     void setIconPath(const QString &path);
     void setPassthroughClicks(bool mode);
 
   protected:
-    IconButton mIconWidget;
-    QLabel mTextLabel, mShortcutLabel;
-    QHBoxLayout mLayout;
-    bool passthroughClicks = true;
+    IconButton m_iconWidget;
+    QLabel m_textLabel, m_shortcutLabel;
+    QHBoxLayout m_layout;
+    bool m_passthroughClicks = true;
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;

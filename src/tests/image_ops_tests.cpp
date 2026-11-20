@@ -312,7 +312,7 @@ TEST_F(TestImageOps, fileOperationsFailurePaths) {
 // Two ways a failed save can still cost you something, asserted separately
 // because QCOMPARE stops a slot at its first failure.
 //
-// (1) The rollback deleted mDocInfo->filePath() and moved the backup of
+// (1) The rollback deleted m_docInfo->filePath() and moved the backup of
 // destPath INTO it. For a Save As those are different files, so undoing a
 // failed write to target.xyz replaced the untouched original image with the
 // other file's contents — the assert below is on content, because a

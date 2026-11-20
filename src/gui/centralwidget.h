@@ -19,10 +19,10 @@ class CentralWidget : public QStackedWidget {
     void toggleViewMode();
 
   private:
-    DocumentWidget *documentView = nullptr;
-    FolderViewProxy *folderView = nullptr;
+    DocumentWidget *m_documentView = nullptr;
+    FolderViewProxy *m_folderView = nullptr;
     // MODE_FOLDER, not MODE_DOCUMENT: the ctor calls showDocumentView(),
     // which early-returns on MODE_DOCUMENT (the other value is MODE_FOLDERVIEW) — an uninitialized or
     // document-initialized mode would skip the first full setup (UBSan catch)
-    ViewMode mode = MODE_FOLDERVIEW;
+    ViewMode m_mode = MODE_FOLDERVIEW;
 };

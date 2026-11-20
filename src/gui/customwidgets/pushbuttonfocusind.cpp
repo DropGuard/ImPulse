@@ -1,16 +1,16 @@
 #include "pushbuttonfocusind.h"
 
 PushButtonFocusInd::PushButtonFocusInd(QWidget *parent) : QPushButton(parent) {
-    mIsHighlighted = false;
+    m_isHighlighted = false;
 }
 
 void PushButtonFocusInd::setHighlighted(bool mode) {
-    mIsHighlighted = mode;
+    m_isHighlighted = mode;
     update();
 }
 
 bool PushButtonFocusInd::isHighlighted() {
-    return mIsHighlighted;
+    return m_isHighlighted;
 }
 
 void PushButtonFocusInd::mousePressEvent(QMouseEvent *event) {
@@ -34,7 +34,7 @@ void PushButtonFocusInd::mouseReleaseEvent(QMouseEvent *event) {
 
 void PushButtonFocusInd::paintEvent(QPaintEvent *event) {
     QPushButton::paintEvent(event);
-    if(mIsHighlighted) {
+    if(m_isHighlighted) {
         QPainter painter(this);
         QPointF p1(4, 4);
         QPointF p2(13, 4);

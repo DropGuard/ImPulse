@@ -40,10 +40,10 @@ class Image {
 
   protected:
     virtual void load() = 0;
-    std::unique_ptr<DocumentInfo> mDocInfo;
+    std::unique_ptr<DocumentInfo> m_docInfo;
     // "load() has run", NOT "we got pixels": a file we try to open and fail to
     // decode still counts as attempted. The honest name matters because getImage()
     // is the only question that distinguishes the two, and Core::guiSetImage asks it.
-    bool mLoadAttempted, mEdited;
-    QString mPath;
+    bool m_loadAttempted, m_edited;
+    QString m_path;
 };

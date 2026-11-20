@@ -10,7 +10,7 @@ class ContextMenuItem : public MenuItem {
   public:
     ContextMenuItem(QWidget *parent = nullptr);
     ~ContextMenuItem() override;
-    void setAction(QString mAction);
+    void setAction(QString m_action);
     // keyboard activation: the same path a mouse press takes
     void activate() {
         onPress();
@@ -23,5 +23,5 @@ class ContextMenuItem : public MenuItem {
     void onPress() override;
 
   private:
-    QString mAction;
+    QString m_action;
 };

@@ -35,10 +35,10 @@ class PrintDialog : public QDialog {
 
   private:
     void saveSettings();
-    Ui::PrintDialog *ui;
-    std::shared_ptr<const QImage> img = nullptr;
-    QPrinter pdfPrinter, *printer = nullptr;
-    bool printPdfDefault = false;
+    Ui::PrintDialog *m_ui;
+    std::shared_ptr<const QImage> m_img = nullptr;
+    QPrinter m_pdfPrinter, *m_printer = nullptr;
+    bool m_printPdfDefault = false;
 };
 
 #endif // PRINTDIALOG_H

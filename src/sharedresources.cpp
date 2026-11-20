@@ -14,10 +14,10 @@ QPixmap *SharedResources::getPixmap(ShrIcon icon, qreal dpr) {
     QString path;
     if(icon == ShrIcon::SHR_ICON_ERROR) {
         path = ":/res/icons/common/other/loading-error72.png";
-        pixmap = mLoadingErrorIcon72;
+        pixmap = m_loadingErrorIcon72;
     } else {
         path = ":/res/icons/common/other/loading72.png";
-        pixmap = mLoadingIcon72;
+        pixmap = m_loadingIcon72;
     }
     if(pixmap)
         return pixmap;
@@ -35,9 +35,9 @@ QPixmap *SharedResources::getPixmap(ShrIcon icon, qreal dpr) {
         pixmap = new QPixmap(path);
     }
     if(icon == ShrIcon::SHR_ICON_ERROR)
-        mLoadingErrorIcon72 = pixmap;
+        m_loadingErrorIcon72 = pixmap;
     else
-        mLoadingIcon72 = pixmap;
+        m_loadingIcon72 = pixmap;
     return pixmap;
 }
 

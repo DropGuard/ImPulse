@@ -1,36 +1,36 @@
 #include "controlsoverlay.h"
 
 ControlsOverlay::ControlsOverlay(FloatingWidgetContainer *parent) : FloatingWidget(parent) {
-    folderViewButton = new ActionButton("folderView", ":/res/icons/common/buttons/panel/folderview20.png", 30);
-    folderViewButton->setAccessibleName("ButtonSmall");
-    settingsButton = new ActionButton("openSettings", ":/res/icons/common/buttons/panel/settings20.png", 30);
-    settingsButton->setAccessibleName("ButtonSmall");
-    closeButton = new ActionButton("exit", ":/res/icons/common/buttons/panel/close16.png", 30);
-    closeButton->setAccessibleName("ButtonSmall");
+    m_folderViewButton = new ActionButton("folderView", ":/res/icons/common/buttons/panel/folderview20.png", 30);
+    m_folderViewButton->setAccessibleName("ButtonSmall");
+    m_settingsButton = new ActionButton("openSettings", ":/res/icons/common/buttons/panel/settings20.png", 30);
+    m_settingsButton->setAccessibleName("ButtonSmall");
+    m_closeButton = new ActionButton("exit", ":/res/icons/common/buttons/panel/close16.png", 30);
+    m_closeButton->setAccessibleName("ButtonSmall");
 
     QWidget *horizontalLineWidget = new QWidget;
     horizontalLineWidget->setFixedSize(5, 22);
     horizontalLineWidget->setStyleSheet(QString("background-color: #707070; margin-left: 2px; margin-right: 2px"));
 
-    layout.setContentsMargins(0, 0, 0, 0);
+    m_layout.setContentsMargins(0, 0, 0, 0);
     this->setContentsMargins(0, 0, 0, 0);
-    layout.setSpacing(0);
-    layout.addWidget(folderViewButton);
-    layout.addWidget(horizontalLineWidget);
-    layout.addWidget(settingsButton);
-    layout.addWidget(closeButton);
-    setLayout(&layout);
+    m_layout.setSpacing(0);
+    m_layout.addWidget(m_folderViewButton);
+    m_layout.addWidget(horizontalLineWidget);
+    m_layout.addWidget(m_settingsButton);
+    m_layout.addWidget(m_closeButton);
+    setLayout(&m_layout);
     fitToContents();
 
     setMouseTracking(true);
 
-    fadeEffect = new QGraphicsOpacityEffect(this);
-    this->setGraphicsEffect(fadeEffect);
-    fadeAnimation = new QPropertyAnimation(fadeEffect, "opacity", this);
-    fadeAnimation->setDuration(230);
-    fadeAnimation->setStartValue(1.0f);
-    fadeAnimation->setEndValue(0);
-    fadeAnimation->setEasingCurve(QEasingCurve::OutQuart);
+    m_fadeEffect = new QGraphicsOpacityEffect(this);
+    this->setGraphicsEffect(m_fadeEffect);
+    m_fadeAnimation = new QPropertyAnimation(m_fadeEffect, "opacity", this);
+    m_fadeAnimation->setDuration(230);
+    m_fadeAnimation->setStartValue(1.0f);
+    m_fadeAnimation->setEndValue(0);
+    m_fadeAnimation->setEasingCurve(QEasingCurve::OutQuart);
 
     if(parent)
         setContainerSize(parent->size());
@@ -38,15 +38,15 @@ ControlsOverlay::ControlsOverlay(FloatingWidgetContainer *parent) : FloatingWidg
 }
 
 void ControlsOverlay::show() {
-    fadeEffect->setOpacity(0.0);
+    m_fadeEffect->setOpacity(0.0);
     FloatingWidget::show();
 }
 
 QSize ControlsOverlay::contentsSize() {
     QSize newSize(0, 0);
-    for(int i = 0; i < layout.count(); i++) {
-        newSize.setWidth(newSize.width() + layout.itemAt(i)->widget()->width());
-        newSize.setHeight(layout.itemAt(i)->widget()->height());
+    for(int i = 0; i < m_layout.count(); i++) {
+        newSize.setWidth(newSize.width() + m_layout.itemAt(i)->widget()->width());
+        newSize.setHeight(m_layout.itemAt(i)->widget()->height());
     }
     return newSize;
 }
@@ -62,11 +62,11 @@ void ControlsOverlay::recalculateGeometry() {
 
 void ControlsOverlay::enterEvent(QEnterEvent *event) {
     Q_UNUSED(event)
-    fadeAnimation->stop();
-    fadeEffect->setOpacity(1.0);
+    m_fadeAnimation->stop();
+    m_fadeEffect->setOpacity(1.0);
 }
 
 void ControlsOverlay::leaveEvent(QEvent *event) {
     Q_UNUSED(event)
-    fadeAnimation->start();
+    m_fadeAnimation->start();
 }

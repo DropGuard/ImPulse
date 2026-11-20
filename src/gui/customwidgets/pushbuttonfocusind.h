@@ -17,7 +17,7 @@ class PushButtonFocusInd : public QPushButton {
 
   protected:
     void mousePressEvent(QMouseEvent *event) override;
-    bool mIsHighlighted;
+    bool m_isHighlighted;
     void paintEvent(QPaintEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
 };

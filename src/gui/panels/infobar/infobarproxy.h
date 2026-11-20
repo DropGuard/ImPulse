@@ -24,7 +24,7 @@ class InfoBarProxy : public QWidget {
     void paintEvent(QPaintEvent *event) override;
 
   private:
-    InfoBarStateBuffer stateBuf;
-    QPointer<InfoBar> infoBar;
-    QVBoxLayout layout;
+    InfoBarStateBuffer m_stateBuf;
+    QPointer<InfoBar> m_infoBar;
+    QVBoxLayout m_layout;
 };

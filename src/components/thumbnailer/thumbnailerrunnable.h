@@ -21,13 +21,13 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     // What this job was asked for. A drained job is destroyed without ever
     // reporting, so the owner has to be able to ask it what to forget.
     const QString &requestedPath() const {
-        return path;
+        return m_path;
     }
     int requestedSize() const {
-        return size;
+        return m_size;
     }
     bool requestedCrop() const {
-        return crop;
+        return m_crop;
     }
     // Test-only observation: how many runnables have been constructed. The
     // dedup contract is "one job per request triple", and the only honest way
@@ -74,13 +74,13 @@ class ThumbnailerRunnable : public QObject, public PoolJob {
     // previews (`squareThumbnails`); the folder grid never asks.
     // This is the only place a crop happens.
     static std::unique_ptr<QImage> fitForDisplay(const QImage &source, int size, bool crop);
-    QString path;
-    int size;
-    bool crop, force;
+    QString m_path;
+    int m_size;
+    bool m_crop, m_force;
     // the environment, carried from the dispatch site: the pool thread never
     // reads the settings global
-    LoadPolicy policy;
-    ThumbnailCache *cache = nullptr;
+    LoadPolicy m_policy;
+    ThumbnailCache *m_cache = nullptr;
 
   signals:
     void taskEnd(std::shared_ptr<Thumbnail>, QString, bool crop);

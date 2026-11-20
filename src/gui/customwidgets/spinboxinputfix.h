@@ -13,8 +13,8 @@ class SpinBoxInputFix : public QSpinBox {
     SpinBoxInputFix(QWidget *parent = nullptr);
 
   private:
-    QStringList allowedKeys;
-    QSet<Qt::Key> allowedLogicalKeys;
+    QStringList m_allowedKeys;
+    QSet<Qt::Key> m_allowedLogicalKeys;
 
   protected:
     bool event(QEvent *event) override;

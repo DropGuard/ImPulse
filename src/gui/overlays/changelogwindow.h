@@ -32,7 +32,7 @@ class ChangelogWindow : public OverlayWidget {
     void keyPressEvent(QKeyEvent *) override;
 
   private:
-    Ui::ChangelogWindow *ui;
+    Ui::ChangelogWindow *m_ui;
 
   private slots:
     void hideAndShutUp();

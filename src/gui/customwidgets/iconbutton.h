@@ -20,6 +20,6 @@ class IconButton : public IconWidget {
   protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
-    bool mCheckable, mChecked, mPressed;
+    bool m_checkable, m_checked, m_pressed;
     void mouseMoveEvent(QMouseEvent *event) override;
 };

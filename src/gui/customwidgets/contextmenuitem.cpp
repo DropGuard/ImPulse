@@ -2,19 +2,19 @@
 
 #include <utility>
 
-ContextMenuItem::ContextMenuItem(QWidget *parent) : MenuItem(parent), mAction("") {
+ContextMenuItem::ContextMenuItem(QWidget *parent) : MenuItem(parent), m_action("") {
 }
 
 ContextMenuItem::~ContextMenuItem() {
 }
 
 void ContextMenuItem::setAction(QString text) {
-    this->mAction = std::move(text);
-    setShortcutText(actionManager->shortcutForAction(mAction));
+    this->m_action = std::move(text);
+    setShortcutText(actionManager->shortcutForAction(m_action));
 }
 
 void ContextMenuItem::onPress() {
     emit pressed();
-    if(!mAction.isEmpty())
-        actionManager->invokeAction(mAction);
+    if(!m_action.isEmpty())
+        actionManager->invokeAction(m_action);
 }

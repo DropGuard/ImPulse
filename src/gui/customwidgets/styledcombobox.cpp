@@ -2,31 +2,31 @@
 
 #include "components/actionmanager/actionmanager.h"
 
-StyledComboBox::StyledComboBox(QWidget *parent) : QComboBox(parent), hiResPixmap(false) {
-    dpr = this->devicePixelRatioF();
+StyledComboBox::StyledComboBox(QWidget *parent) : QComboBox(parent), m_hiResPixmap(false) {
+    m_dpr = this->devicePixelRatioF();
     // `settings` outlives every widget, so the connection has to be bound to
     // this widget: the four-argument form disconnects it when `this` dies.
     connect(settings, &Settings::settingsChanged, this, [this]() {
-        ImageLib::recolor(this->downArrow, settings->colorScheme().icons);
+        ImageLib::recolor(this->m_downArrow, settings->colorScheme().icons);
     });
 }
 
 void StyledComboBox::setIconPath(QString path) {
-    if(dpr >= (1.0 + 0.001)) {
+    if(m_dpr >= (1.0 + 0.001)) {
         path.replace(".", "@2x.");
-        hiResPixmap = true;
-        downArrow.load(path);
-        if(dpr >= (2.0 - 0.001))
-            pixmapDrawScale = dpr;
+        m_hiResPixmap = true;
+        m_downArrow.load(path);
+        if(m_dpr >= (2.0 - 0.001))
+            m_pixmapDrawScale = m_dpr;
         else
-            pixmapDrawScale = 2.0;
-        downArrow.setDevicePixelRatio(pixmapDrawScale);
+            m_pixmapDrawScale = 2.0;
+        m_downArrow.setDevicePixelRatio(m_pixmapDrawScale);
     } else {
-        hiResPixmap = false;
-        downArrow.load(path);
-        pixmapDrawScale = dpr;
+        m_hiResPixmap = false;
+        m_downArrow.load(path);
+        m_pixmapDrawScale = m_dpr;
     }
-    ImageLib::recolor(downArrow, settings->colorScheme().icons);
+    ImageLib::recolor(m_downArrow, settings->colorScheme().icons);
     update();
 }
 
@@ -35,13 +35,13 @@ void StyledComboBox::paintEvent(QPaintEvent *e) {
     QPainter p(this);
     QPointF pos(0, 0);
 
-    if(hiResPixmap) {
-        pos = QPointF(width() - 8 - downArrow.width() / pixmapDrawScale,
-                      height() / 2 - downArrow.height() / (2 * pixmapDrawScale));
+    if(m_hiResPixmap) {
+        pos = QPointF(width() - 8 - m_downArrow.width() / m_pixmapDrawScale,
+                      height() / 2 - m_downArrow.height() / (2 * m_pixmapDrawScale));
     } else {
-        pos = QPointF(width() - downArrow.width() - 8, (height() - downArrow.height()) / 2);
+        pos = QPointF(width() - m_downArrow.width() - 8, (height() - m_downArrow.height()) / 2);
     }
-    p.drawPixmap(pos, downArrow);
+    p.drawPixmap(pos, m_downArrow);
 }
 
 // The input-routing combo gives up every key with ignore() and lets the

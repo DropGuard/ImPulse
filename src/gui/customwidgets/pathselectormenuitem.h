@@ -21,6 +21,6 @@ class PathSelectorMenuItem : public MenuItem {
     void directorySelected(QString);
 
   private:
-    QString mDirectory;
-    QString mPath;
+    QString m_directory;
+    QString m_path;
 };

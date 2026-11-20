@@ -34,6 +34,6 @@ class DialogHost : public QObject {
     void resizeRequested(QSize);
 
   private:
-    MW *window;
-    DocumentWidget *docWidget;
+    MW *m_window;
+    DocumentWidget *m_docWidget;
 };

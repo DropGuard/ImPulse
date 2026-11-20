@@ -9,12 +9,12 @@ TreeViewCustom::TreeViewCustom(QWidget *parent) : QTreeView(parent) {
 
     // proxy scrollbar
     this->verticalScrollBar()->setStyleSheet("max-width: 0px;");
-    overlayScrollbar.setParent(this);
-    overlayScrollbar.setStyleSheet("background-color: transparent;");
-    connect(verticalScrollBar(), &QScrollBar::rangeChanged, &overlayScrollbar, &QScrollBar::setRange);
-    connect(verticalScrollBar(), &QScrollBar::valueChanged, &overlayScrollbar, &QScrollBar::setValue);
-    connect(&overlayScrollbar, &QScrollBar::valueChanged, this, [this]() {
-        this->verticalScrollBar()->setValue(overlayScrollbar.value());
+    m_overlayScrollbar.setParent(this);
+    m_overlayScrollbar.setStyleSheet("background-color: transparent;");
+    connect(verticalScrollBar(), &QScrollBar::rangeChanged, &m_overlayScrollbar, &QScrollBar::setRange);
+    connect(verticalScrollBar(), &QScrollBar::valueChanged, &m_overlayScrollbar, &QScrollBar::setValue);
+    connect(&m_overlayScrollbar, &QScrollBar::valueChanged, this, [this]() {
+        this->verticalScrollBar()->setValue(m_overlayScrollbar.value());
     });
 }
 
@@ -65,12 +65,12 @@ void TreeViewCustom::updateScrollbarStyle() {
         handle = settings->colorScheme().scrollbar.name();
     else
         handle = settings->colorScheme().folderview_hc.name();
-    overlayScrollbar.setGeometry(width() - SCROLLBAR_WIDTH, 0, SCROLLBAR_WIDTH, height());
-    overlayScrollbar.setStyleSheet(
+    m_overlayScrollbar.setGeometry(width() - m_scrollbarWidth, 0, m_scrollbarWidth, height());
+    m_overlayScrollbar.setStyleSheet(
         "QScrollBar { background-color: transparent; } QScrollBar::handle:vertical { background-color: " + handle +
         " } QScrollBar::handle:vertical:hover { background-color: " + hover + " }");
 
-    overlayScrollbar.setVisible((this->verticalScrollBar()->maximum()));
+    m_overlayScrollbar.setVisible((this->verticalScrollBar()->maximum()));
 }
 
 // The places tree owns its keyboard: today's handler delegates everything to

@@ -19,7 +19,7 @@ class ImageInfoOverlayProxy {
     bool isHidden();
 
   private:
-    FloatingWidgetContainer *container;
-    QPointer<ImageInfoOverlay> overlay;
-    ImageInfoOverlayStateBuffer stateBuf;
+    FloatingWidgetContainer *m_container;
+    QPointer<ImageInfoOverlay> m_overlay;
+    ImageInfoOverlayStateBuffer m_stateBuf;
 };

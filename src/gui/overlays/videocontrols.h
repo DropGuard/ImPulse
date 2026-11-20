@@ -22,7 +22,7 @@ class VideoControls : public OverlayWidget {
 
     // observability for tests: the mirror of the last applied position
     int playbackPosition() const {
-        return lastPosition;
+        return m_lastPosition;
     }
 
   public slots:
@@ -41,7 +41,7 @@ class VideoControls : public OverlayWidget {
     void readSettings();
 
   private:
-    Ui::VideoControls *ui;
-    int lastPosition;
-    PlaybackMode mode;
+    Ui::VideoControls *m_ui;
+    int m_lastPosition;
+    PlaybackMode m_mode;
 };

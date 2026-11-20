@@ -32,7 +32,7 @@ class ShortcutCreatorDialog : public QDialog {
     void onShortcutEdited();
 
   private:
-    Ui::ShortcutCreatorDialog *ui;
-    QList<QString> actionList, scriptList;
-    QString lastCategory; // the chooser's grouping cursor
+    Ui::ShortcutCreatorDialog *m_ui;
+    QList<QString> m_actionList, m_scriptList;
+    QString m_lastCategory; // the chooser's grouping cursor
 };

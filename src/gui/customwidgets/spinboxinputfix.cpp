@@ -19,8 +19,8 @@ SpinBoxInputFix::SpinBoxInputFix(QWidget *parent) : QSpinBox(parent) {
         {Qt::Key_Home, "Home"},   {Qt::Key_End, "End"},     {Qt::Key_Delete, "Del"},  {Qt::Key_Backspace, "Backspace"},
         {Qt::Key_Enter, "Enter"}, {Qt::Key_Return, "Enter"}};
     for(const auto &[key, name] : ownedKeys) {
-        allowedLogicalKeys.insert(key);
-        allowedKeys << QString::fromLatin1(name);
+        m_allowedLogicalKeys.insert(key);
+        m_allowedKeys << QString::fromLatin1(name);
     }
 }
 
@@ -38,7 +38,7 @@ bool SpinBoxInputFix::event(QEvent *event) {
         // keys to a spin box.
         auto *ke = static_cast<QKeyEvent *>(event);
         if((ke->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier &&
-           allowedLogicalKeys.contains(static_cast<Qt::Key>(ke->key())))
+           m_allowedLogicalKeys.contains(static_cast<Qt::Key>(ke->key())))
             event->accept();
     }
     return QSpinBox::event(event);
@@ -47,7 +47,7 @@ bool SpinBoxInputFix::event(QEvent *event) {
 void SpinBoxInputFix::keyPressEvent(QKeyEvent *event) {
     quint32 nativeScanCode = event->nativeScanCode();
     QString key = actionManager->keyForNativeScancode(nativeScanCode);
-    if(allowedKeys.contains(key)) {
+    if(m_allowedKeys.contains(key)) {
         QSpinBox::keyPressEvent(event);
     } else {
         event->ignore();

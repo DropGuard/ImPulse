@@ -232,13 +232,13 @@ int ThumbnailCache::bucketForRequest(int requestedPixels, bool crop, const QSize
     return bucketSizes[bucketCount - 1];
 }
 
-ThumbnailCache::ThumbnailCache(const QString &_rootPath) : rootPath(_rootPath) {
+ThumbnailCache::ThumbnailCache(const QString &_rootPath) : m_rootPath(_rootPath) {
 }
 
 QString ThumbnailCache::thumbnailPath(const QString &sourcePath, int bucket) const {
     const QByteArray digest = QCryptographicHash::hash(uriFor(sourcePath).toUtf8(), QCryptographicHash::Md5).toHex();
-    return QDir(rootPath).filePath(bucketName(bucket) + QLatin1Char('/') + QString::fromLatin1(digest) +
-                                   QStringLiteral(".png"));
+    return QDir(m_rootPath)
+        .filePath(bucketName(bucket) + QLatin1Char('/') + QString::fromLatin1(digest) + QStringLiteral(".png"));
 }
 
 bool ThumbnailCache::exists(const QString &sourcePath, int bucket) const {
@@ -385,7 +385,7 @@ ThumbnailCache::PurgeReport ThumbnailCache::purgeOlderThan(int days, qint64 byte
     qint64 totalBytes = 0;
 
     for(int i = 0; i < bucketCount; ++i) {
-        const QDir dir(QDir(rootPath).filePath(bucketName(bucketSizes[i])));
+        const QDir dir(QDir(m_rootPath).filePath(bucketName(bucketSizes[i])));
         const QStringList entries = dir.entryList(QStringList() << QStringLiteral("*.png"), QDir::Files);
         for(const QString &name : entries) {
             const QString path = dir.filePath(name);

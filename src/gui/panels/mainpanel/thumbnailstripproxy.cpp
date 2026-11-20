@@ -1,141 +1,141 @@
 #include "thumbnailstripproxy.h"
 
 ThumbnailStripProxy::ThumbnailStripProxy(QWidget *parent) : QWidget(parent) {
-    layout.setContentsMargins(0, 0, 0, 0);
+    m_layout.setContentsMargins(0, 0, 0, 0);
 }
 
 void ThumbnailStripProxy::init() {
-    if(thumbnailStrip)
+    if(m_thumbnailStrip)
         return;
     qApp->processEvents(); // chew through events in case we have something that alters stateBuf in queue
-    QMutexLocker ml(&m);
-    thumbnailStrip = new ThumbnailStrip();
-    thumbnailStrip->setParent(this);
+    QMutexLocker ml(&m_m);
+    m_thumbnailStrip = new ThumbnailStrip();
+    m_thumbnailStrip->setParent(this);
     ml.unlock();
-    layout.addWidget(thumbnailStrip);
-    this->setFocusProxy(thumbnailStrip);
-    this->setLayout(&layout);
+    m_layout.addWidget(m_thumbnailStrip);
+    this->setFocusProxy(m_thumbnailStrip);
+    this->setLayout(&m_layout);
 
-    connect(thumbnailStrip, &ThumbnailStrip::itemActivated, this, &ThumbnailStripProxy::itemActivated);
-    connect(thumbnailStrip, &ThumbnailStrip::thumbnailsRequested, this, &ThumbnailStripProxy::thumbnailsRequested);
+    connect(m_thumbnailStrip, &ThumbnailStrip::itemActivated, this, &ThumbnailStripProxy::itemActivated);
+    connect(m_thumbnailStrip, &ThumbnailStrip::thumbnailsRequested, this, &ThumbnailStripProxy::thumbnailsRequested);
 
-    thumbnailStrip->show();
+    m_thumbnailStrip->show();
 
     // apply buffer
-    thumbnailStrip->populate(stateBuf.itemCount);
-    thumbnailStrip->select(stateBuf.selection);
+    m_thumbnailStrip->populate(m_stateBuf.itemCount);
+    m_thumbnailStrip->select(m_stateBuf.selection);
     // wait till layout stuff happens
     // before calling focusOn()
     qApp->processEvents();
-    thumbnailStrip->focusOnSelection();
+    m_thumbnailStrip->focusOnSelection();
 }
 
 bool ThumbnailStripProxy::isInitialized() {
-    return (thumbnailStrip != nullptr);
+    return (m_thumbnailStrip != nullptr);
 }
 
 void ThumbnailStripProxy::populate(int count) {
-    QMutexLocker ml(&m);
-    stateBuf.itemCount = count;
-    if(thumbnailStrip) {
+    QMutexLocker ml(&m_m);
+    m_stateBuf.itemCount = count;
+    if(m_thumbnailStrip) {
         ml.unlock();
-        thumbnailStrip->populate(stateBuf.itemCount);
+        m_thumbnailStrip->populate(m_stateBuf.itemCount);
     } else {
-        stateBuf.selection.clear();
+        m_stateBuf.selection.clear();
     }
 }
 
 void ThumbnailStripProxy::setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) {
-    if(thumbnailStrip) {
-        thumbnailStrip->setThumbnail(pos, thumb);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->setThumbnail(pos, thumb);
     }
 }
 
 void ThumbnailStripProxy::select(QList<int> indices) {
-    if(thumbnailStrip) {
-        thumbnailStrip->select(indices);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->select(indices);
     } else {
-        stateBuf.selection = indices;
+        m_stateBuf.selection = indices;
     }
 }
 
 void ThumbnailStripProxy::select(int index) {
-    if(thumbnailStrip) {
-        thumbnailStrip->select(index);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->select(index);
     } else {
-        stateBuf.selection.clear();
-        stateBuf.selection << index;
+        m_stateBuf.selection.clear();
+        m_stateBuf.selection << index;
     }
 }
 
 QList<int> ThumbnailStripProxy::selection() {
-    if(thumbnailStrip) {
-        return thumbnailStrip->selection();
+    if(m_thumbnailStrip) {
+        return m_thumbnailStrip->selection();
     } else {
-        return stateBuf.selection;
+        return m_stateBuf.selection;
     }
 }
 
 void ThumbnailStripProxy::focusOn(int index) {
-    if(thumbnailStrip) {
-        thumbnailStrip->focusOn(index);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->focusOn(index);
     }
 }
 
 void ThumbnailStripProxy::focusOnSelection() {
-    if(thumbnailStrip) {
-        thumbnailStrip->focusOnSelection();
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->focusOnSelection();
     }
 }
 
 void ThumbnailStripProxy::insertItem(int index) {
-    if(thumbnailStrip) {
-        thumbnailStrip->insertItem(index);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->insertItem(index);
     } else {
-        stateBuf.itemCount++;
+        m_stateBuf.itemCount++;
     }
 }
 
 void ThumbnailStripProxy::removeItem(int index) {
-    if(thumbnailStrip) {
-        thumbnailStrip->removeItem(index);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->removeItem(index);
     } else {
-        stateBuf.itemCount--;
-        stateBuf.selection.removeAll(index);
-        for(int i = 0; i < stateBuf.selection.count(); i++) {
-            if(stateBuf.selection[i] > index)
-                stateBuf.selection[i]--;
+        m_stateBuf.itemCount--;
+        m_stateBuf.selection.removeAll(index);
+        for(int i = 0; i < m_stateBuf.selection.count(); i++) {
+            if(m_stateBuf.selection[i] > index)
+                m_stateBuf.selection[i]--;
         }
-        if(!stateBuf.selection.count())
-            stateBuf.selection << ((index >= stateBuf.itemCount) ? stateBuf.itemCount - 1 : index);
+        if(!m_stateBuf.selection.count())
+            m_stateBuf.selection << ((index >= m_stateBuf.itemCount) ? m_stateBuf.itemCount - 1 : index);
     }
 }
 
 void ThumbnailStripProxy::reloadItem(int index) {
-    if(thumbnailStrip)
-        thumbnailStrip->reloadItem(index);
+    if(m_thumbnailStrip)
+        m_thumbnailStrip->reloadItem(index);
 }
 
 // The buffered selection is the only row state a viewless proxy holds, and
 // init() replays it — so the row move has to reach it here too.
 void ThumbnailStripProxy::renameItem(int oldIndex, int newIndex, const QString &name) {
-    if(thumbnailStrip) {
-        thumbnailStrip->renameItem(oldIndex, newIndex, name);
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->renameItem(oldIndex, newIndex, name);
     } else if(oldIndex != newIndex) {
-        for(int i = 0; i < stateBuf.selection.count(); i++) {
-            if(stateBuf.selection[i] == oldIndex)
-                stateBuf.selection[i] = newIndex;
-            else if(oldIndex < newIndex && stateBuf.selection[i] > oldIndex && stateBuf.selection[i] <= newIndex)
-                stateBuf.selection[i]--;
-            else if(newIndex < oldIndex && stateBuf.selection[i] >= newIndex && stateBuf.selection[i] < oldIndex)
-                stateBuf.selection[i]++;
+        for(int i = 0; i < m_stateBuf.selection.count(); i++) {
+            if(m_stateBuf.selection[i] == oldIndex)
+                m_stateBuf.selection[i] = newIndex;
+            else if(oldIndex < newIndex && m_stateBuf.selection[i] > oldIndex && m_stateBuf.selection[i] <= newIndex)
+                m_stateBuf.selection[i]--;
+            else if(newIndex < oldIndex && m_stateBuf.selection[i] >= newIndex && m_stateBuf.selection[i] < oldIndex)
+                m_stateBuf.selection[i]++;
         }
     }
 }
 
 void ThumbnailStripProxy::setDragHover(int index) {
-    if(thumbnailStrip)
-        thumbnailStrip->setDragHover(index);
+    if(m_thumbnailStrip)
+        m_thumbnailStrip->setDragHover(index);
 }
 
 void ThumbnailStripProxy::setDirectoryPath(QString path) {
@@ -143,20 +143,20 @@ void ThumbnailStripProxy::setDirectoryPath(QString path) {
 }
 
 void ThumbnailStripProxy::addItem() {
-    if(thumbnailStrip) {
-        thumbnailStrip->addItem();
+    if(m_thumbnailStrip) {
+        m_thumbnailStrip->addItem();
     } else {
-        stateBuf.itemCount++;
+        m_stateBuf.itemCount++;
     }
 }
 
 QSize ThumbnailStripProxy::itemSize() {
-    return thumbnailStrip->itemSize();
+    return m_thumbnailStrip->itemSize();
 }
 
 void ThumbnailStripProxy::readSettings() {
-    if(thumbnailStrip)
-        thumbnailStrip->readSettings();
+    if(m_thumbnailStrip)
+        m_thumbnailStrip->readSettings();
 }
 
 void ThumbnailStripProxy::showEvent(QShowEvent *event) {

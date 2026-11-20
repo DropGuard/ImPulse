@@ -25,7 +25,7 @@ class FileReplaceDialog : public QDialog {
     void onCancelClicked();
 
   private:
-    Ui::FileReplaceDialog *ui;
-    bool multi;
-    DialogResult result;
+    Ui::FileReplaceDialog *m_ui;
+    bool m_multi;
+    DialogResult m_result;
 };

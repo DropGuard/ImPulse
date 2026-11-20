@@ -39,7 +39,7 @@ class FVOptionsPopup : public QWidget {
     void selectFoldersView();
 
   private:
-    Ui::FVOptionsPopup *ui;
+    Ui::FVOptionsPopup *m_ui;
     void setViewMode(FolderViewMode mode);
     void setSimpleView();
     void setExtendedView();

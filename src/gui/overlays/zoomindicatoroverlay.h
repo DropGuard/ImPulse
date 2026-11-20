@@ -20,9 +20,9 @@ class ZoomIndicatorOverlay : public OverlayWidget {
     void recalculateGeometry() override;
 
   private:
-    QFontMetrics fm;
-    QHBoxLayout layout;
-    QLabel label;
-    QTimer visibilityTimer;
-    int hideDelay;
+    QFontMetrics m_fm;
+    QHBoxLayout m_layout;
+    QLabel m_label;
+    QTimer m_visibilityTimer;
+    int m_hideDelay;
 };

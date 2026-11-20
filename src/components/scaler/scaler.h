@@ -27,11 +27,11 @@ class Scaler : public QObject {
     void slotForwardScaledResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
   private:
-    WorkerPool &pool;
-    bool buffered, running;
-    ScalerRequest bufferedRequest, startedRequest;
+    WorkerPool &m_pool;
+    bool m_buffered, m_running;
+    ScalerRequest m_bufferedRequest, m_startedRequest;
 
-    Cache *cache;
+    Cache *m_cache;
 
     // hands the request to the pool and records it as in flight — on this
     // thread, at the moment of hand-off; the pool telling us back would be

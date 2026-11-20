@@ -28,5 +28,5 @@ class SaveConfirmOverlay : public OverlayWidget {
     void readSettings();
 
   private:
-    Ui::SaveConfirmOverlay *ui;
+    Ui::SaveConfirmOverlay *m_ui;
 };

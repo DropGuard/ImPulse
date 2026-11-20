@@ -30,8 +30,8 @@ class Thumbnailer : public QObject {
     void scheduleSweep(int idleDays, qint64 byteCap, std::atomic<Qt::HANDLE> *ranOn = nullptr);
 
   private:
-    WorkerPool &pool;
-    ThumbnailCache *cache;
+    WorkerPool &m_pool;
+    ThumbnailCache *m_cache;
     void startThumbnailerThread(QString filePath, int size, bool crop, bool force);
 
   private slots:

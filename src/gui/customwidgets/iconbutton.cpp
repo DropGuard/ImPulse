@@ -1,22 +1,22 @@
 #include "iconbutton.h"
 
-IconButton::IconButton(QWidget *parent) : IconWidget(parent), mCheckable(false), mChecked(false), mPressed(false) {
+IconButton::IconButton(QWidget *parent) : IconWidget(parent), m_checkable(false), m_checked(false), m_pressed(false) {
 }
 
 void IconButton::setCheckable(bool mode) {
-    mCheckable = mode;
+    m_checkable = mode;
 }
 
 bool IconButton::isChecked() {
-    return mChecked;
+    return m_checked;
 }
 
 void IconButton::setChecked(bool mode) {
-    if(mCheckable && mode != mChecked) {
-        mPressed = false;
+    if(m_checkable && mode != m_checked) {
+        m_pressed = false;
         setProperty("pressed", false);
-        mChecked = mode;
-        setProperty("checked", mChecked);
+        m_checked = mode;
+        setProperty("checked", m_checked);
         style()->unpolish(this);
         style()->polish(this);
     }
@@ -24,11 +24,11 @@ void IconButton::setChecked(bool mode) {
 
 void IconButton::mousePressEvent(QMouseEvent *event) {
     Q_UNUSED(event)
-    if(mCheckable) {
+    if(m_checkable) {
         setChecked(!this->property("checked").toBool());
-        emit toggled(mChecked);
+        emit toggled(m_checked);
     } else {
-        mPressed = true;
+        m_pressed = true;
         setProperty("pressed", true);
     }
     style()->unpolish(this);
@@ -37,11 +37,11 @@ void IconButton::mousePressEvent(QMouseEvent *event) {
 
 void IconButton::mouseReleaseEvent(QMouseEvent *event) {
     Q_UNUSED(event)
-    mPressed = false;
-    if(rect().contains(event->pos()) && !mCheckable) {
+    m_pressed = false;
+    if(rect().contains(event->pos()) && !m_checkable) {
         emit clicked();
     }
-    if(!mChecked) {
+    if(!m_checked) {
         setProperty("pressed", false);
         style()->unpolish(this);
         style()->polish(this);
@@ -49,7 +49,7 @@ void IconButton::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void IconButton::mouseMoveEvent(QMouseEvent *event) {
-    if(mChecked || !mPressed)
+    if(m_checked || !m_pressed)
         return;
     if(rect().contains(event->pos())) {
         if(!property("pressed").toBool()) {
