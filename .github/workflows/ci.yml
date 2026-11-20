@@ -34,6 +34,17 @@ jobs:
           /opt/aqt-venv/bin/aqt install-qt linux desktop 6.10.2 linux_gcc_64 -O /opt/qt
       - name: system deps
         run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
+      # clang-format from LLVM's repo, not 24.04's 18: the style gate compares
+      # its output against a tree formatted by 21, and the two disagree on
+      # chained << alignment (measured: thumbnailerrunnable.cpp). A format gate
+      # is only meaningful when both sides run the same formatter — otherwise
+      # it reports the version skew as if it were the tree's debt.
+      - name: clang-format 21 (the version the tree is formatted with)
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list >/dev/null
+          sudo apt-get update && sudo apt-get install -y clang-format-21
+          sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
       - name: configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
       - name: build (warnings are contractual — the fatal families are -Werror)
@@ -58,6 +69,13 @@ jobs:
           /opt/aqt-venv/bin/aqt install-qt linux desktop 6.10.2 linux_gcc_64 -O /opt/qt
       - name: system deps
         run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
+      # ctest here runs FORMAT_RULES too; see the build-test job for why 21.
+      - name: clang-format 21 (the version the tree is formatted with)
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list >/dev/null
+          sudo apt-get update && sudo apt-get install -y clang-format-21
+          sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
       - name: sanitizer tree (address,undefined — the ASan gate the local tree runs)
         run: |
           cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=address,undefined -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
