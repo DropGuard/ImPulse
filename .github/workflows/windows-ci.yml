@@ -48,6 +48,9 @@ jobs:
           msystem: CLANG64
           update: true
           release: false
+          # the pacman package cache: 230s of the job was downloading and
+          # unpacking the same packages on every run
+          cache: true
           install: >-
             git
             mingw-w64-clang-x86_64-toolchain
@@ -67,10 +70,22 @@ jobs:
             mingw-w64-clang-x86_64-cppcheck
             mingw-w64-clang-x86_64-clang-tools-extra
             mingw-w64-clang-x86_64-clazy
+            mingw-w64-clang-x86_64-ccache
+      # ccache for the compile itself; the setup-msys2 cache above covers only
+      # the pacman packages. The path is msys2's own home, not the Windows one.
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: C:\msys64\home\runneradmin\.cache\ccache
+          key: ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-
       - name: configure
         run: |
+          ccache --set-config=max_size=2G
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON \
-            -DEXIV2=ON -DVIDEO_SUPPORT=ON -DOPENCV_SUPPORT=ON
+            -DEXIV2=ON -DVIDEO_SUPPORT=ON -DOPENCV_SUPPORT=ON \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j"$(nproc)"
       # Everything, including the three gates. This environment carries

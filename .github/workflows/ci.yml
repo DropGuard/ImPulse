@@ -43,16 +43,30 @@ jobs:
             ninja-build cmake file python3-venv \
             qt6-base-dev qt6-tools-dev libqt6svg6-dev libgl1-mesa-dev libxkbcommon-dev \
             libopencv-dev libexiv2-dev libmpv-dev libgtest-dev \
-            clang-format-21 clang-tidy-21 clazy cppcheck
+            clang-format-21 clang-tidy-21 clazy cppcheck ccache
           # the tree calls them by their unversioned names
           sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
           sudo ln -sf /usr/bin/clang-tidy-21 /usr/local/bin/clang-tidy
+      # ccache: every run used to compile the whole tree from scratch. The key
+      # carries the commit, but restore-keys falls back to the newest cache from
+      # this workflow — a key of the commit alone would never hit, and a key
+      # without it would never miss.
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-
       # LINT_TESTS=ON puts the static-analysis gate into ctest, so this job
       # runs the same four gates the pre-commit hook runs — which is the point
       # of a clean machine: the hook can be skipped with --no-verify, and it
       # skips itself when a tool is missing.
       - name: configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON
+        run: |
+          ccache --set-config=max_size=2G
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
       - name: the suites (includes FORMAT_RULES, ARCH_RULES, LINT)
