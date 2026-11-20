@@ -80,8 +80,13 @@ class EngineStackFixture {
         fixtureReady = QDir().mkpath(fixtureBase);
     }
 
+    // qFatal, not an assertion macro: this fixture is compiled into suites on
+    // both frameworks, and QVERIFY reports to a QTest result object that gtest
+    // never reads (silent green). A fixture that cannot write its own files has
+    // no test to report into — stop, loudly, with the path named.
     void makeFile(const QString &name) {
-        QVERIFY(!writeTestFile(fixtureDir + "/" + name, "x").isEmpty());
+        if(writeTestFile(fixtureDir + "/" + name, "x").isEmpty())
+            qFatal("fixture cannot write %s/%s", qPrintable(fixtureDir), qPrintable(name));
     }
 
     // each slot gets its own directory: the engine holds inotify watches on these
@@ -96,16 +101,20 @@ class EngineStackFixture {
         // no pair of lines that can drift apart. The failure it names -- an
         // uncreatable /tmp root -- would otherwise surface far away, as whatever
         // write happened to fail first.
-        QVERIFY2(fixtureReady, qPrintable(QStringLiteral("cannot create the fixture root: ") + fixtureBase));
-        QVERIFY(home.path() != nullptr);
+        if(!fixtureReady)
+            qFatal("cannot create the fixture root: %s", qPrintable(fixtureBase));
+        if(home.path() == nullptr)
+            qFatal("fixture has no isolated home");
         ++slotSeq;
         fixtureDir = fixtureBase + QString("/slot%1").arg(slotSeq);
-        QVERIFY(QDir().mkpath(fixtureDir));
+        if(!QDir().mkpath(fixtureDir))
+            qFatal("fixture cannot create %s", qPrintable(fixtureDir));
         makeFile("img1.jpg");
         makeFile("img2.jpg");
         makeFile("img10.jpg");
         makeFile("skip.txt");
-        QVERIFY(QDir(fixtureDir).mkdir("subdir"));
+        if(!QDir(fixtureDir).mkdir("subdir"))
+            qFatal("fixture cannot create %s/subdir", qPrintable(fixtureDir));
     }
 
     // the load environment for factory calls: tests run on their own thread,
@@ -136,10 +145,12 @@ class EngineStackFixture {
     // machine happened to be fast enough to finish the scan first.
     void openListed(EngineBridge &bridge, const QString &dir, int sortMode = 0, bool hidden = false) {
         QSignalSpy listed(&bridge, &EngineBridge::dirListed);
-        QVERIFY(bridge.openDir(dir, sortMode, hidden));
+        if(!bridge.openDir(dir, sortMode, hidden))
+            qFatal("openListed: engine refused %s", qPrintable(dir));
+        if(bridge.listedDirectory() != dir && !listed.wait(10000))
+            qFatal("openListed: %s never listed (last: %s)", qPrintable(dir), qPrintable(bridge.listedDirectory()));
         if(bridge.listedDirectory() != dir)
-            QVERIFY(listed.wait(10000));
-        QCOMPARE(bridge.listedDirectory(), dir);
+            qFatal("openListed: listed %s, wanted %s", qPrintable(bridge.listedDirectory()), qPrintable(dir));
     }
 
     // "and nothing else arrives" needs a bound, not a sleep: the loader keeps a
@@ -148,7 +159,15 @@ class EngineStackFixture {
     // sleeps this replaces (600ms "a second tier would have arrived by now")
     // passed by luck whenever the machine was fast and failed by luck otherwise.
     void waitLoaderIdle(DirectoryModel &model) {
-        QTRY_VERIFY_WITH_TIMEOUT(!model.loaderBusy(), 10000);
+        // qWaitFor, not QTRY_VERIFY: the macro's failure path reports to QTest's
+        // result object, which does not exist under gtest — it would time out
+        // and say nothing. This fixture serves suites on both frameworks.
+        if(!QTest::qWaitFor(
+               [&] {
+                   return !model.loaderBusy();
+               },
+               10000))
+            qFatal("waitLoaderIdle: the loader never went idle");
     }
 
     // Serialize a listing exactly the way model.rs::write_listing does: u32 file
@@ -264,7 +283,8 @@ class EngineStackFixture {
             QTest::qWait(20);
             agrees = mirrorMatchesEngineExport(dm, diff);
         }
-        QVERIFY2(agrees, qPrintable(diff));
+        if(!agrees)
+            qFatal("mirror disagrees with the engine listing:\n%s", qPrintable(diff));
     }
 
   protected:

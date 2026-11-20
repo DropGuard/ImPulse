@@ -177,11 +177,18 @@ inline QKeyEvent keyPressFor(Qt::Key key, const QString &keyName, Qt::KeyboardMo
 // (dispatch_probe_tests pins which is which), so any leg that asserts "the
 // map fired the action" must go through the target's window handle. One call
 // is one press+release pair.
-inline void deliverWindowKey(QWidget *target, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+// Returns false when the target has no window handle (it was never shown), so
+// the caller asserts in ITS own vocabulary: this header is shared by suites on
+// two frameworks, and an assertion macro here would have to pick one — the one
+// it picks either reports to QTest's absent result object (silent green under
+// gtest) or drags gtest into a QTest translation unit.
+inline bool deliverWindowKey(QWidget *target, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
     QWindow *win = target->window()->windowHandle();
-    QVERIFY2(win != nullptr, "the target has no window handle — was it shown?");
+    if(!win)
+        return false;
     QTest::keyClick(win, key, modifiers);
     QCoreApplication::processEvents(QEventLoop::AllEvents);
+    return true;
 }
 
 // ---- grid/test helpers shared by the widget-facing suites ----
