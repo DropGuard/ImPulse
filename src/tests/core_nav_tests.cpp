@@ -584,8 +584,11 @@ class TestCoreNav : public QObject {
         QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), img, 10000);
 
         // the full chain runs; with no session match nothing executes and the
-        // wallpaper is untouched — the assertion is the safe return
-        QMetaObject::invokeMethod(&core, "setWallpaper");
+        // wallpaper is untouched — the assertion is the safe return. Called
+        // directly, not by name: setWallpaper is one of Core's commands (the
+        // block that used to be private behind friend declarations), and the
+        // string form bought nothing.
+        core.setWallpaper();
         qputenv("DESKTOP_SESSION", oldSession);
     }
 
