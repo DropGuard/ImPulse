@@ -55,14 +55,14 @@ class CropOverlay : public FloatingWidget {
 
   private:
     // selection state is the overlay's own; image geometry is pulled live
-    ViewerWidget *viewer;
-    QPoint startPos, endPos, moveStartPos, resizeAnchor;
-    QRect selectionRect, selectionDrawRect, selectionDrawRectDpi, handles[8];
-    bool lockAspectRatio;
-    QBrush brushInactiveTint, brushDarkGray, brushGray, brushLightGray;
-    QRectF handlesDpi[8];
-    CursorAction cursorAction;
-    QPen selectionOutlinePen;
+    ViewerWidget *m_viewer;
+    QPoint m_startPos, m_endPos, m_moveStartPos, m_resizeAnchor;
+    QRect m_selectionRect, m_selectionDrawRect, m_selectionDrawRectDpi, m_handles[8];
+    bool m_lockAspectRatio;
+    QBrush m_brushInactiveTint, m_brushDarkGray, m_brushGray, m_brushLightGray;
+    QRectF m_handlesDpi[8];
+    CursorAction m_cursorAction;
+    QPen m_selectionOutlinePen;
     // both queried live: a window dragged across screens with different DPRs
     // must not keep converting coordinates with the construction-time ratio
     qreal dpr() const {
@@ -71,7 +71,7 @@ class CropOverlay : public FloatingWidget {
     int handleSize() const {
         return static_cast<int>(8 * dpr());
     }
-    QPointF ar;
+    QPointF m_ar;
 
     QRect placeInside(QRect what, QRect where);
     void drawSelection(QPainter *);

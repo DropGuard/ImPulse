@@ -204,23 +204,23 @@ class Core : public QObject, public INavigationHost {
     // scripted fake. Set after construction because the provider is the window
     // in production, and the window does not exist until initGui ran.
     void setUserInteractions(IUserInteractions *ui) {
-        ui_ = ui;
+        m_ui = ui;
     }
     IUserInteractions *userInteractions() const {
-        return ui_;
+        return m_ui;
     }
     // The overlay surface, for the same reason and with the same lifetime rule.
     void setOverlayHost(IOverlayHost *host) {
-        overlays_ = host;
+        m_overlays = host;
     }
     IOverlayHost *overlayHost() const {
-        return overlays_;
+        return m_overlays;
     }
     // The executor Core runs on: borrowed from Deps, or the one Core owns. A
     // test that supplied a pool reads it back here to submit against the same
     // one, rather than reaching into the member.
     WorkerPool &executor() {
-        return pool;
+        return m_pool;
     }
 
     // The window tree. Public because the widget-driven tests need it, and
@@ -228,23 +228,23 @@ class Core : public QObject, public INavigationHost {
     // it private in the first place -- MainWindow is part of Core's observable
     // surface, not an implementation detail.
     MW *mainWindow() const {
-        return mw;
+        return m_mw;
     }
 
     // The directory model Core drives. Exposed read-only: a caller may inspect
     // it, not replace it (attachModel is the one writer, and it is private).
     const std::shared_ptr<DirectoryModel> &directoryModel() const {
-        return model;
+        return m_model;
     }
     // The projection Core maintains -- what the title bar and overlays render.
     // Read-only for the same reason.
     const State &viewState() const {
-        return state;
+        return m_state;
     }
     // Whether the slideshow loops. Read-only: the behavior under test is the
     // slideshow reacting to the setting, not a caller flipping it directly.
     bool slideshowLoops() const {
-        return nav_->slideshowLoops();
+        return m_nav->slideshowLoops();
     }
     // The paths currently selected, in view order. Public because every command
     // that acts on "the selection" is public and this is how a caller confirms
@@ -255,14 +255,14 @@ class Core : public QObject, public INavigationHost {
     // assert on what the view was told. Read-only for the same reason as the
     // model.
     DirectoryPresenter &folderPresenter() {
-        return folderViewPresenter;
+        return m_folderViewPresenter;
     }
 
     // The slideshow's clock. Tests assert on isActive because "the timer is
     // armed" is the observable half of "a slideshow is running"; stopping it is
     // the behavior under test, not something a caller may do directly.
     const QTimer &slideshowClock() const {
-        return nav_->slideshowClock();
+        return m_nav->slideshowClock();
     }
 
   public slots:
@@ -272,11 +272,11 @@ class Core : public QObject, public INavigationHost {
     // core.cpp wiring, and the tests drive them exactly the way a key press
     // does
     bool loadPath(const QString &path) {
-        return nav_->loadPath(path);
+        return m_nav->loadPath(path);
     }
 
   private:
-    QElapsedTimer t;
+    QElapsedTimer m_t;
 
     void initGui();
     void initComponents();
@@ -289,7 +289,7 @@ class Core : public QObject, public INavigationHost {
     void onFirstRun();
 
     // ui stuff
-    MW *mw = nullptr; // null in a headless Core; every read is guarded
+    MW *m_mw = nullptr; // null in a headless Core; every read is guarded
 
     // The one executor Loader/Scaler/Thumbnailer run on, injected into every
     // component that needs it.
@@ -299,51 +299,51 @@ class Core : public QObject, public INavigationHost {
     // with. Declared before the components so that in the owned case the pool's
     // destruction -- the only place the workers are joined -- happens after each
     // of them has drained and waited.
-    std::unique_ptr<WorkerPool> ownedPool;
-    WorkerPool &pool;
+    std::unique_ptr<WorkerPool> m_ownedPool;
+    WorkerPool &m_pool;
     // the engine Core drives everything through: borrowed from Deps, or the
     // process-wide instance. Stored so the model is built on the same one the
     // thumbnailer got -- the two must not disagree about which engine they
     // answer to.
-    EngineBridge &mBridge;
+    EngineBridge &m_bridge;
 
     // the dialog answers, through the interface MW implements; tests inject a
     // scripted fake here to drive the interactive command machines. Non-owning:
     // it points at mw in production and is set in initGui
-    IUserInteractions *ui_ = nullptr;
+    IUserInteractions *m_ui = nullptr;
     // where Core's display sink and mode legs go: the window in production, a
     // recording stub in a headless test. Not owned.
-    ICoreView *view_ = nullptr;
+    ICoreView *m_view = nullptr;
     // the crop surface: the window's controller in production, a scripted
     // fake in tests that exercise crop flows. Optional — null headless.
-    ICropSurface *crop_ = nullptr;
+    ICropSurface *m_crop = nullptr;
     // the dialog host: the window's in production, a parent-less one in a
     // headless test. Borrow/own — the window owns its own.
-    DialogHost *dialogs_ = nullptr;
-    std::unique_ptr<DialogHost> ownedDialogs;
+    DialogHost *m_dialogs = nullptr;
+    std::unique_ptr<DialogHost> m_ownedDialogs;
 
     // where Core's messages and overlay commands go: MainWindow's OverlayHost in
     // production, a scripted host in a test that does not want a window. Not
     // owned -- the Deps-provided host outlives Core, and the production one is
     // a child of the window tree Core deletes.
-    IOverlayHost *overlays_ = nullptr;
+    IOverlayHost *m_overlays = nullptr;
 
-    State state;
+    State m_state;
 
     // the navigation object: owns the slideshow clock, the shuffle randomizer
     // and the folder-end policy; writes the navigation slice of State
     // (see navigationcontroller.h). QObject-child of Core — destroyed by the
     // tree, so member order does not matter here.
-    NavigationController *nav_ = nullptr;
+    NavigationController *m_nav = nullptr;
 
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
     // production, the recording stub in a headless test. Declared after
     // State, so it dies before the state it watches.
-    QPropertyNotifier slideshowRelay;
+    QPropertyNotifier m_slideshowRelay;
 
     // components
-    std::shared_ptr<DirectoryModel> model;
+    std::shared_ptr<DirectoryModel> m_model;
 
     // White-box seam for the navigation test: the direction-aware preload
     // decision lives in loadFileIndex() and is only observable through the
@@ -352,13 +352,13 @@ class Core : public QObject, public INavigationHost {
     // the one Thumbnailer in the process, shared by both presenters (rule R9).
     // Declared after pool_ and before the presenters, so destruction runs
     // presenters → thumbnailer → pool_ and the pool outlives its drain
-    Thumbnailer thumbnailer;
+    Thumbnailer m_thumbnailer;
 
-    DirectoryPresenter thumbPanelPresenter, folderViewPresenter;
+    DirectoryPresenter m_thumbPanelPresenter, m_folderViewPresenter;
 
     void rotateByDegrees(int degrees);
 
-    QTranslator *translator = nullptr;
+    QTranslator *m_translator = nullptr;
 
     void attachModel(DirectoryModel *_model);
     QString selectedPath();
@@ -394,31 +394,31 @@ class Core : public QObject, public INavigationHost {
     void interactiveMove(const QList<QString> &paths, const QString &destDirectory);
     // the two adjacent-folder commands; the bool is "land on the last file"
     void prevDirectory(bool selectLast) {
-        nav_->prevDirectory(selectLast);
+        m_nav->prevDirectory(selectLast);
     }
     void prevDirectory() {
-        nav_->prevDirectory();
+        m_nav->prevDirectory();
     }
     void startSlideshow() {
-        nav_->startSlideshow();
+        m_nav->startSlideshow();
     }
     void stopSlideshow() {
-        nav_->stopSlideshow();
+        m_nav->stopSlideshow();
     }
     void nextImage() {
-        nav_->nextImage();
+        m_nav->nextImage();
     }
     void prevImage() {
-        nav_->prevImage();
+        m_nav->prevImage();
     }
     void nextImageSlideshow() {
-        nav_->nextImageSlideshow();
+        m_nav->nextImageSlideshow();
     }
     void jumpToFirst() {
-        nav_->jumpToFirst();
+        m_nav->jumpToFirst();
     }
     void jumpToLast() {
-        nav_->jumpToLast();
+        m_nav->jumpToLast();
     }
     void rotateLeft();
     void rotateRight();
@@ -440,19 +440,19 @@ class Core : public QObject, public INavigationHost {
     // directory. Same key, two scopes, because the subject differs.
     void pasteFilesToCurrentDirectory();
     void toggleShuffle() {
-        nav_->toggleShuffle();
+        m_nav->toggleShuffle();
     }
     void enableFolderView() {
-        nav_->enableFolderView();
+        m_nav->enableFolderView();
     }
     void toggleFolderView() {
-        nav_->toggleFolderView();
+        m_nav->toggleFolderView();
     }
     void toggleSlideshow() {
-        nav_->toggleSlideshow();
+        m_nav->toggleSlideshow();
     }
     void nextDirectory() {
-        nav_->nextDirectory();
+        m_nav->nextDirectory();
     }
     // The drag-and-drop entry points a real gesture uses: a drop from outside
     // the app, what a drag out of it produces, and the paths for it.
@@ -484,13 +484,13 @@ class Core : public QObject, public INavigationHost {
     void reloadImage(const QString &fileName);
     void copyPathClipboard();
     void sortByName() {
-        nav_->sortByName();
+        m_nav->sortByName();
     }
     void sortByTime() {
-        nav_->sortByTime();
+        m_nav->sortByTime();
     }
     void sortBySize() {
-        nav_->sortBySize();
+        m_nav->sortBySize();
     }
     void showRenameDialog();
     void onDraggedOut(); // the action's no-argument form; the paths form is public

@@ -42,7 +42,7 @@ class ImageViewerV2 : public QGraphicsView {
     // switches (the keymap's inspect scope). The property itself stays private:
     // writes remain the viewer's alone.
     QPropertyNotifier observeFitMode(std::function<void()> callback) {
-        return imageFitMode.addNotifier(std::move(callback));
+        return m_imageFitMode.addNotifier(std::move(callback));
     }
 
   public:
@@ -134,50 +134,50 @@ class ImageViewerV2 : public QGraphicsView {
     void onDPRChanged();
 
   private:
-    std::shared_ptr<QPixmap> pixmap;
-    std::unique_ptr<QPixmap> pixmapScaled;
-    std::shared_ptr<QMovie> movie;
-    QGraphicsPixmapItem pixmapItem, pixmapItemScaled;
-    QTimer *animationTimer, *scaleTimer;
-    QScrollBar *hs, *vs;
-    QPoint mouseMoveStartPos, mousePressPos, drawPos;
-    bool transparencyGrid, expandImage, smoothAnimatedImages, smoothUpscaling, forceFastScale, loopPlayback,
-        mIsFullscreen, scrollBarWorkaround, useFixedZoomLevels, trackpadDetection;
-    QList<float> zoomLevels;
-    MouseInteractionState mouseInteraction;
-    const int SCROLL_UPDATE_RATE = 7;
-    const int DEFAULT_SCROLL_DISTANCE = 240;
-    const qreal TRACKPAD_SCROLL_MULTIPLIER = 0.7;
-    const qreal WHEEL_SCROLL_MULTIPLIER = 2.0f;
-    const int ANIMATION_SPEED = 150;
-    const float FAST_SCALE_THRESHOLD = 1.0f;
-    const int LARGE_VIEWPORT_SIZE = 2073600;
+    std::shared_ptr<QPixmap> m_pixmap;
+    std::unique_ptr<QPixmap> m_pixmapScaled;
+    std::shared_ptr<QMovie> m_movie;
+    QGraphicsPixmapItem m_pixmapItem, m_pixmapItemScaled;
+    QTimer *m_animationTimer, *m_scaleTimer;
+    QScrollBar *m_hs, *m_vs;
+    QPoint m_mouseMoveStartPos, m_mousePressPos, m_drawPos;
+    bool m_transparencyGrid, m_expandImage, m_smoothAnimatedImages, m_smoothUpscaling, m_forceFastScale, m_loopPlayback,
+        m_isFullscreen, m_scrollBarWorkaround, m_useFixedZoomLevels, m_trackpadDetection;
+    QList<float> m_zoomLevels;
+    MouseInteractionState m_mouseInteraction;
+    const int m_scrollUpdateRate = 7;
+    const int m_defaultScrollDistance = 240;
+    const qreal m_trackpadScrollMultiplier = 0.7;
+    const qreal m_wheelScrollMultiplier = 2.0f;
+    const int m_animationSpeed = 150;
+    const float m_fastScaleThreshold = 1.0f;
+    const int m_largeViewportSize = 2073600;
     // how many px you can move while holding RMB until it counts as a zoom attempt
-    int zoomThreshold = 4;
-    int dragThreshold = 10;
+    int m_zoomThreshold = 4;
+    int m_dragThreshold = 10;
 
-    bool dragsEnabled = true;
-    bool wayland = false;
+    bool m_dragsEnabled = true;
+    bool m_wayland = false;
 
-    float zoomStep = 0.1, dpr;
-    float minScale, maxScale, fitWindowScale, expandLimit, lockedScale;
-    QPointF savedViewportPos;
-    ViewLockMode mViewLock;
+    float m_zoomStep = 0.1, m_dpr;
+    float m_minScale, m_maxScale, m_fitWindowScale, m_expandLimit, m_lockedScale;
+    QPointF m_savedViewportPos;
+    ViewLockMode m_viewLock;
 
-    QPair<QPointF, QPoint> zoomAnchor; // [pixmap coords, viewport coords]
+    QPair<QPointF, QPoint> m_zoomAnchor; // [pixmap coords, viewport coords]
 
-    QElapsedTimer lastTouchpadScroll;
+    QElapsedTimer m_lastTouchpadScroll;
 
     // QProperty: the fit mode has more than one consumer (applyFitMode
     // internally, the keymap's inspect scope, tests) — the property notifies
     // on every write, so no funnel discipline is needed at the call sites
-    QProperty<ImageFitMode> imageFitMode;
-    ScalingFilter mScalingFilter;
-    ImageFitMode imageFitModeDefault;
-    QGraphicsScene *scene;
-    ImageFocusPoint focusIn1to1;
+    QProperty<ImageFitMode> m_imageFitMode;
+    ScalingFilter m_scalingFilter;
+    ImageFitMode m_imageFitModeDefault;
+    QGraphicsScene *m_scene;
+    ImageFocusPoint m_focusIn1to1;
 
-    QPixmap checkboard;
+    QPixmap m_checkboard;
 
     void zoomAnchored(float newScale);
     void fitNormal();
@@ -191,7 +191,7 @@ class ImageViewerV2 : public QGraphicsView {
     void reset();
     void applyFitMode();
 
-    QTimeLine *scrollTimeLineX, *scrollTimeLineY;
+    QTimeLine *m_scrollTimeLineX, *m_scrollTimeLineY;
     void stopPosAnimation();
     QPointF sceneRoundPos(QPointF scenePoint) const;
     QRectF sceneRoundRect(QRectF sceneRect) const;

@@ -64,35 +64,35 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     CropController *crop();
 
   private:
-    bool shownOnceFired = false;
+    bool m_shownOnceFired = false;
     // the parent tree owns every widget; these observe. See the rule comment
     // at mainpanel.cpp ("The pointer here only observes"), generalized here.
-    ViewerWidget *viewerWidget = nullptr;
-    QHBoxLayout layout;
+    ViewerWidget *m_viewerWidget = nullptr;
+    QHBoxLayout m_layout;
     // const by construction: the views read state, they never write it. The
     // one non-const use — wiring the notifiers — happens in the constructor
     // through the State* parameter, and never again.
-    const State *appState = nullptr;
+    const State *m_appState = nullptr;
 
-    bool showInfoBarFullscreen, showInfoBarWindowed;
-    DocumentWidget *docWidget = nullptr;
-    FolderViewProxy *folderView = nullptr;
-    CentralWidget *centralWidget = nullptr;
-    SidePanel *sidePanel;
-    FullscreenInfoOverlayProxy *infoBarFullscreen;
-    InfoBarProxy *infoBarWindowed = nullptr;
-    OverlayHost *overlayHost = nullptr;
-    DialogHost *dialogHost = nullptr;
-    CropController *cropController = nullptr;
+    bool m_showInfoBarFullscreen, m_showInfoBarWindowed;
+    DocumentWidget *m_docWidget = nullptr;
+    FolderViewProxy *m_folderView = nullptr;
+    CentralWidget *m_centralWidget = nullptr;
+    SidePanel *m_sidePanel;
+    FullscreenInfoOverlayProxy *m_infoBarFullscreen;
+    InfoBarProxy *m_infoBarWindowed = nullptr;
+    OverlayHost *m_overlayHost = nullptr;
+    DialogHost *m_dialogHost = nullptr;
+    CropController *m_cropController = nullptr;
 
-    QPropertyNotifier infoObserver;
-    QPropertyNotifier slideshowObserver;
-    QPropertyNotifier shuffleObserver;
-    QPropertyNotifier directoryObserver;
-    QPropertyNotifier viewModeObserver;
+    QPropertyNotifier m_infoObserver;
+    QPropertyNotifier m_slideshowObserver;
+    QPropertyNotifier m_shuffleObserver;
+    QPropertyNotifier m_directoryObserver;
+    QPropertyNotifier m_viewModeObserver;
     // the keymap's inspect scope follows the viewer's fit mode
-    QPropertyNotifier fitModeObserver;
-    WindowShell *windowShell = nullptr;
+    QPropertyNotifier m_fitModeObserver;
+    WindowShell *m_windowShell = nullptr;
     // The window's children, produced as a value instead of assigned to
     // members from inside a setup function. The point is that the creation order lives in ONE function
     // and that a missing field is caught before the window exists — by the

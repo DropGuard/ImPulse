@@ -38,14 +38,14 @@ void Core::removePermanent() {
         msg = tr("Delete ") + QString::number(paths.count()) + tr(" items permanently?");
     else
         msg = tr("Delete item permanently?");
-    if(!ui_->showConfirmation(tr("Delete permanently"), msg))
+    if(!m_ui->showConfirmation(tr("Delete permanently"), msg))
         return;
     FileOpResult result;
     int successCount = 0;
     for(const auto &path : paths) {
         QFileInfo fi(path);
         if(fi.isDir())
-            model->removeDir(path, false, true, result);
+            m_model->removeDir(path, false, true, result);
         else
             result = removeFile(path, false);
         if(result == FileOpResult::SUCCESS)
@@ -55,7 +55,7 @@ void Core::removePermanent() {
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
-            overlays_->showMessageSuccess(tr("File removed"));
+            m_overlays->showMessageSuccess(tr("File removed"));
         else
             outputError(result);
     } else if(paths.count() > 1) {
@@ -73,7 +73,7 @@ void Core::moveToTrash() {
             msg = tr("Move ") + QString::number(paths.count()) + tr(" items to trash?");
         else
             msg = tr("Move item to trash?");
-        if(!ui_->showConfirmation(tr("Move to trash"), msg))
+        if(!m_ui->showConfirmation(tr("Move to trash"), msg))
             return;
     }
     FileOpResult result;
@@ -87,7 +87,7 @@ void Core::moveToTrash() {
     }
     if(paths.count() == 1) {
         if(result == FileOpResult::SUCCESS)
-            overlays_->showMessageSuccess(tr("Moved to trash"));
+            m_overlays->showMessageSuccess(tr("Moved to trash"));
         else
             outputError(result);
     } else if(paths.count() > 1) {
@@ -100,9 +100,9 @@ void Core::reloadImage() {
 }
 
 void Core::reloadImage(const QString &filePath) {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
-    model->reload(filePath);
+    m_model->reload(filePath);
 }
 
 void Core::renameCurrentSelection(const QString &newName) {
@@ -110,38 +110,38 @@ void Core::renameCurrentSelection(const QString &newName) {
     // and Core::onFileRenamed follows it for the file on screen — an in-app
     // rename and an external one take the same path and get the same result.
     const QString oldPath = selectedPath();
-    if(!model->fileCount() || newName.isEmpty() || oldPath.isEmpty())
+    if(!m_model->fileCount() || newName.isEmpty() || oldPath.isEmpty())
         return;
     FileOpResult result;
-    model->renameEntry(oldPath, newName, false, result);
+    m_model->renameEntry(oldPath, newName, false, result);
     if(result == FileOpResult::DESTINATION_DIR_EXISTS) {
-        overlays_->toggleRenameOverlay(newName);
+        m_overlays->toggleRenameOverlay(newName);
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
-        if(ui_->showConfirmation(tr("File exists"), tr("Overwrite file?"))) {
-            model->renameEntry(oldPath, newName, true, result);
+        if(m_ui->showConfirmation(tr("File exists"), tr("Overwrite file?"))) {
+            m_model->renameEntry(oldPath, newName, true, result);
         } else {
             // show rename dialog again
-            overlays_->toggleRenameOverlay(newName);
+            m_overlays->toggleRenameOverlay(newName);
         }
     }
     outputError(result);
 }
 
 FileOpResult Core::removeFile(const QString &filePath, bool trash) {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return FileOpResult::NOTHING_TO_DO;
 
     bool reopen = false;
     std::shared_ptr<Image> img;
-    if(state.currentFilePath == filePath) {
-        img = model->getImage(filePath);
+    if(m_state.currentFilePath == filePath) {
+        img = m_model->getImage(filePath);
         if(img->type() == ANIMATED || img->type() == VIDEO) {
-            view_->closeImage();
+            m_view->closeImage();
             reopen = true;
         }
     }
     FileOpResult result;
-    model->removeFile(filePath, trash, result);
+    m_model->removeFile(filePath, trash, result);
     if(result != FileOpResult::SUCCESS && reopen)
         guiSetImage(img);
     return result;
@@ -150,7 +150,7 @@ FileOpResult Core::removeFile(const QString &filePath, bool trash) {
 void Core::outputError(const FileOpResult &error) const {
     if(error == FileOpResult::SUCCESS || error == FileOpResult::NOTHING_TO_DO)
         return;
-    overlays_->showError(FileOperations::decodeResult(error));
+    m_overlays->showError(FileOperations::decodeResult(error));
     qDebug() << FileOperations::decodeResult(error);
 }
 
@@ -162,18 +162,18 @@ void Core::outputError(const FileOpResult &error) const {
 void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCount) const {
     const int failedCount = total - successCount;
     if(failedCount == 0)
-        overlays_->showMessageSuccess(doneVerb + QString::number(successCount) + tr(" files"));
+        m_overlays->showMessageSuccess(doneVerb + QString::number(successCount) + tr(" files"));
     else
-        overlays_->showError(doneVerb + QString::number(successCount) + tr(" files, ") + QString::number(failedCount) +
-                             tr(" failed"));
+        m_overlays->showError(doneVerb + QString::number(successCount) + tr(" files, ") + QString::number(failedCount) +
+                              tr(" failed"));
 }
 
 void Core::showOpenDialog() {
-    dialogs_->showOpenDialog(model->directoryPath());
+    m_dialogs->showOpenDialog(m_model->directoryPath());
 }
 
 void Core::showInDirectory() {
-    if(!model)
+    if(!m_model)
         return;
 #if defined(__linux__) || defined(__FreeBSD__)
     // org.freedesktop.FileManager1 is the whole mechanism: the session's
@@ -186,7 +186,7 @@ void Core::showInDirectory() {
     // An empty selection reveals the directory itself (selected in its
     // parent); a session without the contract gets a message, not a list
     // of guessed binaries.
-    QString reveal = selectedPath().isEmpty() ? model->directoryPath() : selectedPath();
+    QString reveal = selectedPath().isEmpty() ? m_model->directoryPath() : selectedPath();
     QDBusMessage msg = QDBusMessage::createMethodCall(
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("/org/freedesktop/FileManager1"),
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("ShowItems"));
@@ -198,7 +198,7 @@ void Core::showInDirectory() {
         w->deleteLater();
         QDBusPendingReply<> reply = *w;
         if(reply.isError())
-            overlays_->showMessage(tr("No file manager is available to reveal the file"));
+            m_overlays->showMessage(tr("No file manager is available to reveal the file"));
     });
 #elif __WIN32
     QStringList args;
@@ -224,29 +224,29 @@ void Core::showInDirectory() {
 // keypress copies the current file into the configured folder — no dialog,
 // no clobbering. Unconfigured, it says so instead of guessing.
 void Core::quickCopyToFixedDirectory() {
-    if(!model || model->isEmpty() || selectedPath().isEmpty())
+    if(!m_model || m_model->isEmpty() || selectedPath().isEmpty())
         return;
     QString destDir = settings->quickCopyDirectory();
     if(destDir.isEmpty()) {
-        overlays_->showMessage(tr("Set the quick copy folder in settings first"));
+        m_overlays->showMessage(tr("Set the quick copy folder in settings first"));
         return;
     }
     QFileInfo srcFi(selectedPath());
     if(!srcFi.isFile()) {
-        overlays_->showMessage(tr("Quick copy: not a regular file"));
+        m_overlays->showMessage(tr("Quick copy: not a regular file"));
         return;
     }
     QDir(destDir).mkpath(".");
     if(QFileInfo::exists(destDir + "/" + srcFi.fileName())) {
-        overlays_->showMessage(tr("Already in the quick copy folder"));
+        m_overlays->showMessage(tr("Already in the quick copy folder"));
         return;
     }
     FileOpResult result;
     FileOperations::copyFileTo(selectedPath(), destDir, false, result);
     if(result == FileOpResult::SUCCESS)
-        overlays_->showMessage(tr("Copied to ") + destDir);
+        m_overlays->showMessage(tr("Copied to ") + destDir);
     else
-        overlays_->showError(FileOperations::decodeResult(result));
+        m_overlays->showError(FileOperations::decodeResult(result));
 }
 
 void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
@@ -268,14 +268,14 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
             if(overwriteFiles.all) // skipping all
                 return;
-            overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), destDirectory + "/" + srcFi.fileName(),
-                                                    FILE_TO_FILE, true);
+            overwriteFiles = m_ui->fileReplaceDialog(srcFi.absoluteFilePath(), destDirectory + "/" + srcFi.fileName(),
+                                                     FILE_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
                 return;
             FileOperations::copyFileTo(path, destDirectory, true, result);
         }
         if(result != FileOpResult::SUCCESS && !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
-            overlays_->showError(FileOperations::decodeResult(result));
+            m_overlays->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
         }
         if(!overwriteFiles.all) // copy attempt done; reset temporary flag
@@ -302,7 +302,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     if(QFileInfo::exists(dstFi.absoluteFilePath()) && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles =
-                ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
+                m_ui->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
                 return;
             if(!overwriteFiles.all) // reset temp flag right away
@@ -312,7 +312,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         FileOpResult result;
         FileOperations::removeFile(dstFi.absoluteFilePath(), result);
         if(result != FileOpResult::SUCCESS) {
-            overlays_->showError(FileOperations::decodeResult(result));
+            m_overlays->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
             return;
         }
@@ -323,7 +323,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     // deleted the file and then copied nothing into a directory that never
     // existed
     if(!dstDir.mkpath(".")) {
-        overlays_->showError(tr("Could not create directory ") + dstDir.absolutePath());
+        m_overlays->showError(tr("Could not create directory ") + dstDir.absolutePath());
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
@@ -353,24 +353,24 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     // SINGLE FILE MOVE ===========================================================================
     if(!srcFi.isDir()) {
         FileOpResult result;
-        model->moveFileTo(path, destDirectory, overwriteFiles, result);
+        m_model->moveFileTo(path, destDirectory, overwriteFiles, result);
         if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
             if(overwriteFiles.all) // skipping all
                 return;
-            overwriteFiles = ui_->fileReplaceDialog(srcFi.absoluteFilePath(), destDirectory + "/" + srcFi.fileName(),
-                                                    FILE_TO_FILE, true);
+            overwriteFiles = m_ui->fileReplaceDialog(srcFi.absoluteFilePath(), destDirectory + "/" + srcFi.fileName(),
+                                                     FILE_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
                 return;
-            model->moveFileTo(path, destDirectory, true, result);
+            m_model->moveFileTo(path, destDirectory, true, result);
         }
         if(result == FileOpResult::SOURCE_NOT_REMOVED) {
             // the destination has the file; only the source removal failed.
             // A warning, not an error: reporting it red would contradict the
             // file the user can see at the destination
-            overlays_->showWarning(FileOperations::decodeResult(result));
+            m_overlays->showWarning(FileOperations::decodeResult(result));
         } else if(result != FileOpResult::SUCCESS &&
                   !(result == FileOpResult::DESTINATION_FILE_EXISTS && !overwriteFiles)) {
-            overlays_->showError(FileOperations::decodeResult(result));
+            m_overlays->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
         }
         if(!overwriteFiles.all) // move attempt done; reset temporary flag
@@ -391,7 +391,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     if(QFileInfo::exists(dstFi.absoluteFilePath()) && !dstFi.isDir()) { // overwriting file with a folder
         if(!overwriteFiles && !overwriteFiles.all) {
             overwriteFiles =
-                ui_->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
+                m_ui->fileReplaceDialog(srcFi.absoluteFilePath(), dstFi.absoluteFilePath(), DIR_TO_FILE, true);
             if(!overwriteFiles || overwriteFiles.cancel)
                 return;
             if(!overwriteFiles.all) // reset temp flag right away
@@ -401,7 +401,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
         FileOpResult result;
         FileOperations::removeFile(dstFi.absoluteFilePath(), result);
         if(result != FileOpResult::SUCCESS) {
-            overlays_->showError(FileOperations::decodeResult(result));
+            m_overlays->showError(FileOperations::decodeResult(result));
             qDebug() << FileOperations::decodeResult(result);
             return;
         }
@@ -412,7 +412,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     // deleted the file and then copied nothing into a directory that never
     // existed
     if(!dstDir.mkpath(".")) {
-        overlays_->showError(tr("Could not create directory ") + dstDir.absolutePath());
+        m_overlays->showError(tr("Could not create directory ") + dstDir.absolutePath());
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
@@ -426,7 +426,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
             return;
     }
     FileOpResult dirRmRes;
-    model->removeDir(srcDir.absolutePath(), false, false, dirRmRes);
+    m_model->removeDir(srcDir.absolutePath(), false, false, dirRmRes);
 }
 
 void Core::copyPathsTo(const QList<QString> &paths, const QString &destDirectory) {
@@ -438,54 +438,54 @@ void Core::movePathsTo(const QList<QString> &paths, const QString &destDirectory
 }
 
 void Core::moveCurrentFile(const QString &destDirectory) {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
     // pause updates to avoid flicker
-    view_->setUpdatesEnabled(false);
+    m_view->setUpdatesEnabled(false);
     // move fails during file playback, so we close it temporarily
-    view_->closeImage();
+    m_view->closeImage();
     FileOpResult result;
-    model->moveFileTo(selectedPath(), destDirectory, false, result);
+    m_model->moveFileTo(selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
-        overlays_->showMessageSuccess(tr("File moved."));
+        m_overlays->showMessageSuccess(tr("File moved."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
-        if(ui_->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
-            model->moveFileTo(selectedPath(), destDirectory, true, result);
+        if(m_ui->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
+            m_model->moveFileTo(selectedPath(), destDirectory, true, result);
     }
     if(result != FileOpResult::SUCCESS) {
-        guiSetImage(model->getImage(selectedPath()));
+        guiSetImage(m_model->getImage(selectedPath()));
         updateInfoString();
         if(result != FileOpResult::DESTINATION_FILE_EXISTS) {
             // a move whose copy landed but whose source could not be removed is
             // a warning with an accurate message, not a plain error
             if(result == FileOpResult::SOURCE_NOT_REMOVED)
-                overlays_->showWarning(FileOperations::decodeResult(result));
+                m_overlays->showWarning(FileOperations::decodeResult(result));
             else
                 outputError(result);
         }
     }
-    view_->setUpdatesEnabled(true);
-    view_->repaintView();
+    m_view->setUpdatesEnabled(true);
+    m_view->repaintView();
 }
 
 void Core::copyCurrentFile(const QString &destDirectory) {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
     FileOpResult result;
-    model->copyFileTo(selectedPath(), destDirectory, false, result);
+    m_model->copyFileTo(selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
-        overlays_->showMessageSuccess(tr("File copied."));
+        m_overlays->showMessageSuccess(tr("File copied."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
-        if(ui_->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
-            model->copyFileTo(selectedPath(), destDirectory, true, result);
+        if(m_ui->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
+            m_model->copyFileTo(selectedPath(), destDirectory, true, result);
     }
     if(result != FileOpResult::SUCCESS && result != FileOpResult::DESTINATION_FILE_EXISTS)
         outputError(result);
 }
 
 void Core::showRenameDialog() {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
     QFileInfo fi(selectedPath());
-    overlays_->toggleRenameOverlay(fi.fileName());
+    m_overlays->toggleRenameOverlay(fi.fileName());
 }
