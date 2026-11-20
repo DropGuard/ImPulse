@@ -62,15 +62,17 @@ jobs:
             -DEXIV2=ON -DVIDEO_SUPPORT=ON -DOPENCV_SUPPORT=ON
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j"$(nproc)"
-      # Build and run the code; do not re-run the tree's text gates here.
-      # FORMAT_RULES, ARCH_RULES and LINT all read the tree, not the platform,
-      # and the Linux job runs them against a pinned formatter and toolchain —
-      # running them again on msys2 adds a second formatter version to keep in
-      # step (24.04's clang-format 18 disagreed with 21 on chained <<, and that
-      # cost a full round trip) while telling us nothing about Windows. What
-      # this job is FOR is the one thing Linux cannot do: compile and run the
-      # #ifdef Q_OS_WIN branches.
-      - name: the suites (the platform-independent text gates are the Linux job's)
+      # Every test runs here. The -E drops three entries that are gates rather
+      # than tests — FORMAT_RULES, ARCH_RULES and LINT_CACHE read the tree's
+      # text, so their verdict is the same on any platform and the Linux job
+      # runs them once against a pinned formatter and toolchain. Repeating them
+      # on msys2 means keeping a second formatter version in step (24.04's
+      # clang-format 18 disagreed with 21 on chained <<) while telling us
+      # nothing about Windows.
+      #
+      # What is left is the whole point: the suites, compiled and run by the
+      # compiler that sees the #ifdef _WIN32 branches.
+      - name: the suites (only the three text gates are the Linux job's)
         run: |
           cd build
           QT_QPA_PLATFORM=offscreen ctest --output-on-failure \
