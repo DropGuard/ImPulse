@@ -295,14 +295,14 @@ class ActionManager : public QObject {
     // name. R12 reads this list against core.cpp's connectAction calls.
     QAction *addAction(const QString &name);
     void initActions();
-    QMap<QString, QAction *> mActions; // <name, trigger token>
+    QMap<QString, QAction *> m_actions; // <name, trigger token>
 
     // the keyboard projection's state and its one apply-everything entry
     // point, called from every table mutation
-    QWidget *windowSurface = nullptr;   // where the QActions are registered
-    QWidget *gridSurface = nullptr;     // where the grid scope's QShortcuts live
-    QWidget *documentSurface = nullptr; // where the document view's QShortcuts live
-    QList<QShortcut *> gridProjections; // rebuilt whenever the grid table moves
+    QWidget *m_windowSurface = nullptr;   // where the QActions are registered
+    QWidget *m_gridSurface = nullptr;     // where the grid scope's QShortcuts live
+    QWidget *m_documentSurface = nullptr; // where the document view's QShortcuts live
+    QList<QShortcut *> m_gridProjections; // rebuilt whenever the grid table moves
     // Both document-surface claim sets store their source token: the hand-over
     // when inspection arms is per KEY, and a QShortcut does not remember which
     // table token produced it ("Enter" expands to two sequences, so squinting
@@ -311,7 +311,7 @@ class ActionManager : public QObject {
         QShortcut *shortcut;
         QString token;
     };
-    QList<SurfaceClaim> documentProjections; // the document table's claims
+    QList<SurfaceClaim> m_documentProjections; // the document table's claims
     // The inspect layer's own claim set, kept apart from documentProjections so
     // arming it is an enabled-bit flip instead of a rebuild. It is a SAME-KEY,
     // SAME-SURFACE variant: Left means prevImage normally and scrollLeft when
@@ -321,31 +321,31 @@ class ActionManager : public QObject {
     // per shared key". QShortcut's enabled bit does exactly that, and unlike a
     // QAction's it has no trigger() path to swallow: invokeAction() bypasses
     // QShortcut entirely, so menus keep working while a scope is disarmed.
-    QList<SurfaceClaim> inspectProjections;
-    bool gridActive = false; // the grid surface holds keyboard focus
+    QList<SurfaceClaim> m_inspectProjections;
+    bool m_gridActive = false; // the grid surface holds keyboard focus
     void applyKeyboardProjection();
     void reproject();                // global table (de-claimed) + inspect layer -> setShortcuts
     void rebuildGridShortcuts();     // grid table -> QShortcuts on the grid surface
     void rebuildDocumentShortcuts(); // document table -> QShortcuts; inspect -> inspectProjections
     void applyInspectProjection();   // inspectMode -> the enabled bits (no rebuild)
 
-    QMap<QString, QString> defaults, shortcuts; // <shortcut, action>
+    QMap<QString, QString> m_defaults, m_shortcuts; // <shortcut, action>
     // the inspect scope's layer: only the deltas live here (fit original /
     // free zoom pan with the arrows instead of changing images)
-    QMap<QString, QString> inspectDefaults, inspectShortcuts; // <shortcut, action>
-    bool inspectMode = false;
+    QMap<QString, QString> m_inspectDefaults, m_inspectShortcuts; // <shortcut, action>
+    bool m_inspectMode = false;
     // true from construction: the app starts in the document view (State's own
     // default), and a headless Core may never see a mode change at all
-    bool documentActive = true;
+    bool m_documentActive = true;
     // the folder grid's scope layer: defaults mirror the navigation the grid
     // hardcoded before the scope system existed
-    QMap<QString, QString> gridDefaults, gridShortcuts; // <shortcut, action>
+    QMap<QString, QString> m_gridDefaults, m_gridShortcuts; // <shortcut, action>
     // the document view's scope layer: every key that only means something
     // while one image is on screen — the walk, zoom, fit, the edit verbs and
     // the two commands that need the result to be visible. They used to live
     // in the global table with `if(viewMode == FOLDERVIEW) return` guards
     // inside the commands; a binding that does not exist needs no guard.
-    QMap<QString, QString> docDefaults, docShortcuts; // <shortcut, action>
+    QMap<QString, QString> m_docDefaults, m_docShortcuts; // <shortcut, action>
 
     void initDefaults();
     void initShortcuts();

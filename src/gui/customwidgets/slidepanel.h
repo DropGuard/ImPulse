@@ -41,27 +41,27 @@ class SlidePanel : public FloatingWidget {
     void animationUpdate(int frame);
 
   protected:
-    QHBoxLayout mLayout;
-    QGraphicsOpacityEffect *fadeEffect;
-    int panelSize, slideAmount;
-    QWidget *mWidget = nullptr;
-    QRect mTriggerRect;
+    QHBoxLayout m_layout;
+    QGraphicsOpacityEffect *m_fadeEffect;
+    int m_panelSize, m_slideAmount;
+    QWidget *m_widget = nullptr;
+    QRect m_triggerRect;
     void setAnimationRange(QPoint start, QPoint end);
     void saveStaticGeometry(QRect geometry);
     QRect staticGeometry();
-    QTimer timer;
-    QTimeLine timeline;
-    QEasingCurve outCurve;
-    const int ANIMATION_DURATION = 230;
-    PanelPosition mPosition;
+    QTimer m_timer;
+    QTimeLine m_timeline;
+    QEasingCurve m_outCurve;
+    const int m_animationDuration = 230;
+    PanelPosition m_position;
     void recalculateGeometry() override;
     virtual void updateTriggerRect();
 
   private:
     void setOrientation();
-    Qt::Orientation mOrientation;
-    QRect mStaticGeometry;
-    qreal panelVisibleOpacity = 1.0;
-    QPoint startPosition, endPosition;
-    bool mLayoutManaged = false;
+    Qt::Orientation m_orientation;
+    QRect m_staticGeometry;
+    qreal m_panelVisibleOpacity = 1.0;
+    QPoint m_startPosition, m_endPosition;
+    bool m_layoutManaged = false;
 };
