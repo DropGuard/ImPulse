@@ -30,10 +30,10 @@
 
 // TODO: also copy selection from folder view?
 void Core::copyFileClipboard() {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
 
-    QMimeData *mimeData = getMimeDataForImage(model->getImage(selectedPath()), TARGET_CLIPBOARD);
+    QMimeData *mimeData = getMimeDataForImage(m_model->getImage(selectedPath()), TARGET_CLIPBOARD);
 
     // mimeData->text() should already contain an url
     QByteArray gnomeFormat = QByteArray("copy\n").append(QUrl(mimeData->text()).toEncoded());
@@ -41,14 +41,14 @@ void Core::copyFileClipboard() {
     mimeData->setData("application/x-kde-cutselection", "0");
 
     QApplication::clipboard()->setMimeData(mimeData);
-    overlays_->showMessage(tr("File copied"));
+    m_overlays->showMessage(tr("File copied"));
 }
 
 void Core::copyPathClipboard() {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
     QApplication::clipboard()->setText(selectedPath());
-    overlays_->showMessage(tr("Path copied"));
+    m_overlays->showMessage(tr("Path copied"));
 }
 
 // open from clipboard
@@ -68,7 +68,7 @@ void Core::copyPathClipboard() {
 //     overwrite prompt for an operation that can only produce an identical
 //     file.
 void Core::pasteFilesToCurrentDirectory() {
-    const QString destDir = model->directoryPath();
+    const QString destDir = m_model->directoryPath();
     if(destDir.isEmpty())
         return; // no directory to paste into
     const QMimeData *mimeData = QApplication::clipboard()->mimeData();
@@ -113,9 +113,9 @@ void Core::openFromClipboard() {
         const QImage image = cb->image();
         if(image.isNull())
             return;
-        QString destPath = (!model->isEmpty() ? model->directoryPath() : QDir::homePath());
+        QString destPath = (!m_model->isEmpty() ? m_model->directoryPath() : QDir::homePath());
         destPath.append("/clipboard.png");
-        destPath = dialogs_->getSaveFileName(destPath);
+        destPath = m_dialogs->getSaveFileName(destPath);
         if(destPath.isEmpty())
             return;
         // the same save-with-rollback the on-disk editors use; this used to be
@@ -151,8 +151,8 @@ void Core::onDraggedOut() {
 QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {
     QMimeData *mimeData;
     // single selection, image
-    if(paths.count() == 1 && model->containsFile(paths.first())) {
-        mimeData = getMimeDataForImage(model->getImage(paths.last()), TARGET_DROP);
+    if(paths.count() == 1 && m_model->containsFile(paths.first())) {
+        mimeData = getMimeDataForImage(m_model->getImage(paths.last()), TARGET_DROP);
         // the Image object may simply not be in the cache — an entry in the
         // listing is a file whether or not its full-size image was loaded.
         // An empty QMimeData makes every drop target refuse the drag with a

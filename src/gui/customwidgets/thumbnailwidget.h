@@ -81,16 +81,16 @@ class ThumbnailWidget : public QGraphicsWidget {
     void updateDpr(qreal newDpr);
     void refreshCacheMode();
 
-    std::shared_ptr<Thumbnail> thumbnail;
+    std::shared_ptr<Thumbnail> m_thumbnail;
     // the paint-device copy of the thumbnail's image: converted once per
     // assignment, here on the GUI thread — the worker only ever makes QImage
-    QPixmap displayPixmap;
-    bool highlighted, hovered, dropHovered;
-    int mThumbnailSize, padding, marginX, marginY, labelSpacing, textHeight;
-    QRectF bgRect, mBoundingRect;
-    QFont font, fontInfo;
-    QRect drawRectCentered, nameRect, infoRect;
-    qreal dpr = 1.0;
+    QPixmap m_displayPixmap;
+    bool m_highlighted, m_hovered, m_dropHovered;
+    int m_thumbnailSize, m_padding, m_marginX, m_marginY, m_labelSpacing, m_textHeight;
+    QRectF m_bgRect, m_boundingRect;
+    QFont m_font, m_fontInfo;
+    QRect m_drawRectCentered, m_nameRect, m_infoRect;
+    qreal m_dpr = 1.0;
     void updateBoundingRect();
-    ThumbnailStyle thumbStyle;
+    ThumbnailStyle m_thumbStyle;
 };

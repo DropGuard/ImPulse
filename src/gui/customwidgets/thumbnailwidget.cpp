@@ -1,22 +1,22 @@
 #include "thumbnailwidget.h"
 
 ThumbnailWidget::ThumbnailWidget(QGraphicsItem *parent)
-    : QGraphicsWidget(parent), isLoaded(false), thumbnail(nullptr), highlighted(false), hovered(false),
-      dropHovered(false), mThumbnailSize(100), padding(5), marginX(2), marginY(2), labelSpacing(9), textHeight(5),
-      thumbStyle(THUMB_SIMPLE) {
+    : QGraphicsWidget(parent), isLoaded(false), m_thumbnail(nullptr), m_highlighted(false), m_hovered(false),
+      m_dropHovered(false), m_thumbnailSize(100), m_padding(5), m_marginX(2), m_marginY(2), m_labelSpacing(9),
+      m_textHeight(5), m_thumbStyle(THUMB_SIMPLE) {
     setAttribute(Qt::WA_OpaquePaintEvent, true);
-    dpr = qApp->devicePixelRatio();
-    if(trunc(dpr) == dpr) // don't enable for fractional scaling
+    m_dpr = qApp->devicePixelRatio();
+    if(trunc(m_dpr) == m_dpr) // don't enable for fractional scaling
         setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     setAcceptHoverEvents(true);
-    font.setBold(false);
-    QFontMetrics fm(font);
-    textHeight = fm.height();
+    m_font.setBold(false);
+    QFontMetrics fm(m_font);
+    m_textHeight = fm.height();
 }
 
 void ThumbnailWidget::updateDpr(qreal newDpr) {
-    if(dpr != newDpr) {
-        dpr = newDpr;
+    if(m_dpr != newDpr) {
+        m_dpr = newDpr;
         refreshCacheMode();
         updateThumbnailDrawPosition();
         updateBackgroundRect();
@@ -27,12 +27,12 @@ void ThumbnailWidget::updateDpr(qreal newDpr) {
 /// setCacheMode() purges the item cache, and calling it from inside paint()
 /// frees the device cache entry the scene is drawing into, which crashes.
 void ThumbnailWidget::refreshCacheMode() {
-    if(trunc(dpr) != dpr) // don't enable for fractional scaling
+    if(trunc(m_dpr) != m_dpr) // don't enable for fractional scaling
         return;
     QMetaObject::invokeMethod(
         this,
         [this] {
-            if(trunc(dpr) != dpr)
+            if(trunc(m_dpr) != m_dpr)
                 return;
             setCacheMode(QGraphicsItem::DeviceCoordinateCache);
             // re-setting the mode only purges the cache, it does not repaint
@@ -42,9 +42,9 @@ void ThumbnailWidget::refreshCacheMode() {
 }
 
 void ThumbnailWidget::setThumbnailSize(int size) {
-    if(mThumbnailSize != size && size > 0) {
+    if(m_thumbnailSize != size && size > 0) {
         isLoaded = false;
-        mThumbnailSize = size;
+        m_thumbnailSize = size;
         updateBoundingRect();
         updateGeometry();
         updateThumbnailDrawPosition();
@@ -55,32 +55,32 @@ void ThumbnailWidget::setThumbnailSize(int size) {
 }
 
 void ThumbnailWidget::setPadding(int _padding) {
-    padding = _padding;
+    m_padding = _padding;
     updateBoundingRect();
 }
 
 void ThumbnailWidget::setMargins(int _marginX, int _marginY) {
-    marginX = _marginX;
-    marginY = _marginY;
+    m_marginX = _marginX;
+    m_marginY = _marginY;
     updateBoundingRect();
 }
 
 int ThumbnailWidget::thumbnailSize() {
-    return mThumbnailSize;
+    return m_thumbnailSize;
 }
 
 void ThumbnailWidget::reset() {
-    if(thumbnail)
-        thumbnail.reset();
-    highlighted = false;
-    hovered = false;
+    if(m_thumbnail)
+        m_thumbnail.reset();
+    m_highlighted = false;
+    m_hovered = false;
     isLoaded = false;
     update();
 }
 
 void ThumbnailWidget::setThumbStyle(ThumbnailStyle _style) {
-    if(thumbStyle != _style) {
-        thumbStyle = _style;
+    if(m_thumbStyle != _style) {
+        m_thumbStyle = _style;
         updateBoundingRect();
         updateThumbnailDrawPosition();
         setupTextLayout();
@@ -108,11 +108,11 @@ QSizeF ThumbnailWidget::effectiveSizeHint(Qt::SizeHint which, const QSizeF &cons
 
 void ThumbnailWidget::setThumbnail(std::shared_ptr<Thumbnail> _thumbnail) {
     if(_thumbnail) {
-        thumbnail = _thumbnail;
-        if(thumbnail && thumbnail->image())
-            displayPixmap = QPixmap::fromImage(*thumbnail->image());
+        m_thumbnail = _thumbnail;
+        if(m_thumbnail && m_thumbnail->image())
+            m_displayPixmap = QPixmap::fromImage(*m_thumbnail->image());
         else
-            displayPixmap = QPixmap();
+            m_displayPixmap = QPixmap();
         isLoaded = true;
         updateThumbnailDrawPosition();
         setupTextLayout();
@@ -122,8 +122,8 @@ void ThumbnailWidget::setThumbnail(std::shared_ptr<Thumbnail> _thumbnail) {
 }
 
 void ThumbnailWidget::unsetThumbnail() {
-    if(thumbnail)
-        thumbnail.reset();
+    if(m_thumbnail)
+        m_thumbnail.reset();
     isLoaded = false;
 }
 
@@ -131,64 +131,65 @@ void ThumbnailWidget::unsetThumbnail() {
 // given — so a rename builds a second description of the same pixels rather
 // than mutating the first. The QPixmap is refcounted, so nothing is decoded.
 void ThumbnailWidget::renameThumbnail(const QString &newName) {
-    if(!thumbnail)
+    if(!m_thumbnail)
         return;
-    setThumbnail(std::make_shared<Thumbnail>(newName, thumbnail->info(), thumbnail->size(), thumbnail->image()));
+    setThumbnail(std::make_shared<Thumbnail>(newName, m_thumbnail->info(), m_thumbnail->size(), m_thumbnail->image()));
 }
 
 void ThumbnailWidget::setupTextLayout() {
-    if(thumbStyle != THUMB_SIMPLE) {
-        nameRect =
-            QRect(padding + marginX, padding + marginY + mThumbnailSize + labelSpacing, mThumbnailSize, textHeight);
-        infoRect = nameRect.adjusted(0, textHeight + 2, 0, textHeight + 2);
+    if(m_thumbStyle != THUMB_SIMPLE) {
+        m_nameRect = QRect(m_padding + m_marginX, m_padding + m_marginY + m_thumbnailSize + m_labelSpacing,
+                           m_thumbnailSize, m_textHeight);
+        m_infoRect = m_nameRect.adjusted(0, m_textHeight + 2, 0, m_textHeight + 2);
     }
 }
 
 void ThumbnailWidget::updateBackgroundRect() {
-    bool verticalFit = (drawRectCentered.height() >= drawRectCentered.width());
-    if(thumbStyle == THUMB_NORMAL && !verticalFit) {
-        bgRect.setBottom(height() - marginY);
-        bgRect.setLeft(marginX);
-        bgRect.setRight(width() - marginX);
-        if(!thumbnail || !displayPixmap)
-            bgRect.setTop(drawRectCentered.top() - padding);
+    bool verticalFit = (m_drawRectCentered.height() >= m_drawRectCentered.width());
+    if(m_thumbStyle == THUMB_NORMAL && !verticalFit) {
+        m_bgRect.setBottom(height() - m_marginY);
+        m_bgRect.setLeft(m_marginX);
+        m_bgRect.setRight(width() - m_marginX);
+        if(!m_thumbnail || !m_displayPixmap)
+            m_bgRect.setTop(m_drawRectCentered.top() - m_padding);
         else // ensure we get equal padding on the top & sides
-            bgRect.setTop(qMax(drawRectCentered.top() - drawRectCentered.left() + marginX, marginY));
+            m_bgRect.setTop(qMax(m_drawRectCentered.top() - m_drawRectCentered.left() + m_marginX, m_marginY));
     } else {
-        bgRect = boundingRect().adjusted(marginX, marginY, -marginX, -marginY);
+        m_bgRect = boundingRect().adjusted(m_marginX, m_marginY, -m_marginX, -m_marginY);
     }
 }
 
 void ThumbnailWidget::setHighlighted(bool mode) {
-    if(highlighted != mode) {
-        highlighted = mode;
+    if(m_highlighted != mode) {
+        m_highlighted = mode;
         update();
     }
 }
 
 bool ThumbnailWidget::isHighlighted() {
-    return highlighted;
+    return m_highlighted;
 }
 
 void ThumbnailWidget::setDropHovered(bool mode) {
-    if(dropHovered != mode) {
-        dropHovered = mode;
+    if(m_dropHovered != mode) {
+        m_dropHovered = mode;
         update();
     }
 }
 
 bool ThumbnailWidget::isDropHovered() {
-    return dropHovered;
+    return m_dropHovered;
 }
 
 QRectF ThumbnailWidget::boundingRect() const {
-    return mBoundingRect;
+    return m_boundingRect;
 }
 
 void ThumbnailWidget::updateBoundingRect() {
-    mBoundingRect = QRectF(0, 0, mThumbnailSize + (padding + marginX) * 2, mThumbnailSize + (padding + marginY) * 2);
-    if(thumbStyle != THUMB_SIMPLE)
-        mBoundingRect.adjust(0, 0, 0, labelSpacing + textHeight * 2);
+    m_boundingRect =
+        QRectF(0, 0, m_thumbnailSize + (m_padding + m_marginX) * 2, m_thumbnailSize + (m_padding + m_marginY) * 2);
+    if(m_thumbStyle != THUMB_SIMPLE)
+        m_boundingRect.adjust(0, 0, 0, m_labelSpacing + m_textHeight * 2);
 }
 
 qreal ThumbnailWidget::width() {
@@ -213,28 +214,28 @@ void ThumbnailWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
     if(isHighlighted())
         drawHighlight(painter);
 
-    if(!thumbnail) { // not loaded
+    if(!m_thumbnail) { // not loaded
         // todo: recolor once in shrRes
-        QPixmap loadingIcon(*shrRes->getPixmap(ShrIcon::SHR_ICON_LOADING, dpr));
+        QPixmap loadingIcon(*shrRes->getPixmap(ShrIcon::SHR_ICON_LOADING, m_dpr));
         if(isHighlighted())
             ImageLib::recolor(loadingIcon, settings->colorScheme().accent);
         else
             ImageLib::recolor(loadingIcon, settings->colorScheme().folderview_hc2);
         drawIcon(painter, &loadingIcon);
     } else {
-        if(displayPixmap.isNull() || displayPixmap.width() == 0) { // invalid thumb
-            QPixmap errorIcon(*shrRes->getPixmap(ShrIcon::SHR_ICON_ERROR, dpr));
+        if(m_displayPixmap.isNull() || m_displayPixmap.width() == 0) { // invalid thumb
+            QPixmap errorIcon(*shrRes->getPixmap(ShrIcon::SHR_ICON_ERROR, m_dpr));
             if(isHighlighted())
                 ImageLib::recolor(errorIcon, settings->colorScheme().accent);
             else
                 ImageLib::recolor(errorIcon, settings->colorScheme().folderview_hc2);
             drawIcon(painter, &errorIcon);
         } else {
-            drawThumbnail(painter, &displayPixmap);
+            drawThumbnail(painter, &m_displayPixmap);
             if(isHovered())
                 drawHoverHighlight(painter);
         }
-        if(thumbStyle != THUMB_SIMPLE)
+        if(m_thumbStyle != THUMB_SIMPLE)
             drawLabel(painter);
     }
     if(isDropHovered())
@@ -247,11 +248,11 @@ void ThumbnailWidget::drawHighlight(QPainter *painter) {
         auto op = painter->opacity();
         painter->setRenderHint(QPainter::Antialiasing);
         painter->setOpacity(0.40f * op);
-        painter->fillRect(bgRect, settings->colorScheme().accent);
+        painter->fillRect(m_bgRect, settings->colorScheme().accent);
         painter->setOpacity(0.70f * op);
         QPen pen(settings->colorScheme().accent, 2);
         painter->setPen(pen);
-        painter->drawRect(bgRect.adjusted(1, 1, -1, -1)); // 2px pen
+        painter->drawRect(m_bgRect.adjusted(1, 1, -1, -1)); // 2px pen
         //painter->drawRect(highlightRect.adjusted(0.5,0.5,-0.5,-0.5)); // 1px pen
         painter->setOpacity(op);
         painter->setRenderHints(hints);
@@ -260,7 +261,7 @@ void ThumbnailWidget::drawHighlight(QPainter *painter) {
 
 void ThumbnailWidget::drawHoverBg(QPainter *painter) {
     auto op = painter->opacity();
-    painter->fillRect(bgRect, settings->colorScheme().folderview_hc);
+    painter->fillRect(m_bgRect, settings->colorScheme().folderview_hc);
     painter->setOpacity(op);
 }
 
@@ -269,38 +270,38 @@ void ThumbnailWidget::drawHoverHighlight(QPainter *painter) {
     auto mode = painter->compositionMode();
     painter->setCompositionMode(QPainter::CompositionMode_Plus);
     painter->setOpacity(0.2f);
-    painter->drawPixmap(drawRectCentered, displayPixmap);
+    painter->drawPixmap(m_drawRectCentered, m_displayPixmap);
     painter->setOpacity(op);
     painter->setCompositionMode(mode);
 }
 
 void ThumbnailWidget::drawLabel(QPainter *painter) {
-    if(thumbnail) {
-        drawSingleLineText(painter, nameRect, thumbnail->name(), settings->colorScheme().text_hc2);
+    if(m_thumbnail) {
+        drawSingleLineText(painter, m_nameRect, m_thumbnail->name(), settings->colorScheme().text_hc2);
         auto op = painter->opacity();
         painter->setOpacity(op * 0.62f);
-        drawSingleLineText(painter, infoRect, thumbnail->info(), settings->colorScheme().text_hc2);
+        drawSingleLineText(painter, m_infoRect, m_thumbnail->info(), settings->colorScheme().text_hc2);
         painter->setOpacity(op);
     }
 }
 
 void ThumbnailWidget::drawSingleLineText(QPainter *painter, QRect rect, QString text, const QColor &color) {
-    QFontMetrics fm(font);
+    QFontMetrics fm(m_font);
     bool fits = !(fm.horizontalAdvance(text) > rect.width());
     // filename
     int flags;
-    painter->setFont(font);
+    painter->setFont(m_font);
     if(fits) {
         flags = Qt::TextSingleLine | Qt::AlignVCenter | Qt::AlignHCenter;
         painter->setPen(color);
         painter->drawText(rect, flags, text);
     } else {
         // fancy variant with text fade effect - uses temporary surface to paint; slow
-        QPixmap textLayer(rect.width() * dpr, rect.height() * dpr);
+        QPixmap textLayer(rect.width() * m_dpr, rect.height() * m_dpr);
         textLayer.fill(Qt::transparent);
-        textLayer.setDevicePixelRatio(dpr);
+        textLayer.setDevicePixelRatio(m_dpr);
         QPainter textPainter(&textLayer);
-        textPainter.setFont(font);
+        textPainter.setFont(m_font);
         // paint text onto tmp layer
         flags = Qt::TextSingleLine | Qt::AlignVCenter;
         textPainter.setPen(color);
@@ -327,18 +328,18 @@ void ThumbnailWidget::drawDropHover(QPainter *painter) {
     painter->setRenderHint(QPainter::Antialiasing);
     QColor clr(190, 60, 25);
     painter->setOpacity(0.1f * op);
-    painter->fillRect(bgRect, clr);
+    painter->fillRect(m_bgRect, clr);
     painter->setOpacity(op);
     QPen pen(clr, 2);
     painter->setPen(pen);
-    painter->drawRect(bgRect.adjusted(1, 1, -1, -1));
+    painter->drawRect(m_bgRect.adjusted(1, 1, -1, -1));
     painter->setRenderHints(hints);
 }
 
 void ThumbnailWidget::drawThumbnail(QPainter *painter, const QPixmap *pixmap) {
-    if(!thumbnail->hasAlphaChannel())
-        painter->fillRect(drawRectCentered.adjusted(3, 3, 3, 3), QColor(0, 0, 0, 60));
-    painter->drawPixmap(drawRectCentered, *pixmap);
+    if(!m_thumbnail->hasAlphaChannel())
+        painter->fillRect(m_drawRectCentered.adjusted(3, 3, 3, 3), QColor(0, 0, 0, 60));
+    painter->drawPixmap(m_drawRectCentered, *pixmap);
 }
 
 void ThumbnailWidget::drawIcon(QPainter *painter, const QPixmap *pixmap) {
@@ -365,32 +366,32 @@ void ThumbnailWidget::hoverLeaveEvent(QGraphicsSceneHoverEvent *event) {
 }
 
 void ThumbnailWidget::setHovered(bool mode) {
-    if(hovered != mode) {
-        hovered = mode;
+    if(m_hovered != mode) {
+        m_hovered = mode;
         update();
     }
 }
 
 bool ThumbnailWidget::isHovered() {
-    return hovered;
+    return m_hovered;
 }
 
 void ThumbnailWidget::updateThumbnailDrawPosition() {
-    if(thumbnail && !displayPixmap.isNull()) {
+    if(m_thumbnail && !m_displayPixmap.isNull()) {
         QPoint topLeft;
         QSize pixmapSize; // dpr-adjusted size
         if(isLoaded)
-            pixmapSize = thumbnail->image()->size() / qApp->devicePixelRatio();
+            pixmapSize = m_thumbnail->image()->size() / qApp->devicePixelRatio();
         else
-            pixmapSize = thumbnail->image()->size().scaled(mThumbnailSize, mThumbnailSize, Qt::KeepAspectRatio);
+            pixmapSize = m_thumbnail->image()->size().scaled(m_thumbnailSize, m_thumbnailSize, Qt::KeepAspectRatio);
         bool verticalFit = (pixmapSize.height() >= pixmapSize.width());
         topLeft.setX((width() - pixmapSize.width()) / 2.0);
-        if(thumbStyle == THUMB_SIMPLE)
+        if(m_thumbStyle == THUMB_SIMPLE)
             topLeft.setY((height() - pixmapSize.height()) / 2.0);
-        else if(thumbStyle == THUMB_NORMAL_CENTERED && !verticalFit)
-            topLeft.setY((height() - pixmapSize.height()) / 2.0 - textHeight);
+        else if(m_thumbStyle == THUMB_NORMAL_CENTERED && !verticalFit)
+            topLeft.setY((height() - pixmapSize.height()) / 2.0 - m_textHeight);
         else // THUMB_NORMAL - snap thumbnail to the filename label
-            topLeft.setY(padding + marginY + mThumbnailSize - pixmapSize.height());
-        drawRectCentered = QRect(topLeft, pixmapSize);
+            topLeft.setY(m_padding + m_marginY + m_thumbnailSize - pixmapSize.height());
+        m_drawRectCentered = QRect(topLeft, pixmapSize);
     }
 }

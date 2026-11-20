@@ -43,41 +43,42 @@ Core::Core(const Deps &deps)
       // A borrowed pool is used as-is; otherwise Core owns one sized the way the
       // app always sized it. The unique_ptr is declared before the reference so
       // the member it points at outlives the reference's users.
-      ownedPool(deps.pool ? nullptr : std::make_unique<WorkerPool>(workerPoolThreadCount())),
-      pool(deps.pool ? *deps.pool : *ownedPool), mBridge(deps.bridge ? *deps.bridge : EngineBridge::instance()),
-      thumbnailer(pool), thumbPanelPresenter(thumbnailer), folderViewPresenter(thumbnailer) {
+      m_ownedPool(deps.pool ? nullptr : std::make_unique<WorkerPool>(workerPoolThreadCount())),
+      m_pool(deps.pool ? *deps.pool : *m_ownedPool), m_bridge(deps.bridge ? *deps.bridge : EngineBridge::instance()),
+      m_thumbnailer(m_pool), m_thumbPanelPresenter(m_thumbnailer), m_folderViewPresenter(m_thumbnailer) {
     loadTranslation();
     if(deps.headless) {
         // no window tree at all: the three seams are the whole surface. Their
         // completeness is guarded by the seam census at the end of this
         // constructor — deliberately not by an assert, which compiles out in
         // the Release build.
-        ui_ = deps.ui;
-        overlays_ = deps.overlays;
-        view_ = deps.view;
-        ownedDialogs = std::make_unique<DialogHost>(nullptr, nullptr);
-        dialogs_ = ownedDialogs.get();
-        crop_ = deps.crop; // optional: only crop-flow tests provide one
+        m_ui = deps.ui;
+        m_overlays = deps.overlays;
+        m_view = deps.view;
+        m_ownedDialogs = std::make_unique<DialogHost>(nullptr, nullptr);
+        m_dialogs = m_ownedDialogs.get();
+        m_crop = deps.crop; // optional: only crop-flow tests provide one
     } else {
         initGui();
         // the main window owns the dialogs and the interaction interface, so it
         // is the production provider of both; tests replace these pointers with
         // scripted fakes
-        ui_ = mw;
-        view_ = deps.view ? deps.view : mw;
-        overlays_ = deps.overlays ? deps.overlays : mw->overlays();
-        dialogs_ = mw->dialogs();
-        crop_ = deps.crop ? deps.crop : mw->crop();
+        m_ui = m_mw;
+        m_view = deps.view ? deps.view : m_mw;
+        m_overlays = deps.overlays ? deps.overlays : m_mw->overlays();
+        m_dialogs = m_mw->dialogs();
+        m_crop = deps.crop ? deps.crop : m_mw->crop();
     }
     // the navigation object: both branches have set the seams it drives, so
     // it is constructed here, once — the listing arrives later, via attachModel
-    nav_ = new NavigationController(&state, this, view_, overlays_, thumbPanelPresenter, folderViewPresenter, this);
+    m_nav = new NavigationController(&m_state, this, m_view, m_overlays, m_thumbPanelPresenter, m_folderViewPresenter,
+                                     this);
     // the seam census — deliberately NOT Q_ASSERT, which compiles out of the
     // Release build this tree ships. A seam wired in one construction branch
     // only (nav_, in its day) must stay loud in every build shape, and the
     // message must say which seam set to inspect. crop_ is the documented
     // optional (crop-flow tests provide it); everything else is mandatory.
-    if(!ui_ || !view_ || !overlays_ || !dialogs_ || !nav_)
+    if(!m_ui || !m_view || !m_overlays || !m_dialogs || !m_nav)
         qFatal("Core construction left a seam null (the census checks ui_, view_, overlays_, dialogs_, nav_) — "
                "every seam must be wired in both construction branches");
     // the slideshow loop is a pure function of the state: slides advance by
@@ -85,8 +86,8 @@ Core::Core(const Deps &deps)
     // through the view seam — the window's notifier keeps only the info
     // projection, this one owns the player request, so a headless Core
     // reaches the seam exactly the way production does.
-    slideshowRelay = state.slideshow.addNotifier([this] {
-        view_->setLoopPlayback(!state.slideshow.value());
+    m_slideshowRelay = m_state.slideshow.addNotifier([this] {
+        m_view->setLoopPlayback(!m_state.slideshow.value());
     });
     initComponents();
     connectComponents();
@@ -113,15 +114,15 @@ Core::~Core() {
     // and every Core instance leaked one). Presenters hold raw views into the
     // tree but run no code after this point; their own destruction follows as
     // ordinary member teardown.
-    delete mw;
-    mw = nullptr;
+    delete m_mw;
+    m_mw = nullptr;
     // the translator lives on the application's translator list, so it has to
     // come off that list before it is freed — and it had no parent and no
     // destructor, so until now nothing ever freed it
-    if(translator) {
-        qApp->removeTranslator(translator);
-        delete translator;
-        translator = nullptr;
+    if(m_translator) {
+        qApp->removeTranslator(m_translator);
+        delete m_translator;
+        m_translator = nullptr;
     }
 }
 
@@ -137,14 +138,14 @@ void Core::readSettings() {
     // path: the regenerated batch starts with Thumbnailer::clearTasks(), which
     // drains it. What remains here is the running job, so a thumbnail callback
     // cannot land mid-repopulation.
-    pool.waitForOwner(PoolOwner::Thumbnailer);
-    nav_->applySlideshowSettings(settings->slideshowInterval(), settings->loopSlideshow());
-    nav_->setFolderEndAction(settings->folderEndAction());
+    m_pool.waitForOwner(PoolOwner::Thumbnailer);
+    m_nav->applySlideshowSettings(settings->slideshowInterval(), settings->loopSlideshow());
+    m_nav->setFolderEndAction(settings->folderEndAction());
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
-    if(folderViewPresenter.showDirs() != showDirs)
-        folderViewPresenter.setShowDirs(showDirs);
-    if(state.shuffle)
-        nav_->syncRandomizer();
+    if(m_folderViewPresenter.showDirs() != showDirs)
+        m_folderViewPresenter.setShowDirs(showDirs);
+    if(m_state.shuffle)
+        m_nav->syncRandomizer();
 }
 
 // The keymap's document scope follows the view mode. Navigation writes the
@@ -156,9 +157,9 @@ void Core::onViewModeChanged(ViewMode mode) {
 }
 
 void Core::showGui() {
-    if(!mw)
+    if(!m_mw)
         return; // headless Core has nothing to show
-    view_->showWindowDefault();
+    m_view->showWindowDefault();
     // the heavy-UI trigger is the window's own first show (shownOnce, wired
     // in the MW constructor) — the processEvents + 50 ms guess this used to
     // run is gone, along with the TODO that called it unreliable
@@ -166,43 +167,43 @@ void Core::showGui() {
 
 // create MainWindow and all widgets
 void Core::initGui() {
-    mw = new MW(&state);
-    mw->hide();
+    m_mw = new MW(&m_state);
+    m_mw->hide();
 }
 
 void Core::attachModel(DirectoryModel *_model) {
-    model.reset(_model);
-    thumbPanelPresenter.setModel(model);
-    folderViewPresenter.setModel(model);
+    m_model.reset(_model);
+    m_thumbPanelPresenter.setModel(m_model);
+    m_folderViewPresenter.setModel(m_model);
     bool showDirs = (settings->folderViewMode() == FV_EXT_FOLDERS);
-    folderViewPresenter.setShowDirs(showDirs);
-    nav_->attachModel(_model);
+    m_folderViewPresenter.setShowDirs(showDirs);
+    m_nav->attachModel(_model);
 }
 
 void Core::initComponents() {
-    attachModel(new DirectoryModel(pool, mBridge));
+    attachModel(new DirectoryModel(m_pool, m_bridge));
 }
 
 void Core::connectComponents() {
 
-    connect(&folderViewPresenter, &DirectoryPresenter::draggedOut, this,
+    connect(&m_folderViewPresenter, &DirectoryPresenter::draggedOut, this,
             qOverload<const QList<QString> &>(&Core::onDraggedOut));
 
-    connect(&folderViewPresenter, &DirectoryPresenter::droppedInto, this,
+    connect(&m_folderViewPresenter, &DirectoryPresenter::droppedInto, this,
             qOverload<const QList<QString> &, const QString &>(&Core::movePathsTo));
 
-    connect(scriptManager, &ScriptManager::error, overlays_, &IOverlayHost::showError);
+    connect(scriptManager, &ScriptManager::error, m_overlays, &IOverlayHost::showError);
 
-    connect(overlays_, &IOverlayHost::copyRequested, this, &Core::copyCurrentFile);
-    connect(overlays_, &IOverlayHost::moveRequested, this, &Core::moveCurrentFile);
-    connect(overlays_, &IOverlayHost::saveAsClicked, this, &Core::requestSavePath);
-    connect(overlays_, &IOverlayHost::saveRequested, this, &Core::saveCurrentFile);
-    connect(overlays_, &IOverlayHost::renameRequested, this, &Core::renameCurrentSelection);
-    connect(overlays_, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
+    connect(m_overlays, &IOverlayHost::copyRequested, this, &Core::copyCurrentFile);
+    connect(m_overlays, &IOverlayHost::moveRequested, this, &Core::moveCurrentFile);
+    connect(m_overlays, &IOverlayHost::saveAsClicked, this, &Core::requestSavePath);
+    connect(m_overlays, &IOverlayHost::saveRequested, this, &Core::saveCurrentFile);
+    connect(m_overlays, &IOverlayHost::renameRequested, this, &Core::renameCurrentSelection);
+    connect(m_overlays, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
 
-    connect(model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
+    connect(m_model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
 
-    if(mw)
+    if(m_mw)
         connectWindowComponents();
 }
 
@@ -210,26 +211,26 @@ void Core::connectComponents() {
 // window->Core legs. Headless Core skips the whole method — a windowless
 // process has no drops, no drags, no folder-view clicks, no keys.
 void Core::connectWindowComponents() {
-    connect(mw, &MW::droppedIn, this, &Core::onDropIn);
-    connect(mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
-    connect(mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
-    connect(mw, &MW::sortingSelected, nav_, &NavigationController::sortBy);
-    connect(mw, &MW::showFoldersChanged, nav_, &NavigationController::setFoldersDisplay);
-    connect(mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
-    connect(mw, &MW::playbackFinished, nav_, &NavigationController::onPlaybackFinished);
-    connect(mw, &MW::scalingRequested, this, &Core::scalingRequest);
-    thumbPanelPresenter.setView(mw->getThumbnailPanel());
-    folderViewPresenter.setView(mw->getFolderView());
-    connect(mw->dialogs(), &DialogHost::opened, nav_, &NavigationController::loadPath);
-    connect(mw->crop(), &CropController::cropRequested, this, &Core::crop);
-    connect(mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
-    connect(mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
-    connect(mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
+    connect(m_mw, &MW::droppedIn, this, &Core::onDropIn);
+    connect(m_mw, &MW::copyUrlsRequested, this, qOverload<const QList<QString> &, const QString &>(&Core::copyPathsTo));
+    connect(m_mw, &MW::moveUrlsRequested, this, &Core::movePathsTo);
+    connect(m_mw, &MW::sortingSelected, m_nav, &NavigationController::sortBy);
+    connect(m_mw, &MW::showFoldersChanged, m_nav, &NavigationController::setFoldersDisplay);
+    connect(m_mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
+    connect(m_mw, &MW::playbackFinished, m_nav, &NavigationController::onPlaybackFinished);
+    connect(m_mw, &MW::scalingRequested, this, &Core::scalingRequest);
+    m_thumbPanelPresenter.setView(m_mw->getThumbnailPanel());
+    m_folderViewPresenter.setView(m_mw->getFolderView());
+    connect(m_mw->dialogs(), &DialogHost::opened, m_nav, &NavigationController::loadPath);
+    connect(m_mw->crop(), &CropController::cropRequested, this, &Core::crop);
+    connect(m_mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
+    connect(m_mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
+    connect(m_mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
 }
 
 void Core::initActions() {
-    actionManager->connectAction("nextImage", nav_, &NavigationController::nextImage);
-    actionManager->connectAction("prevImage", nav_, &NavigationController::prevImage);
+    actionManager->connectAction("nextImage", m_nav, &NavigationController::nextImage);
+    actionManager->connectAction("prevImage", m_nav, &NavigationController::prevImage);
     actionManager->connectAction("resize", this, &Core::showResizeDialog);
     actionManager->connectAction("flipH", this, &Core::flipH);
     actionManager->connectAction("flipV", this, &Core::flipV);
@@ -243,39 +244,39 @@ void Core::initActions() {
     actionManager->connectAction("exit", this, &Core::close);
     actionManager->connectAction("removeFile", this, &Core::removePermanent);
     actionManager->connectAction("moveToTrash", this, &Core::moveToTrash);
-    actionManager->connectAction("copyFile", overlays_, &IOverlayHost::triggerCopyOverlay);
+    actionManager->connectAction("copyFile", m_overlays, &IOverlayHost::triggerCopyOverlay);
     actionManager->connectAction("quickCopy", this, &Core::quickCopyToFixedDirectory);
-    actionManager->connectAction("moveFile", overlays_, &IOverlayHost::triggerMoveOverlay);
-    actionManager->connectAction("jumpToFirst", nav_, &NavigationController::jumpToFirst);
-    actionManager->connectAction("jumpToLast", nav_, &NavigationController::jumpToLast);
+    actionManager->connectAction("moveFile", m_overlays, &IOverlayHost::triggerMoveOverlay);
+    actionManager->connectAction("jumpToFirst", m_nav, &NavigationController::jumpToFirst);
+    actionManager->connectAction("jumpToLast", m_nav, &NavigationController::jumpToLast);
     // script actions are dynamic — no registered QAction exists for an
     // "s:<name>" binding, so the runScript carrier signal stays a plain
     // connect (R12's documented exception)
     connect(actionManager, &ActionManager::runScript, this, &Core::runScript);
-    actionManager->connectAction("folderView", nav_, &NavigationController::enableFolderView);
-    actionManager->connectAction("documentView", nav_, &NavigationController::enableDocumentView);
-    actionManager->connectAction("toggleFolderView", nav_, &NavigationController::toggleFolderView);
+    actionManager->connectAction("folderView", m_nav, &NavigationController::enableFolderView);
+    actionManager->connectAction("documentView", m_nav, &NavigationController::enableDocumentView);
+    actionManager->connectAction("toggleFolderView", m_nav, &NavigationController::toggleFolderView);
     actionManager->connectAction("reloadImage", this, qOverload<>(&Core::reloadImage));
     actionManager->connectAction("copyFileClipboard", this, &Core::copyFileClipboard);
     actionManager->connectAction("copyPathClipboard", this, &Core::copyPathClipboard);
     actionManager->connectAction("renameFile", this, &Core::showRenameDialog);
-    actionManager->connectAction("sortByName", nav_, &NavigationController::sortByName);
-    actionManager->connectAction("sortByTime", nav_, &NavigationController::sortByTime);
-    actionManager->connectAction("sortBySize", nav_, &NavigationController::sortBySize);
-    actionManager->connectAction("toggleImageInfo", overlays_, &IOverlayHost::toggleImageInfoOverlay);
-    actionManager->connectAction("toggleShuffle", nav_, &NavigationController::toggleShuffle);
+    actionManager->connectAction("sortByName", m_nav, &NavigationController::sortByName);
+    actionManager->connectAction("sortByTime", m_nav, &NavigationController::sortByTime);
+    actionManager->connectAction("sortBySize", m_nav, &NavigationController::sortBySize);
+    actionManager->connectAction("toggleImageInfo", m_overlays, &IOverlayHost::toggleImageInfoOverlay);
+    actionManager->connectAction("toggleShuffle", m_nav, &NavigationController::toggleShuffle);
     actionManager->connectAction("showInDirectory", this, &Core::showInDirectory);
-    actionManager->connectAction("toggleSlideshow", nav_, &NavigationController::toggleSlideshow);
-    actionManager->connectAction("goUp", nav_, &NavigationController::loadParentDir);
+    actionManager->connectAction("toggleSlideshow", m_nav, &NavigationController::toggleSlideshow);
+    actionManager->connectAction("goUp", m_nav, &NavigationController::loadParentDir);
     actionManager->connectAction("discardEdits", this, &Core::discardEdits);
-    actionManager->connectAction("nextDirectory", nav_, &NavigationController::nextDirectory);
-    actionManager->connectAction("prevDirectory", nav_, qOverload<>(&NavigationController::prevDirectory));
+    actionManager->connectAction("nextDirectory", m_nav, &NavigationController::nextDirectory);
+    actionManager->connectAction("prevDirectory", m_nav, qOverload<>(&NavigationController::prevDirectory));
     actionManager->connectAction("print", this, &Core::print);
     actionManager->connectAction("toggleFullscreenInfoBar", this, &Core::toggleFullscreenInfoBar);
     actionManager->connectAction("pasteFile", this, &Core::openFromClipboard);
     // the folder grid's scope actions, landed on the proxy the same way the
     // viewer commands land on ViewerWidget
-    if(mw)
+    if(m_mw)
         connectWindowActions();
 }
 
@@ -286,46 +287,46 @@ void Core::connectWindowActions() {
     // the projection's registration surface: a QAction's shortcuts are inert
     // until added to a widget (dispatch_probe_tests), so the whole registry
     // goes live on the main window here
-    actionManager->attachWindowSurface(mw);
-    actionManager->connectAction("fitWindow", mw->viewer(), &ViewerWidget::fitWindow);
-    actionManager->connectAction("fitWidth", mw->viewer(), &ViewerWidget::fitWidth);
-    actionManager->connectAction("fitNormal", mw->viewer(), &ViewerWidget::fitOriginal);
-    actionManager->connectAction("nextFitMode", mw, &MW::cycleFitMode);
-    actionManager->connectAction("toggleFitMode", mw, &MW::switchFitMode);
-    actionManager->connectAction("toggleFullscreen", mw->shell(), &WindowShell::triggerFullScreen);
-    actionManager->connectAction("lockZoom", mw->viewer(), &ViewerWidget::toggleLockZoom);
-    actionManager->connectAction("lockView", mw->viewer(), &ViewerWidget::toggleLockView);
-    actionManager->connectAction("zoomIn", mw->viewer(), &ViewerWidget::zoomIn);
-    actionManager->connectAction("zoomOut", mw->viewer(), &ViewerWidget::zoomOut);
-    actionManager->connectAction("zoomInCursor", mw->viewer(), &ViewerWidget::zoomInCursor);
-    actionManager->connectAction("zoomOutCursor", mw->viewer(), &ViewerWidget::zoomOutCursor);
-    actionManager->connectAction("scrollUp", mw->viewer(), &ViewerWidget::scrollUp);
-    actionManager->connectAction("scrollDown", mw->viewer(), &ViewerWidget::scrollDown);
-    actionManager->connectAction("scrollLeft", mw->viewer(), &ViewerWidget::scrollLeft);
-    actionManager->connectAction("scrollRight", mw->viewer(), &ViewerWidget::scrollRight);
-    actionManager->connectAction("openSettings", mw->dialogs(), &DialogHost::showSettings);
-    actionManager->connectAction("closeFullScreenOrExit", mw->shell(), &WindowShell::closeFullScreenOrExit);
-    actionManager->connectAction("pauseVideo", mw->viewer(), &ViewerWidget::pauseResumePlayback);
-    actionManager->connectAction("seekVideoForward", mw->viewer(), &ViewerWidget::seekForward);
-    actionManager->connectAction("seekVideoBackward", mw->viewer(), &ViewerWidget::seekBackward);
-    actionManager->connectAction("frameStep", mw->viewer(), &ViewerWidget::frameStep);
-    actionManager->connectAction("frameStepBack", mw->viewer(), &ViewerWidget::frameStepBack);
-    actionManager->connectAction("contextMenu", mw, &MW::showContextMenu);
-    actionManager->connectAction("toggleTransparencyGrid", mw->viewer(), &ViewerWidget::toggleTransparencyGrid);
-    actionManager->connectAction("toggleScalingFilter", mw, &MW::toggleScalingFilter);
-    actionManager->connectAction("toggleMute", mw->viewer(), &ViewerWidget::toggleMute);
-    actionManager->connectAction("volumeUp", mw->viewer(), &ViewerWidget::volumeUp);
-    actionManager->connectAction("volumeDown", mw->viewer(), &ViewerWidget::volumeDown);
-    actionManager->connectAction("gridSelectNext", mw->getFolderView(), &FolderViewProxy::gridSelectNext);
-    actionManager->connectAction("gridSelectPrev", mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
-    actionManager->connectAction("gridSelectAbove", mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
-    actionManager->connectAction("gridSelectBelow", mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
-    actionManager->connectAction("gridPageUp", mw->getFolderView(), &FolderViewProxy::gridPageUp);
-    actionManager->connectAction("gridPageDown", mw->getFolderView(), &FolderViewProxy::gridPageDown);
-    actionManager->connectAction("gridSelectFirst", mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
-    actionManager->connectAction("gridSelectLast", mw->getFolderView(), &FolderViewProxy::gridSelectLast);
-    actionManager->connectAction("gridSelectAll", mw->getFolderView(), &FolderViewProxy::gridSelectAll);
-    actionManager->connectAction("gridOpen", mw->getFolderView(), &FolderViewProxy::activateCurrent);
+    actionManager->attachWindowSurface(m_mw);
+    actionManager->connectAction("fitWindow", m_mw->viewer(), &ViewerWidget::fitWindow);
+    actionManager->connectAction("fitWidth", m_mw->viewer(), &ViewerWidget::fitWidth);
+    actionManager->connectAction("fitNormal", m_mw->viewer(), &ViewerWidget::fitOriginal);
+    actionManager->connectAction("nextFitMode", m_mw, &MW::cycleFitMode);
+    actionManager->connectAction("toggleFitMode", m_mw, &MW::switchFitMode);
+    actionManager->connectAction("toggleFullscreen", m_mw->shell(), &WindowShell::triggerFullScreen);
+    actionManager->connectAction("lockZoom", m_mw->viewer(), &ViewerWidget::toggleLockZoom);
+    actionManager->connectAction("lockView", m_mw->viewer(), &ViewerWidget::toggleLockView);
+    actionManager->connectAction("zoomIn", m_mw->viewer(), &ViewerWidget::zoomIn);
+    actionManager->connectAction("zoomOut", m_mw->viewer(), &ViewerWidget::zoomOut);
+    actionManager->connectAction("zoomInCursor", m_mw->viewer(), &ViewerWidget::zoomInCursor);
+    actionManager->connectAction("zoomOutCursor", m_mw->viewer(), &ViewerWidget::zoomOutCursor);
+    actionManager->connectAction("scrollUp", m_mw->viewer(), &ViewerWidget::scrollUp);
+    actionManager->connectAction("scrollDown", m_mw->viewer(), &ViewerWidget::scrollDown);
+    actionManager->connectAction("scrollLeft", m_mw->viewer(), &ViewerWidget::scrollLeft);
+    actionManager->connectAction("scrollRight", m_mw->viewer(), &ViewerWidget::scrollRight);
+    actionManager->connectAction("openSettings", m_mw->dialogs(), &DialogHost::showSettings);
+    actionManager->connectAction("closeFullScreenOrExit", m_mw->shell(), &WindowShell::closeFullScreenOrExit);
+    actionManager->connectAction("pauseVideo", m_mw->viewer(), &ViewerWidget::pauseResumePlayback);
+    actionManager->connectAction("seekVideoForward", m_mw->viewer(), &ViewerWidget::seekForward);
+    actionManager->connectAction("seekVideoBackward", m_mw->viewer(), &ViewerWidget::seekBackward);
+    actionManager->connectAction("frameStep", m_mw->viewer(), &ViewerWidget::frameStep);
+    actionManager->connectAction("frameStepBack", m_mw->viewer(), &ViewerWidget::frameStepBack);
+    actionManager->connectAction("contextMenu", m_mw, &MW::showContextMenu);
+    actionManager->connectAction("toggleTransparencyGrid", m_mw->viewer(), &ViewerWidget::toggleTransparencyGrid);
+    actionManager->connectAction("toggleScalingFilter", m_mw, &MW::toggleScalingFilter);
+    actionManager->connectAction("toggleMute", m_mw->viewer(), &ViewerWidget::toggleMute);
+    actionManager->connectAction("volumeUp", m_mw->viewer(), &ViewerWidget::volumeUp);
+    actionManager->connectAction("volumeDown", m_mw->viewer(), &ViewerWidget::volumeDown);
+    actionManager->connectAction("gridSelectNext", m_mw->getFolderView(), &FolderViewProxy::gridSelectNext);
+    actionManager->connectAction("gridSelectPrev", m_mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
+    actionManager->connectAction("gridSelectAbove", m_mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
+    actionManager->connectAction("gridSelectBelow", m_mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
+    actionManager->connectAction("gridPageUp", m_mw->getFolderView(), &FolderViewProxy::gridPageUp);
+    actionManager->connectAction("gridPageDown", m_mw->getFolderView(), &FolderViewProxy::gridPageDown);
+    actionManager->connectAction("gridSelectFirst", m_mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
+    actionManager->connectAction("gridSelectLast", m_mw->getFolderView(), &FolderViewProxy::gridSelectLast);
+    actionManager->connectAction("gridSelectAll", m_mw->getFolderView(), &FolderViewProxy::gridSelectAll);
+    actionManager->connectAction("gridOpen", m_mw->getFolderView(), &FolderViewProxy::activateCurrent);
     // the folder view's Ctrl+V. Landed on Core, not the grid: the destination
     // is the model's directory and the work is interactiveCopy, both of which
     // the grid surface has no business owning.
@@ -333,8 +334,8 @@ void Core::connectWindowActions() {
 }
 
 void Core::loadTranslation() {
-    if(!translator)
-        translator = new QTranslator;
+    if(!m_translator)
+        m_translator = new QTranslator;
     QString trPathFallback = QCoreApplication::applicationDirPath() + "/translations";
 #ifdef TRANSLATIONS_PATH
     QString trPath = QString(TRANSLATIONS_PATH);
@@ -345,19 +346,19 @@ void Core::loadTranslation() {
     if(localeName == "system")
         localeName = QLocale::system().name();
     if(localeName.isEmpty() || localeName == "en_US") {
-        QApplication::removeTranslator(translator);
+        QApplication::removeTranslator(m_translator);
         return;
     }
     QString trFile = trPath + "/" + localeName;
     QString trFileFallback = trPathFallback + "/" + localeName;
-    if(!translator->load(trFile)) {
+    if(!m_translator->load(trFile)) {
         qDebug() << "Could not load translation file: " << trFile;
-        if(!translator->load(trFileFallback)) {
+        if(!m_translator->load(trFileFallback)) {
             qDebug() << "Could not load translation file: " << trFileFallback;
             return;
         }
     }
-    QApplication::installTranslator(translator);
+    QApplication::installTranslator(m_translator);
 }
 
 void Core::onUpdate() {
@@ -366,29 +367,29 @@ void Core::onUpdate() {
     // TODO: finish changelogs
     //if(settings->showChangelogs())
     //    mw->showChangelogWindow();
-    overlays_->showMessage(tr("Updated: ") + settings->lastVersion().toString() + " > " + appVersion.toString(), 4000);
+    m_overlays->showMessage(tr("Updated: ") + settings->lastVersion().toString() + " > " + appVersion.toString(), 4000);
     settings->setLastVersion(appVersion);
 }
 
 void Core::onFirstRun() {
     //mw->showSomeSortOfWelcomeScreen();
-    overlays_->showMessage(tr("Welcome to ") + qApp->applicationName() + tr(" version ") + appVersion.toString() + "!",
-                           4000);
+    m_overlays->showMessage(tr("Welcome to ") + qApp->applicationName() + tr(" version ") + appVersion.toString() + "!",
+                            4000);
     settings->setFirstRun(false);
     settings->setLastVersion(appVersion);
 }
 
 void Core::close() {
-    if(!mw)
+    if(!m_mw)
         return; // headless: nothing to close
-    mw->close();
+    m_mw->close();
 }
 // -----------------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------------
 
 void Core::toggleFullscreenInfoBar() {
-    view_->toggleFullscreenInfoBar();
+    m_view->toggleFullscreenInfoBar();
 }
 
 // ---------------------------------------------------------------- image operations
@@ -397,29 +398,29 @@ void Core::toggleFullscreenInfoBar() {
 
 // todo: remove?
 QString Core::selectedPath() {
-    if(!model)
+    if(!m_model)
         return "";
-    else if(state.viewMode.value() == MODE_FOLDERVIEW)
-        return folderViewPresenter.selectedPaths().constLast();
+    else if(m_state.viewMode.value() == MODE_FOLDERVIEW)
+        return m_folderViewPresenter.selectedPaths().constLast();
     else
-        return state.currentFilePath;
+        return m_state.currentFilePath;
 }
 
 QList<QString> Core::currentSelection() {
-    if(!model)
+    if(!m_model)
         return QList<QString>();
-    else if(state.viewMode.value() == MODE_FOLDERVIEW)
-        return folderViewPresenter.selectedPaths();
+    else if(m_state.viewMode.value() == MODE_FOLDERVIEW)
+        return m_folderViewPresenter.selectedPaths();
     else
-        return QList<QString>() << state.currentFilePath;
+        return QList<QString>() << m_state.currentFilePath;
 }
 
 //------------------------
 
 void Core::runScript(const QString &scriptName) {
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
-    scriptManager->runScript(scriptName, model->getImage(selectedPath()));
+    scriptManager->runScript(scriptName, m_model->getImage(selectedPath()));
 }
 
 // Linux implementation is KDE Plasma only (plasma-apply-wallpaperimage /
@@ -436,11 +437,11 @@ QPair<QString, QStringList> Core::wallpaperCommand(const QString &session, const
 }
 
 void Core::setWallpaper() {
-    if(model->isEmpty() || selectedPath().isEmpty())
+    if(m_model->isEmpty() || selectedPath().isEmpty())
         return;
-    auto img = model->getImage(selectedPath());
+    auto img = m_model->getImage(selectedPath());
     if(img->type() != DocumentType::STATIC) {
-        overlays_->showMessage("Set wallpaper: file not supported");
+        m_overlays->showMessage("Set wallpaper: file not supported");
         return;
     }
 #ifdef __WIN32
@@ -463,7 +464,7 @@ void Core::setWallpaper() {
     const QString session = qgetenv("DESKTOP_SESSION").toLower();
     auto [program, args] = wallpaperCommand(session, selectedPath());
     if(program.isEmpty()) {
-        overlays_->showMessage("Action is not supported in your desktop session (\"" + session + "\")", 3000);
+        m_overlays->showMessage("Action is not supported in your desktop session (\"" + session + "\")", 3000);
         return;
     }
     QProcess::startDetached(program, args);
@@ -471,21 +472,21 @@ void Core::setWallpaper() {
 }
 
 void Core::print() {
-    if(!mw)
+    if(!m_mw)
         return; // the print dialog parents to the window; headless has none
-    if(model->isEmpty())
+    if(m_model->isEmpty())
         return;
-    PrintDialog p(mw);
-    auto img = model->getImage(selectedPath());
+    PrintDialog p(m_mw);
+    auto img = m_model->getImage(selectedPath());
     if(!img) {
-        overlays_->showError(tr("Could not open image"));
+        m_overlays->showError(tr("Could not open image"));
         return;
     }
     if(img->type() != DocumentType::STATIC) {
-        overlays_->showError(tr("Can only print static images"));
+        m_overlays->showError(tr("Can only print static images"));
         return;
     }
-    QString pdfPath = model->directoryPath() + "/" + img->baseName() + ".pdf";
+    QString pdfPath = m_model->directoryPath() + "/" + img->baseName() + ".pdf";
     p.setImage(img->getImage());
     p.setOutputPath(pdfPath);
     p.exec();
@@ -494,11 +495,11 @@ void Core::print() {
 void Core::scalingRequest(QSize size, ScalingFilter filter) {
     // visibility is the emitter's own timing now (requestScaling suppresses
     // while hidden and re-requests on show); what remains here is the state check
-    if(state.hasActiveImage) {
-        std::shared_ptr<Image> forScale = model->getImage(state.currentFilePath);
+    if(m_state.hasActiveImage) {
+        std::shared_ptr<Image> forScale = m_model->getImage(m_state.currentFilePath);
         if(forScale) {
-            model->scaler->requestScaled(
-                ScalerRequest(forScale, size, state.currentFilePath, filter, settings->smoothUpscaling()));
+            m_model->scaler->requestScaled(
+                ScalerRequest(forScale, size, m_state.currentFilePath, filter, settings->smoothUpscaling()));
         }
     }
 }
@@ -517,65 +518,65 @@ void Core::onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerR
     //
     // The viewer takes a unique_ptr, so hand it one from a value instead of
     // passing a naked QPixmap* and hoping somebody deletes it.
-    if(state.hasActiveImage && req.path == state.currentFilePath) {
-        view_->onScalingFinished(std::make_unique<const QImage>(*scaled));
+    if(m_state.hasActiveImage && req.path == m_state.currentFilePath) {
+        m_view->onScalingFinished(std::make_unique<const QImage>(*scaled));
     }
 }
 
 // reset state; clear cache; etc
 
 QString Core::currentFilePath() const {
-    return state.currentFilePath;
+    return m_state.currentFilePath;
 }
 
 bool Core::firstFramePending() const {
-    return state.delayModel;
+    return m_state.delayModel;
 }
 
 bool Core::isSettled() const {
-    return model && model->listingSettled() && !model->loaderBusy();
+    return m_model && m_model->listingSettled() && !m_model->loaderBusy();
 }
 
 void Core::guiSetImage(std::shared_ptr<Image> img) {
-    state.hasActiveImage = true;
+    m_state.hasActiveImage = true;
     if(!img) {
-        overlays_->showMessage(tr("Error: could not load image."));
+        m_overlays->showMessage(tr("Error: could not load image."));
         return;
     }
     DocumentType type = img->type();
     if(type == STATIC) {
-        view_->showImage(img->getImage());
+        m_view->showImage(img->getImage());
     } else if(type == ANIMATED) {
         auto animated = dynamic_cast<ImageAnimated *>(img.get());
-        view_->showAnimation(animated->getMovie());
+        m_view->showAnimation(animated->getMovie());
     } else if(type == VIDEO) {
         auto video = dynamic_cast<Video *>(img.get());
         // workaround for mpv. If we play video while mainwindow is hidden we get black screen.
         // affects only initial startup (e.g. we open webm from file manager)
         showGui();
-        view_->showVideo(video->filePath());
+        m_view->showVideo(video->filePath());
     }
-    img->isEdited() ? overlays_->showSaveOverlay() : overlays_->hideSaveOverlay();
-    overlays_->setExifInfo(img->getExifTags());
+    img->isEdited() ? m_overlays->showSaveOverlay() : m_overlays->hideSaveOverlay();
+    m_overlays->setExifInfo(img->getExifTags());
 }
 
 void Core::updateInfoString() {
     CurrentInfo ci;
-    ci.index = model->indexOfFile(state.currentFilePath);
-    ci.fileCount = model->fileCount();
-    ci.fileName = model->fileNameAt(ci.index);
-    ci.filePath = model->filePathAt(ci.index);
-    ci.directoryPath = model->directoryPath();
+    ci.index = m_model->indexOfFile(m_state.currentFilePath);
+    ci.fileCount = m_model->fileCount();
+    ci.fileName = m_model->fileNameAt(ci.index);
+    ci.filePath = m_model->filePathAt(ci.index);
+    ci.directoryPath = m_model->directoryPath();
     ci.directoryName = ci.directoryPath.split("/").last();
-    if(model->isLoaded(state.currentFilePath)) {
-        auto img = model->getImage(state.currentFilePath);
+    if(m_model->isLoaded(m_state.currentFilePath)) {
+        auto img = m_model->getImage(m_state.currentFilePath);
         ci.imageSize = img->originalSize();
         ci.fileSize = img->fileSize();
         ci.edited = img->isEdited();
     }
-    ci.slideshow = state.slideshow;
-    ci.shuffle = state.shuffle;
+    ci.slideshow = m_state.slideshow;
+    ci.shuffle = m_state.shuffle;
     // the assignment is the notification: MW re-derives its views from the
     // projection on change (issue #505 semantics live in onLoadFailed)
-    state.currentInfo = ci;
+    m_state.currentInfo = ci;
 }

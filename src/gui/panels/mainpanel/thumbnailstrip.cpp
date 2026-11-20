@@ -10,13 +10,15 @@ ThumbnailStrip::ThumbnailStrip(QWidget *parent) : ThumbnailView(Qt::Horizontal, 
 }
 
 void ThumbnailStrip::updateScrollbarIndicator() {
-    if(!thumbnails.count() || lastSelected() == -1)
+    if(!m_thumbnails.count() || lastSelected() == -1)
         return;
     qreal itemCenter = static_cast<qreal>(lastSelected() + 0.5) / itemCount();
-    if(scrollBar->orientation() == Qt::Horizontal)
-        indicator = QRect(scrollBar->width() * itemCenter - indicatorSize, 2, indicatorSize, scrollBar->height() - 4);
+    if(m_scrollBar->orientation() == Qt::Horizontal)
+        m_indicator =
+            QRect(m_scrollBar->width() * itemCenter - m_indicatorSize, 2, m_indicatorSize, m_scrollBar->height() - 4);
     else
-        indicator = QRect(2, scrollBar->height() * itemCenter - indicatorSize, scrollBar->width() - 4, indicatorSize);
+        m_indicator =
+            QRect(2, m_scrollBar->height() * itemCenter - m_indicatorSize, m_scrollBar->width() - 4, m_indicatorSize);
 }
 
 //  no layout; manual item positioning
@@ -30,29 +32,29 @@ ThumbnailWidget *ThumbnailStrip::createThumbnailWidget() {
     widget->setPadding(thumbPadding);
     widget->setMargins(thumbMarginX, thumbMarginY);
     widget->setThumbStyle(mCurrentStyle);
-    widget->setThumbnailSize(mThumbnailSize);
+    widget->setThumbnailSize(m_thumbnailSize);
     return widget;
 }
 
 void ThumbnailStrip::addItemToLayout(ThumbnailWidget *widget, int pos) {
-    scene.addItem(widget);
-    updateThumbnailPositions(pos, thumbnails.count() - 1);
+    m_scene.addItem(widget);
+    updateThumbnailPositions(pos, m_thumbnails.count() - 1);
 }
 
 void ThumbnailStrip::removeItemFromLayout(int pos) {
     if(checkRange(pos)) {
-        ThumbnailWidget *thumb = thumbnails.at(pos);
-        scene.removeItem(thumb);
+        ThumbnailWidget *thumb = m_thumbnails.at(pos);
+        m_scene.removeItem(thumb);
         // move items
         ThumbnailWidget *tmp;
         if(orientation() == Qt::Horizontal) {
-            for(int i = pos; i < thumbnails.count(); i++) {
-                tmp = thumbnails.at(i);
+            for(int i = pos; i < m_thumbnails.count(); i++) {
+                tmp = m_thumbnails.at(i);
                 tmp->moveBy(-tmp->boundingRect().width(), 0);
             }
         } else {
-            for(int i = pos; i < thumbnails.count(); i++) {
-                tmp = thumbnails.at(i);
+            for(int i = pos; i < m_thumbnails.count(); i++) {
+                tmp = m_thumbnails.at(i);
                 tmp->moveBy(0, -tmp->boundingRect().height());
             }
         }
@@ -60,29 +62,29 @@ void ThumbnailStrip::removeItemFromLayout(int pos) {
 }
 
 void ThumbnailStrip::removeAll() {
-    scene.clear(); // also calls delete on all items
-    thumbnails.clear();
+    m_scene.clear(); // also calls delete on all items
+    m_thumbnails.clear();
 }
 
 void ThumbnailStrip::updateThumbnailPositions() {
-    updateThumbnailPositions(0, thumbnails.count() - 1);
+    updateThumbnailPositions(0, m_thumbnails.count() - 1);
 }
 
 void ThumbnailStrip::updateThumbnailPositions(int start, int end) {
     if(start > end || !checkRange(start) || !checkRange(end))
         return;
-    // assume all thumbnails are the same size
+    // assume all m_thumbnails are the same size
     ThumbnailWidget *tmp;
     if(orientation() == Qt::Horizontal) {
-        int thumbWidth = static_cast<int>(thumbnails.at(start)->boundingRect().width());
+        int thumbWidth = static_cast<int>(m_thumbnails.at(start)->boundingRect().width());
         for(int i = start; i <= end; i++) {
-            tmp = thumbnails.at(i);
+            tmp = m_thumbnails.at(i);
             tmp->setPos(i * thumbWidth, 0);
         }
     } else {
-        int thumbHeight = static_cast<int>(thumbnails.at(start)->boundingRect().height());
+        int thumbHeight = static_cast<int>(m_thumbnails.at(start)->boundingRect().height());
         for(int i = start; i <= end; i++) {
-            tmp = thumbnails.at(i);
+            tmp = m_thumbnails.at(i);
             tmp->setPos(0, i * thumbHeight);
         }
     }
@@ -91,7 +93,7 @@ void ThumbnailStrip::updateThumbnailPositions(int start, int end) {
 void ThumbnailStrip::focusOn(int index) {
     if(!checkRange(index))
         return;
-    auto th = thumbnails.at(index);
+    auto th = m_thumbnails.at(index);
     if(settings->panelCenterSelection()) {
         QGraphicsView::centerOn(th->sceneBoundingRect().center());
     } else {
@@ -123,7 +125,7 @@ void ThumbnailStrip::readSettings() {
     else
         mCurrentStyle = THUMB_NORMAL_CENTERED;
 
-    mThumbnailSize = qBound(20, settings->panelPreviewsSize(), 300);
+    m_thumbnailSize = qBound(20, settings->panelPreviewsSize(), 300);
 
     if(settings->panelPosition() == PANEL_TOP || settings->panelPosition() == PANEL_BOTTOM) {
         ThumbnailView::setOrientation(Qt::Horizontal);
@@ -136,28 +138,28 @@ void ThumbnailStrip::readSettings() {
     }
 
     // apply style, size & reposition
-    for(int i = 0; i < thumbnails.count(); i++) {
-        thumbnails.at(i)->setPadding(thumbPadding);
-        thumbnails.at(i)->setMargins(thumbMarginX, thumbMarginY);
-        thumbnails.at(i)->setThumbStyle(mCurrentStyle);
-        thumbnails.at(i)->setThumbnailSize(mThumbnailSize);
+    for(int i = 0; i < m_thumbnails.count(); i++) {
+        m_thumbnails.at(i)->setPadding(thumbPadding);
+        m_thumbnails.at(i)->setMargins(thumbMarginX, thumbMarginY);
+        m_thumbnails.at(i)->setThumbStyle(mCurrentStyle);
+        m_thumbnails.at(i)->setThumbnailSize(m_thumbnailSize);
     }
-    updateThumbnailPositions(0, thumbnails.count() - 1);
+    updateThumbnailPositions(0, m_thumbnails.count() - 1);
     fitSceneToContents();
     setCropThumbnails(settings->squareThumbnails());
     focusOn(lastSelected());
 }
 
 QSize ThumbnailStrip::itemSize() {
-    if(!thumbnails.count()) {
+    if(!m_thumbnails.count()) {
         ThumbnailWidget w;
         w.setPadding(thumbPadding);
         w.setMargins(thumbMarginX, thumbMarginY);
         w.setThumbStyle(mCurrentStyle);
-        w.setThumbnailSize(mThumbnailSize);
+        w.setThumbnailSize(m_thumbnailSize);
         return w.boundingRect().size().toSize();
     } else {
-        return thumbnails.at(0)->boundingRect().size().toSize();
+        return m_thumbnails.at(0)->boundingRect().size().toSize();
     }
 }
 

@@ -5,10 +5,11 @@
 #include "gui/dialoghost.h"
 #include "gui/crop/cropcontroller.h"
 
-MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appState(state), infoBarFullscreen(nullptr) {
+MW::MW(State *state, QWidget *parent)
+    : FloatingWidgetContainer(parent), m_appState(state), m_infoBarFullscreen(nullptr) {
     setAttribute(Qt::WA_TranslucentBackground, true);
-    layout.setContentsMargins(0, 0, 0, 0);
-    layout.setSpacing(0);
+    m_layout.setContentsMargins(0, 0, 0, 0);
+    m_layout.setSpacing(0);
 
     setMinimumSize(10, 10);
 
@@ -17,32 +18,32 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     // via passthrough from child widgets
     setFocusPolicy(Qt::NoFocus);
 
-    this->setLayout(&layout);
+    this->setLayout(&m_layout);
 
     setWindowTitle(QGuiApplication::applicationDisplayName() + " " + QCoreApplication::applicationVersion());
 
     this->setMouseTracking(true);
     this->setAcceptDrops(true);
     this->setAccessibleName("mainwindow");
-    windowShell = new WindowShell(this);
+    m_windowShell = new WindowShell(this);
     Ui ui = createUi();
     adoptUi(ui);
     // the keymap's inspect scope follows the viewer's fit mode: fit original
     // / free zoom declare "I am inspecting this image" — the arrows pan and
     // never change images until the user leaves the mode
-    fitModeObserver = viewerWidget->observeFitMode([this] {
-        ImageFitMode mode = viewerWidget->fitMode();
+    m_fitModeObserver = m_viewerWidget->observeFitMode([this] {
+        ImageFitMode mode = m_viewerWidget->fitMode();
         actionManager->setInspectMode(mode == FIT_ORIGINAL || mode == FIT_FREE);
     });
-    overlayHost = new OverlayHost(this, viewerWidget, docWidget);
-    cropController = new CropController(this, state, viewerWidget, sidePanel, docWidget);
-    connect(viewerWidget, &ViewerWidget::showScriptSettings, dialogHost, &DialogHost::showScriptSettings);
+    m_overlayHost = new OverlayHost(this, m_viewerWidget, m_docWidget);
+    m_cropController = new CropController(this, state, m_viewerWidget, m_sidePanel, m_docWidget);
+    connect(m_viewerWidget, &ViewerWidget::showScriptSettings, m_dialogHost, &DialogHost::showScriptSettings);
 
     connect(settings, &Settings::settingsChanged, this, &MW::readSettings);
-    connect(windowShell, &WindowShell::fullscreenStateChanged, this, &MW::adaptToWindowState);
+    connect(m_windowShell, &WindowShell::fullscreenStateChanged, this, &MW::adaptToWindowState);
 
     readSettings();
-    windowShell->restoreWindowGeometry();
+    m_windowShell->restoreWindowGeometry();
 
     // the projection drives the views: any rewrite of the snapshot
     // re-derives title/info bars/overlay names (issue #505 semantics live
@@ -56,25 +57,25 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     // this window, before the State they watch does. The wiring is the one
     // non-const touch of State — it goes through the constructor parameter,
     // because appState itself is stored const.
-    infoObserver = state->currentInfo.addNotifier([this] {
+    m_infoObserver = state->currentInfo.addNotifier([this] {
         refreshInfoViews();
     });
-    slideshowObserver = state->slideshow.addNotifier([this] {
+    m_slideshowObserver = state->slideshow.addNotifier([this] {
         // the player request left for the Core seam (view_->setLoopPlayback);
         // this binding keeps only the window's own projection
         refreshInfoViews();
     });
-    shuffleObserver = state->shuffle.addNotifier([this] {
+    m_shuffleObserver = state->shuffle.addNotifier([this] {
         refreshInfoViews();
     });
-    directoryObserver = state->directoryPath.addNotifier([this] {
-        folderView->setDirectoryPath(appState->directoryPath.value());
+    m_directoryObserver = state->directoryPath.addNotifier([this] {
+        m_folderView->setDirectoryPath(m_appState->directoryPath.value());
         refreshInfoViews();
     });
     // the mode dance: the view switch and its surface cleanup, run by the
     // window on the state's change. The slideshow loop relay rides its own
     // binding above.
-    viewModeObserver = state->viewMode.addNotifier([this, state = appState] {
+    m_viewModeObserver = state->viewMode.addNotifier([this, state = m_appState] {
         const bool folder = state->viewMode.value() == MODE_FOLDERVIEW;
         // the keymap's document scope follows the same state the view does:
         // one truth, two consumers
@@ -94,8 +95,8 @@ MW::MW(State *state, QWidget *parent) : FloatingWidgetContainer(parent), appStat
     // This catches the "forgot to create it" half only. Sequencing and
     // wiring-the-wrong-object are still the author's judgment — see the
     // create/wire split this constructor is a step toward.
-    if(!windowShell || !viewerWidget || !infoBarWindowed || !docWidget || !dialogHost || !folderView ||
-       !centralWidget || !infoBarFullscreen || !sidePanel || !overlayHost || !cropController)
+    if(!m_windowShell || !m_viewerWidget || !m_infoBarWindowed || !m_docWidget || !m_dialogHost || !m_folderView ||
+       !m_centralWidget || !m_infoBarFullscreen || !m_sidePanel || !m_overlayHost || !m_cropController)
         qFatal("MW construction left a child null — the census checks windowShell, viewerWidget, "
                "infoBarWindowed, docWidget, dialogHost, folderView, centralWidget, infoBarFullscreen, "
                "sidePanel, overlayHost and cropController");
@@ -115,7 +116,7 @@ MW::~MW() {
     // event loop is alive — the inner overlays themselves are Qt-parented and
     // go with the tree sweep right after this. The message/info proxies live
     // in OverlayHost now.
-    delete infoBarFullscreen;
+    delete m_infoBarFullscreen;
 }
 
 MW::Ui MW::createUi() {
@@ -161,83 +162,83 @@ MW::Ui MW::createUi() {
 void MW::adoptUi(const Ui &ui) {
     // the single place the members are filled. The parent tree owns every
     // widget; these observe (see the rule comment in the header).
-    viewerWidget = ui.viewer;
-    infoBarWindowed = ui.infoBarWindowed;
-    docWidget = ui.doc;
-    dialogHost = ui.dialog;
-    folderView = ui.folderView;
-    centralWidget = ui.central;
-    infoBarFullscreen = ui.infoBarFullscreen;
-    sidePanel = ui.sidePanel;
+    m_viewerWidget = ui.viewer;
+    m_infoBarWindowed = ui.infoBarWindowed;
+    m_docWidget = ui.doc;
+    m_dialogHost = ui.dialog;
+    m_folderView = ui.folderView;
+    m_centralWidget = ui.central;
+    m_infoBarFullscreen = ui.infoBarFullscreen;
+    m_sidePanel = ui.sidePanel;
 
-    layout.addWidget(centralWidget);
-    layout.addWidget(sidePanel);
+    m_layout.addWidget(m_centralWidget);
+    m_layout.addWidget(m_sidePanel);
     // the document view's keys are its own, not the global table's: they ride
     // QShortcuts parented here, active exactly while this subtree is visible
     // and focused (CentralWidget shows page 0 and focuses the focusProxy, so
     // "visible" and "focusable" are the same condition).
-    actionManager->attachDocumentSurface(docWidget);
+    actionManager->attachDocumentSurface(m_docWidget);
     // the notifier below only fires on CHANGE; the initial mode is a state
     // too, and the resolver needs to agree with it from the first keystroke
-    actionManager->setDocumentActive(appState->viewMode.value() != MODE_FOLDERVIEW);
+    actionManager->setDocumentActive(m_appState->viewMode.value() != MODE_FOLDERVIEW);
 }
 
 // The heavy-UI trigger: fired exactly once, from the first show. The flag
 // keeps it at one fire even though setupFullUi is idempotent by its guards.
 void MW::showEvent(QShowEvent *event) {
     QWidget::showEvent(event);
-    if(!shownOnceFired) {
-        shownOnceFired = true;
+    if(!m_shownOnceFired) {
+        m_shownOnceFired = true;
         emit shownOnce();
     }
 }
 
 void MW::setupFullUi() {
-    cropController->setupCropPanel();
-    docWidget->allowPanelInit();
-    docWidget->setupMainPanel();
-    infoBarWindowed->init();
-    infoBarFullscreen->init();
+    m_cropController->setupCropPanel();
+    m_docWidget->allowPanelInit();
+    m_docWidget->setupMainPanel();
+    m_infoBarWindowed->init();
+    m_infoBarFullscreen->init();
 }
 
 void MW::enableFolderView() {
-    cropController->hideCropPanel();
-    overlayHost->hideTransientOverlays();
-    docWidget->hideFloatingPanel();
-    centralWidget->showFolderView();
+    m_cropController->hideCropPanel();
+    m_overlayHost->hideTransientOverlays();
+    m_docWidget->hideFloatingPanel();
+    m_centralWidget->showFolderView();
     refreshInfoViews();
 }
 
 void MW::enableDocumentView() {
-    centralWidget->showDocumentView();
+    m_centralWidget->showDocumentView();
     refreshInfoViews();
 }
 
 ViewMode MW::currentViewMode() {
-    return centralWidget->currentViewMode();
+    return m_centralWidget->currentViewMode();
 }
 
 void MW::fitWindow() {
-    if(viewerWidget->interactionEnabled()) {
+    if(m_viewerWidget->interactionEnabled()) {
         viewer()->fitWindow();
     } else {
-        overlayHost->showMessage("Zoom temporary disabled");
+        m_overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
 void MW::fitWidth() {
-    if(viewerWidget->interactionEnabled()) {
+    if(m_viewerWidget->interactionEnabled()) {
         viewer()->fitWidth();
     } else {
-        overlayHost->showMessage("Zoom temporary disabled");
+        m_overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
 void MW::fitOriginal() {
-    if(viewerWidget->interactionEnabled()) {
+    if(m_viewerWidget->interactionEnabled()) {
         viewer()->fitOriginal();
     } else {
-        overlayHost->showMessage("Zoom temporary disabled");
+        m_overlayHost->showMessage("Zoom temporary disabled");
     }
 }
 
@@ -247,99 +248,99 @@ void MW::switchFitMode() {
     // Space in video mode is play/pause — the context check used to live in
     // ViewerWidget::keyPressEvent, an input side door; the action handler
     // owns the context now
-    if(viewerWidget->currentWidgetType() == VIDEOPLAYER) {
-        viewerWidget->toggleVideoPlayback();
+    if(m_viewerWidget->currentWidgetType() == VIDEOPLAYER) {
+        m_viewerWidget->toggleVideoPlayback();
         return;
     }
-    if(viewerWidget->fitMode() == FIT_WINDOW)
-        viewerWidget->setFitMode(FIT_ORIGINAL);
+    if(m_viewerWidget->fitMode() == FIT_WINDOW)
+        m_viewerWidget->setFitMode(FIT_ORIGINAL);
     else
-        viewerWidget->setFitMode(FIT_WINDOW);
+        m_viewerWidget->setFitMode(FIT_WINDOW);
 }
 
 // Shift+Space: cycle Window -> Width -> Original -> Window
 void MW::cycleFitMode() {
-    if(viewerWidget->fitMode() == FIT_WINDOW)
-        viewerWidget->setFitMode(FIT_WIDTH);
-    else if(viewerWidget->fitMode() == FIT_WIDTH)
-        viewerWidget->setFitMode(FIT_ORIGINAL);
+    if(m_viewerWidget->fitMode() == FIT_WINDOW)
+        m_viewerWidget->setFitMode(FIT_WIDTH);
+    else if(m_viewerWidget->fitMode() == FIT_WIDTH)
+        m_viewerWidget->setFitMode(FIT_ORIGINAL);
     else
-        viewerWidget->setFitMode(FIT_WINDOW);
+        m_viewerWidget->setFitMode(FIT_WINDOW);
 }
 
 void MW::closeImage() {
-    viewerWidget->closeImage();
+    m_viewerWidget->closeImage();
 }
 
 // todo: fix flicker somehow
 // ideally it should change img & resize in one go
 void MW::showImage(std::shared_ptr<const QImage> image) {
     if(settings->autoResizeWindow())
-        windowShell->preShowResize(image->size());
+        m_windowShell->preShowResize(image->size());
     auto pixmap = std::make_unique<QPixmap>(QPixmap::fromImage(*image));
-    viewerWidget->showImage(std::move(pixmap));
-    cropController->updateCropPanelData();
+    m_viewerWidget->showImage(std::move(pixmap));
+    m_cropController->updateCropPanelData();
 }
 
 void MW::showAnimation(const std::shared_ptr<QMovie> &movie) {
     if(settings->autoResizeWindow())
-        windowShell->preShowResize(movie->frameRect().size());
-    viewerWidget->showAnimation(movie);
-    cropController->updateCropPanelData();
+        m_windowShell->preShowResize(movie->frameRect().size());
+    m_viewerWidget->showAnimation(movie);
+    m_cropController->updateCropPanelData();
 }
 
 void MW::showVideo(const QString &file) {
     if(settings->autoResizeWindow())
-        windowShell->preShowResize(QSize()); // tmp. find a way to get this though mpv BEFORE playback
-    viewerWidget->showVideo(file);
+        m_windowShell->preShowResize(QSize()); // tmp. find a way to get this though mpv BEFORE playback
+    m_viewerWidget->showVideo(file);
 }
 
 // viewer command one-liners: ActionManager's connects land here and each
 // re-fires the same-named (or renamed) ViewerWidget signal directly.
 void MW::showContextMenu() {
-    viewerWidget->showContextMenu();
+    m_viewerWidget->showContextMenu();
 }
 
 void MW::onSortingChanged(SortingMode mode) {
-    folderView->onSortingChanged(mode);
-    if(centralWidget->currentViewMode() == ViewMode::MODE_DOCUMENT) {
+    m_folderView->onSortingChanged(mode);
+    if(m_centralWidget->currentViewMode() == ViewMode::MODE_DOCUMENT) {
         switch(mode) {
-        case SortingMode::SORT_NAME: overlayHost->showMessage("Sorting: By Name"); break;
-        case SortingMode::SORT_NAME_DESC: overlayHost->showMessage("Sorting: By Name (desc.)"); break;
-        case SortingMode::SORT_TIME: overlayHost->showMessage("Sorting: By Time"); break;
-        case SortingMode::SORT_TIME_DESC: overlayHost->showMessage("Sorting: By Time (desc.)"); break;
-        case SortingMode::SORT_SIZE: overlayHost->showMessage("Sorting: By File Size"); break;
-        case SortingMode::SORT_SIZE_DESC: overlayHost->showMessage("Sorting: By File Size (desc.)"); break;
+        case SortingMode::SORT_NAME: m_overlayHost->showMessage("Sorting: By Name"); break;
+        case SortingMode::SORT_NAME_DESC: m_overlayHost->showMessage("Sorting: By Name (desc.)"); break;
+        case SortingMode::SORT_TIME: m_overlayHost->showMessage("Sorting: By Time"); break;
+        case SortingMode::SORT_TIME_DESC: m_overlayHost->showMessage("Sorting: By Time (desc.)"); break;
+        case SortingMode::SORT_SIZE: m_overlayHost->showMessage("Sorting: By File Size"); break;
+        case SortingMode::SORT_SIZE_DESC: m_overlayHost->showMessage("Sorting: By File Size (desc.)"); break;
         }
     }
 }
 
 void MW::toggleLockZoom() {
     viewer()->toggleLockZoom();
-    if(viewerWidget->lockZoomEnabled())
-        overlayHost->showMessage("Zoom lock: ON");
+    if(m_viewerWidget->lockZoomEnabled())
+        m_overlayHost->showMessage("Zoom lock: ON");
     else
-        overlayHost->showMessage("Zoom lock: OFF");
+        m_overlayHost->showMessage("Zoom lock: OFF");
     refreshInfoViews();
 }
 
 void MW::toggleLockView() {
     viewer()->toggleLockView();
-    if(viewerWidget->lockViewEnabled())
-        overlayHost->showMessage("View lock: ON");
+    if(m_viewerWidget->lockViewEnabled())
+        m_overlayHost->showMessage("View lock: ON");
     else
-        overlayHost->showMessage("View lock: OFF");
+        m_overlayHost->showMessage("View lock: OFF");
     refreshInfoViews();
 }
 
 void MW::toggleFullscreenInfoBar() {
     if(!this->isFullScreen())
         return;
-    showInfoBarFullscreen = !showInfoBarFullscreen;
-    if(showInfoBarFullscreen)
-        infoBarFullscreen->showWhenReady();
+    m_showInfoBarFullscreen = !m_showInfoBarFullscreen;
+    if(m_showInfoBarFullscreen)
+        m_infoBarFullscreen->showWhenReady();
     else
-        infoBarFullscreen->hide();
+        m_infoBarFullscreen->hide();
 }
 // ICoreView adaptations of the QWidget bits the interface covers
 void MW::repaintView() {
@@ -356,7 +357,7 @@ void MW::showWindowDefault() {
 
 void MW::toggleScalingFilter() {
     ScalingFilter configuredFilter = settings->scalingFilter();
-    if(viewerWidget->scalingFilter() == configuredFilter) {
+    if(m_viewerWidget->scalingFilter() == configuredFilter) {
         setFilterNearest();
     } else {
         setFilter(configuredFilter);
@@ -364,12 +365,12 @@ void MW::toggleScalingFilter() {
 }
 
 void MW::setFilterNearest() {
-    overlayHost->showMessage("Filter: nearest", 600);
+    m_overlayHost->showMessage("Filter: nearest", 600);
     viewer()->setFilterNearest();
 }
 
 void MW::setFilterBilinear() {
-    overlayHost->showMessage("Filter: bilinear", 600);
+    m_overlayHost->showMessage("Filter: bilinear", 600);
     viewer()->setFilterBilinear();
 }
 
@@ -383,13 +384,13 @@ void MW::setFilter(ScalingFilter filter) {
     case QI_FILTER_CV_CUBIC_SHARPEN: filterName = "bicubic + sharpen"; break;
     default: filterName = "configured " + QString::number(static_cast<int>(filter)); break;
     }
-    overlayHost->showMessage("Filter " + filterName, 600);
+    m_overlayHost->showMessage("Filter " + filterName, 600);
     viewer()->setScalingFilter(filter);
 }
 
 void MW::onScalingFinished(std::unique_ptr<const QImage> scaled) {
     // the paint-device conversion happens here, on the GUI thread
-    viewerWidget->onScalingFinished(std::make_unique<QPixmap>(QPixmap::fromImage(*scaled)));
+    m_viewerWidget->onScalingFinished(std::make_unique<QPixmap>(QPixmap::fromImage(*scaled)));
 }
 
 //#############################################################
@@ -424,9 +425,9 @@ void MW::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 void MW::close() {
-    windowShell->saveWindowGeometry();
-    windowShell->saveCurrentDisplay();
-    overlayHost->saveCopySettings();
+    m_windowShell->saveWindowGeometry();
+    m_windowShell->saveCurrentDisplay();
+    m_overlayHost->saveCopySettings();
     QWidget::close();
 }
 
@@ -451,103 +452,103 @@ void MW::resizeEvent(QResizeEvent *event) {
 }
 
 DialogResult MW::fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode mode, bool multiple) {
-    return dialogHost->fileReplaceDialog(src, dst, mode, multiple);
+    return m_dialogHost->fileReplaceDialog(src, dst, mode, multiple);
 }
 
 // the view is a projection: everything shown is re-derived here from the
 // state Core owns and this window's own modes — nothing is stored
 void MW::refreshInfoViews() {
-    const CurrentInfo &info = appState->currentInfo.value();
-    QString states = titleStateSuffix(info.slideshow, info.shuffle, viewerWidget->lockZoomEnabled(),
-                                      viewerWidget->lockViewEnabled());
+    const CurrentInfo &info = m_appState->currentInfo.value();
+    QString states = titleStateSuffix(info.slideshow, info.shuffle, m_viewerWidget->lockZoomEnabled(),
+                                      m_viewerWidget->lockViewEnabled());
 
-    overlayHost->setRenameOverlayName(info.fileName);
+    m_overlayHost->setRenameOverlayName(info.fileName);
 
-    QString windowTitle =
-        assembleWindowTitle(centralWidget->currentViewMode() == MODE_FOLDERVIEW, info, viewerWidget->lockZoomEnabled(),
-                            viewerWidget->lockViewEnabled(), settings->windowTitleExtendedInfo(),
-                            !settings->infoBarWindowed(), qApp->applicationName(), tr("Folder view"));
+    QString windowTitle = assembleWindowTitle(m_centralWidget->currentViewMode() == MODE_FOLDERVIEW, info,
+                                              m_viewerWidget->lockZoomEnabled(), m_viewerWidget->lockViewEnabled(),
+                                              settings->windowTitleExtendedInfo(), !settings->infoBarWindowed(),
+                                              qApp->applicationName(), tr("Folder view"));
 
-    if(centralWidget->currentViewMode() == MODE_FOLDERVIEW || info.fileName.isEmpty()) {
-        infoBarFullscreen->setInfo("", tr("No file opened."), "");
-        infoBarWindowed->setInfo("", tr("No file opened."), "");
+    if(m_centralWidget->currentViewMode() == MODE_FOLDERVIEW || info.fileName.isEmpty()) {
+        m_infoBarFullscreen->setInfo("", tr("No file opened."), "");
+        m_infoBarWindowed->setInfo("", tr("No file opened."), "");
     } else {
         QString pos, res, size;
         titleSegments(info, &pos, &res, &size);
-        infoBarFullscreen->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size);
-        infoBarWindowed->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size + states);
+        m_infoBarFullscreen->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size);
+        m_infoBarWindowed->setInfo(pos, info.fileName + (info.edited ? "  *" : ""), res + "  " + size + states);
     }
     setWindowTitle(windowTitle);
 }
 
 // TODO!!! buffer this in mw
 ViewerWidget *MW::viewer() {
-    return viewerWidget;
+    return m_viewerWidget;
 }
 
 CropController *MW::crop() {
-    return cropController;
+    return m_cropController;
 }
 
 DialogHost *MW::dialogs() {
-    return dialogHost;
+    return m_dialogHost;
 }
 
 OverlayHost *MW::overlays() {
-    return overlayHost;
+    return m_overlayHost;
 }
 
 WindowShell *MW::shell() {
-    return windowShell;
+    return m_windowShell;
 }
 
 FolderViewProxy *MW::getFolderView() {
-    return folderView;
+    return m_folderView;
 }
 
 ThumbnailStripProxy *MW::getThumbnailPanel() {
-    return docWidget->thumbPanel();
+    return m_docWidget->thumbPanel();
 }
 
 // todo: this is crap
 
 bool MW::showConfirmation(const QString &title, const QString &msg) {
-    return dialogHost->showConfirmation(title, msg);
+    return m_dialogHost->showConfirmation(title, msg);
 }
 
 void MW::readSettings() {
-    showInfoBarFullscreen = settings->infoBarFullscreen();
-    showInfoBarWindowed = settings->infoBarWindowed();
+    m_showInfoBarFullscreen = settings->infoBarFullscreen();
+    m_showInfoBarWindowed = settings->infoBarWindowed();
     adaptToWindowState();
 }
 
 // changes ui elements according to fullscreen state
 void MW::adaptToWindowState() {
-    docWidget->hideFloatingPanel();
+    m_docWidget->hideFloatingPanel();
     if(isFullScreen()) { //-------------------------------------- fullscreen ---
-        windowShell->applyFullscreenBackground();
-        infoBarWindowed->hide();
+        m_windowShell->applyFullscreenBackground();
+        m_infoBarWindowed->hide();
 
-        if(showInfoBarFullscreen)
-            infoBarFullscreen->showWhenReady();
+        if(m_showInfoBarFullscreen)
+            m_infoBarFullscreen->showWhenReady();
         else
-            infoBarFullscreen->hide();
+            m_infoBarFullscreen->hide();
 
-        overlayHost->updateControlsOverlay();
+        m_overlayHost->updateControlsOverlay();
     } else { //------------------------------------------------------ window ---
-        windowShell->applyWindowedBackground();
-        infoBarFullscreen->hide();
+        m_windowShell->applyWindowedBackground();
+        m_infoBarFullscreen->hide();
 
-        if(showInfoBarWindowed)
-            infoBarWindowed->show();
+        if(m_showInfoBarWindowed)
+            m_infoBarWindowed->show();
         else
-            infoBarWindowed->hide();
+            m_infoBarWindowed->hide();
 
-        overlayHost->hideControlsOverlay();
+        m_overlayHost->hideControlsOverlay();
     }
-    folderView->onFullscreenModeChanged(isFullScreen());
-    docWidget->onFullscreenModeChanged(isFullScreen());
-    viewerWidget->onFullscreenModeChanged(isFullScreen());
+    m_folderView->onFullscreenModeChanged(isFullScreen());
+    m_docWidget->onFullscreenModeChanged(isFullScreen());
+    m_viewerWidget->onFullscreenModeChanged(isFullScreen());
 }
 
 void MW::paintEvent(QPaintEvent *event) {
@@ -558,7 +559,7 @@ void MW::paintEvent(QPaintEvent *event) {
 
 void MW::leaveEvent(QEvent *event) {
     QWidget::leaveEvent(event);
-    docWidget->hideFloatingPanel(true);
+    m_docWidget->hideFloatingPanel(true);
 }
 
 // block native tab-switching so we can use it in shortcuts

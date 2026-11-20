@@ -75,48 +75,48 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     void droppedInto(const QMimeData *, QObject *, int) override;
 
   protected:
-    QTimer loadTimer;
-    bool blockThumbnailLoading;
+    QTimer m_loadTimer;
+    bool m_blockThumbnailLoading;
 
-    bool mCropThumbnails, mouseReleaseSelect;
-    int mDrawScrollbarIndicator;
-    int mThumbnailSize;
-    bool rangeSelection;
-    ThumbnailSelectMode selectMode;
-    int lastScrollFrameTime;
-    QList<int> mSelection;
-    QPoint dragStartPos;
-    ThumbnailWidget *dragTarget;
+    bool m_cropThumbnails, m_mouseReleaseSelect;
+    int m_drawScrollbarIndicator;
+    int m_thumbnailSize;
+    bool m_rangeSelection;
+    ThumbnailSelectMode m_selectMode;
+    int m_lastScrollFrameTime;
+    QList<int> m_selection;
+    QPoint m_dragStartPos;
+    ThumbnailWidget *m_dragTarget;
 
     void createScrollTimeLine();
-    QElapsedTimer scrollFrameTimer;
-    std::function<void(int)> centerOn;
-    QElapsedTimer lastTouchpadScroll;
-    Qt::Orientation mOrientation = Qt::Horizontal;
+    QElapsedTimer m_scrollFrameTimer;
+    std::function<void(int)> m_centerOn;
+    QElapsedTimer m_lastTouchpadScroll;
+    Qt::Orientation m_orientation = Qt::Horizontal;
 
   protected:
-    QGraphicsScene scene;
-    QList<ThumbnailWidget *> thumbnails;
-    QScrollBar *scrollBar;
-    QTimeLine *scrollTimeLine;
-    QPointF viewportCenter;
+    QGraphicsScene m_scene;
+    QList<ThumbnailWidget *> m_thumbnails;
+    QScrollBar *m_scrollBar;
+    QTimeLine *m_scrollTimeLine;
+    QPointF m_viewportCenter;
 
-    QList<int> rangeSelectionSnapshot;
-    bool wayland = false;
+    QList<int> m_rangeSelectionSnapshot;
+    bool m_wayland = false;
 
-    int offscreenPreloadArea = 3000;
+    int m_offscreenPreloadArea = 3000;
 
-    QRect indicator;
-    const int indicatorSize = 2;
+    QRect m_indicator;
+    const int m_indicatorSize = 2;
 
-    int scrollRefreshRate = 16;
-    const int SCROLL_DURATION = 120;
-    const float WHEEL_SCROLL_MULTIPLIER = 2.5f;
-    const float SCROLL_ACCELERATION = 1.4f;
-    const int SCROLL_ACCELERATION_THRESHOLD = 50;
+    int m_scrollRefreshRate = 16;
+    const int m_scrollDuration = 120;
+    const float m_wheelScrollMultiplier = 2.5f;
+    const float m_scrollAcceleration = 1.4f;
+    const int m_scrollAccelerationThreshold = 50;
 
-    const uint LOAD_DELAY = 150;
-    ScrollDirection lastScrollDirection = SCROLL_FORWARDS;
+    const uint m_loadDelay = 150;
+    ScrollDirection m_lastScrollDirection = SCROLL_FORWARDS;
 
     bool atSceneStart();
     bool atSceneEnd();
