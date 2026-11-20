@@ -1,5 +1,5 @@
 # qimgv root
-cmake_minimum_required(VERSION 3.16)  # Qt 6.6 requires CMake 3.16
+cmake_minimum_required(VERSION 3.22)  # Corrosion 0.6 requires 3.22; Qt 6.6 requires 3.16
 project(impulse
     VERSION 0.1.0
     HOMEPAGE_URL "https://github.com/DropGuard/ImPulse"
@@ -72,7 +72,7 @@ include(FetchContent)
 FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.5.2
+    GIT_TAG v0.6.1
 )
 FetchContent_MakeAvailable(Corrosion)
 # Tier-0 static analysis: the warnings are part of the contract. The build is
