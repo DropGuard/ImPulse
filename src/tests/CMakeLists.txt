@@ -1,5 +1,11 @@
 find_package(Qt6 REQUIRED COMPONENTS Test Widgets)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# GoogleTest is a build dependency like Qt Test and Python3 above: the suites
+# on it get discovery and per-case processes from the framework instead of from
+# a hand-written harness. CONFIG mode, because Debian/Ubuntu ship
+# GTestConfig.cmake and no FindGTest module paths this CMake resolves.
+find_package(GTest CONFIG REQUIRED)
+include(GoogleTest)
 
 include_directories(${CMAKE_SOURCE_DIR})
 
@@ -103,11 +109,19 @@ endforeach()
 # presenter over its scripted view, the edit/save contract, the slideshow, and
 # the clipboard/drag-drop legs. One subject per suite, so a crop change runs
 # crop tests and not the world.
-foreach(suite crop_tests grid_tests shortcut_scope_tests overlay_keys_tests presenter_tests edit_save_tests slideshow_tests clipboard_tests)
+foreach(suite shortcut_scope_tests crop_tests grid_tests presenter_tests edit_save_tests slideshow_tests clipboard_tests)
     add_executable(${suite} ${suite}.cpp core_test_helpers.h)
     target_link_libraries(${suite} PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
     add_test(NAME ${suite} COMMAND ${suite})
     set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+endforeach()
+
+# Migrated to GoogleTest: discovery, filtering and per-case processes are the
+# framework's now (see dispatch_probe_tests for the full rationale).
+foreach(suite overlay_keys_tests)
+    add_executable(${suite} ${suite}.cpp core_test_helpers.h)
+    target_link_libraries(${suite} PRIVATE GTest::gtest Qt6::Test qimgv_gui qimgv_nongui)
+    gtest_discover_tests(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 endforeach()
 
 # Core's file operations: copy, move, rename, delete and trash driven through
@@ -137,10 +151,16 @@ set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300
 # with local QShortcuts only — no Core, no ActionManager, so it links neither
 # object library and is green on both sides of the keyboard migration. A red
 # probe means a migration plan assumption is wrong, not a regression.
+#
+# The first suite on GoogleTest: discovery and filtering are the framework's
+# (gtest_discover_tests registers every TEST_F as its own ctest case, so each
+# runs in its own process — the isolation the other suites spell out by hand).
+# Qt6::Test stays linked for what only Qt provides: QSignalSpy, QTest::qWait,
+# qWaitForWindowExposed. Assertions are EXPECT_*/ASSERT_*; the QVERIFY/QCOMPARE
+# macros are not used in a gtest TU.
 add_executable(dispatch_probe_tests dispatch_probe_tests.cpp)
-target_link_libraries(dispatch_probe_tests PRIVATE Qt6::Test Qt6::Widgets)
-add_test(NAME DISPATCH_PROBE COMMAND dispatch_probe_tests)
-set_tests_properties(DISPATCH_PROBE PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+target_link_libraries(dispatch_probe_tests PRIVATE GTest::gtest Qt6::Test Qt6::Widgets)
+gtest_discover_tests(dispatch_probe_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # the tree's style, as a test rather than only as a pre-commit stage: a
 # skipped hook leaves no trace in the history (that is how the Windows port's
