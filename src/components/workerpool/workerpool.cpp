@@ -3,43 +3,43 @@
 WorkerPool::WorkerPool(int threadCount) {
     if(threadCount < 1)
         threadCount = 1;
-    mThreadCount = threadCount;
+    m_threadCount = threadCount;
     for(int i = 0; i < threadCount; ++i)
-        workers.emplace_back([this] {
+        m_workers.emplace_back([this] {
             workerLoop();
         });
 }
 
 WorkerPool::~WorkerPool() {
     {
-        std::lock_guard<std::mutex> lock(mutex);
-        stopping = true;
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_stopping = true;
     }
-    workAvailable.notify_all();
-    for(std::thread &w : workers)
+    m_workAvailable.notify_all();
+    for(std::thread &w : m_workers)
         w.join();
     // workers are gone, so nothing left in the queue ever ran; the pool exits
     // empty-handed rather than holding jobs whose owner may already be gone
-    for(Entry &e : queue)
+    for(Entry &e : m_queue)
         e.job.reset();
-    idle.notify_all();
+    m_idle.notify_all();
 }
 
 void WorkerPool::submit(PoolOwner owner, int priority, std::unique_ptr<PoolJob> job) {
     {
-        std::lock_guard<std::mutex> lock(mutex);
-        queue.push_back(Entry{owner, priority, nextSeq++, std::move(job)});
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_queue.push_back(Entry{owner, priority, m_nextSeq++, std::move(job)});
     }
-    workAvailable.notify_one();
+    m_workAvailable.notify_one();
 }
 
 std::vector<std::unique_ptr<PoolJob>> WorkerPool::drain(PoolOwner owner) {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<std::unique_ptr<PoolJob>> taken;
-    for(auto it = queue.begin(); it != queue.end();) {
+    for(auto it = m_queue.begin(); it != m_queue.end();) {
         if(it->owner == owner) {
             taken.push_back(std::move(it->job));
-            it = queue.erase(it);
+            it = m_queue.erase(it);
         } else {
             ++it;
         }
@@ -48,11 +48,11 @@ std::vector<std::unique_ptr<PoolJob>> WorkerPool::drain(PoolOwner owner) {
 }
 
 void WorkerPool::cancel(PoolOwner owner) {
-    std::lock_guard<std::mutex> lock(mutex);
-    for(const Entry &e : queue)
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for(const Entry &e : m_queue)
         if(e.owner == owner)
             e.job->requestCancel();
-    for(const Running &r : running)
+    for(const Running &r : m_running)
         if(r.owner == owner)
             r.job->requestCancel();
     // no notify: cancel() changes no state any waiter is waiting on. A caller
@@ -62,46 +62,46 @@ void WorkerPool::cancel(PoolOwner owner) {
 bool WorkerPool::anyQueuedOrRunning(PoolOwner owner, const std::function<bool(const PoolJob &)> &match) const {
     // mutex is mutable so this const query can read the two state lists under
     // the same lock every writer takes
-    std::lock_guard<std::mutex> lock(mutex);
-    for(const Entry &e : queue)
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for(const Entry &e : m_queue)
         if(e.owner == owner && match(*e.job))
             return true;
-    for(const Running &r : running)
+    for(const Running &r : m_running)
         if(r.owner == owner && match(*r.job))
             return true;
     return false;
 }
 
 void WorkerPool::waitForOwner(PoolOwner owner) {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
     // the wait releases the lock while blocked — no state lock spans a wait
-    idle.wait(lock, [this, owner] {
+    m_idle.wait(lock, [this, owner] {
         return ownerIdle(owner);
     });
 }
 
 void WorkerPool::waitForAll() {
-    std::unique_lock<std::mutex> lock(mutex);
-    idle.wait(lock, [this] {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_idle.wait(lock, [this] {
         return allIdle();
     });
 }
 
 void WorkerPool::workerLoop() {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
     for(;;) {
-        workAvailable.wait(lock, [this] {
-            return stopping || !queue.empty();
+        m_workAvailable.wait(lock, [this] {
+            return m_stopping || !m_queue.empty();
         });
-        if(stopping)
+        if(m_stopping)
             return;
         // highest priority wins, ties go to the older submission
-        auto best = queue.begin();
-        for(auto it = std::next(queue.begin()); it != queue.end(); ++it)
+        auto best = m_queue.begin();
+        for(auto it = std::next(m_queue.begin()); it != m_queue.end(); ++it)
             if(it->priority > best->priority || (it->priority == best->priority && it->seq < best->seq))
                 best = it;
         Entry entry = std::move(*best);
-        queue.erase(best);
+        m_queue.erase(best);
         PoolJob *job = entry.job.get();
         // THE POP CHECKPOINT: a job marked while queued dies here, before it can
         // enter `running` — same observable as the old run()-entry checkpoint
@@ -114,13 +114,13 @@ void WorkerPool::workerLoop() {
         // the job is past it (it runs to completion and delivers). No third
         // outcome, no window.
         if(job->cancelRequested()) {
-            idle.notify_all(); // the queue just shrank: waiters re-check
+            m_idle.notify_all(); // the queue just shrank: waiters re-check
             lock.unlock();
             entry.job.reset(); // destroyed outside the lock, like every job
             lock.lock();
             continue;
         }
-        running.push_back(Running{entry.owner, job});
+        m_running.push_back(Running{entry.owner, job});
         lock.unlock(); // the lock never spans run()
         job->run();    // queued signal delivery needs nothing from us
         // Retire the record and the job in that order, with the record going
@@ -128,13 +128,13 @@ void WorkerPool::workerLoop() {
         // while it holds this mutex, so a live record always names a live job
         // and a job that is about to die has nothing left that can mark it.
         lock.lock();
-        for(auto it = running.begin(); it != running.end(); ++it) {
+        for(auto it = m_running.begin(); it != m_running.end(); ++it) {
             if(it->job == job) {
-                running.erase(it);
+                m_running.erase(it);
                 break;
             }
         }
-        idle.notify_all();
+        m_idle.notify_all();
         lock.unlock();
         entry.job.reset(); // the pool is the single deleter
         lock.lock();
@@ -142,15 +142,15 @@ void WorkerPool::workerLoop() {
 }
 
 bool WorkerPool::ownerIdle(PoolOwner owner) {
-    for(const Running &r : running)
+    for(const Running &r : m_running)
         if(r.owner == owner)
             return false;
-    for(const Entry &e : queue)
+    for(const Entry &e : m_queue)
         if(e.owner == owner)
             return false;
     return true;
 }
 
 bool WorkerPool::allIdle() {
-    return running.empty() && queue.empty();
+    return m_running.empty() && m_queue.empty();
 }

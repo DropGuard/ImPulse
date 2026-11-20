@@ -51,10 +51,10 @@ class NavigationController : public QObject {
     // Whether the slideshow loops. Read-only: the behavior under test is the
     // slideshow reacting to the setting, not a caller flipping it directly.
     bool slideshowLoops() const {
-        return loopSlideshow;
+        return m_loopSlideshow;
     }
     const QTimer &slideshowClock() const {
-        return slideshowTimer;
+        return m_slideshowTimer;
     }
     void reset();
 
@@ -131,17 +131,17 @@ class NavigationController : public QObject {
     // directoryPath, viewMode, slideshow, shuffle, pendingListedToken,
     // delayModel, and the two hasActiveImage clears (reset, onFileRemoved).
     // The rest of State is the coordinator's.
-    State *state;
-    INavigationHost *host_;
-    ICoreView *view_;
-    IOverlayHost *overlays_;
-    DirectoryPresenter &thumbPanelPresenter;
-    DirectoryPresenter &folderViewPresenter;
-    DirectoryModel *model = nullptr; // arrives via attachModel
+    State *m_state;
+    INavigationHost *m_host;
+    ICoreView *m_view;
+    IOverlayHost *m_overlays;
+    DirectoryPresenter &m_thumbPanelPresenter;
+    DirectoryPresenter &m_folderViewPresenter;
+    DirectoryModel *m_model = nullptr; // arrives via attachModel
 
     // private state
-    QTimer slideshowTimer;
-    Randomizer randomizer;
-    FolderEndAction folderEndAction;
-    bool loopSlideshow;
+    QTimer m_slideshowTimer;
+    Randomizer m_randomizer;
+    FolderEndAction m_folderEndAction;
+    bool m_loopSlideshow;
 };

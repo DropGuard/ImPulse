@@ -51,28 +51,28 @@ class ViewerWidget : public FloatingWidgetContainer {
     bool lockViewEnabled();
     ScalingFilter scalingFilter();
     CurrentWidget currentWidgetType() const {
-        return currentWidget;
+        return m_currentWidget;
     }
     void toggleVideoPlayback();
 
   private:
-    QVBoxLayout layout;
-    std::unique_ptr<ImageViewerV2> imageViewer;
-    std::unique_ptr<VideoPlayerInitProxy> videoPlayer;
-    std::unique_ptr<ContextMenu> contextMenu;
-    VideoControlsProxyWrapper *videoControls;
-    ZoomIndicatorOverlayProxy *zoomIndicator;
-    ClickZoneOverlay *clickZoneOverlay;
+    QVBoxLayout m_layout;
+    std::unique_ptr<ImageViewerV2> m_imageViewer;
+    std::unique_ptr<VideoPlayerInitProxy> m_videoPlayer;
+    std::unique_ptr<ContextMenu> m_contextMenu;
+    VideoControlsProxyWrapper *m_videoControls;
+    ZoomIndicatorOverlayProxy *m_zoomIndicator;
+    ClickZoneOverlay *m_clickZoneOverlay;
 
     void enableImageViewer();
     void enableVideoPlayer();
 
-    CurrentWidget currentWidget;
-    CanvasInputPolicy canvasInputPolicy;
-    bool mWaylandCursorWorkaround;
-    QTimer cursorTimer;
-    const int CURSOR_HIDE_TIMEOUT_MS = 1000;
-    bool mIsFullscreen;
+    CurrentWidget m_currentWidget;
+    CanvasInputPolicy m_canvasInputPolicy;
+    bool m_waylandCursorWorkaround;
+    QTimer m_cursorTimer;
+    const int m_cursorHideTimeoutMs = 1000;
+    bool m_isFullscreen;
 
     void disableImageViewer();
     void disableVideoPlayer();

@@ -60,20 +60,20 @@ class OverlayHost : public IOverlayHost {
     void setupSaveOverlay();
     void setupRenameOverlay();
 
-    MW *container;
-    ViewerWidget *viewer;
-    DocumentWidget *docWidget;
+    MW *m_container;
+    ViewerWidget *m_viewer;
+    DocumentWidget *m_docWidget;
     // non-QObject proxies: this host is their owner
-    FloatingMessageProxy *floatingMessage = nullptr;
-    ImageInfoOverlayProxy *imageInfoOverlay = nullptr;
+    FloatingMessageProxy *m_floatingMessage = nullptr;
+    ImageInfoOverlayProxy *m_imageInfoOverlay = nullptr;
     // QObject widgets: the parent tree owns them, these pointers observe
-    CopyOverlay *copyOverlay = nullptr;
-    SaveConfirmOverlay *saveOverlay = nullptr;
+    CopyOverlay *m_copyOverlay = nullptr;
+    SaveConfirmOverlay *m_saveOverlay = nullptr;
 
     // the pending-surface registry: blocking by birth (every setup registers),
     // passive surfaces opt out by simply not joining. The lock's condition is
     // this registry, never a checklist at the gate.
-    QList<IPendingSurface *> pendingSurfaces;
-    RenameOverlay *renameOverlay = nullptr;
-    ControlsOverlay *controlsOverlay = nullptr;
+    QList<IPendingSurface *> m_pendingSurfaces;
+    RenameOverlay *m_renameOverlay = nullptr;
+    ControlsOverlay *m_controlsOverlay = nullptr;
 };

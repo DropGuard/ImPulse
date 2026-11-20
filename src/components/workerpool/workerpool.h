@@ -56,14 +56,14 @@ enum class PoolOwner : quint8 {
 class CancelToken {
   public:
     bool requested() const {
-        return mValue.load(std::memory_order_relaxed);
+        return m_value.load(std::memory_order_relaxed);
     }
     void request() {
-        mValue.store(true, std::memory_order_relaxed);
+        m_value.store(true, std::memory_order_relaxed);
     }
 
   private:
-    std::atomic_bool mValue{false};
+    std::atomic_bool m_value{false};
 };
 
 class PoolJob {
@@ -77,24 +77,24 @@ class PoolJob {
     // a friend of every job type; nothing outside the pool should mark a job,
     // because a job that was never asked to stop has no reason to check.
     void requestCancel() {
-        mCancel.request();
+        m_cancel.request();
     }
     // The read side is public because the pool's worker loop evaluates the mark
     // at the pop: a job marked while queued is discarded there, before it can
     // enter the running record that the dedup query reads.
     bool cancelRequested() const {
-        return mCancel.requested();
+        return m_cancel.requested();
     }
 
   protected:
     // for the static helpers a run() body hands its work to, which cannot reach
     // a member of an object they were never given
     const CancelToken &cancelToken() const {
-        return mCancel;
+        return m_cancel;
     }
 
   private:
-    CancelToken mCancel;
+    CancelToken m_cancel;
 };
 
 class WorkerPool {
@@ -104,7 +104,7 @@ class WorkerPool {
     // different question (jobs hold threads' identities), so this answers
     // "how many executors exist" for callers that must match it.
     int threadCount() const {
-        return mThreadCount;
+        return m_threadCount;
     }
     ~WorkerPool();
     WorkerPool(const WorkerPool &) = delete;
@@ -201,13 +201,13 @@ class WorkerPool {
     bool ownerIdle(PoolOwner owner); // mutex held
     bool allIdle();                  // mutex held
 
-    int mThreadCount = 1; // as constructed; see threadCount()
-    std::vector<std::thread> workers;
-    mutable std::mutex mutex;
-    std::condition_variable workAvailable; // workers wait for submissions
-    std::condition_variable idle;          // waitForOwner/waitForAll wait here
-    std::deque<Entry> queue;
-    std::deque<Running> running; // one record per job inside run()
-    unsigned long nextSeq = 0;
-    bool stopping = false;
+    int m_threadCount = 1; // as constructed; see threadCount()
+    std::vector<std::thread> m_workers;
+    mutable std::mutex m_mutex;
+    std::condition_variable m_workAvailable; // workers wait for submissions
+    std::condition_variable m_idle;          // waitForOwner/waitForAll wait here
+    std::deque<Entry> m_queue;
+    std::deque<Running> m_running; // one record per job inside run()
+    unsigned long m_nextSeq = 0;
+    bool m_stopping = false;
 };
