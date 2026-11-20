@@ -32,6 +32,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = next((a for a in sys.argv[1:] if not a.startswith('-')), os.path.join(ROOT, 'build'))
 GATE = '--gate' in sys.argv
 NOCACHE = '--no-cache' in sys.argv
+# Sites, not just counts. A gate that says "9 strict-iterators" without naming
+# them cannot be acted on from a CI log — the run has to be repeated locally to
+# learn anything, and a local run on a different compiler may not reproduce it
+# at all. Printing the file:line costs nothing and makes a red run diagnosable
+# where it happened.
+SHOW_SITES = '--show-sites' in sys.argv
 CACHE = os.path.abspath(os.path.join(BUILD, '.lint-cache'))
 BASELINE = os.path.join(ROOT, 'scripts', 'lint-baseline.txt')
 
@@ -76,7 +82,12 @@ DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+
 # diffing --list-checks — but "identical today" is not a rule: the moment
 # upstream moves a check between levels, the gate and the documented set part
 # ways with nothing to show for it.
-CLAZY_CHECKS = 'level0,level1,detaching'
+# level0,level1 is the whole set AGENTS.md documents: the detaching checks
+# (range-loop-detach, detaching-temporary, readlock-detaching) are level 1, so
+# a literal `detaching` token was not a group name at all — clazy answered
+# "Invalid check: detaching" on every TU and ran level0,level1 anyway. Passing
+# it never changed a verdict, which is exactly why it survived.
+CLAZY_CHECKS = 'level0,level1'
 CLAZY = re.compile(r'^(/[^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
 TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[((?:bugprone|readability)-[a-z0-9-]+)(?:,.*)?\]$')
 CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
@@ -482,6 +493,9 @@ def show(name, found):
         # one header diagnostic repeats in every TU that includes it; what
         # matters is how many places in the tree still need fixing
         print(f'  {len(sites):6d}  {check}')
+        if SHOW_SITES:
+            for path, line in sorted(sites):
+                print(f'          {path}:{line}')
         counts[check] = len(sites)
     return counts
 
