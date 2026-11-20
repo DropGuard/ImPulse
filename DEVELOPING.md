@@ -128,10 +128,10 @@ official Qt binaries into a prefix of your choosing:
 
 ```bash
 pip install aqtinstall
-aqt install-qt linux desktop 6.9.1 linux_gcc_64 -O /opt/qt
+aqt install-qt linux desktop 6.10.2 linux_gcc_64 -O /opt/qt
 sudo apt install build-essential cmake ninja-build libgl1-mesa-dev libxkbcommon-dev \
                  libopencv-dev libexiv2-dev libmpv-dev libgtest-dev
-cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
 ```
 
 Either way, then:
