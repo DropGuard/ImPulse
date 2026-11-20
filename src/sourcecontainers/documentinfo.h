@@ -57,11 +57,11 @@ class DocumentInfo {
     QMap<QString, QString> getExifTags();
 
   private:
-    QFileInfo fileInfo;
-    DocumentType mDocumentType;
-    int mOrientation;
-    QString mFormat;
-    bool exifLoaded;
+    QFileInfo m_fileInfo;
+    DocumentType m_documentType;
+    int m_orientation;
+    QString m_format;
+    bool m_exifLoaded;
 
     // guesses file type from its contents
     // and sets extension
@@ -71,6 +71,6 @@ class DocumentInfo {
     bool detectAnimatedWebP();
     bool detectAnimatedJxl();
     bool detectAnimatedAvif();
-    QMap<QString, QString> exifTags;
-    QMimeType mMimeType;
+    QMap<QString, QString> m_exifTags;
+    QMimeType m_mimeType;
 };

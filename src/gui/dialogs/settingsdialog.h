@@ -49,7 +49,7 @@ class SettingsDialog : public QDialog {
     void saveColorScheme();
     void readShortcuts();
     void readScripts();
-    Ui::SettingsDialog *ui;
+    Ui::SettingsDialog *m_ui;
 
     void addShortcutToTable(const QString &action, const QString &shortcut, Scope scope);
     // the stable registry name a row stands for (the cell shows a display name)
@@ -71,7 +71,7 @@ class SettingsDialog : public QDialog {
     void setupSidebar();
     void removeShortcutAt(int row);
     void adjustSizeToContents();
-    QButtonGroup fitModeGrp, folderEndGrp, zoomIndGrp;
+    QButtonGroup m_fitModeGrp, m_folderEndGrp, m_zoomIndGrp;
 
   private:
     struct CheckBinding {
@@ -79,7 +79,7 @@ class SettingsDialog : public QDialog {
         bool (Settings::*get)();
         void (Settings::*set)(bool);
     };
-    QVector<CheckBinding> mChecks;
+    QVector<CheckBinding> m_checks;
 
     struct ComboBinding {
         QComboBox *box;
@@ -87,7 +87,7 @@ class SettingsDialog : public QDialog {
         QStringList values; // combo index -> stored value
         QString fallback;   // used when the stored value is not in the list
     };
-    QVector<ComboBinding> mCombos;
+    QVector<ComboBinding> m_combos;
 
   private slots:
     void saveSettingsAndClose();

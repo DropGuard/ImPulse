@@ -31,54 +31,54 @@ void pruneOldSessions(const QString &dir, int keep) {
         QFile::remove(dir + "/" + logs.at(i));
 }
 
-SessionLog::SessionLog(qint64 partLimitBytes, int maxParts) : mPartLimit(partLimitBytes), mMaxParts(maxParts) {
+SessionLog::SessionLog(qint64 partLimitBytes, int maxParts) : m_partLimit(partLimitBytes), m_maxParts(maxParts) {
 }
 
 bool SessionLog::open(const QString &basePath) {
-    mBase = basePath;
-    mBytes = 0;
-    mPart = 1;
-    mStopped = false;
-    mFile.setFileName(mBase);
-    if(!mFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    m_base = basePath;
+    m_bytes = 0;
+    m_part = 1;
+    m_stopped = false;
+    m_file.setFileName(m_base);
+    if(!m_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         return false;
-    mFile.write("=== session start ===\n");
-    mFile.flush();
+    m_file.write("=== session start ===\n");
+    m_file.flush();
     return true;
 }
 
 bool SessionLog::isWriting() const {
-    return mFile.isOpen() && !mStopped;
+    return m_file.isOpen() && !m_stopped;
 }
 
 int SessionLog::part() const {
-    return mPart;
+    return m_part;
 }
 
 qint64 SessionLog::bytesInPart() const {
-    return mBytes;
+    return m_bytes;
 }
 
 QString SessionLog::lastError() const {
-    return mFile.errorString();
+    return m_file.errorString();
 }
 
 void SessionLog::write(const QString &line) {
-    if(mStopped || !mFile.isOpen())
+    if(m_stopped || !m_file.isOpen())
         return;
-    mBytes += mFile.write(line.toUtf8());
-    mFile.flush();
-    if(mBytes >= mPartLimit) {
-        if(mPart >= mMaxParts) {
-            mStopped = true; // console keeps working
+    m_bytes += m_file.write(line.toUtf8());
+    m_file.flush();
+    if(m_bytes >= m_partLimit) {
+        if(m_part >= m_maxParts) {
+            m_stopped = true; // console keeps working
             return;
         }
-        ++mPart;
-        mFile.close();
-        mFile.setFileName(mBase + QString(".part%1").arg(mPart));
-        if(!mFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
-            mStopped = true; // rotation target unopenable: stop writing, console keeps working
-        mBytes = 0;
+        ++m_part;
+        m_file.close();
+        m_file.setFileName(m_base + QString(".part%1").arg(m_part));
+        if(!m_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+            m_stopped = true; // rotation target unopenable: stop writing, console keeps working
+        m_bytes = 0;
     }
 }
 

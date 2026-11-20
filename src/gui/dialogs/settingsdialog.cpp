@@ -37,60 +37,60 @@ static QString aboutHtml() {
         .arg(appVersion.toString());
 }
 
-SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::SettingsDialog) {
-    ui->setupUi(this);
-    mChecks = {
-        {ui->loopSlideshowCheckBox, &Settings::loopSlideshow, &Settings::setLoopSlideshow},
-        {ui->fullscreenCheckBox, &Settings::fullscreenMode, &Settings::setFullscreenMode},
-        {ui->videoPlaybackCheckBox, &Settings::videoPlayback, &Settings::setVideoPlayback},
-        {ui->playSoundsCheckBox, &Settings::playVideoSounds, &Settings::setPlayVideoSounds},
-        {ui->enablePanelCheckBox, &Settings::panelEnabled, &Settings::setPanelEnabled},
-        {ui->panelFullscreenOnlyCheckBox, &Settings::panelFullscreenOnly, &Settings::setPanelFullscreenOnly},
-        {ui->squareThumbnailsCheckBox, &Settings::squareThumbnails, &Settings::setSquareThumbnails},
-        {ui->transparencyGridCheckBox, &Settings::transparencyGrid, &Settings::setTransparencyGrid},
-        {ui->showHiddenFilesCheckBox, &Settings::showHiddenFiles, &Settings::setShowHiddenFiles},
-        {ui->enableSmoothScrollCheckBox, &Settings::enableSmoothScroll, &Settings::setEnableSmoothScroll},
-        {ui->usePreloaderCheckBox, &Settings::usePreloader, &Settings::setUsePreloader},
-        {ui->useThumbnailCacheCheckBox, &Settings::useThumbnailCache, &Settings::setUseThumbnailCache},
-        {ui->smoothUpscalingCheckBox, &Settings::smoothUpscaling, &Settings::setSmoothUpscaling},
-        {ui->expandImageCheckBox, &Settings::expandImage, &Settings::setExpandImage},
-        {ui->smoothAnimatedImagesCheckBox, &Settings::smoothAnimatedImages, &Settings::setSmoothAnimatedImages},
-        {ui->blurBackgroundCheckBox, &Settings::blurBackground, &Settings::setBlurBackground},
-        {ui->confirmTrashCheckBox, &Settings::confirmTrash, &Settings::setConfirmTrash},
-        {ui->unlockMinZoomCheckBox, &Settings::unlockMinZoom, &Settings::setUnlockMinZoom},
-        {ui->trackpadDetectionCheckBox, &Settings::trackpadDetection, &Settings::setTrackpadDetection},
-        {ui->clickableEdgesCheckBox, &Settings::clickableEdges, &Settings::setClickableEdges},
-        {ui->clickableEdgesVisibleCheckBox, &Settings::clickableEdgesVisible, &Settings::setClickableEdgesVisible},
-        {ui->showInfoBarFullscreen, &Settings::infoBarFullscreen, &Settings::setInfoBarFullscreen},
-        {ui->showInfoBarWindowed, &Settings::infoBarWindowed, &Settings::setInfoBarWindowed},
-        {ui->showExtendedInfoTitle, &Settings::windowTitleExtendedInfo, &Settings::setWindowTitleExtendedInfo},
-        {ui->cursorAutohideCheckBox, &Settings::cursorAutohide, &Settings::setCursorAutohide},
-        {ui->saveOverlayCheckBox, &Settings::showSaveOverlay, &Settings::setShowSaveOverlay},
-        {ui->unloadThumbsCheckBox, &Settings::unloadThumbs, &Settings::setUnloadThumbs},
-        {ui->animatedJxlCheckBox, &Settings::jxlAnimation, &Settings::setJxlAnimation},
-        {ui->autoResizeWindowCheckBox, &Settings::autoResizeWindow, &Settings::setAutoResizeWindow},
-        {ui->panelCenterSelectionCheckBox, &Settings::panelCenterSelection, &Settings::setPanelCenterSelection},
-        {ui->useFixedZoomLevelsCheckBox, &Settings::useFixedZoomLevels, &Settings::setUseFixedZoomLevels},
-        {ui->pinPanelCheckBox, &Settings::panelPinned, &Settings::setPanelPinned},
+SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), m_ui(new Ui::SettingsDialog) {
+    m_ui->setupUi(this);
+    m_checks = {
+        {m_ui->loopSlideshowCheckBox, &Settings::loopSlideshow, &Settings::setLoopSlideshow},
+        {m_ui->fullscreenCheckBox, &Settings::fullscreenMode, &Settings::setFullscreenMode},
+        {m_ui->videoPlaybackCheckBox, &Settings::videoPlayback, &Settings::setVideoPlayback},
+        {m_ui->playSoundsCheckBox, &Settings::playVideoSounds, &Settings::setPlayVideoSounds},
+        {m_ui->enablePanelCheckBox, &Settings::panelEnabled, &Settings::setPanelEnabled},
+        {m_ui->panelFullscreenOnlyCheckBox, &Settings::panelFullscreenOnly, &Settings::setPanelFullscreenOnly},
+        {m_ui->squareThumbnailsCheckBox, &Settings::squareThumbnails, &Settings::setSquareThumbnails},
+        {m_ui->transparencyGridCheckBox, &Settings::transparencyGrid, &Settings::setTransparencyGrid},
+        {m_ui->showHiddenFilesCheckBox, &Settings::showHiddenFiles, &Settings::setShowHiddenFiles},
+        {m_ui->enableSmoothScrollCheckBox, &Settings::enableSmoothScroll, &Settings::setEnableSmoothScroll},
+        {m_ui->usePreloaderCheckBox, &Settings::usePreloader, &Settings::setUsePreloader},
+        {m_ui->useThumbnailCacheCheckBox, &Settings::useThumbnailCache, &Settings::setUseThumbnailCache},
+        {m_ui->smoothUpscalingCheckBox, &Settings::smoothUpscaling, &Settings::setSmoothUpscaling},
+        {m_ui->expandImageCheckBox, &Settings::expandImage, &Settings::setExpandImage},
+        {m_ui->smoothAnimatedImagesCheckBox, &Settings::smoothAnimatedImages, &Settings::setSmoothAnimatedImages},
+        {m_ui->blurBackgroundCheckBox, &Settings::blurBackground, &Settings::setBlurBackground},
+        {m_ui->confirmTrashCheckBox, &Settings::confirmTrash, &Settings::setConfirmTrash},
+        {m_ui->unlockMinZoomCheckBox, &Settings::unlockMinZoom, &Settings::setUnlockMinZoom},
+        {m_ui->trackpadDetectionCheckBox, &Settings::trackpadDetection, &Settings::setTrackpadDetection},
+        {m_ui->clickableEdgesCheckBox, &Settings::clickableEdges, &Settings::setClickableEdges},
+        {m_ui->clickableEdgesVisibleCheckBox, &Settings::clickableEdgesVisible, &Settings::setClickableEdgesVisible},
+        {m_ui->showInfoBarFullscreen, &Settings::infoBarFullscreen, &Settings::setInfoBarFullscreen},
+        {m_ui->showInfoBarWindowed, &Settings::infoBarWindowed, &Settings::setInfoBarWindowed},
+        {m_ui->showExtendedInfoTitle, &Settings::windowTitleExtendedInfo, &Settings::setWindowTitleExtendedInfo},
+        {m_ui->cursorAutohideCheckBox, &Settings::cursorAutohide, &Settings::setCursorAutohide},
+        {m_ui->saveOverlayCheckBox, &Settings::showSaveOverlay, &Settings::setShowSaveOverlay},
+        {m_ui->unloadThumbsCheckBox, &Settings::unloadThumbs, &Settings::setUnloadThumbs},
+        {m_ui->animatedJxlCheckBox, &Settings::jxlAnimation, &Settings::setJxlAnimation},
+        {m_ui->autoResizeWindowCheckBox, &Settings::autoResizeWindow, &Settings::setAutoResizeWindow},
+        {m_ui->panelCenterSelectionCheckBox, &Settings::panelCenterSelection, &Settings::setPanelCenterSelection},
+        {m_ui->useFixedZoomLevelsCheckBox, &Settings::useFixedZoomLevels, &Settings::setUseFixedZoomLevels},
+        {m_ui->pinPanelCheckBox, &Settings::panelPinned, &Settings::setPanelPinned},
     };
 
     this->setWindowTitle(tr("Preferences — ") + qApp->applicationName());
 
-    ui->shortcutsTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    ui->aboutAppTextBrowser->viewport()->setAutoFillBackground(false);
-    ui->aboutAppTextBrowser->setHtml(aboutHtml());
-    ui->versionLabel->setText("" + QApplication::applicationVersion());
-    ui->qtVersionLabel->setText(qVersion());
-    ui->appIconLabel->setPixmap(QIcon(":/res/icons/common/logo/app/22.png").pixmap(22, 22));
-    ui->qtIconLabel->setPixmap(QIcon(":/res/icons/common/logo/3rdparty/qt22.png").pixmap(22, 16));
+    m_ui->shortcutsTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_ui->aboutAppTextBrowser->viewport()->setAutoFillBackground(false);
+    m_ui->aboutAppTextBrowser->setHtml(aboutHtml());
+    m_ui->versionLabel->setText("" + QApplication::applicationVersion());
+    m_ui->qtVersionLabel->setText(qVersion());
+    m_ui->appIconLabel->setPixmap(QIcon(":/res/icons/common/logo/app/22.png").pixmap(22, 22));
+    m_ui->qtIconLabel->setPixmap(QIcon(":/res/icons/common/logo/3rdparty/qt22.png").pixmap(22, 16));
 
     // fake combobox that acts as a menu button
     // less code than using pushbutton with menu
     // will be replaced with something custom later
-    connect(ui->themeSelectorComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
-        ui->themeSelectorComboBox->blockSignals(true);
-        ui->themeSelectorComboBox->setCurrentIndex(index);
-        ui->themeSelectorComboBox->blockSignals(false);
+    connect(m_ui->themeSelectorComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
+        m_ui->themeSelectorComboBox->blockSignals(true);
+        m_ui->themeSelectorComboBox->setCurrentIndex(index);
+        m_ui->themeSelectorComboBox->blockSignals(false);
         switch(index) {
         case 0:
             setColorScheme(ThemeStore::colorScheme(COLORS_BLACK));
@@ -112,40 +112,40 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
         }
     });
 
-    connect(ui->useSystemColorsCheckBox, &QCheckBox::toggled, this, [this](bool useSystemTheme) {
+    connect(m_ui->useSystemColorsCheckBox, &QCheckBox::toggled, this, [this](bool useSystemTheme) {
         if(useSystemTheme) {
-            ui->themeSelectorComboBox->setCurrentIndex(-1);
+            m_ui->themeSelectorComboBox->setCurrentIndex(-1);
             setColorScheme(ThemeStore::colorScheme(COLORS_SYSTEM));
             settings->setColorTid(COLORS_SYSTEM);
         } else {
             readColorScheme();
             settings->setColorTid(COLORS_CUSTOMIZED);
         }
-        ui->themeSelectorComboBox->setEnabled(!useSystemTheme);
-        ui->colorConfigSubgroup->setEnabled(!useSystemTheme);
-        ui->modifySystemSchemeLabel->setVisible(useSystemTheme);
+        m_ui->themeSelectorComboBox->setEnabled(!useSystemTheme);
+        m_ui->colorConfigSubgroup->setEnabled(!useSystemTheme);
+        m_ui->modifySystemSchemeLabel->setVisible(useSystemTheme);
     });
 
-    connect(ui->modifySystemSchemeLabel, &ClickableLabel::clicked, this, [this]() {
-        ui->useSystemColorsCheckBox->setChecked(false);
+    connect(m_ui->modifySystemSchemeLabel, &ClickableLabel::clicked, this, [this]() {
+        m_ui->useSystemColorsCheckBox->setChecked(false);
         setColorScheme(ThemeStore::colorScheme(COLORS_CUSTOMIZED));
         settings->setColorTid(COLORS_CUSTOMIZED);
     });
 
-    ui->colorSelectorAccent->setDescription(tr("Accent color"));
-    ui->colorSelectorBackground->setDescription(tr("Windowed mode background"));
-    ui->colorSelectorFullscreen->setDescription(tr("Fullscreen mode background"));
-    ui->colorSelectorFolderview->setDescription(tr("FolderView background"));
-    ui->colorSelectorFolderviewPanel->setDescription(tr("FolderView top panel"));
-    ui->colorSelectorText->setDescription(tr("Text color"));
-    ui->colorSelectorWidget->setDescription(tr("Widget background"));
-    ui->colorSelectorWidgetBorder->setDescription(tr("Widget border"));
-    ui->colorSelectorOverlay->setDescription(tr("Overlay background"));
-    ui->colorSelectorOverlayText->setDescription(tr("Overlay text"));
-    ui->colorSelectorScrollbar->setDescription(tr("Scrollbars"));
+    m_ui->colorSelectorAccent->setDescription(tr("Accent color"));
+    m_ui->colorSelectorBackground->setDescription(tr("Windowed mode background"));
+    m_ui->colorSelectorFullscreen->setDescription(tr("Fullscreen mode background"));
+    m_ui->colorSelectorFolderview->setDescription(tr("FolderView background"));
+    m_ui->colorSelectorFolderviewPanel->setDescription(tr("FolderView top panel"));
+    m_ui->colorSelectorText->setDescription(tr("Text color"));
+    m_ui->colorSelectorWidget->setDescription(tr("Widget background"));
+    m_ui->colorSelectorWidgetBorder->setDescription(tr("Widget border"));
+    m_ui->colorSelectorOverlay->setDescription(tr("Overlay background"));
+    m_ui->colorSelectorOverlayText->setDescription(tr("Overlay text"));
+    m_ui->colorSelectorScrollbar->setDescription(tr("Scrollbars"));
 
 #ifndef USE_KDE_BLUR
-    ui->blurBackgroundCheckBox->setEnabled(false);
+    m_ui->blurBackgroundCheckBox->setEnabled(false);
 #endif
 
 #ifndef USE_MPV
@@ -156,26 +156,26 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
 #endif
 
 #ifdef USE_OPENCV
-    ui->scalingQualityComboBox->addItem("Bilinear+sharpen (OpenCV)");
-    ui->scalingQualityComboBox->addItem("Bicubic (OpenCV)");
-    ui->scalingQualityComboBox->addItem("Bicubic+sharpen (OpenCV)");
+    m_ui->scalingQualityComboBox->addItem("Bilinear+sharpen (OpenCV)");
+    m_ui->scalingQualityComboBox->addItem("Bicubic (OpenCV)");
+    m_ui->scalingQualityComboBox->addItem("Bicubic+sharpen (OpenCV)");
 #endif
 
     if(!settings->supportedFormats().contains("jxl"))
-        ui->animatedJxlCheckBox->hide();
+        m_ui->animatedJxlCheckBox->hide();
 
     setupSidebar();
 
     // setup radioBtn groups
-    fitModeGrp.addButton(ui->fitModeWindow);
-    fitModeGrp.addButton(ui->fitModeWidth);
-    fitModeGrp.addButton(ui->fitMode1to1);
-    folderEndGrp.addButton(ui->folderEndSwitchFolder);
-    folderEndGrp.addButton(ui->folderEndNoAction);
-    folderEndGrp.addButton(ui->folderEndLoop);
-    zoomIndGrp.addButton(ui->zoomIndicatorAuto);
-    zoomIndGrp.addButton(ui->zoomIndicatorOff);
-    zoomIndGrp.addButton(ui->zoomIndicatorOn);
+    m_fitModeGrp.addButton(m_ui->fitModeWindow);
+    m_fitModeGrp.addButton(m_ui->fitModeWidth);
+    m_fitModeGrp.addButton(m_ui->fitMode1to1);
+    m_folderEndGrp.addButton(m_ui->folderEndSwitchFolder);
+    m_folderEndGrp.addButton(m_ui->folderEndNoAction);
+    m_folderEndGrp.addButton(m_ui->folderEndLoop);
+    m_zoomIndGrp.addButton(m_ui->zoomIndicatorAuto);
+    m_zoomIndGrp.addButton(m_ui->zoomIndicatorOff);
+    m_zoomIndGrp.addButton(m_ui->zoomIndicatorOn);
 
     // readable language names (ctor-local: consumed by the binding below)
     QMap<QString, QString> langs;
@@ -188,16 +188,16 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
     langs.insert("uk_UA", "Українська");
     langs.insert("zh_CN", "简体中文");
     // fill langs combobox, sorted by locale
-    ui->langComboBox->addItems(langs.values());
+    m_ui->langComboBox->addItems(langs.values());
     // insert system language entry manually at the beginning
     langs.insert("system", "System language");
-    ui->langComboBox->insertItem(0, "System language");
+    m_ui->langComboBox->insertItem(0, "System language");
     // the combo is [System language] + locales in map order; the stored value
     // for index 0 is "system". Unknown stored values fall back to en_US.
     QStringList langValues = langs.keys(); // sorted, "system" included
     langValues.removeAll("system");
     langValues.prepend("system"); // combo index 0 is the System entry
-    mCombos = {{ui->langComboBox, &K_Language, langValues, QStringLiteral("en_US")}};
+    m_combos = {{m_ui->langComboBox, &K_Language, langValues, QStringLiteral("en_US")}};
 
     connect(this, &SettingsDialog::settingsChanged, settings, &Settings::sendChangeNotification);
     readSettings();
@@ -206,29 +206,29 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
 }
 //------------------------------------------------------------------------------
 SettingsDialog::~SettingsDialog() {
-    delete ui;
+    delete m_ui;
 }
 //------------------------------------------------------------------------------
 // an attempt to force minimum width to fit contents
 void SettingsDialog::adjustSizeToContents() {
     // general tab
-    ui->gridLayout->activate();
-    ui->horizontalLayout_28->activate();
-    ui->horizontalLayout_19->activate();
-    ui->gridLayout_3->activate();
-    ui->horizontalLayout_18->activate();
-    ui->gridLayout_4->activate();
-    ui->horizontalLayout_24->activate();
-    ui->gridLayout_5->activate();
-    ui->slideshowGroupContents->activate();
-    ui->scrollAreaWidgetContents->layout()->activate();
-    ui->scrollArea->setMinimumWidth(ui->scrollAreaWidgetContents->minimumSizeHint().width());
+    m_ui->gridLayout->activate();
+    m_ui->horizontalLayout_28->activate();
+    m_ui->horizontalLayout_19->activate();
+    m_ui->gridLayout_3->activate();
+    m_ui->horizontalLayout_18->activate();
+    m_ui->gridLayout_4->activate();
+    m_ui->horizontalLayout_24->activate();
+    m_ui->gridLayout_5->activate();
+    m_ui->slideshowGroupContents->activate();
+    m_ui->scrollAreaWidgetContents->layout()->activate();
+    m_ui->scrollArea->setMinimumWidth(m_ui->scrollAreaWidgetContents->minimumSizeHint().width());
     // view tab
-    ui->horizontalLayout_29->activate();
-    ui->horizontalLayout_31->activate();
-    ui->widget->layout()->activate();
-    ui->scrollAreaWidgetContents_3->layout()->activate();
-    ui->scrollArea_3->setMinimumWidth(ui->scrollAreaWidgetContents_3->minimumSizeHint().width());
+    m_ui->horizontalLayout_29->activate();
+    m_ui->horizontalLayout_31->activate();
+    m_ui->widget->layout()->activate();
+    m_ui->scrollAreaWidgetContents_3->layout()->activate();
+    m_ui->scrollArea_3->setMinimumWidth(m_ui->scrollAreaWidgetContents_3->minimumSizeHint().width());
     // container
     //ui->stackedWidget->layout()->activate();
     this->setMinimumWidth(sizeHint().width() + 22);
@@ -251,124 +251,124 @@ void SettingsDialog::setupSidebar() {
 //------------------------------------------------------------------------------
 void SettingsDialog::readSettings() {
     // checkbox bindings: one declaration, both directions
-    for(const CheckBinding &b : std::as_const(mChecks))
+    for(const CheckBinding &b : std::as_const(m_checks))
         b.box->setChecked((settings->*b.get)());
-    for(const ComboBinding &b : std::as_const(mCombos)) {
+    for(const ComboBinding &b : std::as_const(m_combos)) {
         int idx = b.values.indexOf(settings->load<QString>(*b.desc));
         if(idx < 0)
             idx = b.values.indexOf(b.fallback);
         b.box->setCurrentIndex(idx);
     }
-    ui->loopSlideshowCheckBox->setChecked(settings->loopSlideshow());
-    ui->videoPlaybackCheckBox->setChecked(settings->videoPlayback());
-    ui->videoPlaybackGroupContents->setEnabled(settings->videoPlayback());
-    ui->playSoundsCheckBox->setChecked(settings->playVideoSounds());
-    ui->enablePanelCheckBox->setChecked(settings->panelEnabled());
-    ui->thumbnailPanelGroupContents->setEnabled(settings->panelEnabled());
-    ui->panelFullscreenOnlyCheckBox->setChecked(settings->panelFullscreenOnly());
-    ui->squareThumbnailsCheckBox->setChecked(settings->squareThumbnails());
-    ui->transparencyGridCheckBox->setChecked(settings->transparencyGrid());
-    ui->enableSmoothScrollCheckBox->setChecked(settings->enableSmoothScroll());
-    ui->usePreloaderCheckBox->setChecked(settings->usePreloader());
-    ui->useThumbnailCacheCheckBox->setChecked(settings->useThumbnailCache());
-    ui->smoothUpscalingCheckBox->setChecked(settings->smoothUpscaling());
-    ui->expandImageCheckBox->setChecked(settings->expandImage());
-    ui->expandImagesGroupContents->setEnabled(settings->expandImage());
-    ui->smoothAnimatedImagesCheckBox->setChecked(settings->smoothAnimatedImages());
-    ui->bgOpacitySlider->setValue(static_cast<int>(settings->backgroundOpacity() * 100));
-    ui->blurBackgroundCheckBox->setChecked(settings->blurBackground());
-    ui->sortingComboBox->setCurrentIndex(settings->sortingMode());
-    ui->confirmTrashCheckBox->setChecked(settings->confirmTrash());
-    ui->unlockMinZoomCheckBox->setChecked(settings->unlockMinZoom());
-    ui->trackpadDetectionCheckBox->setChecked(settings->trackpadDetection());
-    ui->clickableEdgesCheckBox->setChecked(settings->clickableEdges());
-    ui->clickableEdgesVisibleCheckBox->setChecked(settings->clickableEdgesVisible());
-    ui->clickableEdgesVisibleCheckBox->setEnabled(settings->clickableEdges());
-    ui->showHiddenFilesCheckBox->setChecked(settings->showHiddenFiles());
+    m_ui->loopSlideshowCheckBox->setChecked(settings->loopSlideshow());
+    m_ui->videoPlaybackCheckBox->setChecked(settings->videoPlayback());
+    m_ui->videoPlaybackGroupContents->setEnabled(settings->videoPlayback());
+    m_ui->playSoundsCheckBox->setChecked(settings->playVideoSounds());
+    m_ui->enablePanelCheckBox->setChecked(settings->panelEnabled());
+    m_ui->thumbnailPanelGroupContents->setEnabled(settings->panelEnabled());
+    m_ui->panelFullscreenOnlyCheckBox->setChecked(settings->panelFullscreenOnly());
+    m_ui->squareThumbnailsCheckBox->setChecked(settings->squareThumbnails());
+    m_ui->transparencyGridCheckBox->setChecked(settings->transparencyGrid());
+    m_ui->enableSmoothScrollCheckBox->setChecked(settings->enableSmoothScroll());
+    m_ui->usePreloaderCheckBox->setChecked(settings->usePreloader());
+    m_ui->useThumbnailCacheCheckBox->setChecked(settings->useThumbnailCache());
+    m_ui->smoothUpscalingCheckBox->setChecked(settings->smoothUpscaling());
+    m_ui->expandImageCheckBox->setChecked(settings->expandImage());
+    m_ui->expandImagesGroupContents->setEnabled(settings->expandImage());
+    m_ui->smoothAnimatedImagesCheckBox->setChecked(settings->smoothAnimatedImages());
+    m_ui->bgOpacitySlider->setValue(static_cast<int>(settings->backgroundOpacity() * 100));
+    m_ui->blurBackgroundCheckBox->setChecked(settings->blurBackground());
+    m_ui->sortingComboBox->setCurrentIndex(settings->sortingMode());
+    m_ui->confirmTrashCheckBox->setChecked(settings->confirmTrash());
+    m_ui->unlockMinZoomCheckBox->setChecked(settings->unlockMinZoom());
+    m_ui->trackpadDetectionCheckBox->setChecked(settings->trackpadDetection());
+    m_ui->clickableEdgesCheckBox->setChecked(settings->clickableEdges());
+    m_ui->clickableEdgesVisibleCheckBox->setChecked(settings->clickableEdgesVisible());
+    m_ui->clickableEdgesVisibleCheckBox->setEnabled(settings->clickableEdges());
+    m_ui->showHiddenFilesCheckBox->setChecked(settings->showHiddenFiles());
 
     if(settings->zoomIndicatorMode() == INDICATOR_ENABLED)
-        ui->zoomIndicatorOn->setChecked(true);
+        m_ui->zoomIndicatorOn->setChecked(true);
     else if(settings->zoomIndicatorMode() == INDICATOR_AUTO)
-        ui->zoomIndicatorAuto->setChecked(true);
+        m_ui->zoomIndicatorAuto->setChecked(true);
     else
-        ui->zoomIndicatorOff->setChecked(true);
-    ui->showInfoBarFullscreen->setChecked(settings->infoBarFullscreen());
-    ui->showInfoBarWindowed->setChecked(settings->infoBarWindowed());
-    ui->showExtendedInfoTitle->setChecked(settings->windowTitleExtendedInfo());
-    ui->cursorAutohideCheckBox->setChecked(settings->cursorAutohide());
+        m_ui->zoomIndicatorOff->setChecked(true);
+    m_ui->showInfoBarFullscreen->setChecked(settings->infoBarFullscreen());
+    m_ui->showInfoBarWindowed->setChecked(settings->infoBarWindowed());
+    m_ui->showExtendedInfoTitle->setChecked(settings->windowTitleExtendedInfo());
+    m_ui->cursorAutohideCheckBox->setChecked(settings->cursorAutohide());
     if(settings->focusPointIn1to1Mode() == FOCUS_TOP)
-        ui->focus1to1Top->setChecked(true);
+        m_ui->focus1to1Top->setChecked(true);
     else if(settings->focusPointIn1to1Mode() == FOCUS_CENTER)
-        ui->focus1to1Center->setChecked(true);
+        m_ui->focus1to1Center->setChecked(true);
     else
-        ui->focus1to1Cursor->setChecked(true);
-    ui->slideshowIntervalSpinBox->setValue(settings->slideshowInterval());
-    ui->imageScrollingComboBox->setCurrentIndex(settings->imageScrolling());
-    ui->saveOverlayCheckBox->setChecked(settings->showSaveOverlay());
-    ui->unloadThumbsCheckBox->setChecked(settings->unloadThumbs());
+        m_ui->focus1to1Cursor->setChecked(true);
+    m_ui->slideshowIntervalSpinBox->setValue(settings->slideshowInterval());
+    m_ui->imageScrollingComboBox->setCurrentIndex(settings->imageScrolling());
+    m_ui->saveOverlayCheckBox->setChecked(settings->showSaveOverlay());
+    m_ui->unloadThumbsCheckBox->setChecked(settings->unloadThumbs());
     if(settings->thumbPanelStyle() == TH_PANEL_SIMPLE)
-        ui->thumbStyleSimple->setChecked(true);
+        m_ui->thumbStyleSimple->setChecked(true);
     else
-        ui->thumbStyleExtended->setChecked(true);
-    ui->animatedJxlCheckBox->setChecked(settings->jxlAnimation());
-    ui->autoResizeWindowCheckBox->setChecked(settings->autoResizeWindow());
-    ui->panelCenterSelectionCheckBox->setChecked(settings->panelCenterSelection());
-    ui->useFixedZoomLevelsCheckBox->setChecked(settings->useFixedZoomLevels());
-    ui->zoomLevels->setText(settings->zoomLevels());
+        m_ui->thumbStyleExtended->setChecked(true);
+    m_ui->animatedJxlCheckBox->setChecked(settings->jxlAnimation());
+    m_ui->autoResizeWindowCheckBox->setChecked(settings->autoResizeWindow());
+    m_ui->panelCenterSelectionCheckBox->setChecked(settings->panelCenterSelection());
+    m_ui->useFixedZoomLevelsCheckBox->setChecked(settings->useFixedZoomLevels());
+    m_ui->zoomLevels->setText(settings->zoomLevels());
 
     if(settings->defaultViewMode() == MODE_FOLDERVIEW)
-        ui->startInFolderViewCheckBox->setChecked(true);
+        m_ui->startInFolderViewCheckBox->setChecked(true);
     else
-        ui->startInFolderViewCheckBox->setChecked(false);
+        m_ui->startInFolderViewCheckBox->setChecked(false);
 
     if(settings->folderEndAction() == FOLDER_END_NO_ACTION)
-        ui->folderEndNoAction->setChecked(true);
+        m_ui->folderEndNoAction->setChecked(true);
     else if(settings->folderEndAction() == FOLDER_END_LOOP)
-        ui->folderEndLoop->setChecked(true);
+        m_ui->folderEndLoop->setChecked(true);
     else
-        ui->folderEndSwitchFolder->setChecked(true);
+        m_ui->folderEndSwitchFolder->setChecked(true);
 
-    ui->mpvLineEdit->setText(settings->mpvBinary());
-    ui->quickCopyLineEdit->setText(settings->quickCopyDirectory());
+    m_ui->mpvLineEdit->setText(settings->mpvBinary());
+    m_ui->quickCopyLineEdit->setText(settings->quickCopyDirectory());
 
-    ui->zoomStepSlider->setValue(static_cast<int>(settings->zoomStep() * 100.f));
-    onZoomStepSliderChanged(ui->zoomStepSlider->value());
+    m_ui->zoomStepSlider->setValue(static_cast<int>(settings->zoomStep() * 100.f));
+    onZoomStepSliderChanged(m_ui->zoomStepSlider->value());
 
-    ui->mouseScrollingSpeedSlider->setValue(static_cast<int>((settings->mouseScrollingSpeed() - 0.5f) / 0.25f));
-    onMouseScrollingSpeedSliderChanged(ui->mouseScrollingSpeedSlider->value());
+    m_ui->mouseScrollingSpeedSlider->setValue(static_cast<int>((settings->mouseScrollingSpeed() - 0.5f) / 0.25f));
+    onMouseScrollingSpeedSliderChanged(m_ui->mouseScrollingSpeedSlider->value());
 
-    ui->autoResizeLimitSlider->setValue(static_cast<int>(settings->autoResizeLimit() / 5.f));
-    onAutoResizeLimitSliderChanged(ui->autoResizeLimitSlider->value());
+    m_ui->autoResizeLimitSlider->setValue(static_cast<int>(settings->autoResizeLimit() / 5.f));
+    onAutoResizeLimitSliderChanged(m_ui->autoResizeLimitSlider->value());
 
-    ui->JPEGQualitySlider->setValue(settings->JPEGSaveQuality());
-    onJPEGQualitySliderChanged(ui->JPEGQualitySlider->value());
+    m_ui->JPEGQualitySlider->setValue(settings->JPEGSaveQuality());
+    onJPEGQualitySliderChanged(m_ui->JPEGQualitySlider->value());
 
-    ui->expandLimitSlider->setValue(settings->expandLimit());
-    onExpandLimitSliderChanged(ui->expandLimitSlider->value());
+    m_ui->expandLimitSlider->setValue(settings->expandLimit());
+    onExpandLimitSliderChanged(m_ui->expandLimitSlider->value());
 
-    ui->memoryLimitSpinBox->setValue(settings->memoryAllocationLimit());
+    m_ui->memoryLimitSpinBox->setValue(settings->memoryAllocationLimit());
 
     // ##### fit mode #####
     if(settings->imageFitMode() == FIT_WINDOW)
-        ui->fitModeWindow->setChecked(true);
+        m_ui->fitModeWindow->setChecked(true);
     else if(settings->imageFitMode() == FIT_WIDTH)
-        ui->fitModeWidth->setChecked(true);
+        m_ui->fitModeWidth->setChecked(true);
     else
-        ui->fitMode1to1->setChecked(true);
+        m_ui->fitMode1to1->setChecked(true);
 
     // ##### UI #####
-    ui->scalingQualityComboBox->setCurrentIndex(settings->scalingFilter());
-    ui->fullscreenCheckBox->setChecked(settings->fullscreenMode());
-    ui->pinPanelCheckBox->setChecked(settings->panelPinned());
-    ui->panelPositionComboBox->setCurrentIndex(settings->panelPosition());
+    m_ui->scalingQualityComboBox->setCurrentIndex(settings->scalingFilter());
+    m_ui->fullscreenCheckBox->setChecked(settings->fullscreenMode());
+    m_ui->pinPanelCheckBox->setChecked(settings->panelPinned());
+    m_ui->panelPositionComboBox->setCurrentIndex(settings->panelPosition());
 
     // reduce by 10x to have nice granular control in qslider
-    ui->panelSizeSlider->setValue(settings->panelPreviewsSize() / 10);
+    m_ui->panelSizeSlider->setValue(settings->panelPreviewsSize() / 10);
 
-    ui->useSystemColorsCheckBox->setChecked(settings->useSystemColorScheme());
-    ui->modifySystemSchemeLabel->setVisible(settings->useSystemColorScheme());
-    ui->themeSelectorComboBox->setEnabled(!settings->useSystemColorScheme());
-    ui->colorConfigSubgroup->setEnabled(!settings->useSystemColorScheme());
+    m_ui->useSystemColorsCheckBox->setChecked(settings->useSystemColorScheme());
+    m_ui->modifySystemSchemeLabel->setVisible(settings->useSystemColorScheme());
+    m_ui->themeSelectorComboBox->setEnabled(!settings->useSystemColorScheme());
+    m_ui->colorConfigSubgroup->setEnabled(!settings->useSystemColorScheme());
 
     readColorScheme();
     readShortcuts();
@@ -378,107 +378,107 @@ void SettingsDialog::readSettings() {
 void SettingsDialog::saveSettings() {
     // background work is waited on where the new settings are consumed:
     // Core::readSettings() drains the shared worker pool before re-reading
-    for(const CheckBinding &b : std::as_const(mChecks))
+    for(const CheckBinding &b : std::as_const(m_checks))
         (settings->*b.set)(b.box->isChecked());
-    for(const ComboBinding &b : std::as_const(mCombos)) {
+    for(const ComboBinding &b : std::as_const(m_combos)) {
         int idx = b.box->currentIndex();
         if(idx >= 0 && idx < b.values.size())
             settings->store(*b.desc, b.values.at(idx));
     }
 
-    settings->setLoopSlideshow(ui->loopSlideshowCheckBox->isChecked());
-    settings->setFullscreenMode(ui->fullscreenCheckBox->isChecked());
-    if(ui->fitModeWindow->isChecked())
+    settings->setLoopSlideshow(m_ui->loopSlideshowCheckBox->isChecked());
+    settings->setFullscreenMode(m_ui->fullscreenCheckBox->isChecked());
+    if(m_ui->fitModeWindow->isChecked())
         settings->setImageFitMode(FIT_WINDOW);
-    else if(ui->fitModeWidth->isChecked())
+    else if(m_ui->fitModeWidth->isChecked())
         settings->setImageFitMode(FIT_WIDTH);
     else
         settings->setImageFitMode(FIT_ORIGINAL);
 
-    settings->setVideoPlayback(ui->videoPlaybackCheckBox->isChecked());
-    settings->setPlayVideoSounds(ui->playSoundsCheckBox->isChecked());
-    settings->setPanelEnabled(ui->enablePanelCheckBox->isChecked());
-    settings->setPanelFullscreenOnly(ui->panelFullscreenOnlyCheckBox->isChecked());
-    settings->setSquareThumbnails(ui->squareThumbnailsCheckBox->isChecked());
-    settings->setTransparencyGrid(ui->transparencyGridCheckBox->isChecked());
-    settings->setShowHiddenFiles(ui->showHiddenFilesCheckBox->isChecked());
-    settings->setEnableSmoothScroll(ui->enableSmoothScrollCheckBox->isChecked());
-    settings->setUsePreloader(ui->usePreloaderCheckBox->isChecked());
-    settings->setUseThumbnailCache(ui->useThumbnailCacheCheckBox->isChecked());
-    settings->setSmoothUpscaling(ui->smoothUpscalingCheckBox->isChecked());
-    settings->setExpandImage(ui->expandImageCheckBox->isChecked());
-    settings->setSmoothAnimatedImages(ui->smoothAnimatedImagesCheckBox->isChecked());
+    settings->setVideoPlayback(m_ui->videoPlaybackCheckBox->isChecked());
+    settings->setPlayVideoSounds(m_ui->playSoundsCheckBox->isChecked());
+    settings->setPanelEnabled(m_ui->enablePanelCheckBox->isChecked());
+    settings->setPanelFullscreenOnly(m_ui->panelFullscreenOnlyCheckBox->isChecked());
+    settings->setSquareThumbnails(m_ui->squareThumbnailsCheckBox->isChecked());
+    settings->setTransparencyGrid(m_ui->transparencyGridCheckBox->isChecked());
+    settings->setShowHiddenFiles(m_ui->showHiddenFilesCheckBox->isChecked());
+    settings->setEnableSmoothScroll(m_ui->enableSmoothScrollCheckBox->isChecked());
+    settings->setUsePreloader(m_ui->usePreloaderCheckBox->isChecked());
+    settings->setUseThumbnailCache(m_ui->useThumbnailCacheCheckBox->isChecked());
+    settings->setSmoothUpscaling(m_ui->smoothUpscalingCheckBox->isChecked());
+    settings->setExpandImage(m_ui->expandImageCheckBox->isChecked());
+    settings->setSmoothAnimatedImages(m_ui->smoothAnimatedImagesCheckBox->isChecked());
 
-    settings->setBackgroundOpacity(static_cast<qreal>(ui->bgOpacitySlider->value()) / 100.f);
-    settings->setBlurBackground(ui->blurBackgroundCheckBox->isChecked());
-    settings->setSortingMode(static_cast<SortingMode>(ui->sortingComboBox->currentIndex()));
-    settings->setConfirmTrash(ui->confirmTrashCheckBox->isChecked());
-    settings->setUnlockMinZoom(ui->unlockMinZoomCheckBox->isChecked());
-    settings->setTrackpadDetection(ui->trackpadDetectionCheckBox->isChecked());
-    settings->setClickableEdges(ui->clickableEdgesCheckBox->isChecked());
-    settings->setClickableEdgesVisible(ui->clickableEdgesVisibleCheckBox->isChecked());
+    settings->setBackgroundOpacity(static_cast<qreal>(m_ui->bgOpacitySlider->value()) / 100.f);
+    settings->setBlurBackground(m_ui->blurBackgroundCheckBox->isChecked());
+    settings->setSortingMode(static_cast<SortingMode>(m_ui->sortingComboBox->currentIndex()));
+    settings->setConfirmTrash(m_ui->confirmTrashCheckBox->isChecked());
+    settings->setUnlockMinZoom(m_ui->unlockMinZoomCheckBox->isChecked());
+    settings->setTrackpadDetection(m_ui->trackpadDetectionCheckBox->isChecked());
+    settings->setClickableEdges(m_ui->clickableEdgesCheckBox->isChecked());
+    settings->setClickableEdgesVisible(m_ui->clickableEdgesVisibleCheckBox->isChecked());
 
-    if(ui->zoomIndicatorOn->isChecked())
+    if(m_ui->zoomIndicatorOn->isChecked())
         settings->setZoomIndicatorMode(INDICATOR_ENABLED);
-    else if(ui->zoomIndicatorAuto->isChecked())
+    else if(m_ui->zoomIndicatorAuto->isChecked())
         settings->setZoomIndicatorMode(INDICATOR_AUTO);
     else
         settings->setZoomIndicatorMode(INDICATOR_DISABLED);
-    settings->setInfoBarFullscreen(ui->showInfoBarFullscreen->isChecked());
-    settings->setInfoBarWindowed(ui->showInfoBarWindowed->isChecked());
-    settings->setWindowTitleExtendedInfo(ui->showExtendedInfoTitle->isChecked());
-    settings->setCursorAutohide(ui->cursorAutohideCheckBox->isChecked());
-    if(ui->focus1to1Top->isChecked())
+    settings->setInfoBarFullscreen(m_ui->showInfoBarFullscreen->isChecked());
+    settings->setInfoBarWindowed(m_ui->showInfoBarWindowed->isChecked());
+    settings->setWindowTitleExtendedInfo(m_ui->showExtendedInfoTitle->isChecked());
+    settings->setCursorAutohide(m_ui->cursorAutohideCheckBox->isChecked());
+    if(m_ui->focus1to1Top->isChecked())
         settings->setFocusPointIn1to1Mode(FOCUS_TOP);
-    else if(ui->focus1to1Center->isChecked())
+    else if(m_ui->focus1to1Center->isChecked())
         settings->setFocusPointIn1to1Mode(FOCUS_CENTER);
     else
         settings->setFocusPointIn1to1Mode(FOCUS_CURSOR);
 
-    settings->setSlideshowInterval(ui->slideshowIntervalSpinBox->value());
+    settings->setSlideshowInterval(m_ui->slideshowIntervalSpinBox->value());
 
-    if(ui->startInFolderViewCheckBox->isChecked())
+    if(m_ui->startInFolderViewCheckBox->isChecked())
         settings->setDefaultViewMode(MODE_FOLDERVIEW);
     else
         settings->setDefaultViewMode(MODE_DOCUMENT);
 
-    if(ui->folderEndNoAction->isChecked())
+    if(m_ui->folderEndNoAction->isChecked())
         settings->setFolderEndAction(FOLDER_END_NO_ACTION);
-    else if(ui->folderEndLoop->isChecked())
+    else if(m_ui->folderEndLoop->isChecked())
         settings->setFolderEndAction(FOLDER_END_LOOP);
     else
         settings->setFolderEndAction(FOLDER_END_GOTO_ADJACENT);
 
-    settings->setMpvBinary(ui->mpvLineEdit->text());
-    settings->setQuickCopyDirectory(ui->quickCopyLineEdit->text());
-    settings->setScalingFilter(static_cast<ScalingFilter>(ui->scalingQualityComboBox->currentIndex()));
-    settings->setImageScrolling(static_cast<ImageScrolling>(ui->imageScrollingComboBox->currentIndex()));
-    settings->setShowSaveOverlay(ui->saveOverlayCheckBox->isChecked());
-    settings->setUnloadThumbs(ui->unloadThumbsCheckBox->isChecked());
-    if(ui->thumbStyleSimple->isChecked())
+    settings->setMpvBinary(m_ui->mpvLineEdit->text());
+    settings->setQuickCopyDirectory(m_ui->quickCopyLineEdit->text());
+    settings->setScalingFilter(static_cast<ScalingFilter>(m_ui->scalingQualityComboBox->currentIndex()));
+    settings->setImageScrolling(static_cast<ImageScrolling>(m_ui->imageScrollingComboBox->currentIndex()));
+    settings->setShowSaveOverlay(m_ui->saveOverlayCheckBox->isChecked());
+    settings->setUnloadThumbs(m_ui->unloadThumbsCheckBox->isChecked());
+    if(m_ui->thumbStyleSimple->isChecked())
         settings->setThumbPanelStyle(TH_PANEL_SIMPLE);
     else
         settings->setThumbPanelStyle(TH_PANEL_EXTENDED);
-    settings->setJxlAnimation(ui->animatedJxlCheckBox->isChecked());
-    settings->setAutoResizeWindow(ui->autoResizeWindowCheckBox->isChecked());
-    settings->setPanelCenterSelection(ui->panelCenterSelectionCheckBox->isChecked());
-    settings->setUseFixedZoomLevels(ui->useFixedZoomLevelsCheckBox->isChecked());
-    settings->setZoomLevels(ui->zoomLevels->text());
+    settings->setJxlAnimation(m_ui->animatedJxlCheckBox->isChecked());
+    settings->setAutoResizeWindow(m_ui->autoResizeWindowCheckBox->isChecked());
+    settings->setPanelCenterSelection(m_ui->panelCenterSelectionCheckBox->isChecked());
+    settings->setUseFixedZoomLevels(m_ui->useFixedZoomLevelsCheckBox->isChecked());
+    settings->setZoomLevels(m_ui->zoomLevels->text());
 
-    settings->setPanelPinned(ui->pinPanelCheckBox->isChecked());
-    int panelPos = ui->panelPositionComboBox->currentIndex();
+    settings->setPanelPinned(m_ui->pinPanelCheckBox->isChecked());
+    int panelPos = m_ui->panelPositionComboBox->currentIndex();
     settings->setPanelPosition(static_cast<PanelPosition>(panelPos));
 
-    settings->setPanelPreviewsSize(ui->panelSizeSlider->value() * 10);
+    settings->setPanelPreviewsSize(m_ui->panelSizeSlider->value() * 10);
 
-    settings->setJPEGSaveQuality(ui->JPEGQualitySlider->value());
-    settings->setZoomStep(static_cast<qreal>(ui->zoomStepSlider->value() / 100.f));
-    settings->setMouseScrollingSpeed(static_cast<qreal>(0.5f + (ui->mouseScrollingSpeedSlider->value() * 0.25f)));
-    settings->setAutoResizeLimit(ui->autoResizeLimitSlider->value() * 5);
-    settings->setExpandLimit(ui->expandLimitSlider->value());
-    settings->setMemoryAllocationLimit(ui->memoryLimitSpinBox->value());
+    settings->setJPEGSaveQuality(m_ui->JPEGQualitySlider->value());
+    settings->setZoomStep(static_cast<qreal>(m_ui->zoomStepSlider->value() / 100.f));
+    settings->setMouseScrollingSpeed(static_cast<qreal>(0.5f + (m_ui->mouseScrollingSpeedSlider->value() * 0.25f)));
+    settings->setAutoResizeLimit(m_ui->autoResizeLimitSlider->value() * 5);
+    settings->setExpandLimit(m_ui->expandLimitSlider->value());
+    settings->setMemoryAllocationLimit(m_ui->memoryLimitSpinBox->value());
 
-    settings->setUseSystemColorScheme(ui->useSystemColorsCheckBox->isChecked());
+    settings->setUseSystemColorScheme(m_ui->useSystemColorsCheckBox->isChecked());
 
     saveColorScheme();
     saveShortcuts();
@@ -499,7 +499,7 @@ void SettingsDialog::saveSettingsAndClose() {
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::resetZoomLevels() {
-    ui->zoomLevels->setText(settings->defaultZoomLevels());
+    m_ui->zoomLevels->setText(settings->defaultZoomLevels());
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::selectMpvPath() {
@@ -507,35 +507,35 @@ void SettingsDialog::selectMpvPath() {
     QString file;
     file = dialog.getOpenFileName(this, tr("Navigate to mpv binary"), "", "mpv*");
     if(!file.isEmpty()) {
-        ui->mpvLineEdit->setText(file);
+        m_ui->mpvLineEdit->setText(file);
     }
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onExpandLimitSliderChanged(int value) {
     if(value == 0)
-        ui->expandLimitLabel->setText("-");
+        m_ui->expandLimitLabel->setText("-");
     else
-        ui->expandLimitLabel->setText(QString::number(value) + "x");
+        m_ui->expandLimitLabel->setText(QString::number(value) + "x");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onJPEGQualitySliderChanged(int value) {
-    ui->JPEGQualityLabel->setText(QString::number(value) + "%");
+    m_ui->JPEGQualityLabel->setText(QString::number(value) + "%");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onZoomStepSliderChanged(int value) {
-    ui->zoomStepLabel->setText(QString::number(value / 100.f, 'f', 2) + "x");
+    m_ui->zoomStepLabel->setText(QString::number(value / 100.f, 'f', 2) + "x");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onMouseScrollingSpeedSliderChanged(int value) {
-    ui->mouseScrollingSpeedLabel->setText(QString::number(0.5f + (value * 0.25f), 'f', 2) + "x");
+    m_ui->mouseScrollingSpeedLabel->setText(QString::number(0.5f + (value * 0.25f), 'f', 2) + "x");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onBgOpacitySliderChanged(int value) {
-    ui->bgOpacityPercentLabel->setText(QString::number(value) + "%");
+    m_ui->bgOpacityPercentLabel->setText(QString::number(value) + "%");
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::onAutoResizeLimitSliderChanged(int value) {
-    ui->autoResizeLimit->setText(QString::number(value * 5.f, 'f', 0) + "%");
+    m_ui->autoResizeLimit->setText(QString::number(value * 5.f, 'f', 0) + "%");
 }
 //------------------------------------------------------------------------------
 int SettingsDialog::exec() {
@@ -543,5 +543,5 @@ int SettingsDialog::exec() {
 }
 
 void SettingsDialog::switchToPage(int number) {
-    ui->sideBar2->selectEntry(number);
+    m_ui->sideBar2->selectEntry(number);
 }

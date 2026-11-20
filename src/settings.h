@@ -326,10 +326,10 @@ class Settings : public QObject {
 
   private: // null-initialized: a directly-constructed instance is safe to destroy
     // even if its cache setup never ran (getInstance calls setupCache())
-    QSettings *settingsConf = nullptr, *stateConf = nullptr, *themeConf = nullptr;
-    QDir *mTmpDir = nullptr, *mConfDir = nullptr;
-    ColorScheme mColorScheme;
-    QMultiMap<QByteArray, QByteArray> mVideoFormatsMap; // [mimetype, format]
+    QSettings *m_settingsConf = nullptr, *m_stateConf = nullptr, *m_themeConf = nullptr;
+    QDir *m_tmpDir = nullptr, *m_confDir = nullptr;
+    ColorScheme m_colorScheme;
+    QMultiMap<QByteArray, QByteArray> m_videoFormatsMap; // [mimetype, format]
     void saveTheme();
 
     void setupCache();

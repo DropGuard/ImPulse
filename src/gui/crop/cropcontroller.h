@@ -49,15 +49,15 @@ class CropController : public QObject, public ICropSurface {
     void onPanelCrop(QRect rect);
 
   private:
-    MW *window;
+    MW *m_window;
     // the one truth for the view-mode gate: the window's centralWidget keeps
     // only a projection of it
-    const State *state;
-    ViewerWidget *viewer;
-    SidePanel *sidePanel;
-    DocumentWidget *docWidget;
-    CropPanel *cropPanel = nullptr;
-    CropOverlay *cropOverlay = nullptr;
-    ActiveSidePanel activeSidePanel;
-    bool cropJustApplied = false;
+    const State *m_state;
+    ViewerWidget *m_viewer;
+    SidePanel *m_sidePanel;
+    DocumentWidget *m_docWidget;
+    CropPanel *m_cropPanel = nullptr;
+    CropOverlay *m_cropOverlay = nullptr;
+    ActiveSidePanel m_activeSidePanel;
+    bool m_cropJustApplied = false;
 };

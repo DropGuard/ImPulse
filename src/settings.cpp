@@ -70,7 +70,7 @@ template <class T> T settingDefault(const SettingDesc &d) {
 
 template <class T> T Settings::load(const SettingDesc &d) const {
     Q_ASSERT(d.kind == kindOf<T>());
-    const QVariant raw = settingsConf->value(d.key);
+    const QVariant raw = m_settingsConf->value(d.key);
     if(!raw.isValid())
         return settingDefault<T>(d);
     if constexpr(std::is_same_v<T, bool>) {
@@ -112,7 +112,7 @@ template <class T> T Settings::load(const SettingDesc &d) const {
 
 template <class T> void Settings::store(const SettingDesc &d, const T &v) {
     Q_ASSERT(d.kind == kindOf<T>());
-    settingsConf->setValue(d.key, v);
+    m_settingsConf->setValue(d.key, v);
 }
 
 // The private thumbnail store this fork used before the XDG adoption is dead
@@ -148,9 +148,9 @@ Settings::Settings(QObject *parent) : QObject(parent) {
 #if defined(__linux__) || defined(__FreeBSD__)
     // config files
     QSettings::setDefaultFormat(QSettings::NativeFormat);
-    settingsConf = new QSettings();
-    stateConf = new QSettings(QCoreApplication::organizationName(), "savedState");
-    themeConf = new QSettings(QCoreApplication::organizationName(), "theme");
+    m_settingsConf = new QSettings();
+    m_stateConf = new QSettings(QCoreApplication::organizationName(), "savedState");
+    m_themeConf = new QSettings(QCoreApplication::organizationName(), "theme");
 #else
     // Portable mode: the conf dir rides the exe — EXCEPT when tests redirect
     // it. QIMGV_CONF_DIR is what makes FreshSettings' org/app isolation
@@ -160,12 +160,12 @@ Settings::Settings(QObject *parent) : QObject(parent) {
     const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
                                  ? QApplication::applicationDirPath() + "/conf"
                                  : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
-    mConfDir = new QDir(confBase);
-    mConfDir->mkpath(confBase);
+    m_confDir = new QDir(confBase);
+    m_confDir->mkpath(confBase);
     settingsConf =
-        new QSettings(mConfDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
-    stateConf = new QSettings(mConfDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
-    themeConf = new QSettings(mConfDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
+        new QSettings(m_confDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
+    stateConf = new QSettings(m_confDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
+    themeConf = new QSettings(m_confDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
 #endif
     fillVideoFormats();
     // cache paths live in the constructor, not in an external protocol: a
@@ -176,10 +176,10 @@ Settings::Settings(QObject *parent) : QObject(parent) {
 //------------------------------------------------------------------------------
 Settings::~Settings() {
     saveTheme();
-    delete mTmpDir;
-    delete settingsConf;
-    delete stateConf;
-    delete themeConf;
+    delete m_tmpDir;
+    delete m_settingsConf;
+    delete m_stateConf;
+    delete m_themeConf;
 }
 //------------------------------------------------------------------------------
 Settings *Settings::getInstance() {
@@ -242,12 +242,12 @@ void Settings::setupCache() {
     // The private subtree under the app's cache dir is gone: thumbnails live in
     // the shared freedesktop store ($XDG_CACHE_HOME/thumbnails, owned by
     // ThumbnailCache), so the app's own directory is only scratch space now.
-    mTmpDir = new QDir(resolveCacheDir());
+    m_tmpDir = new QDir(resolveCacheDir());
 }
 //------------------------------------------------------------------------------
 void Settings::sync() {
-    settingsConf->sync();
-    stateConf->sync();
+    m_settingsConf->sync();
+    m_stateConf->sync();
 }
 //------------------------------------------------------------------------------
 QString Settings::tmpDir() {
@@ -257,23 +257,23 @@ QString Settings::tmpDir() {
     // edited-image export is why that matters — when its QTemporaryFile cannot
     // open it falls back to a FIXED name, so two exports share one file and
     // the second consumer reads the first's pixels.
-    const QString path = mTmpDir->path();
-    if(!mTmpDir->exists())
+    const QString path = m_tmpDir->path();
+    if(!m_tmpDir->exists())
         QDir().mkpath(path);
     return path + "/";
 }
 //------------------------------------------------------------------------------
 void Settings::fillVideoFormats() {
-    mVideoFormatsMap.insert("video/webm", "webm");
-    mVideoFormatsMap.insert("video/mp4", "mp4");
-    mVideoFormatsMap.insert("video/mp4", "m4v");
-    mVideoFormatsMap.insert("video/mpeg", "mpg");
-    mVideoFormatsMap.insert("video/mpeg", "mpeg");
-    mVideoFormatsMap.insert("video/x-matroska", "mkv");
-    mVideoFormatsMap.insert("video/x-ms-wmv", "wmv");
-    mVideoFormatsMap.insert("video/x-msvideo", "avi");
-    mVideoFormatsMap.insert("video/quicktime", "mov");
-    mVideoFormatsMap.insert("video/x-flv", "flv");
+    m_videoFormatsMap.insert("video/webm", "webm");
+    m_videoFormatsMap.insert("video/mp4", "mp4");
+    m_videoFormatsMap.insert("video/mp4", "m4v");
+    m_videoFormatsMap.insert("video/mpeg", "mpg");
+    m_videoFormatsMap.insert("video/mpeg", "mpeg");
+    m_videoFormatsMap.insert("video/x-matroska", "mkv");
+    m_videoFormatsMap.insert("video/x-ms-wmv", "wmv");
+    m_videoFormatsMap.insert("video/x-msvideo", "avi");
+    m_videoFormatsMap.insert("video/quicktime", "mov");
+    m_videoFormatsMap.insert("video/x-flv", "flv");
 }
 //------------------------------------------------------------------------------
 QString Settings::quickCopyDirectory() {
@@ -285,7 +285,7 @@ void Settings::setQuickCopyDirectory(const QString &dir) {
 }
 //------------------------------------------------------------------------------
 QString Settings::mpvBinary() {
-    QString mpvPath = settingsConf->value("mpvBinary", "").toString();
+    QString mpvPath = m_settingsConf->value("mpvBinary", "").toString();
     if(!QFile::exists(mpvPath)) {
 #ifdef _WIN32
         mpvPath = QCoreApplication::applicationDirPath() + "/mpv.exe";
@@ -310,7 +310,7 @@ QList<QByteArray> Settings::supportedFormats() {
     auto formats = QImageReader::supportedImageFormats();
     formats << "jfif";
     if(videoPlayback())
-        formats << mVideoFormatsMap.values();
+        formats << m_videoFormatsMap.values();
     formats.removeAll("pdf");
     return formats;
 }
@@ -343,7 +343,7 @@ QStringList Settings::supportedMimeTypes() {
     QStringList filters;
     QList<QByteArray> mimeTypes = QImageReader::supportedMimeTypes();
     if(videoPlayback())
-        mimeTypes << mVideoFormatsMap.keys();
+        mimeTypes << m_videoFormatsMap.keys();
     for(int i = 0; i < mimeTypes.count(); i++) {
         filters << QString(mimeTypes.at(i));
     }
@@ -430,11 +430,11 @@ void Settings::setPlayVideoSounds(bool mode) {
 }
 //------------------------------------------------------------------------------
 void Settings::setVolume(int vol) {
-    stateConf->setValue("volume", vol);
+    m_stateConf->setValue("volume", vol);
 }
 
 int Settings::volume() {
-    return stateConf->value("volume", 100).toInt();
+    return m_stateConf->value("volume", 100).toInt();
 }
 //------------------------------------------------------------------------------
 FolderViewMode Settings::folderViewMode() {
@@ -454,7 +454,7 @@ void Settings::setThumbPanelStyle(ThumbPanelStyle mode) {
 }
 //------------------------------------------------------------------------------
 const QMultiMap<QByteArray, QByteArray> &Settings::videoFormats() const {
-    return mVideoFormatsMap;
+    return m_videoFormatsMap;
 }
 //------------------------------------------------------------------------------
 int Settings::panelPreviewsSize() {
@@ -483,11 +483,11 @@ void Settings::setFullscreenMode(bool mode) {
 }
 //------------------------------------------------------------------------------
 bool Settings::maximizedWindow() {
-    return stateConf->value("maximizedWindow", false).toBool();
+    return m_stateConf->value("maximizedWindow", false).toBool();
 }
 
 void Settings::setMaximizedWindow(bool mode) {
-    stateConf->setValue("maximizedWindow", mode);
+    m_stateConf->setValue("maximizedWindow", mode);
 }
 //------------------------------------------------------------------------------
 bool Settings::panelEnabled() {
@@ -507,15 +507,15 @@ void Settings::setPanelFullscreenOnly(bool mode) {
 }
 //------------------------------------------------------------------------------
 int Settings::lastDisplay() {
-    return stateConf->value("lastDisplay", 0).toInt();
+    return m_stateConf->value("lastDisplay", 0).toInt();
 }
 
 void Settings::setLastDisplay(int display) {
-    stateConf->setValue("lastDisplay", display);
+    m_stateConf->setValue("lastDisplay", display);
 }
 //------------------------------------------------------------------------------
 PanelPosition Settings::panelPosition() {
-    QString posString = settingsConf->value("panelPosition", "top").toString();
+    QString posString = m_settingsConf->value("panelPosition", "top").toString();
     if(posString == "top") {
         return PanelPosition::PANEL_TOP;
     } else if(posString == "bottom") {
@@ -571,14 +571,14 @@ void Settings::setImageFitMode(ImageFitMode mode) {
 }
 //------------------------------------------------------------------------------
 QRect Settings::windowGeometry() {
-    QRect savedRect = stateConf->value("windowGeometry").toRect();
+    QRect savedRect = m_stateConf->value("windowGeometry").toRect();
     if(savedRect.size().isEmpty())
         savedRect.setRect(100, 100, 900, 600);
     return savedRect;
 }
 
 void Settings::setWindowGeometry(QRect geometry) {
-    stateConf->setValue("windowGeometry", geometry);
+    m_stateConf->setValue("windowGeometry", geometry);
 }
 //------------------------------------------------------------------------------
 bool Settings::loopSlideshow() {
@@ -599,9 +599,9 @@ void Settings::sendChangeNotification() {
 // value: "shortcuts" is the global table, "gridShortcuts" the folder
 // grid's, and the same escape rules apply to each.
 void Settings::readShortcuts(QMap<QString, QString> &shortcuts, const QString &key) {
-    settingsConf->beginGroup("Controls");
+    m_settingsConf->beginGroup("Controls");
     QStringList in, pair;
-    in = settingsConf->value(key).toStringList();
+    in = m_settingsConf->value(key).toStringList();
     QStringList unbound;
     for(int i = 0; i < in.count(); i++) {
         pair = in[i].split("=");
@@ -620,7 +620,7 @@ void Settings::readShortcuts(QMap<QString, QString> &shortcuts, const QString &k
             shortcuts.insert(pair[1], pair[0]);
         }
     }
-    settingsConf->endGroup();
+    m_settingsConf->endGroup();
     for(const QString &action : std::as_const(unbound))
         for(auto i = shortcuts.begin(); i != shortcuts.end();) {
             if(i.value() == action)
@@ -633,8 +633,8 @@ void Settings::readShortcuts(QMap<QString, QString> &shortcuts, const QString &k
 void Settings::saveShortcutsWithTombstones(const QMap<QString, QString> &shortcuts,
                                            const QMap<QString, QString> &defaults, const QString &key) {
     saveShortcuts(shortcuts, key);
-    settingsConf->beginGroup("Controls");
-    QStringList out = settingsConf->value(key).toStringList();
+    m_settingsConf->beginGroup("Controls");
+    QStringList out = m_settingsConf->value(key).toStringList();
     // every default whose action the table no longer holds gets a tombstone.
     // Scoped per action, not per token: the editor deletes a ROW, and an
     // action may hold several keys, so "this action is unbound" is the fact
@@ -650,12 +650,12 @@ void Settings::saveShortcutsWithTombstones(const QMap<QString, QString> &shortcu
         marked.insert(it.value());
         out << QLatin1String("-") + it.value();
     }
-    settingsConf->setValue(key, out);
-    settingsConf->endGroup();
+    m_settingsConf->setValue(key, out);
+    m_settingsConf->endGroup();
 }
 
 void Settings::saveShortcuts(const QMap<QString, QString> &shortcuts, const QString &key) {
-    settingsConf->beginGroup("Controls");
+    m_settingsConf->beginGroup("Controls");
     QMapIterator<QString, QString> i(shortcuts);
     QStringList out;
     while(i.hasNext()) {
@@ -665,19 +665,19 @@ void Settings::saveShortcuts(const QMap<QString, QString> &shortcuts, const QStr
         else
             out << i.value() + "=" + i.key();
     }
-    settingsConf->setValue(key, out);
-    settingsConf->endGroup();
+    m_settingsConf->setValue(key, out);
+    m_settingsConf->endGroup();
 }
 //------------------------------------------------------------------------------
 void Settings::readScripts(QMap<QString, Script> &scripts) {
     scripts.clear();
-    settingsConf->beginGroup("Scripts");
+    m_settingsConf->beginGroup("Scripts");
 
     // pre-@Variant generation layout: <n>/name and <n>/command sit directly
     // under the group; collect them so the array pass can fall back to real
     // data when the value slot holds a Qt6-dead shell
     QMap<int, Script> legacy;
-    const QStringList groupKeys = settingsConf->allKeys();
+    const QStringList groupKeys = m_settingsConf->allKeys();
     for(const QString &k : groupKeys) {
         const QStringList parts = k.split('/');
         if(parts.size() != 2 || parts.at(1) != QStringLiteral("command"))
@@ -687,48 +687,48 @@ void Settings::readScripts(QMap<QString, Script> &scripts) {
         if(!isIndex)
             continue;
         Script s;
-        s.command = settingsConf->value(k).toString();
-        s.blocking = settingsConf->value(parts.at(0) + "/blocking").toBool();
+        s.command = m_settingsConf->value(k).toString();
+        s.blocking = m_settingsConf->value(parts.at(0) + "/blocking").toBool();
         legacy.insert(idx, s);
     }
 
-    int size = settingsConf->beginReadArray("script");
+    int size = m_settingsConf->beginReadArray("script");
     for(int i = 0; i < size; i++) {
-        settingsConf->setArrayIndex(i);
-        QString name = settingsConf->value("name").toString();
-        Script scr = scriptFromStoredValue(settingsConf->value("value"));
+        m_settingsConf->setArrayIndex(i);
+        QString name = m_settingsConf->value("name").toString();
+        Script scr = scriptFromStoredValue(m_settingsConf->value("value"));
         if(scr.command.isEmpty() && legacy.contains(i + 1))
             scr = legacy.value(i + 1);
         if(!name.isEmpty())
             scripts.insert(name, scr);
     }
-    settingsConf->endArray();
+    m_settingsConf->endArray();
 
     // legacy-only configs: group keys without any array at all
     if(size == 0) {
         for(auto it = legacy.constBegin(); it != legacy.constEnd(); ++it) {
-            const QString name = settingsConf->value(QString::number(it.key()) + "/name").toString();
+            const QString name = m_settingsConf->value(QString::number(it.key()) + "/name").toString();
             if(!name.isEmpty())
                 scripts.insert(name, it.value());
         }
     }
-    settingsConf->endGroup();
+    m_settingsConf->endGroup();
 }
 
 void Settings::saveScripts(const QMap<QString, Script> &scripts) {
-    settingsConf->beginGroup("Scripts");
-    settingsConf->beginWriteArray("script");
+    m_settingsConf->beginGroup("Scripts");
+    m_settingsConf->beginWriteArray("script");
     QMapIterator<QString, Script> i(scripts);
     int counter = 0;
     while(i.hasNext()) {
         i.next();
-        settingsConf->setArrayIndex(counter);
-        settingsConf->setValue("name", i.key());
-        settingsConf->setValue("value", scriptToJson(i.value()));
+        m_settingsConf->setArrayIndex(counter);
+        m_settingsConf->setValue("name", i.key());
+        m_settingsConf->setValue("value", scriptToJson(i.value()));
         counter++;
     }
-    settingsConf->endArray();
-    settingsConf->endGroup();
+    m_settingsConf->endArray();
+    m_settingsConf->endGroup();
 }
 //------------------------------------------------------------------------------
 bool Settings::squareThumbnails() {
@@ -764,36 +764,36 @@ void Settings::setUseThumbnailCache(bool mode) {
 }
 //------------------------------------------------------------------------------
 QStringList Settings::savedPaths() {
-    return stateConf->value("savedPaths", QDir::homePath()).toStringList();
+    return m_stateConf->value("savedPaths", QDir::homePath()).toStringList();
 }
 
 void Settings::setSavedPaths(const QStringList &paths) {
-    stateConf->setValue("savedPaths", paths);
+    m_stateConf->setValue("savedPaths", paths);
 }
 //------------------------------------------------------------------------------
 bool Settings::placesPanel() {
-    return stateConf->value("placesPanel", true).toBool();
+    return m_stateConf->value("placesPanel", true).toBool();
 }
 
 void Settings::setPlacesPanel(bool mode) {
-    stateConf->setValue("placesPanel", mode);
+    m_stateConf->setValue("placesPanel", mode);
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 bool Settings::placesPanelTreeExpanded() {
-    return stateConf->value("placesPanelTreeExpanded", true).toBool();
+    return m_stateConf->value("placesPanelTreeExpanded", true).toBool();
 }
 
 void Settings::setPlacesPanelTreeExpanded(bool mode) {
-    stateConf->setValue("placesPanelTreeExpanded", mode);
+    m_stateConf->setValue("placesPanelTreeExpanded", mode);
 }
 //------------------------------------------------------------------------------
 int Settings::placesPanelWidth() {
-    return stateConf->value("placesPanelWidth", 260).toInt();
+    return m_stateConf->value("placesPanelWidth", 260).toInt();
 }
 
 void Settings::setPlacesPanelWidth(int width) {
-    stateConf->setValue("placesPanelWidth", width);
+    m_stateConf->setValue("placesPanelWidth", width);
 }
 //------------------------------------------------------------------------------
 void Settings::setSlideshowInterval(int ms) {
@@ -850,7 +850,7 @@ ScalingFilter Settings::scalingFilter() {
     // default to a nicer QI_FILTER_CV_CUBIC
     defaultFilter = 3;
 #endif
-    int mode = settingsConf->value("scalingFilter", defaultFilter).toInt();
+    int mode = m_settingsConf->value("scalingFilter", defaultFilter).toInt();
 #ifndef USE_OPENCV
     if(mode > 2)
         mode = 1;
@@ -861,7 +861,7 @@ ScalingFilter Settings::scalingFilter() {
 }
 
 void Settings::setScalingFilter(ScalingFilter mode) {
-    settingsConf->setValue("scalingFilter", mode);
+    m_settingsConf->setValue("scalingFilter", mode);
 }
 //------------------------------------------------------------------------------
 bool Settings::smoothAnimatedImages() {
@@ -1004,43 +1004,43 @@ void Settings::setFolderEndAction(FolderEndAction mode) {
 }
 //------------------------------------------------------------------------------
 bool Settings::printLandscape() {
-    return stateConf->value("printLandscape", false).toBool();
+    return m_stateConf->value("printLandscape", false).toBool();
 }
 
 void Settings::setPrintLandscape(bool mode) {
-    stateConf->setValue("printLandscape", mode);
+    m_stateConf->setValue("printLandscape", mode);
 }
 //------------------------------------------------------------------------------
 bool Settings::printPdfDefault() {
-    return stateConf->value("printPdfDefault", false).toBool();
+    return m_stateConf->value("printPdfDefault", false).toBool();
 }
 
 void Settings::setPrintPdfDefault(bool mode) {
-    stateConf->setValue("printPdfDefault", mode);
+    m_stateConf->setValue("printPdfDefault", mode);
 }
 //------------------------------------------------------------------------------
 bool Settings::printColor() {
-    return stateConf->value("printColor", false).toBool();
+    return m_stateConf->value("printColor", false).toBool();
 }
 
 void Settings::setPrintColor(bool mode) {
-    stateConf->setValue("printColor", mode);
+    m_stateConf->setValue("printColor", mode);
 }
 //------------------------------------------------------------------------------
 bool Settings::printFitToPage() {
-    return stateConf->value("printFitToPage", true).toBool();
+    return m_stateConf->value("printFitToPage", true).toBool();
 }
 
 void Settings::setPrintFitToPage(bool mode) {
-    stateConf->setValue("printFitToPage", mode);
+    m_stateConf->setValue("printFitToPage", mode);
 }
 //------------------------------------------------------------------------------
 QString Settings::lastPrinter() {
-    return stateConf->value("lastPrinter", "").toString();
+    return m_stateConf->value("lastPrinter", "").toString();
 }
 
 void Settings::setLastPrinter(const QString &name) {
-    stateConf->setValue("lastPrinter", name);
+    m_stateConf->setValue("lastPrinter", name);
 }
 //------------------------------------------------------------------------------
 bool Settings::jxlAnimation() {
@@ -1103,11 +1103,11 @@ QString Settings::defaultZoomLevels() {
     return QString("0.05,0.1,0.125,0.166,0.25,0.333,0.5,0.66,1,1.5,2,3,4,5,6,7,8");
 }
 QString Settings::zoomLevels() {
-    return settingsConf->value("fixedZoomLevels", defaultZoomLevels()).toString();
+    return m_settingsConf->value("fixedZoomLevels", defaultZoomLevels()).toString();
 }
 
 void Settings::setZoomLevels(const QString &levels) {
-    settingsConf->setValue("fixedZoomLevels", levels);
+    m_settingsConf->setValue("fixedZoomLevels", levels);
 }
 //------------------------------------------------------------------------------
 bool Settings::unlockMinZoom() {
