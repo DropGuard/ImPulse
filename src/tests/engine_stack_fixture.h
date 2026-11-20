@@ -50,8 +50,9 @@ class EngineStackFixture {
         // the pid is in the path because two instances of this binary can run at
         // once (a manual run beside a ctest run), and a shared tree means one
         // process deletes directories the other is still watching
-        : fixtureBase(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/qimgv-engine-stack-test/pid" +
-                      QString::number(QCoreApplication::applicationPid()) + "/" + domain) {
+        : m_fixtureBase(QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
+                        "/qimgv-engine-stack-test/pid" + QString::number(QCoreApplication::applicationPid()) + "/" +
+                        domain) {
         // Initialization lives in the constructor, not in an init() every suite
         // has to remember to call. Eleven classes inherited this fixture and each
         // opened its initTestCase with a bare `init();` -- a call that can be
@@ -75,7 +76,7 @@ class EngineStackFixture {
         // Recorded rather than QVERIFY'd: this runs while the enclosing suite is
         // still being constructed, where QTest has no result to attach a failure
         // to. resetFixture() reports it, where every test goes through.
-        fixtureReady = QDir().mkpath(fixtureBase);
+        m_fixtureReady = QDir().mkpath(m_fixtureBase);
     }
 
     // qFatal, not an assertion macro: this fixture is compiled into suites on
@@ -83,8 +84,8 @@ class EngineStackFixture {
     // never reads (silent green). A fixture that cannot write its own files has
     // no test to report into — stop, loudly, with the path named.
     void makeFile(const QString &name) {
-        if(writeTestFile(fixtureDir + "/" + name, "x").isEmpty())
-            qFatal("fixture cannot write %s/%s", qPrintable(fixtureDir), qPrintable(name));
+        if(writeTestFile(m_fixtureDir + "/" + name, "x").isEmpty())
+            qFatal("fixture cannot write %s/%s", qPrintable(m_fixtureDir), qPrintable(name));
     }
 
     // each slot gets its own directory: the engine holds inotify watches on these
@@ -99,24 +100,24 @@ class EngineStackFixture {
         // no pair of lines that can drift apart. The failure it names -- an
         // uncreatable /tmp root -- would otherwise surface far away, as whatever
         // write happened to fail first.
-        if(!fixtureReady)
-            qFatal("cannot create the fixture root: %s", qPrintable(fixtureBase));
-        if(home.path() == nullptr)
+        if(!m_fixtureReady)
+            qFatal("cannot create the fixture root: %s", qPrintable(m_fixtureBase));
+        if(m_home.path() == nullptr)
             qFatal("fixture has no isolated home");
         // process-wide, not a member: gtest builds a fresh fixture object for
         // every TEST_F, so a member would restart at slot1 and hand each test a
         // directory an earlier test's engine still holds a watch on
         static int slotSeq = 0;
         ++slotSeq;
-        fixtureDir = fixtureBase + QString("/slot%1").arg(slotSeq);
-        if(!QDir().mkpath(fixtureDir))
-            qFatal("fixture cannot create %s", qPrintable(fixtureDir));
+        m_fixtureDir = m_fixtureBase + QString("/slot%1").arg(slotSeq);
+        if(!QDir().mkpath(m_fixtureDir))
+            qFatal("fixture cannot create %s", qPrintable(m_fixtureDir));
         makeFile("img1.jpg");
         makeFile("img2.jpg");
         makeFile("img10.jpg");
         makeFile("skip.txt");
-        if(!QDir(fixtureDir).mkdir("subdir"))
-            qFatal("fixture cannot create %s/subdir", qPrintable(fixtureDir));
+        if(!QDir(m_fixtureDir).mkdir("subdir"))
+            qFatal("fixture cannot create %s/subdir", qPrintable(m_fixtureDir));
     }
 
     // the load environment for factory calls: tests run on their own thread,
@@ -290,9 +291,9 @@ class EngineStackFixture {
     }
 
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString fixtureBase;
-    QString fixtureDir;
-    bool fixtureReady = false;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_fixtureBase;
+    QString m_fixtureDir;
+    bool m_fixtureReady = false;
 };

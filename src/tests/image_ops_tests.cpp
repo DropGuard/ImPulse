@@ -71,7 +71,7 @@ TEST_F(TestImageOps, monoBitmapPaletteColorsSurviveTheLoad) {
         bmp.append(char(0));
         bmp.append(char(0));
     }
-    const QString path = fixtureDir + "/palette-mono.bmp";
+    const QString path = m_fixtureDir + "/palette-mono.bmp";
     QFile out(path);
     EXPECT_TRUE(out.open(QIODevice::WriteOnly)) << qPrintable(out.errorString());
     out.write(bmp);
@@ -91,7 +91,7 @@ TEST_F(TestImageOps, originalSizeSurvivesTheScaledTier) {
     resetFixture();
     QImage big(4000, 3000, QImage::Format_RGB32);
     big.fill(Qt::red);
-    const QString path = fixtureDir + "/big.jpg";
+    const QString path = m_fixtureDir + "/big.jpg";
     QImageWriter w(path, "jpg");
     EXPECT_TRUE(w.write(big)) << qPrintable(w.errorString());
 
@@ -130,11 +130,11 @@ static QByteArray readBytes(const QString &path) {
 // byte-identical with no residue.
 TEST_F(TestImageOps, saveWithBackupOverwritesAndRestores) {
     resetFixture();
-    const QString dest = fixtureDir + "/saved.png";
+    const QString dest = m_fixtureDir + "/saved.png";
     // the fixture directory holds other files, so "no residue" is asserted
     // as "the set of names did not grow", not as an exact listing
     auto filesHere = [this]() {
-        return QDir(fixtureDir).entryList(QDir::Files | QDir::Hidden, QDir::Name);
+        return QDir(m_fixtureDir).entryList(QDir::Files | QDir::Hidden, QDir::Name);
     };
 
     QImage first(8, 8, QImage::Format_RGB32);
@@ -155,7 +155,7 @@ TEST_F(TestImageOps, saveWithBackupOverwritesAndRestores) {
     // QSaveFile names its temp uniquely, so a leftover would be a new name
     QImage third(8, 8, QImage::Format_RGB32);
     third.fill(Qt::red);
-    const QString odd = fixtureDir + "/saved.unknownsuffix";
+    const QString odd = m_fixtureDir + "/saved.unknownsuffix";
     EXPECT_TRUE(QFile::copy(dest, odd));
     const QByteArray oddBytesBefore = readBytes(odd);
     const QStringList beforeFailure = filesHere();
@@ -191,10 +191,10 @@ TEST_F(TestImageOps, rolledBackSaveRestoresTheRowInsteadOfRebuildingIt) {
 #endif
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
-    const QString dest = fixtureDir + "/img1.jpg";
+    const QString dest = m_fixtureDir + "/img1.jpg";
     const int row = dm.indexOfFile(dest);
     EXPECT_TRUE(row >= 0) << qPrintable(QStringLiteral("precondition broken: ") + dest + " is not in the listing");
     const QByteArray original = readBytes(dest);
@@ -241,15 +241,15 @@ TEST_F(TestImageOps, rolledBackSaveRestoresTheRowInsteadOfRebuildingIt) {
 
 TEST_F(TestImageOps, fileOperationsRoundTrip) {
     resetFixture();
-    QString destDir = fixtureDir + "/destdir";
+    QString destDir = m_fixtureDir + "/destdir";
     EXPECT_TRUE(QDir().mkpath(destDir));
 
     FileOpResult result;
-    FileOperations::copyFileTo(fixtureDir + "/img1.jpg", destDir, false, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/img1.jpg", destDir, false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
     QByteArray srcBytes;
     {
-        QFile src(fixtureDir + "/img1.jpg");
+        QFile src(m_fixtureDir + "/img1.jpg");
         EXPECT_TRUE(src.open(QIODevice::ReadOnly));
         srcBytes = src.readAll();
         QFile dst(destDir + "/img1.jpg");
@@ -260,7 +260,7 @@ TEST_F(TestImageOps, fileOperationsRoundTrip) {
     // to rename a file another handle in this same process holds open,
     // and the rename below is exactly that case
 
-    FileOperations::copyFileTo(fixtureDir + "/img1.jpg", destDir, false, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/img1.jpg", destDir, false, result);
     EXPECT_EQ(result, FileOpResult::DESTINATION_FILE_EXISTS);
     {
         QFile dst2(destDir + "/img1.jpg");
@@ -268,9 +268,9 @@ TEST_F(TestImageOps, fileOperationsRoundTrip) {
         EXPECT_EQ(dst2.readAll(), srcBytes);
     }
 
-    FileOperations::moveFileTo(fixtureDir + "/img2.jpg", destDir, false, result);
+    FileOperations::moveFileTo(m_fixtureDir + "/img2.jpg", destDir, false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    EXPECT_TRUE(!QFile::exists(fixtureDir + "/img2.jpg"));
+    EXPECT_TRUE(!QFile::exists(m_fixtureDir + "/img2.jpg"));
     EXPECT_TRUE(QFile::exists(destDir + "/img2.jpg"));
 
     FileOperations::rename(destDir + "/img1.jpg", "renamed.jpg", false, result);
@@ -292,21 +292,21 @@ TEST_F(TestImageOps, fileOperationsRoundTrip) {
 TEST_F(TestImageOps, fileOperationsFailurePaths) {
     resetFixture();
     FileOpResult result;
-    EXPECT_TRUE(QDir().mkpath(fixtureDir + "/destdir"));
-    FileOperations::copyFileTo(fixtureDir + "/nope.jpg", fixtureDir + "/destdir", false, result);
+    EXPECT_TRUE(QDir().mkpath(m_fixtureDir + "/destdir"));
+    FileOperations::copyFileTo(m_fixtureDir + "/nope.jpg", m_fixtureDir + "/destdir", false, result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
-    FileOperations::rename(fixtureDir + "/nope.jpg", "x.jpg", false, result);
+    FileOperations::rename(m_fixtureDir + "/nope.jpg", "x.jpg", false, result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
-    FileOperations::removeFile(fixtureDir + "/nope.jpg", result);
+    FileOperations::removeFile(m_fixtureDir + "/nope.jpg", result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
-    FileOperations::copyFileTo(fixtureDir + "/img1.jpg", fixtureDir + "/nowhere", false, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/img1.jpg", m_fixtureDir + "/nowhere", false, result);
     EXPECT_EQ(result, FileOpResult::DESTINATION_DOES_NOT_EXIST);
-    FileOperations::copyFileTo(fixtureDir + "/img1.jpg", fixtureDir, false, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/img1.jpg", m_fixtureDir, false, result);
     EXPECT_EQ(result, FileOpResult::NOTHING_TO_DO);
-    FileOperations::removeDir(fixtureDir + "/nowhere", true, result);
+    FileOperations::removeDir(m_fixtureDir + "/nowhere", true, result);
     EXPECT_TRUE(result != FileOpResult::SUCCESS);
-    EXPECT_TRUE(!QFile::exists(fixtureDir + "/nope.jpg"));
-    EXPECT_TRUE(!QDir(fixtureDir + "/nowhere").exists());
+    EXPECT_TRUE(!QFile::exists(m_fixtureDir + "/nope.jpg"));
+    EXPECT_TRUE(!QDir(m_fixtureDir + "/nowhere").exists());
 }
 
 // Two ways a failed save can still cost you something, asserted separately
@@ -320,42 +320,43 @@ TEST_F(TestImageOps, fileOperationsFailurePaths) {
 // wrong bytes.
 TEST_F(TestImageOps, failedSaveToAnotherPathDoesNotTouchTheOriginal) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/orig.png", "png", QSize(24, 24)));
-    QFile orig(fixtureDir + "/orig.png");
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/orig.png", "png", QSize(24, 24)));
+    QFile orig(m_fixtureDir + "/orig.png");
     EXPECT_TRUE(orig.open(QIODevice::ReadOnly));
     const QByteArray origBefore = orig.readAll();
     orig.close();
     const QByteArray targetBefore("ORIGINAL TARGET CONTENTS");
     {
-        QFile t(fixtureDir + "/target.xyz");
+        QFile t(m_fixtureDir + "/target.xyz");
         EXPECT_TRUE(t.open(QIODevice::WriteOnly));
         t.write(targetBefore);
     }
 
-    auto image = *ImageFactory::createImage(fixtureDir + "/orig.png", false, loadPolicy());
-    EXPECT_TRUE(!image->save(fixtureDir + "/target.xyz", 95)); // "xyz" is not encodable
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/orig.png", false, loadPolicy());
+    EXPECT_TRUE(!image->save(m_fixtureDir + "/target.xyz", 95)); // "xyz" is not encodable
 
-    QFile after(fixtureDir + "/orig.png");
+    QFile after(m_fixtureDir + "/orig.png");
     EXPECT_TRUE(after.open(QIODevice::ReadOnly));
     EXPECT_EQ(after.readAll(), origBefore);
     after.close();
-    QFile target(fixtureDir + "/target.xyz");
+    QFile target(m_fixtureDir + "/target.xyz");
     EXPECT_TRUE(target.open(QIODevice::ReadOnly));
     EXPECT_EQ(target.readAll(), targetBefore);
-    EXPECT_EQ(int(QDir(fixtureDir).entryList(QStringList() << QStringLiteral("target.xyz_*"), QDir::Files).size()), 0);
+    EXPECT_EQ(int(QDir(m_fixtureDir).entryList(QStringList() << QStringLiteral("target.xyz_*"), QDir::Files).size()),
+              0);
 }
 
 // (2) The edited image was swapped and discarded before `success` was
 // consulted, so every failed save also threw away unsaved work.
 TEST_F(TestImageOps, failedSaveKeepsTheUnsavedEdit) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/orig.png", "png", QSize(24, 24)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/orig.png", "png", QSize(24, 24)));
     auto image = std::dynamic_pointer_cast<ImageStatic>(
-        *ImageFactory::createImage(fixtureDir + "/orig.png", false, loadPolicy()));
+        *ImageFactory::createImage(m_fixtureDir + "/orig.png", false, loadPolicy()));
     EXPECT_TRUE(image != nullptr);
     image->setEditedImage(std::make_unique<const QImage>(image->getImage()->copy(QRect(0, 0, 8, 8))));
     EXPECT_TRUE(image->isEdited());
-    EXPECT_TRUE(!image->save(fixtureDir + "/orig.xyz", 95));
+    EXPECT_TRUE(!image->save(m_fixtureDir + "/orig.xyz", 95));
     EXPECT_TRUE(image->isEdited()) << "a failed save threw away the unsaved edit";
     EXPECT_EQ(image->getImage()->size(), QSize(8, 8));
 }
@@ -371,7 +372,7 @@ TEST_F(TestImageOps, imageStaticSaveRoundTripAndQuality) {
             seed = seed * 1103515245u + 12345u;
             img.setPixel(x, y, QColor((seed >> 16) & 0xff, (seed >> 8) & 0xff, seed & 0xff).rgb());
         }
-    QString saveDir = fixtureDir + "/savedir";
+    QString saveDir = m_fixtureDir + "/savedir";
     EXPECT_TRUE(QDir().mkpath(saveDir));
     QString srcPath = saveDir + "/noise-src.png";
     EXPECT_TRUE(img.save(srcPath, "PNG"));
@@ -440,8 +441,8 @@ TEST_F(TestImageOps, imageLibRotateFlipExactPixels) {
 // performs before handing a paletted image to cv
 TEST_F(TestImageOps, imageLibScaledUsesTheCvPaths) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/cv-src.png", "png", QSize(64, 64)));
-    auto src = std::make_shared<const QImage>(fixtureDir + "/cv-src.png");
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/cv-src.png", "png", QSize(64, 64)));
+    auto src = std::make_shared<const QImage>(m_fixtureDir + "/cv-src.png");
     for(auto filter : {QI_FILTER_CV_BILINEAR_SHARPEN, QI_FILTER_CV_CUBIC, QI_FILTER_CV_CUBIC_SHARPEN}) {
         auto dst = ImageLib::scaled(src, QSize(32, 32), filter);
         EXPECT_TRUE(!dst->isNull());
@@ -463,8 +464,8 @@ TEST_F(TestImageOps, imageLibScaledUsesTheCvPaths) {
 // preservation on failure, modification-time preservation on overwrite
 TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/src.png", "png", QSize(8, 8)));
-    QFile src(fixtureDir + "/src.png");
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/src.png", "png", QSize(8, 8)));
+    QFile src(m_fixtureDir + "/src.png");
 #ifdef Q_OS_WIN
     // futimens works through an O_RDONLY fd for the file's owner;
     // SetFileTime needs FILE_WRITE_ATTRIBUTES, which a read-only open
@@ -475,39 +476,39 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
 #endif
     EXPECT_TRUE(src.setFileTime(QDateTime(QDate(2020, 1, 2), QTime(3, 4, 5)), QFileDevice::FileModificationTime));
     src.close();
-    QDir().mkpath(fixtureDir + "/destdir");
+    QDir().mkpath(m_fixtureDir + "/destdir");
     FileOpResult result;
 
     // move: same dir is nothing, missing source, missing dest dir
-    FileOperations::moveFileTo(fixtureDir + "/src.png", fixtureDir, false, result);
+    FileOperations::moveFileTo(m_fixtureDir + "/src.png", m_fixtureDir, false, result);
     EXPECT_EQ(result, FileOpResult::NOTHING_TO_DO);
-    FileOperations::moveFileTo(fixtureDir + "/nope.png", fixtureDir + "/destdir", false, result);
+    FileOperations::moveFileTo(m_fixtureDir + "/nope.png", m_fixtureDir + "/destdir", false, result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
-    FileOperations::moveFileTo(fixtureDir + "/src.png", fixtureDir + "/nowhere", false, result);
+    FileOperations::moveFileTo(m_fixtureDir + "/src.png", m_fixtureDir + "/nowhere", false, result);
     EXPECT_EQ(result, FileOpResult::DESTINATION_DOES_NOT_EXIST);
     // happy move relocates the file
-    FileOperations::moveFileTo(fixtureDir + "/src.png", fixtureDir + "/destdir", false, result);
+    FileOperations::moveFileTo(m_fixtureDir + "/src.png", m_fixtureDir + "/destdir", false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    EXPECT_TRUE(QFileInfo::exists(fixtureDir + "/destdir/src.png"));
+    EXPECT_TRUE(QFileInfo::exists(m_fixtureDir + "/destdir/src.png"));
 
     // rename: same name is nothing, dest-dir collision, forced rename
-    FileOperations::rename(fixtureDir + "/destdir/src.png", "src.png", false, result);
+    FileOperations::rename(m_fixtureDir + "/destdir/src.png", "src.png", false, result);
     EXPECT_EQ(result, FileOpResult::NOTHING_TO_DO);
-    QDir().mkpath(fixtureDir + "/destdir/blocked");
-    FileOperations::rename(fixtureDir + "/destdir/src.png", "blocked", false, result);
+    QDir().mkpath(m_fixtureDir + "/destdir/blocked");
+    FileOperations::rename(m_fixtureDir + "/destdir/src.png", "blocked", false, result);
     EXPECT_EQ(result, FileOpResult::DESTINATION_DIR_EXISTS);
-    FileOperations::rename(fixtureDir + "/destdir/src.png", "renamed.png", false, result);
+    FileOperations::rename(m_fixtureDir + "/destdir/src.png", "renamed.png", false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    EXPECT_TRUE(QFileInfo::exists(fixtureDir + "/destdir/renamed.png"));
+    EXPECT_TRUE(QFileInfo::exists(m_fixtureDir + "/destdir/renamed.png"));
 
     // copy: a forced overwrite preserves the source's modification time
-    QFileInfo destInfo(fixtureDir + "/destdir/renamed.png");
+    QFileInfo destInfo(m_fixtureDir + "/destdir/renamed.png");
     QDateTime before = destInfo.lastModified();
     // The source's mtime must differ from the destination's for the "preserves
     // the source's time" assertion to mean anything. Sleeping 1100 ms bought
     // that with wall-clock time; setting it says it directly, cannot be
     // shortened by a coarse clock, and costs nothing.
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/newer.png", "png", QSize(8, 8)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/newer.png", "png", QSize(8, 8)));
 #ifdef Q_OS_WIN
     {
         QFile backdate(fixtureDir + "/newer.png");
@@ -517,11 +518,11 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
     }
 #else
     const struct timespec stamp[2] = {{0, UTIME_OMIT}, {before.toSecsSinceEpoch() - 60, 0}};
-    EXPECT_TRUE(::utimensat(AT_FDCWD, (fixtureDir + "/newer.png").toLocal8Bit().constData(), stamp, 0) == 0);
+    EXPECT_TRUE(::utimensat(AT_FDCWD, (m_fixtureDir + "/newer.png").toLocal8Bit().constData(), stamp, 0) == 0);
 #endif
-    FileOperations::copyFileTo(fixtureDir + "/newer.png", fixtureDir + "/destdir", true, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/newer.png", m_fixtureDir + "/destdir", true, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    QFileInfo overwritten(fixtureDir + "/destdir/renamed.png");
+    QFileInfo overwritten(m_fixtureDir + "/destdir/renamed.png");
     EXPECT_TRUE(overwritten.exists());
     // content is the NEWER image now
     QImage reloaded(overwritten.absoluteFilePath());
@@ -531,31 +532,31 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
 
 TEST_F(TestImageOps, fileOperationsRemoveDirAndTrash) {
     resetFixture();
-    QDir().mkpath(fixtureDir + "/tree/nested");
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/tree/nested/x.png", "png", QSize(4, 4)));
+    QDir().mkpath(m_fixtureDir + "/tree/nested");
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/tree/nested/x.png", "png", QSize(4, 4)));
     FileOpResult result;
     // non-recursive removal of a non-empty dir refuses
-    FileOperations::removeDir(fixtureDir + "/tree", false, result);
+    FileOperations::removeDir(m_fixtureDir + "/tree", false, result);
     EXPECT_EQ(result, FileOpResult::DIRECTORY_NOT_EMPTY);
-    EXPECT_TRUE(QDir(fixtureDir + "/tree").exists());
+    EXPECT_TRUE(QDir(m_fixtureDir + "/tree").exists());
     // recursive removal takes the whole tree
-    FileOperations::removeDir(fixtureDir + "/tree", true, result);
+    FileOperations::removeDir(m_fixtureDir + "/tree", true, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    EXPECT_TRUE(!QDir(fixtureDir + "/tree").exists());
+    EXPECT_TRUE(!QDir(m_fixtureDir + "/tree").exists());
     // missing dir
-    FileOperations::removeDir(fixtureDir + "/tree", true, result);
+    FileOperations::removeDir(m_fixtureDir + "/tree", true, result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
 
     // trash: only the deterministic branch is pinned — the XDG trash
     // target is Qt's own mechanism and environment-dependent
-    FileOperations::moveToTrash(fixtureDir + "/missing.jpg", result);
+    FileOperations::moveToTrash(m_fixtureDir + "/missing.jpg", result);
     EXPECT_EQ(result, FileOpResult::SOURCE_DOES_NOT_EXIST);
 }
 
 TEST_F(TestImageOps, imageStaticDiscardsTheUnsavedEdit) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/es.png", "png", QSize(8, 8)));
-    auto img = *ImageFactory::createImage(fixtureDir + "/es.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/es.png", "png", QSize(8, 8)));
+    auto img = *ImageFactory::createImage(m_fixtureDir + "/es.png", false, loadPolicy());
     auto es = std::dynamic_pointer_cast<ImageStatic>(img);
     EXPECT_TRUE(es != nullptr);
     // discarding without an edit reports failure and touches nothing
@@ -576,11 +577,11 @@ TEST_F(TestImageOps, imageStaticLoadsAnIcoFixture) {
     const QByteArray ico =
         QByteArray::fromBase64("AAABAAEAEBAAAAAAIABWAAAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAQAAAAEAgGAAAAH/P/"
                                "YQAAAB1JREFUeJxjrNA48Z+BAsBEieZRA0YNGDVgMBkAAAD6Aof9mEGiAAAAAElFTkSuQmCC");
-    QFile icoFile(fixtureDir + "/app.ico");
+    QFile icoFile(m_fixtureDir + "/app.ico");
     EXPECT_TRUE(icoFile.open(QIODevice::WriteOnly));
     icoFile.write(ico);
     icoFile.close();
-    auto image = *ImageFactory::createImage(fixtureDir + "/app.ico", false, loadPolicy());
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/app.ico", false, loadPolicy());
     EXPECT_EQ(image->type(), DocumentType::STATIC);
     EXPECT_TRUE(image->getImage() != nullptr);
     EXPECT_TRUE(!image->getImage()->isNull());
@@ -660,7 +661,7 @@ TEST_F(TestImageOps, imageLibTransformsFollowTheConventions) {
 // into a JPEG — which is the point of the test, not a shortcut.
 TEST_F(TestImageOps, editingAnImageCarriesItsExifXmpAndIptcOntoTheSavedFile) {
     resetFixture();
-    const QString source = fixtureDir + "/shot.jpg";
+    const QString source = m_fixtureDir + "/shot.jpg";
     QImage img(64, 32, QImage::Format_RGB32);
     img.fill(qRgb(200, 10, 10));
     EXPECT_TRUE(img.save(source, "JPEG", 95));
@@ -682,7 +683,7 @@ TEST_F(TestImageOps, editingAnImageCarriesItsExifXmpAndIptcOntoTheSavedFile) {
 
     // the edit: rotate the pixels, as ImageLib::exifRotated does for a
     // camera whose EXIF says "rotate 90 CW"
-    const QString dest = fixtureDir + "/edited.jpg";
+    const QString dest = m_fixtureDir + "/edited.jpg";
     const QImage rotated = img.transformed(QTransform().rotate(90), Qt::SmoothTransformation);
     EXPECT_TRUE(FileOperations::saveWithBackup(rotated, dest, 95, source));
 
@@ -727,8 +728,8 @@ TEST_F(TestImageOps, editingAnImageCarriesItsExifXmpAndIptcOntoTheSavedFile) {
 // failed carry is a note, never a failed save.
 TEST_F(TestImageOps, aSaveWithoutMetadataStillSucceeds) {
     resetFixture();
-    const QString source = fixtureDir + "/plain.jpg";
-    const QString dest = fixtureDir + "/plain-out.jpg";
+    const QString source = m_fixtureDir + "/plain.jpg";
+    const QString dest = m_fixtureDir + "/plain-out.jpg";
     QImage img(16, 16, QImage::Format_RGB32);
     img.fill(Qt::blue);
     EXPECT_TRUE(img.save(source, "JPEG", 95));
@@ -738,6 +739,6 @@ TEST_F(TestImageOps, aSaveWithoutMetadataStillSucceeds) {
     EXPECT_TRUE(!QImage(dest).isNull());
 
     // and the no-source form the clipboard import uses is unchanged
-    EXPECT_TRUE(FileOperations::saveWithBackup(img, fixtureDir + "/nosrc.jpg", 95));
-    EXPECT_TRUE(QFile::exists(fixtureDir + "/nosrc.jpg"));
+    EXPECT_TRUE(FileOperations::saveWithBackup(img, m_fixtureDir + "/nosrc.jpg", 95));
+    EXPECT_TRUE(QFile::exists(m_fixtureDir + "/nosrc.jpg"));
 }

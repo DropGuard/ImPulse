@@ -20,39 +20,39 @@ namespace {
 
 class CountingJob : public PoolJob {
   public:
-    CountingJob(std::atomic_int *_runs, std::atomic_int *_deaths) : runs(_runs), deaths(_deaths) {
+    CountingJob(std::atomic_int *_runs, std::atomic_int *_deaths) : m_runs(_runs), m_deaths(_deaths) {
     }
     ~CountingJob() override {
-        deaths->fetch_add(1);
+        m_deaths->fetch_add(1);
     }
     void run() override {
-        runs->fetch_add(1);
+        m_runs->fetch_add(1);
     }
 
   private:
-    std::atomic_int *runs;
-    std::atomic_int *deaths;
+    std::atomic_int *m_runs;
+    std::atomic_int *m_deaths;
 };
 
 // occupies its worker until released, so the test controls what stays queued
 class GatedJob : public PoolJob {
   public:
     GatedJob(std::atomic_bool *_gate, std::atomic_int *_starts, std::atomic_int *_deaths)
-        : gate(_gate), starts(_starts), deaths(_deaths) {
+        : m_gate(_gate), m_starts(_starts), m_deaths(_deaths) {
     }
     ~GatedJob() override {
-        deaths->fetch_add(1);
+        m_deaths->fetch_add(1);
     }
     void run() override {
-        starts->fetch_add(1);
-        while(!gate->load())
+        m_starts->fetch_add(1);
+        while(!m_gate->load())
             QThread::msleep(1);
     }
 
   private:
-    std::atomic_bool *gate;
-    std::atomic_int *starts;
-    std::atomic_int *deaths;
+    std::atomic_bool *m_gate;
+    std::atomic_int *m_starts;
+    std::atomic_int *m_deaths;
 };
 
 // A job type that must never appear under PoolOwner::Thumbnailer. It pins the
@@ -67,36 +67,36 @@ class ForeignJob : public PoolJob {
 
 class OrderJob : public PoolJob {
   public:
-    OrderJob(int _marker, std::atomic_int *_next, int *_order) : marker(_marker), next(_next), order(_order) {
+    OrderJob(int _marker, std::atomic_int *_next, int *_order) : m_marker(_marker), m_next(_next), m_order(_order) {
     }
     void run() override {
-        order[next->fetch_add(1)] = marker;
+        m_order[m_next->fetch_add(1)] = m_marker;
     }
 
   private:
-    int marker;
-    std::atomic_int *next;
-    int *order;
+    int m_marker;
+    std::atomic_int *m_next;
+    int *m_order;
 };
 
 // spins inside run() until the cancel mark arrives — the deterministic
 // stand-in for "cancel() fired while this job was running"
 class CancelGatedJob : public PoolJob {
   public:
-    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_deaths) : sawMark(_sawMark), deaths(_deaths) {
+    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_deaths) : m_sawMark(_sawMark), m_deaths(_deaths) {
     }
     ~CancelGatedJob() override {
-        deaths->fetch_add(1);
+        m_deaths->fetch_add(1);
     }
     void run() override {
         while(!cancelRequested())
             QThread::msleep(1);
-        sawMark->store(true);
+        m_sawMark->store(true);
     }
 
   private:
-    std::atomic_bool *sawMark;
-    std::atomic_int *deaths;
+    std::atomic_bool *m_sawMark;
+    std::atomic_int *m_deaths;
 };
 
 } // namespace

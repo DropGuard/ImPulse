@@ -15,36 +15,36 @@
 
 class TestPresenter : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base, alpha, beta;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base, m_alpha, m_beta;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("presenter");
-        alpha = QDir(base).filePath("alpha");
-        beta = QDir(base).filePath("beta");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        EXPECT_TRUE(QDir().mkpath(beta));
-        writeImage(QDir(alpha).filePath("a.png"));
-        writeImage(QDir(beta).filePath("b.png"));
-        EXPECT_TRUE(QDir().mkpath(base));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("presenter");
+        m_alpha = QDir(m_base).filePath("alpha");
+        m_beta = QDir(m_base).filePath("beta");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        EXPECT_TRUE(QDir().mkpath(m_beta));
+        writeImage(QDir(m_alpha).filePath("a.png"));
+        writeImage(QDir(m_beta).filePath("b.png"));
+        EXPECT_TRUE(QDir().mkpath(m_base));
     }
 };
 
 TEST_F(TestPresenter, presenterPopulatesTheViewWhenModelArrives) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -65,7 +65,7 @@ TEST_F(TestPresenter, presenterPopulatesTheViewWhenModelArrives) {
 TEST_F(TestPresenter, presenterSetViewTwiceKeepsTheFirstBinding) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -88,7 +88,7 @@ TEST_F(TestPresenter, presenterSetViewTwiceKeepsTheFirstBinding) {
 TEST_F(TestPresenter, presenterForwardsActivationToTheFilePath) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -107,13 +107,13 @@ TEST_F(TestPresenter, presenterForwardsActivationToTheFilePath) {
     QMetaObject::invokeMethod(&proxy, "itemActivated", Q_ARG(int, 0));
 
     EXPECT_EQ(activated.count(), 1);
-    EXPECT_EQ(activated.at(0).at(0).toString(), QDir(alpha).filePath("a.png"));
+    EXPECT_EQ(activated.at(0).at(0).toString(), QDir(m_alpha).filePath("a.png"));
 }
 
 TEST_F(TestPresenter, presenterDisconnectViewStopsForwardingAndAllowsRebinding) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -140,13 +140,13 @@ TEST_F(TestPresenter, presenterDisconnectViewStopsForwardingAndAllowsRebinding) 
     EXPECT_TRUE(second.isInitialized()) << "rebinding after disconnectView does not populate";
     QMetaObject::invokeMethod(&second, "itemActivated", Q_ARG(int, 0));
     EXPECT_EQ(activated.count(), 2);
-    EXPECT_EQ(activated.at(1).at(0).toString(), QDir(alpha).filePath("a.png"));
+    EXPECT_EQ(activated.at(1).at(0).toString(), QDir(m_alpha).filePath("a.png"));
 }
 
 TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -164,7 +164,7 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
 
     EXPECT_TRUE(proxy.isInitialized()); // the binding survived the model swap
     auto model2 = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model2->setDirectory(beta));
+    EXPECT_TRUE(model2->setDirectory(m_beta));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model2->fileCount() == 1;
@@ -191,7 +191,7 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
 TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -229,8 +229,8 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     // the draggedOver branch needs a directory index while dirs are shown,
     // and onDraggedOver skips anything already selected — populate selects
     // index 0, so the hover target is the second directory
-    EXPECT_TRUE(QDir(alpha).mkpath("subdir"));
-    EXPECT_TRUE(QDir(alpha).mkpath("subdir2"));
+    EXPECT_TRUE(QDir(m_alpha).mkpath("subdir"));
+    EXPECT_TRUE(QDir(m_alpha).mkpath("subdir2"));
     presenter.setShowDirs(true);
     presenter.reloadModel();
     EXPECT_TRUE(QTest::qWaitFor(
@@ -262,7 +262,7 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
 TEST_F(TestPresenter, presenterForwardsDragFromTheView) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;
@@ -288,7 +288,7 @@ TEST_F(TestPresenter, presenterForwardsDragFromTheView) {
 
     // view droppedInto(mime, source, index) -> presenter droppedInto(paths, dir)
     QMimeData data;
-    data.setUrls({QUrl::fromLocalFile(QDir(alpha).filePath("a.png"))});
+    data.setUrls({QUrl::fromLocalFile(QDir(m_alpha).filePath("a.png"))});
     emit proxy.droppedInto(&data, nullptr, 0);
     EXPECT_EQ(into.count(), 1);
 }
@@ -437,7 +437,7 @@ TEST_F(TestPresenter, disconnectViewAfterTheViewDiedIsSafe) {
     ThumbnailStripProxy second;
     presenter.setView(&second);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    EXPECT_TRUE(model->setDirectory(alpha));
+    EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->fileCount() == 1;

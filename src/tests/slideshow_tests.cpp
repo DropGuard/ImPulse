@@ -15,27 +15,27 @@
 
 class TestSlideshow : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("slideshow");
-        EXPECT_TRUE(QDir().mkpath(base));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("slideshow");
+        EXPECT_TRUE(QDir().mkpath(m_base));
     }
 
     QStringList slideshowFiles(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag);
+        const QString dir = QDir(m_base).filePath(tag);
         // not an immediate return: this helper has a value to hand back — the
         // same reason dropPosOverThumbnail reports through a non-fatal failure
         if(!QDir().mkpath(dir))

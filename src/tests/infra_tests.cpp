@@ -14,8 +14,8 @@ TEST_F(TestInfra, bridgeInstancesAreIsolated) {
     // target and one session epoch — the per-slot fixture dirs exist only
     // because of that. Two plain instances now get independent engines:
     resetFixture();
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("other"));
-    QFile other(fixtureDir + "/other/z.jpg");
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("other"));
+    QFile other(m_fixtureDir + "/other/z.jpg");
     EXPECT_TRUE(other.open(QIODevice::WriteOnly));
 
     EngineBridge bridgeA;
@@ -25,17 +25,17 @@ TEST_F(TestInfra, bridgeInstancesAreIsolated) {
     EXPECT_TRUE(listedA.isValid());
     EXPECT_TRUE(listedB.isValid());
 
-    EXPECT_TRUE(bridgeA.openDir(fixtureDir, 0, false));
-    EXPECT_TRUE(bridgeB.openDir(fixtureDir + "/other", 0, false));
+    EXPECT_TRUE(bridgeA.openDir(m_fixtureDir, 0, false));
+    EXPECT_TRUE(bridgeB.openDir(m_fixtureDir + "/other", 0, false));
 
     ASSERT_TRY_EQ_TIMEOUT(listedA.count(), 1, 10000);
     ASSERT_TRY_EQ_TIMEOUT(listedB.count(), 1, 10000);
-    EXPECT_EQ(listedA.at(0).at(0).toString(), fixtureDir);
-    EXPECT_EQ(listedB.at(0).at(0).toString(), fixtureDir + "/other");
+    EXPECT_EQ(listedA.at(0).at(0).toString(), m_fixtureDir);
+    EXPECT_EQ(listedB.at(0).at(0).toString(), m_fixtureDir + "/other");
     // and the listings do not cross: each instance reports its own engine,
     // including which directory its reads describe
-    EXPECT_EQ(bridgeA.listedDirectory(), fixtureDir);
-    EXPECT_EQ(bridgeB.listedDirectory(), fixtureDir + "/other");
+    EXPECT_EQ(bridgeA.listedDirectory(), m_fixtureDir);
+    EXPECT_EQ(bridgeB.listedDirectory(), m_fixtureDir + "/other");
     EXPECT_EQ(bridgeA.fileCount(), 3);
     EXPECT_EQ(bridgeB.fileCount(), 1);
 }
@@ -62,7 +62,7 @@ TEST_F(TestInfra, everyMutationIsDeliveredAcrossManyNotifyRounds) {
     EXPECT_TRUE(listed.isValid());
     QSignalSpy mutated(&bridge, &EngineBridge::dirMutated);
     EXPECT_TRUE(mutated.isValid());
-    EXPECT_TRUE(bridge.openDir(fixtureDir, 0, false));
+    EXPECT_TRUE(bridge.openDir(m_fixtureDir, 0, false));
     // settle the initial listing first: a file created before it lands
     // becomes part of the listing, not a mutation of it
     ASSERT_TRY_EQ_TIMEOUT(listed.count(), 1, 10000);
@@ -86,7 +86,7 @@ TEST_F(TestInfra, everyMutationIsDeliveredAcrossManyNotifyRounds) {
     // const so the range-for does not detach (clazy range-loop-detach)
     QStringList built;
     for(int i = 0; i < fileCount; ++i)
-        built << fixtureDir + QStringLiteral("/wake%1.jpg").arg(i);
+        built << m_fixtureDir + QStringLiteral("/wake%1.jpg").arg(i);
     const QStringList expected = built;
     for(const QString &path : expected)
         EXPECT_TRUE(seen.contains(path)) << qPrintable(QStringLiteral("mutation never delivered: ") + path);
@@ -102,7 +102,7 @@ TEST_F(TestInfra, aBridgeCanBeDestroyedWhileItsEngineIsBusy) {
     resetFixture();
     {
         EngineBridge bridge;
-        EXPECT_TRUE(bridge.openDir(fixtureDir, 0, false));
+        EXPECT_TRUE(bridge.openDir(m_fixtureDir, 0, false));
         // leave the watcher mid-churn: files created after the watch is
         // installed arrive as mutations, and nothing drains them before
         // the object goes out of scope
@@ -113,7 +113,7 @@ TEST_F(TestInfra, aBridgeCanBeDestroyedWhileItsEngineIsBusy) {
     // bridge must still work, which proves the free did not poison state
     EngineBridge after;
     QSignalSpy listed(&after, &EngineBridge::dirListed);
-    EXPECT_TRUE(after.openDir(fixtureDir, 0, false));
+    EXPECT_TRUE(after.openDir(m_fixtureDir, 0, false));
     ASSERT_TRY_EQ_TIMEOUT(listed.count(), 1, 10000);
 }
 

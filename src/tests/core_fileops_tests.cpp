@@ -63,7 +63,7 @@ class TestCoreFileOps : public ::testing::Test, protected EngineStackFixture {
     // The tree the operations run against: one folder of images, addressed the
     // way these tests read it. Named here rather than inherited because this
     // suite does not share core_nav's fixture any more.
-    QString base, alpha;
+    QString m_base, m_alpha;
 
     static void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
@@ -71,22 +71,22 @@ class TestCoreFileOps : public ::testing::Test, protected EngineStackFixture {
 
     QString uniqueDir(const QString &tag) {
         const QString dir =
-            QDir(home.path()).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
+            QDir(m_home.path()).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("ops");
-        alpha = QDir(base).filePath("alpha");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        writeImage(QDir(alpha).filePath("a.png"));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("ops");
+        m_alpha = QDir(m_base).filePath("alpha");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        writeImage(QDir(m_alpha).filePath("a.png"));
     }
 };
 
 TEST_F(TestCoreFileOps, quickCopyLandsInTheConfiguredFolder) {
-    QString dest = QDir(home.path()).filePath("quickcopy-dest");
+    QString dest = QDir(m_home.path()).filePath("quickcopy-dest");
     settings->setQuickCopyDirectory(dest);
     EXPECT_TRUE(QDir().mkpath(dest));
 
@@ -99,7 +99,7 @@ TEST_F(TestCoreFileOps, quickCopyLandsInTheConfiguredFolder) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    QString img = QDir(base).filePath("qc.png");
+    QString img = QDir(m_base).filePath("qc.png");
     writeImage(img);
     EXPECT_TRUE(core.loadPath(img));
     {
@@ -231,8 +231,8 @@ TEST_F(TestCoreFileOps, interactiveCopyPlacesFileWithoutDialogs) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString src = makeTxt(base, "f1.txt", "one");
-    const QString destDir = QDir(base).filePath("dst");
+    const QString src = makeTxt(m_base, "f1.txt", "one");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
     core.interactiveCopy({src}, destDir);
@@ -252,8 +252,8 @@ TEST_F(TestCoreFileOps, interactiveCopyOverwritesWhenScriptedYes) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString src = makeTxt(base, "f1.txt", "new");
-    const QString destDir = QDir(base).filePath("dst");
+    const QString src = makeTxt(m_base, "f1.txt", "new");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "f1.txt", "old");
     fake.replaceAnswers << DialogResult{true, false, false};
@@ -275,11 +275,11 @@ TEST_F(TestCoreFileOps, interactiveCopyYesToAllSticksAcrossTheBatch) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
     for(const char *n : {"f1", "f2", "f3"}) {
-        sources << makeTxt(base, QString(n) + ".txt", n);
+        sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     fake.replaceAnswers << DialogResult{true, true, false}; // one answer, whole batch
@@ -301,11 +301,11 @@ TEST_F(TestCoreFileOps, interactiveCopyNoToAllSkipsTheRestWithoutAsking) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
     for(const char *n : {"f1", "f2", "f3"}) {
-        sources << makeTxt(base, QString(n) + ".txt", "new");
+        sources << makeTxt(m_base, QString(n) + ".txt", "new");
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     fake.replaceAnswers << DialogResult{false, true, false}; // no + apply to all
@@ -327,11 +327,11 @@ TEST_F(TestCoreFileOps, interactiveCopyPlainYesAsksAgainForEachCollision) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
     for(const char *n : {"f1", "f2", "f3"}) {
-        sources << makeTxt(base, QString(n) + ".txt", n);
+        sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     for(int i = 0; i < 3; ++i)
@@ -354,11 +354,11 @@ TEST_F(TestCoreFileOps, interactiveCopyCancelStopsTheBatch) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
     for(const char *n : {"f1", "f2", "f3"}) {
-        sources << makeTxt(base, QString(n) + ".txt", n);
+        sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     fake.replaceAnswers << DialogResult{false, false, true}; // cancel
@@ -380,10 +380,10 @@ TEST_F(TestCoreFileOps, interactiveCopyOverwritesADirectoryCollisionWhenScripted
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString srcDir = QDir(base).filePath("sdir");
+    const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");                    // a FILE where the directory lands
     fake.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
@@ -404,10 +404,10 @@ TEST_F(TestCoreFileOps, interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString srcDir = QDir(base).filePath("sdir");
+    const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");
     fake.replaceAnswers << DialogResult{false, false, false}; // no
@@ -429,10 +429,10 @@ TEST_F(TestCoreFileOps, interactiveMoveOverwritesADirectoryCollisionWhenScripted
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    const QString srcDir = QDir(base).filePath("sdir");
+    const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");
     fake.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
@@ -441,7 +441,7 @@ TEST_F(TestCoreFileOps, interactiveMoveOverwritesADirectoryCollisionWhenScripted
 
     EXPECT_EQ(fake.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir/inner.txt")), QByteArray("inner"));
-    EXPECT_TRUE(!QFileInfo::exists(QDir(base).filePath("sdir/inner.txt")))
+    EXPECT_TRUE(!QFileInfo::exists(QDir(m_base).filePath("sdir/inner.txt")))
         << "a move that overwrote a file with a directory left the source behind";
 }
 
@@ -463,11 +463,11 @@ TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString destDir = QDir(base).filePath("dst");
+    const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
     for(const char *n : {"m1", "m2", "m3"}) {
-        sources << makeTxt(base, QString(n) + ".txt", n);
+        sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     fake.replaceAnswers << DialogResult{true, true, false};
@@ -477,7 +477,7 @@ TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
     EXPECT_EQ(fake.replaceCalls, 1);
     for(const char *n : {"m1", "m2", "m3"}) {
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray(n));
-        EXPECT_TRUE(!QFileInfo::exists(QDir(base).filePath(QString(n) + ".txt")))
+        EXPECT_TRUE(!QFileInfo::exists(QDir(m_base).filePath(QString(n) + ".txt")))
             << qPrintable(QString(n) + " survived a move"); // a move removes the source
     }
 }
@@ -487,7 +487,7 @@ TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
 // its destination from baseName() — and let a directory be dropped into
 // its own subtree, recursing until the reporter's 5000 entries shredded.
 TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
-    QString root = QDir(home.path()).filePath("issue612");
+    QString root = QDir(m_home.path()).filePath("issue612");
     QDir().mkpath(root + "/thetop/1. What/3. This is weird/X. Okay whatever");
     QDir().mkpath(root + "/thetop/1. What/5. Another one/Normal name works");
     QDir().mkpath(root + "/thetop/Another normal name/This works");
@@ -534,7 +534,7 @@ TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -556,7 +556,7 @@ TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
         EXPECT_EQ(core.directoryModel()->fileCount(), before - 1)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(!QFileInfo::exists(QDir(alpha).filePath("a.png"))) << "the confirmed removal never reached the disk";
+    EXPECT_TRUE(!QFileInfo::exists(QDir(m_alpha).filePath("a.png"))) << "the confirmed removal never reached the disk";
     EXPECT_EQ(fake.confirmCalls, 1);
 }
 
@@ -571,7 +571,7 @@ TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
     deps.ui = &fake;
     Core core(deps);
     fake.confirmAnswer = false;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -586,7 +586,7 @@ TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
 
     EXPECT_EQ(fake.confirmCalls, 1);
     EXPECT_EQ(core.directoryModel()->fileCount(), before);
-    EXPECT_TRUE(QFileInfo::exists(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(QFileInfo::exists(QDir(m_alpha).filePath("a.png")));
 }
 
 TEST_F(TestCoreFileOps, saveRequestTravelingTheInjectedHostWritesTheEdit) {
@@ -654,7 +654,7 @@ TEST_F(TestCoreFileOps, headlessCoreConstructsWithoutAnyWidget) {
 
     // the operations run, the display sink records, the messages land in
     // the overlay fake — the full file-ops contract without a single widget
-    const QString img = QDir(alpha).filePath("a.png");
+    const QString img = QDir(m_alpha).filePath("a.png");
     EXPECT_TRUE(core.loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -692,7 +692,7 @@ TEST_F(TestCoreFileOps, renameCurrentSelectionForcesAfterScriptedConfirmation) {
     deps.view = &view;
     deps.ui = &fake;
     Core core(deps);
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -702,19 +702,19 @@ TEST_F(TestCoreFileOps, renameCurrentSelectionForcesAfterScriptedConfirmation) {
         EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     // the collision the rename will hit: renamed.png already exists
-    const QString colliding = QDir(alpha).filePath("renamed.png");
+    const QString colliding = QDir(m_alpha).filePath("renamed.png");
     writeImage(colliding);
-    const QByteArray original = coretest::contentOf(QDir(alpha).filePath("a.png"));
+    const QByteArray original = coretest::contentOf(QDir(m_alpha).filePath("a.png"));
 
     core.renameCurrentSelection("renamed.png");
 
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return !QFileInfo::exists(QDir(alpha).filePath("a.png"));
+                return !QFileInfo::exists(QDir(m_alpha).filePath("a.png"));
             },
             10000);
-        EXPECT_TRUE(!QFileInfo::exists(QDir(alpha).filePath("a.png")))
+        EXPECT_TRUE(!QFileInfo::exists(QDir(m_alpha).filePath("a.png")))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_TRUE(QFileInfo::exists(colliding));

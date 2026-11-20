@@ -15,27 +15,27 @@
 
 class TestClipboard : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base, alpha, beta;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base, m_alpha, m_beta;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("clipboard");
-        alpha = QDir(base).filePath("alpha");
-        beta = QDir(base).filePath("beta");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        writeImage(QDir(alpha).filePath("a.png"));
-        EXPECT_TRUE(QDir().mkpath(beta));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("clipboard");
+        m_alpha = QDir(m_base).filePath("alpha");
+        m_beta = QDir(m_base).filePath("beta");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        writeImage(QDir(m_alpha).filePath("a.png"));
+        EXPECT_TRUE(QDir().mkpath(m_beta));
     }
 
     // the QTRY_* vocabulary's gtest form: pump events until the condition
@@ -57,7 +57,7 @@ TEST_F(TestClipboard, dropIntoTheAppOpensTheDroppedFileAndIgnoresItself) {
     writeImage(target);
 
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     const QString before = core.currentFilePath();
 
@@ -94,7 +94,7 @@ TEST_F(TestClipboard, clipboardUrlOpensThatFileAndOtherFormsAreRefused) {
     writeImage(target);
 
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     const QString before = core.currentFilePath();
 
@@ -201,12 +201,12 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
 
 TEST_F(TestClipboard, draggingAnUndecodedEntryStillOffersTheFile) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     // far.png sits beyond the preload neighborhood: a.png preloads its
     // immediate neighbor (mid.png), never the far one — undecoded
-    writeImage(QDir(alpha).filePath("mid.png"));
-    const QString farPath = QDir(alpha).filePath("far.png");
+    writeImage(QDir(m_alpha).filePath("mid.png"));
+    const QString farPath = QDir(m_alpha).filePath("far.png");
     writeImage(farPath);
     EXPECT_TRUE(!core.directoryModel()->isLoaded(farPath))
         << "precondition broken: the far image is decoded, the test measures nothing";
@@ -225,12 +225,12 @@ TEST_F(TestClipboard, draggingAnUndecodedEntryStillOffersTheFile) {
 // path layer — two different floors of the same building).
 TEST_F(TestClipboard, draggingAnOverLimitImageStillOffersTheFile) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     // the user-side limit knob, tightened for the test: 8MB refuses the
     // ~70MB decode deterministically, whatever Qt 6.10's own default is
     settings->setMemoryAllocationLimit(8);
-    const QString huge = QDir(alpha).filePath("huge.png");
+    const QString huge = QDir(m_alpha).filePath("huge.png");
     QImage big(4200, 4200, QImage::Format_ARGB32); // ~70MB decoded, over the limit
     big.fill(Qt::red);
     EXPECT_TRUE(big.save(huge, "png"));
@@ -244,15 +244,15 @@ TEST_F(TestClipboard, draggingAnOverLimitImageStillOffersTheFile) {
 
 // A drag is an OPERATION, not a session object: QDrag::exec() blocks until
 // the gesture ends, so nothing it carries may outlive the call that started
-// it. The old shape (mDrag = new QDrag(this)) overwrote the member on every
+// it. The old shape (m_drag = new QDrag(this)) overwrote the member on every
 // gesture and left the previous QDrag — plus the QMimeData it owns, which
 // for image drags can carry pixels — parented to Core for the whole session.
 // Pin: repeated drag-outs retain nothing on Core.
 TEST_F(TestClipboard, repeatedDragOutsRetainNothing) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
-    const QString file = QDir(alpha).filePath("a.png");
+    const QString file = QDir(m_alpha).filePath("a.png");
     const int before = core.children().size();
 
     for(int i = 0; i < 8; ++i)
@@ -279,7 +279,7 @@ TEST_F(TestClipboard, pastingFileUrlsPlacesThemInTheBrowsingDirectory) {
     writeImage(srcFile);
 
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     // make the destination the browsed directory
     EXPECT_TRUE(core.loadPath(dest)); // loadPath on a directory switches there
@@ -338,7 +338,7 @@ TEST_F(TestClipboard, pastingAFileAlreadyInTheDirectoryIsSilent) {
 TEST_F(TestClipboard, pastingARemoteUrlDoesNothing) {
     const QString dest = uniqueDir("paste-remote");
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     EXPECT_TRUE(core.loadPath(dest));
 

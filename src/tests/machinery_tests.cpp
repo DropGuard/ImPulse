@@ -25,18 +25,18 @@ namespace {
 // occupies its worker until released, so a test decides what stays queued
 class HoldJob : public PoolJob {
   public:
-    HoldJob(std::atomic_bool *_gate, std::atomic_int *_starts) : gate(_gate), starts(_starts) {
+    HoldJob(std::atomic_bool *_gate, std::atomic_int *_starts) : m_gate(_gate), m_starts(_starts) {
     }
     void run() override {
-        if(starts)
-            starts->fetch_add(1);
-        while(!gate->load())
+        if(m_starts)
+            m_starts->fetch_add(1);
+        while(!m_gate->load())
             QThread::msleep(1);
     }
 
   private:
-    std::atomic_bool *gate;
-    std::atomic_int *starts;
+    std::atomic_bool *m_gate;
+    std::atomic_int *m_starts;
 };
 
 } // namespace
@@ -115,31 +115,31 @@ TEST_F(TestMachinery, cacheRoundTripsInsertsAndTrims) {
     resetFixture();
     // the factory now refuses pixel-less objects, so the cache fixtures
     // must be real decodable images, not one-byte listing placeholders
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/img1.jpg", "jpg", QSize(8, 8)));
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/img2.jpg", "jpg", QSize(8, 8)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/img1.jpg", "jpg", QSize(8, 8)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/img2.jpg", "jpg", QSize(8, 8)));
     Cache cache;
-    auto a = ImageFactory::createImage(fixtureDir + "/img1.jpg", false, loadPolicy());
-    auto b = ImageFactory::createImage(fixtureDir + "/img2.jpg", false, loadPolicy());
+    auto a = ImageFactory::createImage(m_fixtureDir + "/img1.jpg", false, loadPolicy());
+    auto b = ImageFactory::createImage(m_fixtureDir + "/img2.jpg", false, loadPolicy());
     EXPECT_TRUE(a.has_value());
     EXPECT_TRUE(b.has_value());
     // every absence is the optional: a missing file, a directory, and a
     // file whose suffix qimgv still tries but cannot decode — the factory
     // never hands out an object whose pixels do not exist, so no consumer
     // downstream ever needs a null-check
-    EXPECT_TRUE(!ImageFactory::createImage(fixtureDir + "/missing.jpg", false, loadPolicy()).has_value());
-    EXPECT_TRUE(!ImageFactory::createImage(fixtureDir + "/subdir", false, loadPolicy()).has_value());
-    EXPECT_TRUE(!ImageFactory::createImage(fixtureDir + "/skip.txt", false, loadPolicy()).has_value());
+    EXPECT_TRUE(!ImageFactory::createImage(m_fixtureDir + "/missing.jpg", false, loadPolicy()).has_value());
+    EXPECT_TRUE(!ImageFactory::createImage(m_fixtureDir + "/subdir", false, loadPolicy()).has_value());
+    EXPECT_TRUE(!ImageFactory::createImage(m_fixtureDir + "/skip.txt", false, loadPolicy()).has_value());
     // the animated side holds the same contract
     QByteArray junkAnim = "GIF89a-not-really";
-    QFile jf(fixtureDir + "/broken.gif");
+    QFile jf(m_fixtureDir + "/broken.gif");
     EXPECT_TRUE(jf.open(QIODevice::WriteOnly));
     jf.write(junkAnim);
     jf.close();
-    EXPECT_TRUE(!ImageFactory::createImage(fixtureDir + "/broken.gif", false, loadPolicy()).has_value());
+    EXPECT_TRUE(!ImageFactory::createImage(m_fixtureDir + "/broken.gif", false, loadPolicy()).has_value());
     EXPECT_TRUE(cache.insert(*a));
     EXPECT_TRUE(cache.insert(*b));
-    EXPECT_TRUE(cache.contains(fixtureDir + "/img1.jpg"));
-    EXPECT_EQ(cache.get(fixtureDir + "/img1.jpg").get(), a->get());
+    EXPECT_TRUE(cache.contains(m_fixtureDir + "/img1.jpg"));
+    EXPECT_EQ(cache.get(m_fixtureDir + "/img1.jpg").get(), a->get());
 
     // a duplicate insert is refused, not double-stored
     EXPECT_TRUE(!cache.insert(*a));
@@ -150,18 +150,18 @@ TEST_F(TestMachinery, cacheRoundTripsInsertsAndTrims) {
     EXPECT_TRUE(!cache.insert(nullptr));
     EXPECT_EQ(cache.keys().size(), 2);
 
-    cache.trimTo(QStringList() << fixtureDir + "/img2.jpg");
-    EXPECT_TRUE(!cache.contains(fixtureDir + "/img1.jpg"));
-    EXPECT_TRUE(cache.contains(fixtureDir + "/img2.jpg"));
+    cache.trimTo(QStringList() << m_fixtureDir + "/img2.jpg");
+    EXPECT_TRUE(!cache.contains(m_fixtureDir + "/img1.jpg"));
+    EXPECT_TRUE(cache.contains(m_fixtureDir + "/img2.jpg"));
 
-    cache.remove(fixtureDir + "/img2.jpg");
+    cache.remove(m_fixtureDir + "/img2.jpg");
     EXPECT_TRUE(cache.keys().isEmpty());
 }
 
 TEST_F(TestMachinery, documentInfoClassifiesFormatsAndAnimation) {
     resetFixture();
     auto write = [this](const QString &name, const QByteArray &bytes) {
-        QFile f(fixtureDir + "/" + name);
+        QFile f(m_fixtureDir + "/" + name);
         EXPECT_TRUE(f.open(QIODevice::WriteOnly));
         f.write(bytes);
     };
@@ -176,14 +176,14 @@ TEST_F(TestMachinery, documentInfoClassifiesFormatsAndAnimation) {
     webpAnimBytes.append(QByteArray(4, '\x00'));
     webpAnimBytes.append('\x02');
     write("anim.webp", webpAnimBytes);
-    DocumentInfo animatedWebp(fixtureDir + "/anim.webp", LoadPolicy::fromSettings());
+    DocumentInfo animatedWebp(m_fixtureDir + "/anim.webp", LoadPolicy::fromSettings());
     EXPECT_EQ(animatedWebp.type(), DocumentType::ANIMATED);
     EXPECT_EQ(animatedWebp.format(), QStringLiteral("webp"));
 
     QByteArray webpStaticBytes = webpAnimBytes;
     webpStaticBytes[webpStaticBytes.size() - 1] = '\x00';
     write("still.webp", webpStaticBytes);
-    DocumentInfo staticWebp(fixtureDir + "/still.webp", LoadPolicy::fromSettings());
+    DocumentInfo staticWebp(m_fixtureDir + "/still.webp", LoadPolicy::fromSettings());
     EXPECT_EQ(staticWebp.type(), DocumentType::STATIC);
 
     // APNG: acTL inside the first 120 bytes. Whether the "apng" format is
@@ -193,7 +193,7 @@ TEST_F(TestMachinery, documentInfoClassifiesFormatsAndAnimation) {
     png.append(QByteArray(20, '\x00'));
     png.append("acTL");
     write("maybe-apng.png", png);
-    DocumentInfo apng(fixtureDir + "/maybe-apng.png", LoadPolicy::fromSettings());
+    DocumentInfo apng(m_fixtureDir + "/maybe-apng.png", LoadPolicy::fromSettings());
     if(QImageReader::supportedImageFormats().contains("apng")) {
         EXPECT_EQ(apng.type(), DocumentType::ANIMATED);
         EXPECT_EQ(apng.format(), QStringLiteral("apng"));
@@ -210,9 +210,9 @@ TEST_F(TestMachinery, documentInfoClassifiesFormatsAndAnimation) {
     avif.append(QByteArray(24, '\x00'));
     write("anim.avif", avif);
     QMimeDatabase mimeDb;
-    if(mimeDb.mimeTypeForFile(fixtureDir + "/anim.avif", QMimeDatabase::MatchContent).name() ==
+    if(mimeDb.mimeTypeForFile(m_fixtureDir + "/anim.avif", QMimeDatabase::MatchContent).name() ==
        QStringLiteral("image/avif")) {
-        DocumentInfo avifDoc(fixtureDir + "/anim.avif", LoadPolicy::fromSettings());
+        DocumentInfo avifDoc(m_fixtureDir + "/anim.avif", LoadPolicy::fromSettings());
         EXPECT_EQ(avifDoc.type(), DocumentType::ANIMATED);
     } else {
         GTEST_SKIP() << "this mime database does not identify ftypavis as image/avif";
@@ -221,17 +221,17 @@ TEST_F(TestMachinery, documentInfoClassifiesFormatsAndAnimation) {
     // a .jfif file falls through content detection to the suffix, which
     // the code maps onto jpg
     write("photo.jfif", "not really a jpeg");
-    DocumentInfo jfif(fixtureDir + "/photo.jfif", LoadPolicy::fromSettings());
+    DocumentInfo jfif(m_fixtureDir + "/photo.jfif", LoadPolicy::fromSettings());
     EXPECT_EQ(jfif.format(), QStringLiteral("jpg"));
     EXPECT_EQ(jfif.type(), DocumentType::STATIC);
 
     write("frame.gif", "GIF89a-not-really");
-    DocumentInfo gif(fixtureDir + "/frame.gif", LoadPolicy::fromSettings());
+    DocumentInfo gif(m_fixtureDir + "/frame.gif", LoadPolicy::fromSettings());
     EXPECT_EQ(gif.type(), DocumentType::ANIMATED);
     EXPECT_EQ(gif.format(), QStringLiteral("gif"));
 
     write("pic.bmp", "BM-junk");
-    DocumentInfo bmp(fixtureDir + "/pic.bmp", LoadPolicy::fromSettings());
+    DocumentInfo bmp(m_fixtureDir + "/pic.bmp", LoadPolicy::fromSettings());
     EXPECT_EQ(bmp.type(), DocumentType::STATIC);
     EXPECT_EQ(bmp.format(), QStringLiteral("bmp"));
 }
@@ -250,13 +250,13 @@ TEST_F(TestMachinery, documentInfoClassificationFollowsTheCarriedPolicy) {
     LoadPolicy videoOn;
     videoOn.videoPlayback = true;
     videoOn.videoFormats.insert("video/mp4", "mp4");
-    DocumentInfo videoed(fixtureDir + "/clip.mp4", videoOn);
+    DocumentInfo videoed(m_fixtureDir + "/clip.mp4", videoOn);
     EXPECT_EQ(videoed.type(), DocumentType::VIDEO);
     EXPECT_EQ(videoed.format(), QStringLiteral("mp4"));
 
     LoadPolicy videoOff;
     videoOff.videoPlayback = false;
-    DocumentInfo plain(fixtureDir + "/clip.mp4", videoOff);
+    DocumentInfo plain(m_fixtureDir + "/clip.mp4", videoOff);
     EXPECT_EQ(plain.type(), DocumentType::STATIC);
     EXPECT_EQ(plain.format(), QStringLiteral("mp4"));
 }
@@ -315,14 +315,14 @@ TEST_F(TestMachinery, splitCommandLineKeepsQuotedArguments) {
 
 TEST_F(TestMachinery, processArgumentsSubstitutesTheFileTag) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/tagged.png", "png", QSize(8, 8)));
-    auto img = *ImageFactory::createImage(fixtureDir + "/tagged.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/tagged.png", "png", QSize(8, 8)));
+    auto img = *ImageFactory::createImage(m_fixtureDir + "/tagged.png", false, loadPolicy());
     QStringList cmd = {"tool", "%file%"};
     ScriptManager::processArguments(cmd, img);
     // the substitution hands the file to a foreign tool, so the path
     // arrives in the platform's native separators; the comparison
     // normalizes them instead of pinning one spelling
-    EXPECT_EQ(QDir::fromNativeSeparators(cmd.at(1)), fixtureDir + "/tagged.png");
+    EXPECT_EQ(QDir::fromNativeSeparators(cmd.at(1)), m_fixtureDir + "/tagged.png");
 }
 
 // Loader::clearTasks() is the user leaving a folder: the queued half comes
@@ -356,7 +356,7 @@ TEST_F(TestMachinery, loaderClearTasksDropsQueuedJobsWithoutAReport) {
     QObject::connect(&loader, &Loader::loadFailed, &loader, [&](const QString &) {
         failed.fetch_add(1);
     });
-    const QString path = fixtureDir + "/never-decoded.png";
+    const QString path = m_fixtureDir + "/never-decoded.png";
     loader.loadAsync(path, loadPolicy());
     EXPECT_EQ(loader.isBusy(), true);
     EXPECT_EQ(loader.isLoading(path), true);
@@ -378,9 +378,9 @@ TEST_F(TestMachinery, loaderClearTasksDropsQueuedJobsWithoutAReport) {
 // so the finished sequence IS the queue order.
 TEST_F(TestMachinery, loadWindowPromotesTheTargetAndDropsThePassedFiles) {
     resetFixture();
-    const QString a = fixtureDir + "/w-a.png";
-    const QString b = fixtureDir + "/w-b.png";
-    const QString c = fixtureDir + "/w-c.png";
+    const QString a = m_fixtureDir + "/w-a.png";
+    const QString b = m_fixtureDir + "/w-b.png";
+    const QString c = m_fixtureDir + "/w-c.png";
     EXPECT_TRUE(writeBigImage(a, "png", QSize(8, 8)));
     EXPECT_TRUE(writeBigImage(b, "png", QSize(8, 8)));
     EXPECT_TRUE(writeBigImage(c, "png", QSize(8, 8)));
@@ -421,7 +421,7 @@ TEST_F(TestMachinery, loadWindowPromotesTheTargetAndDropsThePassedFiles) {
 // report — resultScaled is true only for a tier-1 decode.
 TEST_F(TestMachinery, loadWindowPromotionKeepsTheTier) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.jpg", "jpg", offscreenScreenPixels() * 2));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.jpg", "jpg", offscreenScreenPixels() * 2));
     std::atomic_bool gate{false};
     std::atomic_int holds{0};
     WorkerPool pool(1);
@@ -435,7 +435,7 @@ TEST_F(TestMachinery, loadWindowPromotionKeepsTheTier) {
                          finishedPath = path;
                          finishedScaled = scaled;
                      });
-    const QString path = fixtureDir + "/big.jpg";
+    const QString path = m_fixtureDir + "/big.jpg";
     loader.loadAsyncFull(path, loadPolicy()); // tier-2, queued behind the gate
     EXPECT_TRUE(loader.isLoading(path));
 
@@ -534,12 +534,12 @@ TEST_F(TestMachinery, imageAnimatedLoadsFramesFromAGif) {
         QByteArray::fromBase64("R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACw"
                                "AAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAIBgABCAQ"
                                "QEAA7");
-    QFile f(fixtureDir + "/anim.gif");
+    QFile f(m_fixtureDir + "/anim.gif");
     EXPECT_TRUE(f.open(QIODevice::WriteOnly));
     f.write(gif);
     f.close();
 
-    auto image = *ImageFactory::createImage(fixtureDir + "/anim.gif", false, loadPolicy());
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/anim.gif", false, loadPolicy());
     EXPECT_EQ(image->type(), DocumentType::ANIMATED);
     auto animated = std::dynamic_pointer_cast<ImageAnimated>(image);
     EXPECT_TRUE(animated != nullptr);
@@ -594,12 +594,12 @@ TEST_F(TestMachinery, documentInfoReadsExifOrientationAndTags) {
     // (PIL-written at authoring time; one long literal, correctness over beauty)
     const QByteArray exifBytes = QByteArray::fromBase64(
         "/9j/4AAQSkZJRgABAQAAAQABAAD/4QCwRXhpZgAATU0AKgAAAAgABQEPAAIAAAAJAAAASgEQAAIAAAAKAAAAVAESAAMAAAABAAYAAAEyAAIAAAAUAAAAXodpAAQAAAABAAAAcgAAAABUZXN0TWFrZQAAVGVzdE1vZGVsADIwMjQ6MDE6MDIgMDM6MDQ6MDUAAASCmgADAAAAAgABADyCnQADAAAAAgAcAAqIJwADAAAAAQBkAACSCgADAAAAAglgAGQAAAAA/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8AAEQgACAAIAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8Ahooor4c/OD//2Q==");
-    QFile out(fixtureDir + "/exif.jpg");
+    QFile out(m_fixtureDir + "/exif.jpg");
     EXPECT_TRUE(out.open(QIODevice::WriteOnly));
     out.write(exifBytes);
     out.close();
 
-    DocumentInfo doc(fixtureDir + "/exif.jpg", LoadPolicy::fromSettings());
+    DocumentInfo doc(m_fixtureDir + "/exif.jpg", LoadPolicy::fromSettings());
     // exifOrientation() returns QImageReader::transformation()'s flag
     // value, not the raw tag: orientation 6 lands as TransformationRotate90
     EXPECT_EQ(doc.exifOrientation(), 4); // QImageIOHandler::TransformationRotate90
@@ -630,8 +630,8 @@ TEST_F(TestMachinery, documentInfoReadsExifOrientationAndTags) {
 TEST_F(TestMachinery, scaledResultSurvivesTheQueuedHop) {
     resetFixture();
     const QSize orig(64, 64);
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/real.png", "png", orig));
-    auto image = *ImageFactory::createImage(fixtureDir + "/real.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/real.png", "png", orig));
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/real.png", false, loadPolicy());
     EXPECT_TRUE(image->getImage()->size() == orig);
 
     Cache cache;
@@ -643,7 +643,7 @@ TEST_F(TestMachinery, scaledResultSurvivesTheQueuedHop) {
         result = pix;
         ++delivered;
     });
-    scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
+    scaler.requestScaled(ScalerRequest(image, QSize(32, 32), m_fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
     ASSERT_TRY_EQ_TIMEOUT(delivered, 1, 10000);
     EXPECT_EQ(result->size(), QSize(32, 32));
 }
@@ -662,19 +662,19 @@ TEST_F(TestMachinery, scaledResultSurvivesTheQueuedHop) {
 TEST_F(TestMachinery, scalerRequestEqualityCoversEverythingThatChangesTheResult) {
     resetFixture();
     const QSize orig(64, 64);
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/real.png", "png", orig));
-    auto image = *ImageFactory::createImage(fixtureDir + "/real.png", false, loadPolicy());
-    const QString p = fixtureDir + "/real.png";
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/real.png", "png", orig));
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/real.png", false, loadPolicy());
+    const QString p = m_fixtureDir + "/real.png";
 
     ScalerRequest base(image, QSize(32, 32), p, QI_FILTER_BILINEAR, true);
     EXPECT_TRUE(!(base == ScalerRequest(image, QSize(32, 32), p, QI_FILTER_BILINEAR, false)))
         << "requests that scale differently compare equal: the buffered one would be dropped";
     EXPECT_TRUE(!(base == ScalerRequest(image, QSize(40, 32), p, QI_FILTER_BILINEAR, true))); // size
     EXPECT_TRUE(!(base == ScalerRequest(image, QSize(32, 32), p, QI_FILTER_NEAREST, true)));  // filter
-    auto other = *ImageFactory::createImage(fixtureDir + "/real.png", false, loadPolicy());
+    auto other = *ImageFactory::createImage(m_fixtureDir + "/real.png", false, loadPolicy());
     EXPECT_TRUE(!(base == ScalerRequest(other, QSize(32, 32), p, QI_FILTER_BILINEAR, true))); // image
-    EXPECT_TRUE(base ==
-                ScalerRequest(image, QSize(32, 32), fixtureDir + "/other.png", QI_FILTER_BILINEAR, true)); // path only
+    EXPECT_TRUE(base == ScalerRequest(image, QSize(32, 32), m_fixtureDir + "/other.png", QI_FILTER_BILINEAR,
+                                      true)); // path only
 }
 
 TEST_F(TestMachinery, threeSynchronousRequestsHandOffExactlyTwice) {
@@ -688,10 +688,10 @@ TEST_F(TestMachinery, threeSynchronousRequestsHandOffExactlyTwice) {
     // what is delivered is deterministic: the buffered result, once.
     resetFixture();
     const QSize orig(64, 64);
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/a.png", "png", orig));
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/b.png", "png", orig));
-    auto a = *ImageFactory::createImage(fixtureDir + "/a.png", false, loadPolicy());
-    auto b = *ImageFactory::createImage(fixtureDir + "/b.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/a.png", "png", orig));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/b.png", "png", orig));
+    auto a = *ImageFactory::createImage(m_fixtureDir + "/a.png", false, loadPolicy());
+    auto b = *ImageFactory::createImage(m_fixtureDir + "/b.png", false, loadPolicy());
 
     Cache cache;
     cache.insert(a);
@@ -708,13 +708,13 @@ TEST_F(TestMachinery, threeSynchronousRequestsHandOffExactlyTwice) {
                          gotPath = req.path;
                      });
 
-    scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
-    scaler.requestScaled(ScalerRequest(b, QSize(40, 20), fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
-    scaler.requestScaled(ScalerRequest(b, QSize(48, 24), fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
+    scaler.requestScaled(ScalerRequest(a, QSize(32, 32), m_fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
+    scaler.requestScaled(ScalerRequest(b, QSize(40, 20), m_fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
+    scaler.requestScaled(ScalerRequest(b, QSize(48, 24), m_fixtureDir + "/b.png", QI_FILTER_BILINEAR, true));
 
     ASSERT_TRY_EQ_TIMEOUT(delivered, 1, 10000);
     EXPECT_EQ(gotSize, QSize(48, 24)); // the last request, not the first
-    EXPECT_EQ(gotPath, fixtureDir + "/b.png");
+    EXPECT_EQ(gotPath, m_fixtureDir + "/b.png");
     // the middle request (40x20) must never have been scaled and delivered:
     // every hand-off is synchronous above, so nothing can arrive later:
     // drain the queue and require it stayed empty
@@ -732,10 +732,10 @@ TEST_F(TestMachinery, aPinnedImageIsSkippedByEvictionAndReleasedLater) {
     // deadlock, so eviction skips instead of blocking.
     resetFixture();
     const QSize orig(64, 64);
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/a.png", "png", orig));
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/b.png", "png", orig));
-    auto a = *ImageFactory::createImage(fixtureDir + "/a.png", false, loadPolicy());
-    auto b = *ImageFactory::createImage(fixtureDir + "/b.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/a.png", "png", orig));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/b.png", "png", orig));
+    auto a = *ImageFactory::createImage(m_fixtureDir + "/a.png", false, loadPolicy());
+    auto b = *ImageFactory::createImage(m_fixtureDir + "/b.png", false, loadPolicy());
 
     Cache cache;
     EXPECT_TRUE(cache.insert(a));
@@ -747,7 +747,7 @@ TEST_F(TestMachinery, aPinnedImageIsSkippedByEvictionAndReleasedLater) {
         ++delivered;
     });
 
-    scaler.requestScaled(ScalerRequest(a, QSize(32, 32), fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
+    scaler.requestScaled(ScalerRequest(a, QSize(32, 32), m_fixtureDir + "/a.png", QI_FILTER_BILINEAR, true));
 
     cache.trimTo(QStringList{});
     EXPECT_TRUE(cache.contains(a->filePath()))
@@ -779,8 +779,8 @@ TEST_F(TestMachinery, aPinnedImageIsSkippedByEvictionAndReleasedLater) {
 TEST_F(TestMachinery, destroyingTheScalerReleasesTheImageItWasHolding) {
     resetFixture();
     const QSize orig(64, 64);
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/real.png", "png", orig));
-    auto image = *ImageFactory::createImage(fixtureDir + "/real.png", false, loadPolicy());
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/real.png", "png", orig));
+    auto image = *ImageFactory::createImage(m_fixtureDir + "/real.png", false, loadPolicy());
     EXPECT_EQ(image.use_count(), 1L);
 
     {
@@ -792,7 +792,7 @@ TEST_F(TestMachinery, destroyingTheScalerReleasesTheImageItWasHolding) {
         QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](std::shared_ptr<const QImage>, ScalerRequest) {
             ++delivered;
         });
-        scaler.requestScaled(ScalerRequest(image, QSize(32, 32), fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
+        scaler.requestScaled(ScalerRequest(image, QSize(32, 32), m_fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
         ASSERT_TRY_EQ_TIMEOUT(delivered, 1, 10000);
     }
 

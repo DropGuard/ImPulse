@@ -27,17 +27,17 @@
 // (the same reason the engine_stack units are separate binaries).
 class ThumbnailGateJob : public PoolJob {
   public:
-    ThumbnailGateJob(std::atomic_bool *_gate, std::atomic_int *_starts) : gate(_gate), starts(_starts) {
+    ThumbnailGateJob(std::atomic_bool *_gate, std::atomic_int *_starts) : m_gate(_gate), m_starts(_starts) {
     }
     void run() override {
-        starts->fetch_add(1);
-        while(!gate->load())
+        m_starts->fetch_add(1);
+        while(!m_gate->load())
             QThread::msleep(1);
     }
 
   private:
-    std::atomic_bool *gate;
-    std::atomic_int *starts;
+    std::atomic_bool *m_gate;
+    std::atomic_int *m_starts;
 };
 
 class TestThumbnailer : public ::testing::Test, protected EngineStackFixture {
@@ -47,11 +47,11 @@ class TestThumbnailer : public ::testing::Test, protected EngineStackFixture {
 };
 TEST_F(TestThumbnailer, canceledThumbnailJobStillProducesAWellFormedReport) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/canceled.png", "png", QSize(4, 4)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/canceled.png", "png", QSize(4, 4)));
     LoadPolicy policy = loadPolicy();
     CancelToken token;
     token.request();
-    auto thumbnail = ThumbnailerRunnable::generate(nullptr, fixtureDir + "/canceled.png", 64, /*crop=*/false,
+    auto thumbnail = ThumbnailerRunnable::generate(nullptr, m_fixtureDir + "/canceled.png", 64, /*crop=*/false,
                                                    /*force=*/true, policy, &token);
     EXPECT_TRUE(thumbnail != nullptr);
     EXPECT_EQ(thumbnail->size(), 64);
@@ -215,10 +215,10 @@ TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
 
     // every request goes straight into the pool; the engine no longer
     // schedules thumbnails
-    thumb.getThumbnailAsync(fixtureDir + "/img1.jpg", 32, false, false);
-    thumb.getThumbnailAsync(fixtureDir + "/img2.jpg", 32, false, false);
+    thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 32, false, false);
+    thumb.getThumbnailAsync(m_fixtureDir + "/img2.jpg", 32, false, false);
     // a duplicate collapses instead of double-dispatching
-    thumb.getThumbnailAsync(fixtureDir + "/img1.jpg", 32, false, false);
+    thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 32, false, false);
     ASSERT_TRY_EQ_TIMEOUT(ready.count(), 2, 10000);
     coretest::drainEvents();
     EXPECT_EQ(ready.count(), 2);
@@ -226,13 +226,13 @@ TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
     // the clear happens while the third request is still queued: it is
     // drained and never reports, so clearTasks must forget it by name —
     // a set that kept it would dedup every later request for that file
-    thumb.getThumbnailAsync(fixtureDir + "/img10.jpg", 32, false, false);
+    thumb.getThumbnailAsync(m_fixtureDir + "/img10.jpg", 32, false, false);
     thumb.clearTasks();
 
     // the pipeline still works after the clear: a fresh request dispatches
     // and completes (img10's stale dispatch may also complete on drain,
     // so assert a lower bound, not an exact count)
-    thumb.getThumbnailAsync(fixtureDir + "/img1.jpg", 64, false, false);
+    thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 64, false, false);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 3, 10000);
     thumb.waitForDone();
 }
@@ -262,7 +262,7 @@ TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
 // gate releases the worker.
 TEST_F(TestThumbnailer, aJobMarkedBeforeItStartsForgetsItsRequest) {
     resetFixture();
-    const QString path = fixtureDir + "/cancelme.png";
+    const QString path = m_fixtureDir + "/cancelme.png";
     EXPECT_TRUE(makeImageFile(path, QSize(64, 64)));
 
     std::atomic_bool gate{false};
@@ -310,9 +310,9 @@ TEST_F(TestThumbnailer, aClearedBatchIsRecoveredByTheNextWave) {
                          ready.insert(path);
                      });
     const QStringList batch = {
-        fixtureDir + "/img1.jpg",
-        fixtureDir + "/img2.jpg",
-        fixtureDir + "/img10.jpg",
+        m_fixtureDir + "/img1.jpg",
+        m_fixtureDir + "/img2.jpg",
+        m_fixtureDir + "/img10.jpg",
     };
     for(const QString &path : batch)
         thumb.getThumbnailAsync(path, 32, false, false);
@@ -360,12 +360,12 @@ TEST_F(TestThumbnailer, aClearedBatchIsRecoveredByTheNextWave) {
 // two racing on the same file.
 TEST_F(TestThumbnailer, aStaleReportCannotFreeTheNextWavesSlot) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/gen.png", "png", QSize(256, 256)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/gen.png", "png", QSize(256, 256)));
     std::atomic_bool gate1{false}, gate2{false};
     std::atomic_int holds1{0}, holds2{0};
     WorkerPool pool(1);
     Thumbnailer thumb(pool);
-    const QString path = fixtureDir + "/gen.png";
+    const QString path = m_fixtureDir + "/gen.png";
     const int before = ThumbnailerRunnable::constructionCount().load();
 
     // one worker. gate1 holds it, A1 queues behind, gate2 queues behind A1.
@@ -399,7 +399,7 @@ TEST_F(TestThumbnailer, aStaleReportCannotFreeTheNextWavesSlot) {
 
 TEST_F(TestThumbnailer, aMarkedRunningJobDoesNotSwallowTheReRequest) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/slow.png", "png", QSize(5000, 4000)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/slow.png", "png", QSize(5000, 4000)));
     std::atomic_bool gate{false};
     std::atomic_int holds{0};
     WorkerPool pool(2);
@@ -411,7 +411,7 @@ TEST_F(TestThumbnailer, aMarkedRunningJobDoesNotSwallowTheReRequest) {
                      [&delivered](std::shared_ptr<Thumbnail>, const QString &) {
                          delivered++;
                      });
-    const QString path = fixtureDir + "/slow.png";
+    const QString path = m_fixtureDir + "/slow.png";
     thumb.getThumbnailAsync(path, 128, false, false);
     // the second worker is free: the job is picked up immediately and sits
     // inside generate(), past its entry checkpoint

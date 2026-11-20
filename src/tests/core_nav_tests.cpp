@@ -150,26 +150,26 @@ template <typename Proxy> void proxyOutlivesItsContainer() {
 // A bound test, not a hang test.
 class DeadlineJob : public PoolJob {
   public:
-    DeadlineJob(std::atomic_bool *_gate, std::atomic_int *_holds) : gate(_gate), holds(_holds) {
+    DeadlineJob(std::atomic_bool *_gate, std::atomic_int *_holds) : m_gate(_gate), m_holds(_holds) {
     }
     void run() override {
-        holds->store(1);
+        m_holds->store(1);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(5000);
-        while(!gate->load() && std::chrono::steady_clock::now() < deadline)
+        while(!m_gate->load() && std::chrono::steady_clock::now() < deadline)
             QThread::msleep(1);
-        holds->store(0);
+        m_holds->store(0);
     }
 
   private:
-    std::atomic_bool *gate;
-    std::atomic_int *holds;
+    std::atomic_bool *m_gate;
+    std::atomic_int *m_holds;
 };
 
 class TestCoreNav : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons; // the app's process-wide state, by construction
-    QString base, alpha, beta;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons; // the app's process-wide state, by construction
+    QString m_base, m_alpha, m_beta;
 
     static bool sawDir(const QSignalSpy &spy, const QString &dir, int from = 0) {
         for(int i = from; i < spy.count(); ++i)
@@ -187,35 +187,35 @@ class TestCoreNav : public ::testing::Test {
         // IsolatedHome redirected HOME and the config identity; the singletons
         // arrive with the AppSingletons member, so there is no list to keep in
         // sync here.
-        EXPECT_TRUE(home.path() != nullptr);
+        EXPECT_TRUE(m_home.path() != nullptr);
 
-        base = QDir(home.path()).filePath("nav");
-        alpha = QDir(base).filePath("alpha");
-        beta = QDir(base).filePath("beta");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        EXPECT_TRUE(QDir().mkpath(beta));
-        writeImage(QDir(alpha).filePath("a.png"));
-        writeImage(QDir(beta).filePath("b.png"));
+        m_base = QDir(m_home.path()).filePath("nav");
+        m_alpha = QDir(m_base).filePath("alpha");
+        m_beta = QDir(m_base).filePath("beta");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        EXPECT_TRUE(QDir().mkpath(m_beta));
+        writeImage(QDir(m_alpha).filePath("a.png"));
+        writeImage(QDir(m_beta).filePath("b.png"));
     }
 
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 };
 
 TEST_F(TestCoreNav, titleFollowsTheProjection) {
-    writeImage(QDir(base).filePath("t.png"));
+    writeImage(QDir(m_base).filePath("t.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("t.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("t.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (QDir(base).filePath("t.png"));
+                return (core.currentFilePath()) == (QDir(m_base).filePath("t.png"));
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("t.png"))
+        EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("t.png"))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     {
@@ -252,24 +252,24 @@ TEST_F(TestCoreNav, titleFollowsTheProjection) {
 }
 
 TEST_F(TestCoreNav, folderViewFollowsTheDirectoryState) {
-    QDir().mkpath(QDir(base).filePath("projdir"));
+    QDir().mkpath(QDir(m_base).filePath("projdir"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("projdir")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("projdir")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.mainWindow()->getFolderView()->directoryPath()) == (QDir(base).filePath("projdir"));
+                return (core.mainWindow()->getFolderView()->directoryPath()) == (QDir(m_base).filePath("projdir"));
             },
             10000);
-        EXPECT_EQ(core.mainWindow()->getFolderView()->directoryPath(), QDir(base).filePath("projdir"))
+        EXPECT_EQ(core.mainWindow()->getFolderView()->directoryPath(), QDir(m_base).filePath("projdir"))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 }
 
 TEST_F(TestCoreNav, cropSurfaceHintsItsKeys) {
-    writeImage(QDir(base).filePath("cropkeys.png"));
+    writeImage(QDir(m_base).filePath("cropkeys.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("cropkeys.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("cropkeys.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -378,11 +378,11 @@ TEST_F(TestCoreNav, cropSurfaceHintsItsKeys) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (QImage(QDir(base).filePath("cropkeys.png")).size()) ==
+                return (QImage(QDir(m_base).filePath("cropkeys.png")).size()) ==
                        (QSize(originalWidth - 2, originalHeight - 2));
             },
             10000);
-        EXPECT_EQ(QImage(QDir(base).filePath("cropkeys.png")).size(), QSize(originalWidth - 2, originalHeight - 2))
+        EXPECT_EQ(QImage(QDir(m_base).filePath("cropkeys.png")).size(), QSize(originalWidth - 2, originalHeight - 2))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     } // ...and writes it
     EXPECT_TRUE(core.mainWindow()->crop()->isActive())
@@ -396,16 +396,16 @@ TEST_F(TestCoreNav, cropSurfaceHintsItsKeys) {
 TEST_F(TestCoreNav, zoomInWorksAndFitSwitchCollapsesFreeZoom) {
     QImage img(400, 300, QImage::Format_RGB32);
     img.fill(Qt::magenta);
-    EXPECT_TRUE(img.save(QDir(base).filePath("small.png"), "PNG"));
+    EXPECT_TRUE(img.save(QDir(m_base).filePath("small.png"), "PNG"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("small.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("small.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (QDir(base).filePath("small.png"));
+                return (core.currentFilePath()) == (QDir(m_base).filePath("small.png"));
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("small.png"))
+        EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("small.png"))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
@@ -446,7 +446,7 @@ TEST_F(TestCoreNav, preloaderFollowsTheDirectionOfTravel) {
 
     // four files so both directions have an uncached neighbor to prove
     // themselves with: forward from c reaches d, backward from d reaches b
-    QString seq = QDir(base).filePath("seq");
+    QString seq = QDir(m_base).filePath("seq");
     EXPECT_TRUE(QDir().mkpath(seq));
     QStringList files;
     for(const char *n : {"a", "b", "c", "d"}) {
@@ -575,7 +575,7 @@ TEST_F(TestCoreNav, preloaderFollowsTheDirectionOfTravel) {
 // ~1s at 2 cores).
 TEST_F(TestCoreNav, theFullResUpgradeWaitsForTheDwell) {
     settings->setUsePreloader(true);
-    QString dir = QDir(base).filePath("dwell");
+    QString dir = QDir(m_base).filePath("dwell");
     EXPECT_TRUE(QDir().mkpath(dir));
     QStringList files;
     for(const char *n : {"a", "b", "c"}) {
@@ -664,7 +664,7 @@ TEST_F(TestCoreNav, theFullResUpgradeWaitsForTheDwell) {
 // unconditional showGui in place: the window appeared empty first and the
 // image arrived after. The reveal belongs to the first ready frame.
 TEST_F(TestCoreNav, coldOpenKeepsTheWindowHiddenUntilTheFirstFrame) {
-    QString dir = QDir(base).filePath("waitfirst");
+    QString dir = QDir(m_base).filePath("waitfirst");
     EXPECT_TRUE(QDir().mkpath(dir));
     QStringList files;
     for(const char *n : {"one", "two"}) {
@@ -712,7 +712,7 @@ TEST_F(TestCoreNav, coldOpenKeepsTheWindowHiddenUntilTheFirstFrame) {
 // "window ready, then act" — instead of leaking a visibility query into
 // Core.
 TEST_F(TestCoreNav, scalingWaitsForTheWindowThenActs) {
-    QString dir = QDir(base).filePath("scalingtiming");
+    QString dir = QDir(m_base).filePath("scalingtiming");
     EXPECT_TRUE(QDir().mkpath(dir));
     // a large image: at fit-window it is DOWNSCALED (scale < 1) — the one
     // shape requestScaling actually serves; an 8x8 fixture would sit at
@@ -767,27 +767,27 @@ TEST_F(TestCoreNav, gotoAdjacentAtFolderEndEntersNextFolder) {
     EXPECT_TRUE(listed.isValid());
 
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     // opening a file defers the folder listing until the image is ready
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return sawDir(listed, alpha);
+                return sawDir(listed, m_alpha);
             },
             10000);
-        EXPECT_TRUE(sawDir(listed, alpha)) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(sawDir(listed, m_alpha)) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(core.currentFilePath(), QDir(alpha).filePath("a.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_alpha).filePath("a.png"));
 
     const int before = listed.count();
     actionManager->action("nextImage")->trigger();
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return sawDir(listed, beta, before);
+                return sawDir(listed, m_beta, before);
             },
             10000);
-        EXPECT_TRUE(sawDir(listed, beta, before))
+        EXPECT_TRUE(sawDir(listed, m_beta, before))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     // it must land on the new folder's image, not on whatever the previous
@@ -795,10 +795,10 @@ TEST_F(TestCoreNav, gotoAdjacentAtFolderEndEntersNextFolder) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (QDir(beta).filePath("b.png"));
+                return (core.currentFilePath()) == (QDir(m_beta).filePath("b.png"));
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), QDir(beta).filePath("b.png"))
+        EXPECT_EQ(core.currentFilePath(), QDir(m_beta).filePath("b.png"))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 }
@@ -809,14 +809,14 @@ TEST_F(TestCoreNav, noActionAtFolderEndStaysInThisFolder) {
 
     QSignalSpy listed(&EngineBridge::instance(), &EngineBridge::dirListed);
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return sawDir(listed, alpha);
+                return sawDir(listed, m_alpha);
             },
             10000);
-        EXPECT_TRUE(sawDir(listed, alpha)) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(sawDir(listed, m_alpha)) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
     const int before = listed.count();
@@ -832,8 +832,8 @@ TEST_F(TestCoreNav, noActionAtFolderEndStaysInThisFolder) {
         EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_EQ(listed.count(), before);
-    EXPECT_TRUE(!sawDir(listed, beta, before));
-    EXPECT_EQ(core.currentFilePath(), QDir(alpha).filePath("a.png"));
+    EXPECT_TRUE(!sawDir(listed, m_beta, before));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_alpha).filePath("a.png"));
 }
 
 TEST_F(TestCoreNav, setWallpaperOnAnUnsupportedSessionIsASafeNoOp) {
@@ -841,7 +841,7 @@ TEST_F(TestCoreNav, setWallpaperOnAnUnsupportedSessionIsASafeNoOp) {
     const QByteArray oldSession = qgetenv("DESKTOP_SESSION");
     qputenv("DESKTOP_SESSION", "twm");
 
-    QString wpBase = QDir(home.path()).filePath("wp");
+    QString wpBase = QDir(m_home.path()).filePath("wp");
     EXPECT_TRUE(QDir().mkpath(wpBase));
     QString img = QDir(wpBase).filePath("w.png");
     writeImage(img);
@@ -1085,7 +1085,7 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     // 250 'l' + ".png" fits the source directory (254 <= NAME_MAX) but
     // cannot fit any real trash: even HOME=/ gives a 26-char files/ prefix.
     const QString longName = QString(250, QLatin1Char('l')) + QStringLiteral(".png");
-    const QString longFile = QDir(alpha).filePath(longName);
+    const QString longFile = QDir(m_alpha).filePath(longName);
     writeImage(longFile);
 #endif
 
@@ -1096,7 +1096,7 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     coretest::FakeInteractions fake;
     fake.confirmAnswer = true;
     core.setUserInteractions(&fake);
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {

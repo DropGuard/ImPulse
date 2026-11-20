@@ -15,25 +15,25 @@
 
 class TestEditSave : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base, alpha;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base, m_alpha;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("editsave");
-        alpha = QDir(base).filePath("alpha");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        EXPECT_TRUE(QDir().mkpath(base));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("editsave");
+        m_alpha = QDir(m_base).filePath("alpha");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        EXPECT_TRUE(QDir().mkpath(m_base));
     }
 };
 
@@ -122,7 +122,7 @@ TEST_F(TestEditSave, editingInDocumentModeEditsInMemoryWithoutConfirmation) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -158,7 +158,7 @@ TEST_F(TestEditSave, resizeEditsTheLoadedImage) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -192,7 +192,7 @@ TEST_F(TestEditSave, resizeBelongsToTheDocumentViewOnly) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -238,7 +238,7 @@ TEST_F(TestEditSave, discardEditsRestoresTheOnDiskImage) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -265,7 +265,7 @@ TEST_F(TestEditSave, discardEditsRestoresTheOnDiskImage) {
 // intent through Core's public edit legs — all of which used to be
 // unreachable without a window (the old path dereferenced mw->crop()).
 TEST_F(TestEditSave, cropSurfaceTogglesThroughTheSeamAndIntentReachesTheEditLeg) {
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
 
     // no image on screen yet: Core's policy refuses to open the surface
@@ -327,7 +327,7 @@ TEST_F(TestEditSave, theEditedImageExportGetsAUniqueTempFileOwnedByItsMime) {
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(

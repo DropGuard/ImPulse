@@ -20,23 +20,23 @@
 #include "gui/crop/cropoverlay.h"
 class TestOverlayKeys : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("okeys");
-        EXPECT_TRUE(QDir().mkpath(base));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("okeys");
+        EXPECT_TRUE(QDir().mkpath(m_base));
     }
 };
 
@@ -44,15 +44,15 @@ class TestOverlayKeys : public ::testing::Test {
 // reaches the action system, where "Esc" maps to closeFullScreenOrExit
 // (app exit in windowed mode). Each surface's own key door handles it.
 TEST_F(TestOverlayKeys, overlayEscDismissesTheSurface) {
-    writeImage(QDir(base).filePath("esc.png"));
+    writeImage(QDir(m_base).filePath("esc.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("esc.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("esc.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("esc.png");
+            return core.currentFilePath() == QDir(m_base).filePath("esc.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("esc.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("esc.png"));
     QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, 0, 1);
 
     // copy overlay (serves copy and move alike)
@@ -102,9 +102,9 @@ TEST_F(TestOverlayKeys, overlayEscDismissesTheSurface) {
 // real scan code, because a synthesized key with scan code 0 has no name
 // and would fall through.
 TEST_F(TestOverlayKeys, saveConfirmOverlayAnswersItsKeys) {
-    writeImage(QDir(base).filePath("svkeys.png"));
+    writeImage(QDir(m_base).filePath("svkeys.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("svkeys.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("svkeys.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -278,30 +278,30 @@ TEST_F(TestOverlayKeys, subjectChangingActionListIsWhatItClaims) {
 }
 
 TEST_F(TestOverlayKeys, loadFailureOfUnviewedFileStaysSilent) {
-    writeImage(QDir(base).filePath("keep.png"));
+    writeImage(QDir(m_base).filePath("keep.png"));
     // the load-failure message rides the overlay interface now — the
     // dialog layer asks questions, it does not announce
     coretest::FakeOverlayHost overlayFake;
     Core::Deps deps;
     deps.overlays = &overlayFake;
     Core core(deps);
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("keep.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("keep.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("keep.png");
+            return core.currentFilePath() == QDir(m_base).filePath("keep.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("keep.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("keep.png"));
     // the constructor's version/first-run message already landed here —
     // baseline it, the way the old FakeInteractions test did
     int before = overlayFake.messageCalls;
 
     // a failure for a file the user never opened stays silent
-    emit core.directoryModel()->loadFailed(QDir(base).filePath("never-seen.png"));
+    emit core.directoryModel()->loadFailed(QDir(m_base).filePath("never-seen.png"));
     EXPECT_EQ(overlayFake.messageCalls, before);
 
     // the on-screen file's own failure announces itself and closes the view
-    emit core.directoryModel()->loadFailed(QDir(base).filePath("keep.png"));
+    emit core.directoryModel()->loadFailed(QDir(m_base).filePath("keep.png"));
     EXPECT_EQ(overlayFake.messageCalls, before + 1);
     EXPECT_TRUE(overlayFake.lastMessage.contains(QStringLiteral("Load failed")));
 }

@@ -61,48 +61,48 @@ inline bool makeImageFile(const QString &path, const QSize &size, const char *fo
 class IsolatedHome {
   public:
     IsolatedHome() {
-        dir.setAutoRemove(true);
-        Q_ASSERT(dir.isValid());
+        m_dir.setAutoRemove(true);
+        Q_ASSERT(m_dir.isValid());
         // What was there before: restored on destruction, because a fixture that
         // only writes is a fixture that leaks. Today every use is a suite member
         // living as long as the process, so the restore never fires in practice
         // -- which is the other reason to have it: the day someone scopes one of
         // these to a function (the way FreshSettings is used), the code after it
         // must not keep running against a directory that was just deleted.
-        savedHome = qgetenv("HOME");
-        savedCache = qgetenv("XDG_CACHE_HOME");
-        savedConfig = qgetenv("XDG_CONFIG_HOME");
-        savedOrg = QCoreApplication::organizationName();
-        savedApp = QCoreApplication::applicationName();
-        hadHome = qEnvironmentVariableIsSet("HOME");
-        hadCache = qEnvironmentVariableIsSet("XDG_CACHE_HOME");
-        hadConfig = qEnvironmentVariableIsSet("XDG_CONFIG_HOME");
-        qputenv("HOME", dir.path().toUtf8());
+        m_savedHome = qgetenv("HOME");
+        m_savedCache = qgetenv("XDG_CACHE_HOME");
+        m_savedConfig = qgetenv("XDG_CONFIG_HOME");
+        m_savedOrg = QCoreApplication::organizationName();
+        m_savedApp = QCoreApplication::applicationName();
+        m_hadHome = qEnvironmentVariableIsSet("HOME");
+        m_hadCache = qEnvironmentVariableIsSet("XDG_CACHE_HOME");
+        m_hadConfig = qEnvironmentVariableIsSet("XDG_CONFIG_HOME");
+        qputenv("HOME", m_dir.path().toUtf8());
         // HOME alone no longer isolates the cache: the thumbnail store lives in
         // the shared freedesktop location, and QStandardPaths prefers
         // XDG_CACHE_HOME over $HOME/.cache. On a machine where the developer set
         // it (a common KDE setup), a test that reached the real store would read
         // and DELETE the user's thumbnails. Pointing both at the fixture keeps
         // the isolation true regardless of the caller's session.
-        qputenv("XDG_CACHE_HOME", QDir(dir.path()).filePath("cache").toUtf8());
-        qputenv("XDG_CONFIG_HOME", QDir(dir.path()).filePath("config").toUtf8());
+        qputenv("XDG_CACHE_HOME", QDir(m_dir.path()).filePath("cache").toUtf8());
+        qputenv("XDG_CONFIG_HOME", QDir(m_dir.path()).filePath("config").toUtf8());
         QCoreApplication::setOrganizationName("ImPulse");
         QCoreApplication::setApplicationName("impulse");
     }
 
     ~IsolatedHome() {
-        restore("HOME", savedHome, hadHome);
-        restore("XDG_CACHE_HOME", savedCache, hadCache);
-        restore("XDG_CONFIG_HOME", savedConfig, hadConfig);
-        QCoreApplication::setOrganizationName(savedOrg);
-        QCoreApplication::setApplicationName(savedApp);
+        restore("HOME", m_savedHome, m_hadHome);
+        restore("XDG_CACHE_HOME", m_savedCache, m_hadCache);
+        restore("XDG_CONFIG_HOME", m_savedConfig, m_hadConfig);
+        QCoreApplication::setOrganizationName(m_savedOrg);
+        QCoreApplication::setApplicationName(m_savedApp);
     }
 
     IsolatedHome(const IsolatedHome &) = delete;
     IsolatedHome &operator=(const IsolatedHome &) = delete;
 
     QString path() const {
-        return dir.path();
+        return m_dir.path();
     }
 
   private:
@@ -113,10 +113,10 @@ class IsolatedHome {
             qunsetenv(name);
     }
 
-    QByteArray savedHome, savedCache, savedConfig;
-    QString savedOrg, savedApp;
-    bool hadHome = false, hadCache = false, hadConfig = false;
-    QTemporaryDir dir;
+    QByteArray m_savedHome, m_savedCache, m_savedConfig;
+    QString m_savedOrg, m_savedApp;
+    bool m_hadHome = false, m_hadCache = false, m_hadConfig = false;
+    QTemporaryDir m_dir;
 };
 
 // Swaps the global `settings` pointer to a brand-new Settings instance bound
@@ -126,21 +126,21 @@ class IsolatedHome {
 class FreshSettings {
   public:
     FreshSettings() {
-        saved = ::settings;
+        m_saved = ::settings;
         // a unique application name means a config file nothing else reads or
         // has cached: the fresh instance starts from defaults, deterministically
         const QString fresh =
             QStringLiteral("qimgv-test-%1-%2").arg(QCoreApplication::applicationPid()).arg(++counter, 0, 16);
-        savedApp = QCoreApplication::applicationName();
+        m_savedApp = QCoreApplication::applicationName();
         QCoreApplication::setApplicationName(fresh);
         // Windows portable mode reads conf and cache from the exe's directory
         // and ignores the applicationName swap entirely — this env redirect is
         // what makes the isolation actually hold on that platform (the same
         // trick the XDG vars above are for on Linux).
-        savedConfEnv = qgetenv("QIMGV_CONF_DIR");
-        savedCacheEnv = qgetenv("QIMGV_CACHE_DIR");
-        const QString confFresh = dir.path() + "/conf";
-        const QString cacheFresh = dir.path() + "/cache";
+        m_savedConfEnv = qgetenv("QIMGV_CONF_DIR");
+        m_savedCacheEnv = qgetenv("QIMGV_CACHE_DIR");
+        const QString confFresh = m_dir.path() + "/conf";
+        const QString cacheFresh = m_dir.path() + "/cache";
         QDir().mkpath(confFresh);
         QDir().mkpath(cacheFresh);
         qputenv("QIMGV_CONF_DIR", confFresh.toUtf8());
@@ -150,20 +150,20 @@ class FreshSettings {
 
     ~FreshSettings() {
         delete ::settings;
-        ::settings = saved;
+        ::settings = m_saved;
         // the name is part of the identity this fixture swaps: leaving it at the
         // unique test name meant the next QSettings wrote to a config path that
         // nothing else in the run expects -- IsolatedHome, in particular,
         // assumes applicationName is the production one.
-        QCoreApplication::setApplicationName(savedApp);
-        if(savedConfEnv.isEmpty())
+        QCoreApplication::setApplicationName(m_savedApp);
+        if(m_savedConfEnv.isEmpty())
             qunsetenv("QIMGV_CONF_DIR");
         else
-            qputenv("QIMGV_CONF_DIR", savedConfEnv);
-        if(savedCacheEnv.isEmpty())
+            qputenv("QIMGV_CONF_DIR", m_savedConfEnv);
+        if(m_savedCacheEnv.isEmpty())
             qunsetenv("QIMGV_CACHE_DIR");
         else
-            qputenv("QIMGV_CACHE_DIR", savedCacheEnv);
+            qputenv("QIMGV_CACHE_DIR", m_savedCacheEnv);
     }
 
     FreshSettings(const FreshSettings &) = delete;
@@ -171,8 +171,8 @@ class FreshSettings {
 
   private:
     inline static int counter = 0;
-    Settings *saved = nullptr;
-    QString savedApp;
-    QByteArray savedConfEnv, savedCacheEnv;
-    QTemporaryDir dir;
+    Settings *m_saved = nullptr;
+    QString m_savedApp;
+    QByteArray m_savedConfEnv, m_savedCacheEnv;
+    QTemporaryDir m_dir;
 };

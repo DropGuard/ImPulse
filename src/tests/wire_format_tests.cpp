@@ -22,7 +22,7 @@ TEST_F(TestWireFormat, listingArenaRoundTripsThroughTheCppParser) {
     makeFile(QString(120, QChar('x')) + QStringLiteral(".jpg")); // past any fixed buffer
 
     auto &bridge = EngineBridge::instance();
-    openListed(bridge, fixtureDir, 0, false);
+    openListed(bridge, m_fixtureDir, 0, false);
 
     EXPECT_EQ(bridge.fileCount(), 5);
     EXPECT_EQ(bridge.dirCount(), 1);
@@ -62,7 +62,7 @@ TEST_F(TestWireFormat, unicodeNamesSurviveTheArenaByteForByte) {
     makeFile(wide);
 
     auto &bridge = EngineBridge::instance();
-    openListed(bridge, fixtureDir, 0, false);
+    openListed(bridge, m_fixtureDir, 0, false);
 
     EXPECT_EQ(bridge.fileCount(), 4);
 
@@ -76,7 +76,7 @@ TEST_F(TestWireFormat, unicodeNamesSurviveTheArenaByteForByte) {
     for(const auto &f : files) {
         if(f.name == wide) {
             found = true;
-            EXPECT_EQ(f.path, fixtureDir + QStringLiteral("/") + wide);
+            EXPECT_EQ(f.path, m_fixtureDir + QStringLiteral("/") + wide);
         }
     }
     EXPECT_TRUE(found);
@@ -85,7 +85,7 @@ TEST_F(TestWireFormat, unicodeNamesSurviveTheArenaByteForByte) {
 TEST_F(TestWireFormat, truncatedArenaStopsAtARecordBoundary) {
     resetFixture();
     auto &bridge = EngineBridge::instance();
-    openListed(bridge, fixtureDir, 0, false);
+    openListed(bridge, m_fixtureDir, 0, false);
 
     EXPECT_EQ(bridge.fileCount(), 3);
 

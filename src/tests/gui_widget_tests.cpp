@@ -100,19 +100,19 @@ template <typename Proxy> void proxyOutlivesItsContainer() {
 
 class TestGuiWidgets : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons; // the app's process-wide state, by construction
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons; // the app's process-wide state, by construction
 
     // a directory of this test's own, never shared with a sibling
     QString uniqueDir(const QString &tag) {
         const QString dir =
-            QDir(home.path()).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
+            QDir(m_home.path()).filePath(tag + QStringLiteral("-%1").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
+        EXPECT_TRUE(m_home.path() != nullptr);
     }
 };
 
