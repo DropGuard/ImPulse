@@ -1082,13 +1082,21 @@ TEST_F(TestCoreFileOps, scalingResultsAreDeliveredForTheCurrentPathOnly) {
     writeImage(img);
     coretest::FakeInteractions fake;
     coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
+    ::testing::StrictMock<coretest::MockCoreView> view;
     Core::Deps deps;
     deps.headless = true;
     deps.ui = &fake;
     deps.overlays = &overlayFake;
     deps.view = &view;
     Core core(deps);
+    // the calls Core makes while loading are not this test's subject; the
+    // scaling hand-off is. Stated here so an unmentioned call still fails.
+    EXPECT_CALL(view, showImage).Times(::testing::AnyNumber());
+    EXPECT_CALL(view, repaintView).Times(::testing::AnyNumber());
+    EXPECT_CALL(view, setUpdatesEnabled).Times(::testing::AnyNumber());
+    EXPECT_CALL(view, closeImage).Times(::testing::AnyNumber());
+    EXPECT_CALL(view, onSortingChanged).Times(::testing::AnyNumber());
+    EXPECT_CALL(view, showWindowDefault).Times(::testing::AnyNumber());
     EXPECT_TRUE(core.loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -1105,13 +1113,18 @@ TEST_F(TestCoreFileOps, scalingResultsAreDeliveredForTheCurrentPathOnly) {
     const ScalerRequest req(image, QSize(16, 16), img, settings->scalingFilter(), settings->smoothUpscaling());
     auto result = std::make_shared<const QImage>(16, 16, QImage::Format_RGB32);
 
-    EXPECT_EQ(view.scalingResults, 0);
+    // The whole contract in two lines: the result for the path on screen is
+    // delivered exactly once, and the one for a path nobody is looking at is
+    // never delivered. Under RecordingView these were a counter read before
+    // and after; here the expectation IS the assertion.
+    {
+        ::testing::InSequence seq;
+        EXPECT_CALL(view, onScalingFinished).Times(1); // delivered: the path on screen
+        EXPECT_CALL(view, onScalingFinished).Times(0); // dropped: a path nobody is looking at
+    }
     emit core.directoryModel()->scaler->scalingFinished(result, req);
-    EXPECT_EQ(view.scalingResults, 1); // delivered: the path on screen
-
     const ScalerRequest stale(req.image, req.size, dir + "/elsewhere.png", req.filter, req.smoothUpscaling);
     emit core.directoryModel()->scaler->scalingFinished(result, stale);
-    EXPECT_EQ(view.scalingResults, 1); // dropped: a path nobody is looking at
 }
 
 int main(int argc, char **argv) {

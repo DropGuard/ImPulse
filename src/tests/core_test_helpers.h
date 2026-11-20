@@ -20,6 +20,7 @@
 #endif
 
 #include <QtTest/QTest>
+#include <gmock/gmock.h>
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
@@ -294,6 +295,30 @@ inline QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
 // A recording ICoreView for headless Core tests: counts the display sink
 // calls and keeps the last arguments. The mode entries are counted, not
 // stored — the mode itself is Core's state, readable there.
+// The same contract as RecordingView, but the calls are EXPECTATIONS rather
+// than a tally: a test states what the view should be asked to do, and an
+// unmentioned call fails the test instead of being silently counted. That is
+// the difference between "the repaint did not happen" checked against a number
+// the test had to remember to read, and EXPECT_CALL(...).Times(0).
+//
+// Both exist on purpose. RecordingView is right for a test that only needs the
+// side effects (what size arrived, in what order); this one is right when the
+// CALLS are the subject.
+class MockCoreView : public ICoreView {
+  public:
+    MOCK_METHOD(void, showImage, (std::shared_ptr<const QImage>), (override));
+    MOCK_METHOD(void, showAnimation, (const std::shared_ptr<QMovie> &), (override));
+    MOCK_METHOD(void, showVideo, (const QString &), (override));
+    MOCK_METHOD(void, closeImage, (), (override));
+    MOCK_METHOD(void, repaintView, (), (override));
+    MOCK_METHOD(void, setUpdatesEnabled, (bool), (override));
+    MOCK_METHOD(void, showWindowDefault, (), (override));
+    MOCK_METHOD(void, toggleFullscreenInfoBar, (), (override));
+    MOCK_METHOD(void, setLoopPlayback, (bool), (override));
+    MOCK_METHOD(void, onSortingChanged, (SortingMode), (override));
+    MOCK_METHOD(void, onScalingFinished, (std::unique_ptr<const QImage>), (override));
+};
+
 class RecordingView : public ICoreView {
   public:
     int showImageCalls = 0;

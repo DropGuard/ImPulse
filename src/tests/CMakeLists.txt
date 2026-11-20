@@ -7,6 +7,11 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
+# gtest and gmock ship as separate packages (libgtest-dev / libgmock-dev) and
+# separate CMake targets. Every suite links both through this one name so a
+# new suite cannot silently end up without the mock library.
+set(QIMGV_GTEST_TARGETS GTest::gtest GTest::gmock)
+
 include_directories(${CMAKE_SOURCE_DIR})
 
 # Legacy test: currently unbuildable (stale include path predating the gui/
@@ -61,14 +66,14 @@ add_executable(engine_stack_tests
     infra_tests.cpp)
 # USE_EXIV2 arrives with qimgv_nongui's PUBLIC compile definitions: one answer
 # to "is Exiv2 available" for every target, instead of each restating it.
-target_link_libraries(engine_stack_tests PRIVATE GTest::gtest Qt6::Test qimgv_nongui)
+target_link_libraries(engine_stack_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_nongui)
 gtest_discover_tests(engine_stack_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # Core-level navigation: links the widget tree too, so a real Core can be built
 # and driven under the offscreen platform. OBJECT libraries do not re-export each
 # other's objects, so both are listed — the same pair the executable links.
 add_executable(core_nav_tests core_nav_tests.cpp core_test_helpers.h)
-target_link_libraries(core_nav_tests PRIVATE GTest::gtest Qt6::Test qimgv_gui qimgv_nongui)
+target_link_libraries(core_nav_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
 gtest_discover_tests(core_nav_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # ---- the LLVM idiom: the tests are build targets, and the check targets fuse
@@ -118,7 +123,7 @@ endforeach()
 # framework's now (see dispatch_probe_tests for the full rationale).
 foreach(suite grid_tests slideshow_tests clipboard_tests overlay_keys_tests crop_tests presenter_tests edit_save_tests shortcut_scope_tests)
     add_executable(${suite} ${suite}.cpp core_test_helpers.h)
-    target_link_libraries(${suite} PRIVATE GTest::gtest Qt6::Test qimgv_gui qimgv_nongui)
+    target_link_libraries(${suite} PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
     gtest_discover_tests(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 endforeach()
 
@@ -126,7 +131,7 @@ endforeach()
 # scripted dialogs. Same object libraries as CORE_NAV, but no engine listing is
 # read, so it runs as its own binary with its own fixture domain.
 add_executable(core_fileops_tests core_fileops_tests.cpp core_test_helpers.h)
-target_link_libraries(core_fileops_tests PRIVATE GTest::gtest Qt6::Test qimgv_gui qimgv_nongui)
+target_link_libraries(core_fileops_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
 gtest_discover_tests(core_fileops_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # The widget surfaces: overlays, panels, the grid's keyboard and drag, the
@@ -134,7 +139,7 @@ gtest_discover_tests(core_fileops_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIM
 # suite exists so the checks that only need a widget do not pay for an engine,
 # a watcher and an async listing, and so a failure names the surface.
 add_executable(gui_widget_tests gui_widget_tests.cpp core_test_helpers.h)
-target_link_libraries(gui_widget_tests PRIVATE GTest::gtest Qt6::Test qimgv_gui qimgv_nongui)
+target_link_libraries(gui_widget_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
 gtest_discover_tests(gui_widget_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # executable architecture rules (ArchUnit-style): gui isolation, FFI caller
@@ -154,7 +159,7 @@ set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300
 # qWaitForWindowExposed. Assertions are EXPECT_*/ASSERT_*; the QVERIFY/QCOMPARE
 # macros are poisoned in a gtest TU by gtest_qt.h (see that header).
 add_executable(dispatch_probe_tests dispatch_probe_tests.cpp)
-target_link_libraries(dispatch_probe_tests PRIVATE GTest::gtest Qt6::Test Qt6::Widgets)
+target_link_libraries(dispatch_probe_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test Qt6::Widgets)
 gtest_discover_tests(dispatch_probe_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # The harness proving itself: that a timed-out wait is a real failure and that
@@ -162,7 +167,7 @@ gtest_discover_tests(dispatch_probe_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" T
 # this, a migration that turned every asynchronous assertion into a silent
 # no-op would look exactly like a green suite.
 add_executable(harness_sanity_tests harness_sanity_tests.cpp)
-target_link_libraries(harness_sanity_tests PRIVATE GTest::gtest Qt6::Test Qt6::Widgets)
+target_link_libraries(harness_sanity_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test Qt6::Widgets)
 gtest_discover_tests(harness_sanity_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # the tree's style, as a test rather than only as a pre-commit stage: a
