@@ -47,7 +47,11 @@ void FileOperations::removeFile(const QString &filePath, FileOpResult &result) {
     return;
 }
 
-// non-recursive
+// recursive=false answers DIRECTORY_NOT_EMPTY for a directory that holds
+// anything; recursive=true removes the tree. The link question does not arise
+// here: QDir::removeRecursively deletes a symlink itself rather than the tree
+// it points at (Qt documents it), unlike the entry-by-entry recursion Core's
+// copy and move do.
 void FileOperations::removeDir(const QString &dirPath, bool recursive, FileOpResult &result) {
     QDir dir(dirPath);
     if(!dir.exists()) {
@@ -90,7 +94,10 @@ QString FileOperations::decodeResult(const FileOpResult &result) {
     case FileOpResult::NOTHING_TO_DO: return QObject::tr("Nothing to do.");
     case FileOpResult::OTHER_ERROR: return QObject::tr("Other error.");
     }
-    return nullptr;
+    // Unreachable while the switch covers the enum, and -Wswitch makes a new
+    // value say so at compile time. {} rather than nullptr: the return type is
+    // QString, and a null QString is a different object from an empty one.
+    return {};
 }
 
 void FileOperations::copyFileTo(const QString &srcFilePath, const QString &destDirPath, bool force,

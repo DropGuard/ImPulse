@@ -205,14 +205,24 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     view.show(); // materialize so the forwarding path is the real one
     presenter.setModel(model);
 
-    // the strip requests thumbnails for itself once it materializes; wait
-    // that out, then clear the counter so the number below is attributable
-    // only to the invoke that drives the presenter's connection
-    EXPECT_TRUE(QTest::qWaitFor(
-        [&] {
-            return view.thumbnailCalls > 0;
-        },
-        10000));
+    // The strip requests thumbnails for itself once it materializes, and it
+    // may ask more than once as rows arrive. Waiting for "at least one" and
+    // then clearing the counter left any still-queued request to land after
+    // the clear, so the count below read 2 instead of 1 — measured as a
+    // failure only under ctest -j4, where the event queue is slower. Wait for
+    // the count to STOP moving instead, then clear.
+    {
+        int lastSeen = -1;
+        EXPECT_TRUE(QTest::qWaitFor(
+            [&] {
+                const bool stable = view.thumbnailCalls > 0 && view.thumbnailCalls == lastSeen;
+                lastSeen = view.thumbnailCalls;
+                return stable;
+            },
+            10000));
+    }
+    // anything the strip queued for itself is dispatched by now
+    QCoreApplication::processEvents();
     view.thumbnailCalls = 0;
     view.lastThumbnailPos = -1;
 
