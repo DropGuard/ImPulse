@@ -29,6 +29,11 @@ jobs:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v4
+      # Rust comes from pacman, not dtolnay's action: that action writes to the
+      # Windows-side PATH (~/.cargo under C:\Users\...), which an msys2 shell
+      # does not read — measured, corrosion still said "rustc not found" with
+      # the action's step green above it. The msys2 package puts rustc on the
+      # shell's own PATH, which is the one corrosion resolves.
       - name: install the ucrt64 toolchain and libraries (the dev machine's exact set)
         uses: msys2/setup-msys2@v2
         with:
@@ -50,11 +55,7 @@ jobs:
             mingw-w64-ucrt-x86_64-exiv2
             mingw-w64-ucrt-x86_64-mpv
             mingw-w64-ucrt-x86_64-gtest
-      # The Rust engine is built by corrosion, which looks for rustc in PATH
-      # and ~/.cargo/bin. The Linux job gets it from dtolnay's action; the
-      # msys2 shell inherits the Windows runner's PATH, so rustup's default
-      # install location is visible once this step has run.
-      - uses: dtolnay/rust-toolchain@stable
+            mingw-w64-ucrt-x86_64-rust
       - name: configure
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
