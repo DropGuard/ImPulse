@@ -29,138 +29,138 @@ void InputMap::initKeyMap() {
     // windows keymap for qimgv
 
     // row 1
-    keyMap.insert(1, "Esc");
-    keyMap.insert(59, "F1");
-    keyMap.insert(60, "F2");
-    keyMap.insert(61, "F3");
-    keyMap.insert(62, "F4");
-    keyMap.insert(63, "F5");
-    keyMap.insert(64, "F6");
-    keyMap.insert(65, "F7");
-    keyMap.insert(66, "F8");
-    keyMap.insert(67, "F9");
-    keyMap.insert(68, "F10");
-    keyMap.insert(87, "F11");
-    keyMap.insert(88, "F12");
-    //keyMap.insert(  , "Print" );
-    keyMap.insert(70, "ScrollLock");
-    keyMap.insert(69, "Pause");
+    m_keyMap.insert(1, "Esc");
+    m_keyMap.insert(59, "F1");
+    m_keyMap.insert(60, "F2");
+    m_keyMap.insert(61, "F3");
+    m_keyMap.insert(62, "F4");
+    m_keyMap.insert(63, "F5");
+    m_keyMap.insert(64, "F6");
+    m_keyMap.insert(65, "F7");
+    m_keyMap.insert(66, "F8");
+    m_keyMap.insert(67, "F9");
+    m_keyMap.insert(68, "F10");
+    m_keyMap.insert(87, "F11");
+    m_keyMap.insert(88, "F12");
+    //m_keyMap.insert(  , "Print" );
+    m_keyMap.insert(70, "ScrollLock");
+    m_keyMap.insert(69, "Pause");
 
     // row 2
-    keyMap.insert(41, "`");
-    keyMap.insert(2, "1");
-    keyMap.insert(3, "2");
-    keyMap.insert(4, "3");
-    keyMap.insert(5, "4");
-    keyMap.insert(6, "5");
-    keyMap.insert(7, "6");
-    keyMap.insert(8, "7");
-    keyMap.insert(9, "8");
-    keyMap.insert(10, "9");
-    keyMap.insert(11, "0");
-    keyMap.insert(12, "-");
-    keyMap.insert(13, "=");
-    keyMap.insert(14, "Backspace");
-    keyMap.insert(338, "Ins");
-    keyMap.insert(327, "Home");
-    keyMap.insert(329, "PgUp");
+    m_keyMap.insert(41, "`");
+    m_keyMap.insert(2, "1");
+    m_keyMap.insert(3, "2");
+    m_keyMap.insert(4, "3");
+    m_keyMap.insert(5, "4");
+    m_keyMap.insert(6, "5");
+    m_keyMap.insert(7, "6");
+    m_keyMap.insert(8, "7");
+    m_keyMap.insert(9, "8");
+    m_keyMap.insert(10, "9");
+    m_keyMap.insert(11, "0");
+    m_keyMap.insert(12, "-");
+    m_keyMap.insert(13, "=");
+    m_keyMap.insert(14, "Backspace");
+    m_keyMap.insert(338, "Ins");
+    m_keyMap.insert(327, "Home");
+    m_keyMap.insert(329, "PgUp");
 
     // row 3
-    keyMap.insert(15, "Tab");
-    keyMap.insert(16, "Q");
-    keyMap.insert(17, "W");
-    keyMap.insert(18, "E");
-    keyMap.insert(19, "R");
-    keyMap.insert(20, "T");
-    keyMap.insert(21, "Y");
-    keyMap.insert(22, "U");
-    keyMap.insert(23, "I");
-    keyMap.insert(24, "O");
-    keyMap.insert(25, "P");
-    keyMap.insert(26, "[");
-    keyMap.insert(27, "]");
-    keyMap.insert(28, "Enter"); // Qt outputs "Return" here and "Enter" on numpad
-    keyMap.insert(339, "Del");
-    keyMap.insert(335, "End");
-    keyMap.insert(337, "PgDown");
+    m_keyMap.insert(15, "Tab");
+    m_keyMap.insert(16, "Q");
+    m_keyMap.insert(17, "W");
+    m_keyMap.insert(18, "E");
+    m_keyMap.insert(19, "R");
+    m_keyMap.insert(20, "T");
+    m_keyMap.insert(21, "Y");
+    m_keyMap.insert(22, "U");
+    m_keyMap.insert(23, "I");
+    m_keyMap.insert(24, "O");
+    m_keyMap.insert(25, "P");
+    m_keyMap.insert(26, "[");
+    m_keyMap.insert(27, "]");
+    m_keyMap.insert(28, "Enter"); // Qt outputs "Return" here and "Enter" on numpad
+    m_keyMap.insert(339, "Del");
+    m_keyMap.insert(335, "End");
+    m_keyMap.insert(337, "PgDown");
 
     // row 4
-    keyMap.insert(58, "CapsLock");
-    keyMap.insert(30, "A");
-    keyMap.insert(31, "S");
-    keyMap.insert(32, "D");
-    keyMap.insert(33, "F");
-    keyMap.insert(34, "G");
-    keyMap.insert(35, "H");
-    keyMap.insert(36, "J");
-    keyMap.insert(37, "K");
-    keyMap.insert(38, "L");
-    keyMap.insert(39, ";");
-    keyMap.insert(40, "'");
-    keyMap.insert(43, "\\");
+    m_keyMap.insert(58, "CapsLock");
+    m_keyMap.insert(30, "A");
+    m_keyMap.insert(31, "S");
+    m_keyMap.insert(32, "D");
+    m_keyMap.insert(33, "F");
+    m_keyMap.insert(34, "G");
+    m_keyMap.insert(35, "H");
+    m_keyMap.insert(36, "J");
+    m_keyMap.insert(37, "K");
+    m_keyMap.insert(38, "L");
+    m_keyMap.insert(39, ";");
+    m_keyMap.insert(40, "'");
+    m_keyMap.insert(43, "\\");
 
     // row 5
-    keyMap.insert(44, "Z");
-    keyMap.insert(45, "X");
-    keyMap.insert(46, "C");
-    keyMap.insert(47, "V");
-    keyMap.insert(48, "B");
-    keyMap.insert(49, "N");
-    keyMap.insert(50, "M");
-    keyMap.insert(51, ",");
-    keyMap.insert(52, ".");
-    keyMap.insert(53, "/");
-    keyMap.insert(328, "Up");
+    m_keyMap.insert(44, "Z");
+    m_keyMap.insert(45, "X");
+    m_keyMap.insert(46, "C");
+    m_keyMap.insert(47, "V");
+    m_keyMap.insert(48, "B");
+    m_keyMap.insert(49, "N");
+    m_keyMap.insert(50, "M");
+    m_keyMap.insert(51, ",");
+    m_keyMap.insert(52, ".");
+    m_keyMap.insert(53, "/");
+    m_keyMap.insert(328, "Up");
 
     // row 6
-    keyMap.insert(57, "Space");
-    keyMap.insert(349, "Menu");
-    keyMap.insert(331, "Left");
-    keyMap.insert(336, "Down");
-    keyMap.insert(333, "Right");
+    m_keyMap.insert(57, "Space");
+    m_keyMap.insert(349, "Menu");
+    m_keyMap.insert(331, "Left");
+    m_keyMap.insert(336, "Down");
+    m_keyMap.insert(333, "Right");
 
     // numpad
-    keyMap.insert(325, "NumLock");
-    keyMap.insert(309, "/");
-    keyMap.insert(55, "*");
-    keyMap.insert(74, "-");
-    keyMap.insert(71, "7");
-    keyMap.insert(72, "8");
-    keyMap.insert(73, "9");
-    keyMap.insert(78, "+");
-    keyMap.insert(75, "4");
-    keyMap.insert(76, "5");
-    keyMap.insert(77, "6");
-    keyMap.insert(79, "1");
-    keyMap.insert(80, "2");
-    keyMap.insert(81, "3");
-    keyMap.insert(284, "Enter");
-    keyMap.insert(82, "0");
-    keyMap.insert(83, ".");
+    m_keyMap.insert(325, "NumLock");
+    m_keyMap.insert(309, "/");
+    m_keyMap.insert(55, "*");
+    m_keyMap.insert(74, "-");
+    m_keyMap.insert(71, "7");
+    m_keyMap.insert(72, "8");
+    m_keyMap.insert(73, "9");
+    m_keyMap.insert(78, "+");
+    m_keyMap.insert(75, "4");
+    m_keyMap.insert(76, "5");
+    m_keyMap.insert(77, "6");
+    m_keyMap.insert(79, "1");
+    m_keyMap.insert(80, "2");
+    m_keyMap.insert(81, "3");
+    m_keyMap.insert(284, "Enter");
+    m_keyMap.insert(82, "0");
+    m_keyMap.insert(83, ".");
 
     // special
-    //keyMap.insert( ?? , "Wake Up" ); // "Fn" key on thinkpad
-    keyMap.insert(86, "<"); // near left shift (iso layout)
-    //keyMap.insert(??, "PgBack");
-    //keyMap.insert(??, "PgForward");
+    //m_keyMap.insert( ?? , "Wake Up" ); // "Fn" key on thinkpad
+    m_keyMap.insert(86, "<"); // near left shift (iso layout)
+    //m_keyMap.insert(??, "PgBack");
+    //m_keyMap.insert(??, "PgForward");
 
     // looks like qt 6.7.0 changed nativeScanCode() values on windows
     // see https://github.com/easymodo/qimgv/issues/539
-    keyMap.insert(57426, "Ins");
-    keyMap.insert(57415, "Home");
-    keyMap.insert(57417, "PgUp");
-    keyMap.insert(57427, "Del");
-    keyMap.insert(57423, "End");
-    keyMap.insert(57425, "PgDown");
-    keyMap.insert(57416, "Up");
-    keyMap.insert(57437, "Menu");
-    keyMap.insert(57419, "Left");
-    keyMap.insert(57424, "Down");
-    keyMap.insert(57421, "Right");
+    m_keyMap.insert(57426, "Ins");
+    m_keyMap.insert(57415, "Home");
+    m_keyMap.insert(57417, "PgUp");
+    m_keyMap.insert(57427, "Del");
+    m_keyMap.insert(57423, "End");
+    m_keyMap.insert(57425, "PgDown");
+    m_keyMap.insert(57416, "Up");
+    m_keyMap.insert(57437, "Menu");
+    m_keyMap.insert(57419, "Left");
+    m_keyMap.insert(57424, "Down");
+    m_keyMap.insert(57421, "Right");
     // numpad
-    keyMap.insert(57413, "NumLock");
-    keyMap.insert(57397, "/");
-    keyMap.insert(57372, "Enter");
+    m_keyMap.insert(57413, "NumLock");
+    m_keyMap.insert(57397, "/");
+    m_keyMap.insert(57372, "Enter");
 
 #elif defined(__linux__) || defined(__FreeBSD__)
     // linux keymap for qimgv
