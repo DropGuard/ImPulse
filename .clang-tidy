@@ -1,0 +1,31 @@
+---
+# The tree's naming rule, enforced by scripts/lint.py rather than by review.
+#
+# Data members carry m_. Public members do not: a public field is part of a
+# type's interface, and a type whose fields are public is a value, not an
+# object — CachedThumbnail and the wire-format structs are the shape this rule
+# protects. Prefixing those would put a private-implementation marker on a
+# public API and make the two cases look alike when they are not.
+#
+# The prefix is the ONLY thing asserted. Case is deliberately left alone:
+# this tree has snake_case members in the mpv plugin (m_mpv_gl, beside
+# handle_mpv_event) and camelBack everywhere else, and a Case rule would
+# rewrite one of them into the other's style for no benefit.
+Checks: '-*,readability-identifier-naming'
+CheckOptions:
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.ProtectedMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.PublicMemberPrefix
+    value: ''
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: aNy_CasE
+  - key: readability-identifier-naming.ProtectedMemberCase
+    value: aNy_CasE
+  - key: readability-identifier-naming.PublicMemberCase
+    value: aNy_CasE
+  # qthelper.hpp is libmpv's example file, still carrying its upstream
+  # include guard and upstream member names; it is not ours to rename.
+  - key: readability-identifier-naming.PrivateMemberIgnoredRegexp
+    value: '^(sptr|node_|container)$'

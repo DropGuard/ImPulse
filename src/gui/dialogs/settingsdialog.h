@@ -18,9 +18,9 @@
 #include "components/actionmanager/actionmanager.h"
 
 namespace Ui {
-class QCheckBox;
 class SettingsDialog;
 }
+class QCheckBox;
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
