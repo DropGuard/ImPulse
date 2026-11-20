@@ -242,6 +242,46 @@ TEST_F(TestCoreFileOps, interactiveCopyPlacesFileWithoutDialogs) {
     EXPECT_TRUE(QFileInfo::exists(src)); // a copy leaves the source alone
 }
 
+// A directory holding a symlink to a directory must not be followed. Qt's
+// QFileInfo::isDir() answers true for a link that points at one, so the
+// recursive copy treated it as a real subdirectory and copied the target's
+// contents — and a link back up the tree would recurse without end.
+TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
+    coretest::FakeInteractions fake;
+    coretest::FakeOverlayHost overlayFake;
+    coretest::RecordingView view;
+    Core::Deps deps;
+    deps.headless = true;
+    deps.overlays = &overlayFake;
+    deps.view = &view;
+    deps.ui = &fake;
+    Core core(deps);
+
+    const QString srcDir = QDir(m_base).filePath("srcdir");
+    const QString realDir = QDir(srcDir).filePath("real");
+    EXPECT_TRUE(QDir().mkpath(realDir));
+    makeTxt(realDir, "inside.txt", "inner");
+    // a link to a sibling directory, and one pointing back at the parent
+    EXPECT_TRUE(QFile::link(realDir, QDir(srcDir).filePath("linkdir")));
+    EXPECT_TRUE(QFile::link(srcDir, QDir(realDir).filePath("up")));
+
+    const QString destDir = QDir(m_base).filePath("linkdst");
+    EXPECT_TRUE(QDir().mkpath(destDir));
+
+    core.interactiveCopy({srcDir}, destDir);
+
+    // the real directory and its file arrive; the links arrive as links (or
+    // are skipped), and nothing recurses through them
+    EXPECT_TRUE(QFileInfo::exists(QDir(destDir).filePath("srcdir/real/inside.txt")));
+    // the link arrived as a link: if the copy had followed it, the destination
+    // would hold a real directory with the target's contents inside
+    const QFileInfo copiedLink(QDir(destDir).filePath("srcdir/linkdir"));
+    EXPECT_TRUE(copiedLink.isSymLink()) << "the copy followed a directory symlink";
+    EXPECT_EQ(copiedLink.symLinkTarget(), realDir);
+    // and the upward link did not recurse the copy into itself
+    EXPECT_TRUE(QFileInfo(QDir(destDir).filePath("srcdir/real/up")).isSymLink());
+}
+
 TEST_F(TestCoreFileOps, interactiveCopyOverwritesWhenScriptedYes) {
     coretest::FakeInteractions fake;
     coretest::FakeOverlayHost overlayFake;
@@ -417,6 +457,39 @@ TEST_F(TestCoreFileOps, interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile) {
     EXPECT_EQ(fake.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir")), QByteArray("old file")); // intact
     EXPECT_TRUE(!QFileInfo::exists(QDir(destDir).filePath("sdir/inner.txt")));
+}
+
+// The same guard on the move side: a directory holding a symlink to another
+// directory must move the link, not walk into the target.
+TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
+    coretest::FakeInteractions fake;
+    coretest::FakeOverlayHost overlayFake;
+    coretest::RecordingView view;
+    Core::Deps deps;
+    deps.headless = true;
+    deps.overlays = &overlayFake;
+    deps.view = &view;
+    deps.ui = &fake;
+    Core core(deps);
+
+    const QString srcDir = QDir(m_base).filePath("mvsrcdir");
+    const QString realDir = QDir(srcDir).filePath("real");
+    EXPECT_TRUE(QDir().mkpath(realDir));
+    makeTxt(realDir, "inside.txt", "inner");
+    EXPECT_TRUE(QFile::link(realDir, QDir(srcDir).filePath("linkdir")));
+    EXPECT_TRUE(QFile::link(srcDir, QDir(realDir).filePath("up")));
+
+    const QString destDir = QDir(m_base).filePath("mvdst");
+    EXPECT_TRUE(QDir().mkpath(destDir));
+
+    core.interactiveMove({srcDir}, destDir);
+
+    EXPECT_TRUE(QFileInfo::exists(QDir(destDir).filePath("mvsrcdir/real/inside.txt")));
+    // The links moved as links, so nothing recursed. The source directory
+    // itself survives with no regular contents — removeDir refuses a
+    // non-empty directory, and a directory of links is still non-empty.
+    const QStringList left = QDir(srcDir).entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    EXPECT_TRUE(left.isEmpty()) << "the move left behind: " << left.join(", ").toStdString();
 }
 
 TEST_F(TestCoreFileOps, interactiveMoveOverwritesADirectoryCollisionWhenScriptedYes) {

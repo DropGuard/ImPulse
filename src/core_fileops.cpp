@@ -319,12 +319,25 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
-    // copy all contents
-    // TODO: skip symlinks? test
-    QStringList entryList =
+    // copy all contents. A symlink to a directory is NOT descended into:
+    // QFileInfo::isDir() answers true for one, so the recursion below would
+    // copy the target's contents — and a link pointing back up the tree
+    // recurses until the path stops resolving. Measured before the guard: a
+    // two-directory fixture with one link between them never terminated.
+    const QStringList entryList =
         srcDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
     for(const auto &entry : std::as_const(entryList)) {
-        doInteractiveCopy(srcDir.absolutePath() + "/" + entry, dstDir.absolutePath(), overwriteFiles);
+        const QString entryPath = srcDir.absolutePath() + "/" + entry;
+        if(QFileInfo(entryPath).isSymLink()) {
+            // Copy the LINK, not what it points at: QFile::copy follows the
+            // link and would duplicate the target's contents (measured).
+            const QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            const QString linkDest = dstDir.absolutePath() + "/" + entry;
+            QFile::remove(linkDest);
+            QFile::link(linkTarget, linkDest);
+            continue;
+        }
+        doInteractiveCopy(entryPath, dstDir.absolutePath(), overwriteFiles);
         if(overwriteFiles.cancel)
             return;
     }
@@ -408,12 +421,24 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
         qDebug() << "Could not create directory " << dstDir.absolutePath();
         return;
     }
-    // move all contents
-    // TODO: skip symlinks? test
-    QStringList entryList =
+    // move all contents. Same guard as the copy: a symlink to a directory
+    // reports isDir() true and would be descended into.
+    const QStringList entryList =
         srcDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
     for(const auto &entry : std::as_const(entryList)) {
-        doInteractiveMove(srcDir.absolutePath() + "/" + entry, dstDir.absolutePath(), overwriteFiles);
+        const QString entryPath = srcDir.absolutePath() + "/" + entry;
+        if(QFileInfo(entryPath).isSymLink()) {
+            // Move the LINK, not its target: QFile::copy (which moveFileTo
+            // uses) follows it. Recreate the same link at the destination and
+            // drop the original; a failure here is reported like any other.
+            const QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            const QString linkDest = dstDir.absolutePath() + "/" + entry;
+            QFile::remove(linkDest);
+            if(QFile::link(linkTarget, linkDest))
+                QFile::remove(entryPath);
+            continue;
+        }
+        doInteractiveMove(entryPath, dstDir.absolutePath(), overwriteFiles);
         if(overwriteFiles.cancel)
             return;
     }
