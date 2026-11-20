@@ -296,16 +296,11 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         settings->setFolderEndAction(FOLDER_END_NO_ACTION);
     }
 
-    // Scratch space can be removed from outside this class — tmpfiles.d, a
-    // user emptying the cache — and tmpDir() must then hand back a directory
-    // that exists. It re-creates; it does not heal isolation, and this pin is
-    // about the former only.
-    //
-    // The failure mode it prevents is not "an open fails": the clipboard's
-    // edited-image export falls back to a FIXED file name when its
-    // QTemporaryFile cannot open, so two exports share one file and the second
-    // consumer reads the first's pixels (edit_save_tests has the pin for that
-    // contract).
+    // The scratch directory can be swept out from under a long-running
+    // session; asking for it again must hand back one that exists. What makes
+    // that matter: the clipboard's edited-image export falls back to a FIXED
+    // name when its QTemporaryFile cannot open, and two exports then share one
+    // file.
     void tmpDirRecreatesADirectoryRemovedUnderIt() {
         FreshSettings fresh;
         const QString dir = settings->tmpDir();
