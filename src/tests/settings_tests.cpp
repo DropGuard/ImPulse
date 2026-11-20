@@ -1,5 +1,7 @@
 #include "engine_stack_fixture.h"
 
+#include <QTemporaryFile>
+
 #include <functional>
 #include <utility> // std::as_const: a range loop over a non-const QList may detach
 
@@ -292,6 +294,32 @@ class TestSettingsTable : public QObject, protected EngineStackFixture {
         settings->setFolderEndAction(static_cast<FolderEndAction>(99));
         QVERIFY(settings->folderEndAction() == FOLDER_END_NO_ACTION);
         settings->setFolderEndAction(FOLDER_END_NO_ACTION);
+    }
+
+    // Scratch space can be removed from outside this class — tmpfiles.d, a
+    // user emptying the cache — and tmpDir() must then hand back a directory
+    // that exists. It re-creates; it does not heal isolation, and this pin is
+    // about the former only.
+    //
+    // The failure mode it prevents is not "an open fails": the clipboard's
+    // edited-image export falls back to a FIXED file name when its
+    // QTemporaryFile cannot open, so two exports share one file and the second
+    // consumer reads the first's pixels (edit_save_tests has the pin for that
+    // contract).
+    void tmpDirRecreatesADirectoryRemovedUnderIt() {
+        FreshSettings fresh;
+        const QString dir = settings->tmpDir();
+        QVERIFY2(QDir(dir).exists(), "the fixture did not start with a tmp dir");
+
+        QVERIFY2(QDir(dir).removeRecursively(), "could not remove the tmp dir");
+        QVERIFY2(!QDir(dir).exists(), "the directory survived removeRecursively");
+
+        const QString again = settings->tmpDir();
+        QCOMPARE(again, dir); // the same name — a scratch dir, not a new one
+        QVERIFY2(QDir(again).exists(), "tmpDir() named a directory that does not exist");
+
+        QTemporaryFile probe(QDir(again).filePath(QStringLiteral("image-XXXXXX.png")));
+        QVERIFY2(probe.open(), qPrintable(QStringLiteral("cannot open in tmpDir: ") + probe.errorString()));
     }
 
     // the state-side list: saved paths round-trip through the state config
