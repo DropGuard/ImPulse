@@ -18,9 +18,9 @@ class SettingsSidebar : public QWidget {
     void selectEntry(int idx);
 
   private:
-    QBoxLayout *layout;
-    QList<SettingsSidebarItem *> entries;
-    Qt::Orientation orientation = Qt::Vertical;
+    QBoxLayout *m_layout;
+    QList<SettingsSidebarItem *> m_entries;
+    Qt::Orientation m_orientation = Qt::Vertical;
     void selectEntryAt(QPoint pos);
 
   signals:
@@ -41,10 +41,10 @@ class SettingsSidebarItem : public QWidget {
     bool highlighted();
 
   private:
-    QBoxLayout *layout;
-    IconWidget iconWidget;
-    QLabel textLabel;
-    bool mHighlighted = false;
+    QBoxLayout *m_layout;
+    IconWidget m_iconWidget;
+    QLabel m_textLabel;
+    bool m_highlighted = false;
 
   protected:
     void paintEvent(QPaintEvent *event) override;

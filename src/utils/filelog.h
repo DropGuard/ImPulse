@@ -37,13 +37,13 @@ class SessionLog {
     void write(const QString &line);
 
   private:
-    QFile mFile;
-    QString mBase;
-    qint64 mPartLimit;
-    int mMaxParts;
-    qint64 mBytes = 0;
-    int mPart = 1;
-    bool mStopped = false;
+    QFile m_file;
+    QString m_base;
+    qint64 m_partLimit;
+    int m_maxParts;
+    qint64 m_bytes = 0;
+    int m_part = 1;
+    bool m_stopped = false;
 };
 
 // mkpath(dir), prune to the newest 10, open the session file, write the

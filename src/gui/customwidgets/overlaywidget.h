@@ -45,10 +45,10 @@ class OverlayWidget : public FloatingWidget {
     void opacityChanged();
 
   private:
-    QGraphicsOpacityEffect *opacityEffect;
-    int mHorizontalMargin, mVerticalMargin;
-    bool fadeEnabled;
-    QPropertyAnimation *fadeAnimation;
+    QGraphicsOpacityEffect *m_opacityEffect;
+    int m_horizontalMargin, m_verticalMargin;
+    bool m_fadeEnabled;
+    QPropertyAnimation *m_fadeAnimation;
 
   private slots:
     void setOpacity(qreal opacity);
@@ -60,5 +60,5 @@ class OverlayWidget : public FloatingWidget {
     void recalculateGeometry() override;
     // a valid value from birth: recalculateGeometry() switches on this
     // before any subclass readSettings() has had its say (UBSan catch)
-    FloatingWidgetPosition position = FloatingWidgetPosition::BOTTOM;
+    FloatingWidgetPosition m_position = FloatingWidgetPosition::BOTTOM;
 };

@@ -34,11 +34,11 @@ class IconWidget : public QWidget {
     void loadIcon();
     void applyColor();
 
-    QString iconPath;
-    QColor color;
-    IconColorMode colorMode = ICON_COLOR_THEME;
-    bool hiResPixmap;
-    QPoint iconOffset;
-    QPixmap *pixmap;
-    qreal dpr, pixmapDrawScale;
+    QString m_iconPath;
+    QColor m_color;
+    IconColorMode m_colorMode = ICON_COLOR_THEME;
+    bool m_hiResPixmap;
+    QPoint m_iconOffset;
+    QPixmap *m_pixmap;
+    qreal m_dpr, m_pixmapDrawScale;
 };

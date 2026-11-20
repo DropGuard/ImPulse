@@ -1,9 +1,9 @@
 #include "documentinfo.h"
 
 DocumentInfo::DocumentInfo(QString path, const LoadPolicy &policy)
-    : mDocumentType(DocumentType::NONE), mOrientation(0), mFormat(""), exifLoaded(false) {
-    fileInfo.setFile(path);
-    if(!fileInfo.isFile()) {
+    : m_documentType(DocumentType::NONE), m_orientation(0), m_format(""), m_exifLoaded(false) {
+    m_fileInfo.setFile(path);
+    if(!m_fileInfo.isFile()) {
         qDebug() << "FileInfo: cannot open: " << path;
         return;
     }
@@ -18,104 +18,104 @@ DocumentInfo::~DocumentInfo() {
 // ##############################################################
 
 QString DocumentInfo::directoryPath() const {
-    return fileInfo.absolutePath();
+    return m_fileInfo.absolutePath();
 }
 
 QString DocumentInfo::filePath() const {
-    return fileInfo.absoluteFilePath();
+    return m_fileInfo.absoluteFilePath();
 }
 
 QString DocumentInfo::fileName() const {
-    return fileInfo.fileName();
+    return m_fileInfo.fileName();
 }
 
 QString DocumentInfo::baseName() const {
-    return fileInfo.baseName();
+    return m_fileInfo.baseName();
 }
 
 // bytes
 qint64 DocumentInfo::fileSize() const {
-    return fileInfo.size();
+    return m_fileInfo.size();
 }
 
 DocumentType DocumentInfo::type() const {
-    return mDocumentType;
+    return m_documentType;
 }
 
 QMimeType DocumentInfo::mimeType() const {
-    return mMimeType;
+    return m_mimeType;
 }
 
 QString DocumentInfo::format() const {
-    return mFormat;
+    return m_format;
 }
 
 QDateTime DocumentInfo::lastModified() const {
-    return fileInfo.lastModified();
+    return m_fileInfo.lastModified();
 }
 
 // For cases like orientation / even mimetype change we just reload
 // Image from scratch, so don`t bother handling it here
 void DocumentInfo::refresh() {
-    fileInfo.refresh();
+    m_fileInfo.refresh();
 }
 
 int DocumentInfo::exifOrientation() const {
-    return mOrientation;
+    return m_orientation;
 }
 
 // ##############################################################
 // ####################### PRIVATE METHODS ######################
 // ##############################################################
 void DocumentInfo::detectFormat(const LoadPolicy &policy) {
-    if(mDocumentType != DocumentType::NONE)
+    if(m_documentType != DocumentType::NONE)
         return;
     QMimeDatabase mimeDb;
-    mMimeType = mimeDb.mimeTypeForFile(fileInfo.filePath(), QMimeDatabase::MatchContent);
-    auto mimeName = mMimeType.name().toUtf8();
-    auto suffix = fileInfo.suffix().toLower().toUtf8();
+    m_mimeType = mimeDb.mimeTypeForFile(m_fileInfo.filePath(), QMimeDatabase::MatchContent);
+    auto mimeName = m_mimeType.name().toUtf8();
+    auto suffix = m_fileInfo.suffix().toLower().toUtf8();
     if(mimeName == "image/jpeg") {
-        mFormat = "jpg";
-        mDocumentType = DocumentType::STATIC;
+        m_format = "jpg";
+        m_documentType = DocumentType::STATIC;
     } else if(mimeName == "image/png") {
         if(QImageReader::supportedImageFormats().contains("apng") && detectAPNG()) {
-            mFormat = "apng";
-            mDocumentType = DocumentType::ANIMATED;
+            m_format = "apng";
+            m_documentType = DocumentType::ANIMATED;
         } else {
-            mFormat = "png";
-            mDocumentType = DocumentType::STATIC;
+            m_format = "png";
+            m_documentType = DocumentType::STATIC;
         }
     } else if(mimeName == "image/gif") {
-        mFormat = "gif";
-        mDocumentType = DocumentType::ANIMATED;
+        m_format = "gif";
+        m_documentType = DocumentType::ANIMATED;
     } else if(mimeName == "image/webp" || (mimeName == "audio/x-riff" && suffix == "webp")) {
-        mFormat = "webp";
-        mDocumentType = detectAnimatedWebP() ? DocumentType::ANIMATED : DocumentType::STATIC;
+        m_format = "webp";
+        m_documentType = detectAnimatedWebP() ? DocumentType::ANIMATED : DocumentType::STATIC;
     } else if(mimeName == "image/jxl") {
-        mFormat = "jxl";
-        mDocumentType = detectAnimatedJxl() ? DocumentType::ANIMATED : DocumentType::STATIC;
-        if(mDocumentType == DocumentType::ANIMATED && !policy.jxlAnimation) {
-            mDocumentType = DocumentType::NONE;
+        m_format = "jxl";
+        m_documentType = detectAnimatedJxl() ? DocumentType::ANIMATED : DocumentType::STATIC;
+        if(m_documentType == DocumentType::ANIMATED && !policy.jxlAnimation) {
+            m_documentType = DocumentType::NONE;
             qDebug() << "animated jxl is off; skipping file";
         }
     } else if(mimeName == "image/avif") {
-        mFormat = "avif";
-        mDocumentType = detectAnimatedAvif() ? DocumentType::ANIMATED : DocumentType::STATIC;
+        m_format = "avif";
+        m_documentType = detectAnimatedAvif() ? DocumentType::ANIMATED : DocumentType::STATIC;
     } else if(mimeName == "image/bmp") {
-        mFormat = "bmp";
-        mDocumentType = DocumentType::STATIC;
+        m_format = "bmp";
+        m_documentType = DocumentType::STATIC;
     } else if(policy.videoPlayback && policy.videoFormats.contains(mimeName)) {
-        mDocumentType = DocumentType::VIDEO;
-        mFormat = policy.videoFormats.value(mimeName);
+        m_documentType = DocumentType::VIDEO;
+        m_format = policy.videoFormats.value(mimeName);
     } else {
         // just try to open via suffix if all of the above fails
-        mFormat = suffix;
-        if(mFormat.compare("jfif", Qt::CaseInsensitive) == 0)
-            mFormat = "jpg";
+        m_format = suffix;
+        if(m_format.compare("jfif", Qt::CaseInsensitive) == 0)
+            m_format = "jpg";
         if(policy.videoPlayback && policy.videoFormats.values().contains(suffix))
-            mDocumentType = DocumentType::VIDEO;
+            m_documentType = DocumentType::VIDEO;
         else
-            mDocumentType = DocumentType::STATIC;
+            m_documentType = DocumentType::STATIC;
     }
     loadExifOrientation();
 }
@@ -123,7 +123,7 @@ void DocumentInfo::detectFormat(const LoadPolicy &policy) {
 inline
     // dumb apng detector
     bool DocumentInfo::detectAPNG() {
-    QFile f(fileInfo.filePath());
+    QFile f(m_fileInfo.filePath());
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         const int len = 120;
@@ -136,7 +136,7 @@ inline
 }
 
 bool DocumentInfo::detectAnimatedWebP() {
-    QFile f(fileInfo.filePath());
+    QFile f(m_fileInfo.filePath());
     bool result = false;
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
@@ -159,12 +159,12 @@ bool DocumentInfo::detectAnimatedWebP() {
 
 // TODO avoid creating multiple QImageReader instances
 bool DocumentInfo::detectAnimatedJxl() {
-    QImageReader r(fileInfo.filePath(), "jxl");
+    QImageReader r(m_fileInfo.filePath(), "jxl");
     return r.supportsAnimation();
 }
 
 bool DocumentInfo::detectAnimatedAvif() {
-    QFile f(fileInfo.filePath());
+    QFile f(m_fileInfo.filePath());
     bool result = false;
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
@@ -181,10 +181,10 @@ bool DocumentInfo::detectAnimatedAvif() {
 }
 
 void DocumentInfo::loadExifTags() {
-    if(exifLoaded)
+    if(m_exifLoaded)
         return;
-    exifLoaded = true;
-    exifTags.clear();
+    m_exifLoaded = true;
+    m_exifTags.clear();
 #ifdef USE_EXIV2
     try {
         std::unique_ptr<Exiv2::Image> image;
@@ -193,7 +193,7 @@ void DocumentInfo::loadExifTags() {
         // the UTF-8 narrow string (wide paths are converted internally), which
         // is exactly QString::toStdString — the old wide-char helper would
         // find no matching open() here
-        image = Exiv2::ImageFactory::open(fileInfo.filePath().toStdString());
+        image = Exiv2::ImageFactory::open(m_fileInfo.filePath().toStdString());
 
         assert(image.get() != 0);
         image->readMetadata();
@@ -215,25 +215,25 @@ void DocumentInfo::loadExifTags() {
 
         it = exifData.findKey(make);
         if(it != exifData.end() /* && it->count() */)
-            exifTags.insert(QObject::tr("Make"), QString::fromStdString(it->value().toString()));
+            m_exifTags.insert(QObject::tr("Make"), QString::fromStdString(it->value().toString()));
 
         it = exifData.findKey(model);
         if(it != exifData.end())
-            exifTags.insert(QObject::tr("Model"), QString::fromStdString(it->value().toString()));
+            m_exifTags.insert(QObject::tr("Model"), QString::fromStdString(it->value().toString()));
 
         it = exifData.findKey(dateTime);
         if(it != exifData.end())
-            exifTags.insert(QObject::tr("Date/Time"), QString::fromStdString(it->value().toString()));
+            m_exifTags.insert(QObject::tr("Date/Time"), QString::fromStdString(it->value().toString()));
 
         it = exifData.findKey(exposureTime);
         if(it != exifData.end()) {
             Exiv2::Rational r = it->toRational();
             if(r.first < r.second) {
                 qreal exp = round(static_cast<qreal>(r.second) / r.first);
-                exifTags.insert(QObject::tr("ExposureTime"), "1/" + QString::number(exp) + QObject::tr(" sec"));
+                m_exifTags.insert(QObject::tr("ExposureTime"), "1/" + QString::number(exp) + QObject::tr(" sec"));
             } else {
                 qreal exp = round(static_cast<qreal>(r.first) / r.second);
-                exifTags.insert(QObject::tr("ExposureTime"), QString::number(exp) + QObject::tr(" sec"));
+                m_exifTags.insert(QObject::tr("ExposureTime"), QString::number(exp) + QObject::tr(" sec"));
             }
         }
 
@@ -241,22 +241,22 @@ void DocumentInfo::loadExifTags() {
         if(it != exifData.end()) {
             Exiv2::Rational r = it->toRational();
             qreal fn = static_cast<qreal>(r.first) / r.second;
-            exifTags.insert(QObject::tr("F Number"), "f/" + QString::number(fn, 'g', 3));
+            m_exifTags.insert(QObject::tr("F Number"), "f/" + QString::number(fn, 'g', 3));
         }
 
         it = exifData.findKey(isoSpeedRatings);
         if(it != exifData.end())
-            exifTags.insert(QObject::tr("ISO Speed ratings"), QString::fromStdString(it->value().toString()));
+            m_exifTags.insert(QObject::tr("ISO Speed ratings"), QString::fromStdString(it->value().toString()));
 
         it = exifData.findKey(flash);
         if(it != exifData.end())
-            exifTags.insert(QObject::tr("Flash"), QString::fromStdString(it->value().toString()));
+            m_exifTags.insert(QObject::tr("Flash"), QString::fromStdString(it->value().toString()));
 
         it = exifData.findKey(focalLength);
         if(it != exifData.end()) {
             Exiv2::Rational r = it->toRational();
             qreal fn = static_cast<qreal>(r.first) / r.second;
-            exifTags.insert(QObject::tr("Focal Length"), QString::number(fn, 'g', 3) + QObject::tr(" mm"));
+            m_exifTags.insert(QObject::tr("Focal Length"), QString::number(fn, 'g', 3) + QObject::tr(" mm"));
         }
 
         it = exifData.findKey(userComment);
@@ -265,7 +265,7 @@ void DocumentInfo::loadExifTags() {
             auto comment = QString::fromStdString(it->value().toString());
             if(comment.startsWith("charset="))
                 comment.remove(0, comment.indexOf(" ") + 1);
-            exifTags.insert(QObject::tr("UserComment"), comment);
+            m_exifTags.insert(QObject::tr("UserComment"), comment);
         }
     }
 
@@ -292,23 +292,23 @@ void DocumentInfo::loadExifTags() {
 }
 
 QMap<QString, QString> DocumentInfo::getExifTags() {
-    if(!exifLoaded)
+    if(!m_exifLoaded)
         loadExifTags();
-    return exifTags;
+    return m_exifTags;
 }
 
 void DocumentInfo::loadExifOrientation() {
-    if(mDocumentType == DocumentType::VIDEO || mDocumentType == DocumentType::NONE)
+    if(m_documentType == DocumentType::VIDEO || m_documentType == DocumentType::NONE)
         return;
 
     QString path = filePath();
     QImageReader *reader = nullptr;
-    if(!mFormat.isEmpty())
-        reader = new QImageReader(path, mFormat.toStdString().c_str());
+    if(!m_format.isEmpty())
+        reader = new QImageReader(path, m_format.toStdString().c_str());
     else
         reader = new QImageReader(path);
 
     if(reader->canRead())
-        mOrientation = static_cast<int>(reader->transformation());
+        m_orientation = static_cast<int>(reader->transformation());
     delete reader;
 }

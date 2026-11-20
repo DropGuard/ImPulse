@@ -34,41 +34,41 @@ void SettingsDialog::readColorScheme() {
 
 void SettingsDialog::setColorScheme(ColorScheme colors) {
     switch(colors.tid) {
-    case COLORS_LIGHT: ui->themeSelectorComboBox->setCurrentIndex(3); break;
-    case COLORS_BLACK: ui->themeSelectorComboBox->setCurrentIndex(0); break;
-    case COLORS_DARK: ui->themeSelectorComboBox->setCurrentIndex(1); break;
-    case COLORS_DARKBLUE: ui->themeSelectorComboBox->setCurrentIndex(2); break;
-    default: ui->themeSelectorComboBox->setCurrentIndex(-1); break;
+    case COLORS_LIGHT: m_ui->themeSelectorComboBox->setCurrentIndex(3); break;
+    case COLORS_BLACK: m_ui->themeSelectorComboBox->setCurrentIndex(0); break;
+    case COLORS_DARK: m_ui->themeSelectorComboBox->setCurrentIndex(1); break;
+    case COLORS_DARKBLUE: m_ui->themeSelectorComboBox->setCurrentIndex(2); break;
+    default: m_ui->themeSelectorComboBox->setCurrentIndex(-1); break;
     }
-    ui->colorSelectorAccent->setColor(colors.accent);
-    ui->colorSelectorBackground->setColor(colors.background);
-    ui->colorSelectorFullscreen->setColor(colors.background_fullscreen);
-    ui->colorSelectorFolderview->setColor(colors.folderview);
-    ui->colorSelectorFolderviewPanel->setColor(colors.folderview_topbar);
-    ui->colorSelectorText->setColor(colors.text);
-    ui->colorSelectorIcons->setColor(colors.icons);
-    ui->colorSelectorWidget->setColor(colors.widget);
-    ui->colorSelectorWidgetBorder->setColor(colors.widget_border);
-    ui->colorSelectorOverlay->setColor(colors.overlay);
-    ui->colorSelectorOverlayText->setColor(colors.overlay_text);
-    ui->colorSelectorScrollbar->setColor(colors.scrollbar);
+    m_ui->colorSelectorAccent->setColor(colors.accent);
+    m_ui->colorSelectorBackground->setColor(colors.background);
+    m_ui->colorSelectorFullscreen->setColor(colors.background_fullscreen);
+    m_ui->colorSelectorFolderview->setColor(colors.folderview);
+    m_ui->colorSelectorFolderviewPanel->setColor(colors.folderview_topbar);
+    m_ui->colorSelectorText->setColor(colors.text);
+    m_ui->colorSelectorIcons->setColor(colors.icons);
+    m_ui->colorSelectorWidget->setColor(colors.widget);
+    m_ui->colorSelectorWidgetBorder->setColor(colors.widget_border);
+    m_ui->colorSelectorOverlay->setColor(colors.overlay);
+    m_ui->colorSelectorOverlayText->setColor(colors.overlay_text);
+    m_ui->colorSelectorScrollbar->setColor(colors.scrollbar);
 }
 
 //------------------------------------------------------------------------------
 void SettingsDialog::saveColorScheme() {
     BaseColorScheme base;
-    base.accent = ui->colorSelectorAccent->color();
-    base.background = ui->colorSelectorBackground->color();
-    base.background_fullscreen = ui->colorSelectorFullscreen->color();
-    base.folderview = ui->colorSelectorFolderview->color();
-    base.folderview_topbar = ui->colorSelectorFolderviewPanel->color();
-    base.text = ui->colorSelectorText->color();
-    base.icons = ui->colorSelectorIcons->color();
-    base.widget = ui->colorSelectorWidget->color();
-    base.widget_border = ui->colorSelectorWidgetBorder->color();
-    base.overlay = ui->colorSelectorOverlay->color();
-    base.overlay_text = ui->colorSelectorOverlayText->color();
-    base.scrollbar = ui->colorSelectorScrollbar->color();
+    base.accent = m_ui->colorSelectorAccent->color();
+    base.background = m_ui->colorSelectorBackground->color();
+    base.background_fullscreen = m_ui->colorSelectorFullscreen->color();
+    base.folderview = m_ui->colorSelectorFolderview->color();
+    base.folderview_topbar = m_ui->colorSelectorFolderviewPanel->color();
+    base.text = m_ui->colorSelectorText->color();
+    base.icons = m_ui->colorSelectorIcons->color();
+    base.widget = m_ui->colorSelectorWidget->color();
+    base.widget_border = m_ui->colorSelectorWidgetBorder->color();
+    base.overlay = m_ui->colorSelectorOverlay->color();
+    base.overlay_text = m_ui->colorSelectorOverlayText->color();
+    base.scrollbar = m_ui->colorSelectorScrollbar->color();
     base.tid = settings->colorScheme().tid;
     settings->setColorScheme(ColorScheme(base));
 }
@@ -77,9 +77,9 @@ void SettingsDialog::saveColorScheme() {
 // by a header row stating when the scope is live. Inside a section rows are
 // sorted by action name — auto-sort stays off, it would shred the sections.
 void SettingsDialog::readShortcuts() {
-    ui->shortcutsTableWidget->clearContents();
-    ui->shortcutsTableWidget->setRowCount(0);
-    ui->shortcutsTableWidget->setSortingEnabled(false);
+    m_ui->shortcutsTableWidget->clearContents();
+    m_ui->shortcutsTableWidget->setRowCount(0);
+    m_ui->shortcutsTableWidget->setSortingEnabled(false);
 
     // one section per scope, in kAllScopes order — the section title and the
     // table it saves into are the same Scope, so a fifth scope renders and
@@ -103,7 +103,7 @@ void SettingsDialog::readShortcuts() {
 
 //------------------------------------------------------------------------------
 void SettingsDialog::readScripts() {
-    ui->scriptsListWidget->clear();
+    m_ui->scriptsListWidget->clear();
     const QMap<QString, Script> scripts = scriptManager->allScripts();
     QMapIterator<QString, Script> i(scripts);
     while(i.hasNext()) {
@@ -117,10 +117,10 @@ void SettingsDialog::addScriptToList(const QString &name) {
     if(name.isEmpty())
         return;
 
-    QListWidget *list = ui->scriptsListWidget;
+    QListWidget *list = m_ui->scriptsListWidget;
     QListWidgetItem *nameItem = new QListWidgetItem(name);
     nameItem->setTextAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    list->insertItem(ui->scriptsListWidget->count(), nameItem);
+    list->insertItem(m_ui->scriptsListWidget->count(), nameItem);
     list->sortItems(Qt::AscendingOrder);
 }
 //------------------------------------------------------------------------------
@@ -135,9 +135,9 @@ void SettingsDialog::addScript() {
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::editScript() {
-    int row = ui->scriptsListWidget->currentRow();
+    int row = m_ui->scriptsListWidget->currentRow();
     if(row >= 0) {
-        QString name = ui->scriptsListWidget->currentItem()->text();
+        QString name = m_ui->scriptsListWidget->currentItem()->text();
         editScript(name);
     }
 }
@@ -159,10 +159,10 @@ void SettingsDialog::editScript(const QString &name) {
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::removeScript() {
-    int row = ui->scriptsListWidget->currentRow();
+    int row = m_ui->scriptsListWidget->currentRow();
     if(row >= 0) {
-        QString scriptName = ui->scriptsListWidget->currentItem()->text();
-        delete ui->scriptsListWidget->takeItem(row);
+        QString scriptName = m_ui->scriptsListWidget->currentItem()->text();
+        delete m_ui->scriptsListWidget->takeItem(row);
         saveShortcuts();
         // every table, through one door. The three hand-written calls this
         // replaces had already forgotten the DOCUMENT table — a script bound
@@ -183,15 +183,15 @@ void SettingsDialog::addShortcutToTable(const QString &action, const QString &sh
     if(action.isEmpty() || shortcut.isEmpty())
         return;
 
-    ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
+    m_ui->shortcutsTableWidget->setRowCount(m_ui->shortcutsTableWidget->rowCount() + 1);
     QTableWidgetItem *actionItem = new QTableWidgetItem(actionDisplayName(action));
     actionItem->setToolTip(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
     actionItem->setData(Qt::UserRole, scopeTag(scope)); // which table this row saves into
-    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
+    m_ui->shortcutsTableWidget->setItem(m_ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
     QTableWidgetItem *shortcutItem = new QTableWidgetItem(shortcut);
     shortcutItem->setTextAlignment(Qt::AlignCenter);
-    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
+    m_ui->shortcutsTableWidget->setItem(m_ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
 }
 
 // an unbound action: registered and wired, but carrying no key anywhere.
@@ -200,17 +200,17 @@ void SettingsDialog::addShortcutToTable(const QString &action, const QString &sh
 // editing the row binds into the section it sits in — placement IS the
 // destination, the same "section = table" rule every bound row follows.
 void SettingsDialog::addUnboundActionRow(const QString &action, Scope scope) {
-    ui->shortcutsTableWidget->setRowCount(ui->shortcutsTableWidget->rowCount() + 1);
+    m_ui->shortcutsTableWidget->setRowCount(m_ui->shortcutsTableWidget->rowCount() + 1);
     QTableWidgetItem *actionItem = new QTableWidgetItem(actionDisplayName(action));
     actionItem->setToolTip(action);
     actionItem->setTextAlignment(Qt::AlignCenter);
     actionItem->setData(Qt::UserRole, scopeTag(scope));
     actionItem->setForeground(QBrush(Qt::gray));
-    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
+    m_ui->shortcutsTableWidget->setItem(m_ui->shortcutsTableWidget->rowCount() - 1, 0, actionItem);
     QTableWidgetItem *shortcutItem = new QTableWidgetItem();
     shortcutItem->setTextAlignment(Qt::AlignCenter);
     shortcutItem->setForeground(QBrush(Qt::gray));
-    ui->shortcutsTableWidget->setItem(ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
+    m_ui->shortcutsTableWidget->setItem(m_ui->shortcutsTableWidget->rowCount() - 1, 1, shortcutItem);
 }
 
 // The actions no table claims, offered at the bottom of the section their home
@@ -256,22 +256,22 @@ QString SettingsDialog::sectionTitle(Scope scope) const {
 
 // a scenario opener, not a binding: no scope tag, so every sweep skips it
 void SettingsDialog::addSectionHeader(const QString &title) {
-    const int row = ui->shortcutsTableWidget->rowCount();
-    ui->shortcutsTableWidget->setRowCount(row + 1);
+    const int row = m_ui->shortcutsTableWidget->rowCount();
+    m_ui->shortcutsTableWidget->setRowCount(row + 1);
     QTableWidgetItem *header = new QTableWidgetItem(title);
     QFont bold = header->font();
     bold.setBold(true);
     header->setFont(bold);
     header->setFlags(Qt::ItemIsEnabled);
-    ui->shortcutsTableWidget->setItem(row, 0, header);
-    ui->shortcutsTableWidget->setSpan(row, 0, 1, 2);
+    m_ui->shortcutsTableWidget->setItem(row, 0, header);
+    m_ui->shortcutsTableWidget->setSpan(row, 0, 1, 2);
 }
 
 // The action a row stands for, by its stable registry name. The visible cell
 // is the display name (and a translated UI can change it), so every reader
 // that feeds a table or a dialog asks this, never the cell's text.
 QString SettingsDialog::rowAction(int row) const {
-    QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(row, 0);
+    QTableWidgetItem *actionItem = m_ui->shortcutsTableWidget->item(row, 0);
     if(!actionItem)
         return QString();
     return actionItem->toolTip();
@@ -290,7 +290,7 @@ QString SettingsDialog::actionDisplayName(const QString &action) const {
 // the scope a row belongs to. False for the section headers (no tag), which
 // is the "a header is prose, not a binding" rule every sweep rests on.
 bool SettingsDialog::rowScope(int row, Scope &out) const {
-    QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(row, 0);
+    QTableWidgetItem *actionItem = m_ui->shortcutsTableWidget->item(row, 0);
     if(!actionItem)
         return false;
     const QString tag = actionItem->data(Qt::UserRole).toString();
@@ -306,9 +306,9 @@ bool SettingsDialog::rowScope(int row, Scope &out) const {
 // where a freshly added binding lands: the section the user is looking at —
 // a header row or no selection means the global table
 Scope SettingsDialog::selectedScope() const {
-    const int row = ui->shortcutsTableWidget->currentRow();
+    const int row = m_ui->shortcutsTableWidget->currentRow();
     Scope scope = Scope::Global;
-    if(row >= 0 && row < ui->shortcutsTableWidget->rowCount() && rowScope(row, scope))
+    if(row >= 0 && row < m_ui->shortcutsTableWidget->rowCount() && rowScope(row, scope))
         return scope;
     return Scope::Global;
 }
@@ -326,8 +326,8 @@ void SettingsDialog::addShortcut() {
     // same key, same scope: a replacement. The same key in ANOTHER scope is
     // the whole point of scopes and survives. Rows shift on removal, so the
     // sweep re-examines the index it just removed at.
-    for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
-        QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
+    for(int i = 0; i < m_ui->shortcutsTableWidget->rowCount(); i++) {
+        QTableWidgetItem *shortcutItem = m_ui->shortcutsTableWidget->item(i, 1);
         Scope rowScopeValue = Scope::Global;
         if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i, rowScopeValue) &&
            rowScopeValue == scope)
@@ -335,24 +335,24 @@ void SettingsDialog::addShortcut() {
     }
     addShortcutToTable(w.selectedAction(), w.selectedShortcut(), scope);
     // select
-    auto items = ui->shortcutsTableWidget->findItems(w.selectedShortcut(), Qt::MatchExactly);
+    auto items = m_ui->shortcutsTableWidget->findItems(w.selectedShortcut(), Qt::MatchExactly);
     if(items.count()) {
-        int newRow = ui->shortcutsTableWidget->row(items.at(0));
-        ui->shortcutsTableWidget->selectRow(newRow);
+        int newRow = m_ui->shortcutsTableWidget->row(items.at(0));
+        m_ui->shortcutsTableWidget->selectRow(newRow);
     }
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::removeShortcutAt(int row) {
-    if(row < 0 || row >= ui->shortcutsTableWidget->rowCount())
+    if(row < 0 || row >= m_ui->shortcutsTableWidget->rowCount())
         return;
     Scope ignored;
     if(!rowScope(row, ignored))
         return; // a section header is not a binding
-    ui->shortcutsTableWidget->removeRow(row);
+    m_ui->shortcutsTableWidget->removeRow(row);
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::editShortcut(int row) {
-    if(row < 0 || row >= ui->shortcutsTableWidget->rowCount())
+    if(row < 0 || row >= m_ui->shortcutsTableWidget->rowCount())
         return;
     Scope scope = Scope::Global;
     if(!rowScope(row, scope))
@@ -360,7 +360,7 @@ void SettingsDialog::editShortcut(int row) {
     ShortcutCreatorDialog w;
     w.setWindowTitle(tr("Edit shortcut"));
     w.setAction(rowAction(row));
-    w.setShortcut(ui->shortcutsTableWidget->item(row, 1)->text());
+    w.setShortcut(m_ui->shortcutsTableWidget->item(row, 1)->text());
     if(!w.exec())
         return;
     if(!ShortcutCreatorDialog::confirmRebinding(w.selectedAction(), this))
@@ -368,8 +368,8 @@ void SettingsDialog::editShortcut(int row) {
     // remove itself
     removeShortcutAt(row);
     // remove anything we are replacing in the same scope
-    for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
-        QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
+    for(int i = 0; i < m_ui->shortcutsTableWidget->rowCount(); i++) {
+        QTableWidgetItem *shortcutItem = m_ui->shortcutsTableWidget->item(i, 1);
         Scope rowScopeValue = Scope::Global;
         if(shortcutItem && shortcutItem->text() == w.selectedShortcut() && rowScope(i, rowScopeValue) &&
            rowScopeValue == scope)
@@ -378,19 +378,19 @@ void SettingsDialog::editShortcut(int row) {
     // re-add
     addShortcutToTable(w.selectedAction(), w.selectedShortcut(), scope);
     // re-select
-    auto items = ui->shortcutsTableWidget->findItems(w.selectedShortcut(), Qt::MatchExactly);
+    auto items = m_ui->shortcutsTableWidget->findItems(w.selectedShortcut(), Qt::MatchExactly);
     if(items.count()) {
-        int newRow = ui->shortcutsTableWidget->row(items.at(0));
-        ui->shortcutsTableWidget->selectRow(newRow);
+        int newRow = m_ui->shortcutsTableWidget->row(items.at(0));
+        m_ui->shortcutsTableWidget->selectRow(newRow);
     }
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::editShortcut() {
-    editShortcut(ui->shortcutsTableWidget->currentRow());
+    editShortcut(m_ui->shortcutsTableWidget->currentRow());
 }
 //------------------------------------------------------------------------------
 void SettingsDialog::removeShortcut() {
-    removeShortcutAt(ui->shortcutsTableWidget->currentRow());
+    removeShortcutAt(m_ui->shortcutsTableWidget->currentRow());
 }
 //------------------------------------------------------------------------------
 // Each row saves into the table its section stands for; headers carry no
@@ -407,9 +407,9 @@ void SettingsDialog::saveShortcuts() {
     // must hold across the dialog's save/close cycle.)
     for(Scope scope : kAllScopes)
         actionManager->removeAllShortcuts(scope);
-    for(int i = 0; i < ui->shortcutsTableWidget->rowCount(); i++) {
-        QTableWidgetItem *actionItem = ui->shortcutsTableWidget->item(i, 0);
-        QTableWidgetItem *shortcutItem = ui->shortcutsTableWidget->item(i, 1);
+    for(int i = 0; i < m_ui->shortcutsTableWidget->rowCount(); i++) {
+        QTableWidgetItem *actionItem = m_ui->shortcutsTableWidget->item(i, 0);
+        QTableWidgetItem *shortcutItem = m_ui->shortcutsTableWidget->item(i, 1);
         if(!actionItem || !shortcutItem)
             continue; // a header spans column 0 and has no shortcut twin
         Scope scope = Scope::Global;

@@ -165,37 +165,37 @@ void Settings::loadTheme() {
         setColorScheme(ThemeStore::colorScheme(ColorSchemes::COLORS_SYSTEM));
     } else {
         BaseColorScheme base;
-        themeConf->beginGroup("Colors");
+        m_themeConf->beginGroup("Colors");
         for(const ThemeColorDesc &row : kThemeColors) {
-            QColor c(themeConf->value(row.key, row.def).toString());
+            QColor c(m_themeConf->value(row.key, row.def).toString());
             if(!c.isValid())
                 c = QColor(row.def); // junk from a hand-edited theme file
             base.*row.base = c;
         }
-        base.tid = themeConf->value("tid", "-1").toInt();
-        themeConf->endGroup();
+        base.tid = m_themeConf->value("tid", "-1").toInt();
+        m_themeConf->endGroup();
         setColorScheme(ColorScheme(base));
     }
 }
 void Settings::saveTheme() {
     if(useSystemColorScheme())
         return;
-    themeConf->beginGroup("Colors");
+    m_themeConf->beginGroup("Colors");
     for(const ThemeColorDesc &row : kThemeColors)
-        themeConf->setValue(row.key, (mColorScheme.*row.scheme).name());
-    themeConf->setValue("tid", mColorScheme.tid);
-    themeConf->endGroup();
+        m_themeConf->setValue(row.key, (m_colorScheme.*row.scheme).name());
+    m_themeConf->setValue("tid", m_colorScheme.tid);
+    m_themeConf->endGroup();
 }
 //------------------------------------------------------------------------------
 const ColorScheme &Settings::colorScheme() {
-    return mColorScheme;
+    return m_colorScheme;
 }
 //------------------------------------------------------------------------------
 void Settings::setColorScheme(ColorScheme scheme) {
-    mColorScheme = scheme;
+    m_colorScheme = scheme;
     loadStylesheet();
 }
 //------------------------------------------------------------------------------
 void Settings::setColorTid(int tid) {
-    mColorScheme.tid = tid;
+    m_colorScheme.tid = tid;
 }

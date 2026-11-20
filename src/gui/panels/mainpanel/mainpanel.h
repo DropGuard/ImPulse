@@ -25,10 +25,10 @@ class MainPanel : public SlidePanel {
     void onPinClicked();
 
   private:
-    QVBoxLayout *buttonsLayout = nullptr;
-    QWidget buttonsWidget;
-    ThumbnailStripProxy *thumbnailStrip = nullptr;
-    ActionButton *openButton, *settingsButton, *exitButton, *folderViewButton, *pinButton;
+    QVBoxLayout *m_buttonsLayout = nullptr;
+    QWidget m_buttonsWidget;
+    ThumbnailStripProxy *m_thumbnailStrip = nullptr;
+    ActionButton *m_openButton, *m_settingsButton, *m_exitButton, *m_folderViewButton, *m_pinButton;
 
   protected:
     void paintEvent(QPaintEvent *event) override;
