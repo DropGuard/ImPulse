@@ -20,10 +20,6 @@
 
 #include "qimgv_engine.h"
 
-#ifdef __APPLE__
-#include "macosapplication.h"
-#endif
-
 //------------------------------------------------------------------------------
 void saveSettings() {
     delete settings;
@@ -57,16 +53,9 @@ int main(int argc, char *argv[]) {
     //qDebug() << qgetenv("QT_SCREEN_SCALE_FACTORS");
     //qDebug() << qgetenv("QT_ENABLE_HIGHDPI_SCALING");
 
-#ifdef __APPLE__
-    MacOSApplication a(argc, argv);
-    // default to "fusion" if available ("macos" has layout bugs, weird comboboxes etc)
-    if(QStyleFactory::keys().contains("Fusion"))
-        a.setStyle(QStyleFactory::create("Fusion"));
-#else
     QApplication a(argc, argv);
     // use some style workarounds
     a.setStyle(new ProxyStyle);
-#endif
 
     QCoreApplication::setOrganizationName("ImPulse");
     QCoreApplication::setOrganizationDomain("github.com/DropGuard/ImPulse");
@@ -140,10 +129,6 @@ int main(int argc, char *argv[]) {
     // -----------------------------------------------------------------------------
 
     Core core;
-
-#ifdef __APPLE__
-    QObject::connect(&a, &MacOSApplication::fileOpened, &core, &Core::loadPath);
-#endif
 
     if(parser.positionalArguments().count())
         core.loadPath(parser.positionalArguments().at(0));

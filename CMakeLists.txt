@@ -34,7 +34,7 @@ option(VIDEO_SUPPORT "Enable video support" ON)
 option(OPENCV_SUPPORT "Enable HQ scaling via OpenCV" ON)
 option(KDE_SUPPORT "Support blur when using KDE" OFF)
 
-if(UNIX AND NOT APPLE)
+if(UNIX)
     set(QT_EXTERN_PATH "" CACHE STRING "Tell compile external QT path, example: (/opt/Qt/6.2.0/gcc_64)")
     string(COMPARE EQUAL "${QT_EXTERN_PATH}" "" result)
     if (NOT result)

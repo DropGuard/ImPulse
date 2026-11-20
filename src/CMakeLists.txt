@@ -2,11 +2,6 @@ include(GNUInstallDirs)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-if(APPLE)
-    set(APPLE_ICON_NAME "qimgv.icns")
-    set(APPLE_ICON_PATH "distrib/${APPLE_ICON_NAME}")
-endif()
-
 # TRANSLATIONS
 find_package(Qt6 COMPONENTS LinguistTools)
 # Example of creating a new translation file.
@@ -32,9 +27,7 @@ set_source_files_properties(${TS_FILES} PROPERTIES OUTPUT_LOCATION ${PROJECT_BIN
 # hand-copied list of source files.
 add_executable(qimgv
     main.cpp
-    macosapplication.cpp
     qimgv.rc
-    ${APPLE_ICON_PATH}
     ${QM_FILES}
 )
 
@@ -182,18 +175,8 @@ if(WIN32) # Check if we are on Windows
     else()
         message(SEND_ERROR "You are using an unsupported Windows compiler! (Not MSVC or GCC)")
     endif(MSVC)
-elseif(APPLE)
-    set_target_properties(qimgv PROPERTIES
-        MACOSX_BUNDLE YES
-        MACOSX_BUNDLE_BUNDLE_NAME "qimgv"
-        MACOSX_BUNDLE_BUNDLE_VERSION "1.0.2"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.2"
-        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/distrib/MyBundleInfo.plist.in
-        MACOSX_BUNDLE_ICON_FILE ${APPLE_ICON_NAME}
-    )
-    set_source_files_properties(${APPLE_ICON_PATH} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 elseif(NOT UNIX)
-    message(SEND_ERROR "You are on an unsupported platform! (Not Win32, Mac OS X or Unix)")
+    message(SEND_ERROR "You are on an unsupported platform! (Not Win32 or Unix)")
 endif()
 
 ## INSTALLATION

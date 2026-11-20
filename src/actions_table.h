@@ -22,9 +22,8 @@
 //    "Ctrl"/"Alt"/"Shift" (inputmap.cpp), and the platform-name assertion in
 //    shortcut_scope_tests pins exactly that. If a platform ever answers
 //    different names, that test fails BY NAME instead of the table silently
-//    describing keys nobody can press. (The __APPLE__ branch initDefaults
-//    used to carry is not represented: it was unobservable here, and an
-//    unobservable branch is not a design constraint.)
+//    describing keys nobody can press. The tree has two built platforms —
+//    Linux and Windows — and both answer the same names.
 //  - the defaults are a second, flat table keyed by (action, scope, token)
 //    rather than a field on the row, because a binding's scope and an
 //    action's home scope are different facts: contextMenu's home is Global
