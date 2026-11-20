@@ -544,71 +544,56 @@ else:
                                     "binding into the scope that owns it")
 scanned['R12c'] = scanned.get('R12c', 0) + 1
 
-# Rule 13: the unit-harness protocol is closed. slot_harness re-spawns the
-# executable once per unit on Windows (there is no fork to lean on), so every
-# suite main that calls the harness must dispatch its own children, and the
-# harness must carry its safety halves — or one suite run multiplies into a
-# self-relaunching process tree. That shape shipped once: engine_stack's child
-# path read a routing environment variable while the spawn wrote a different
-# channel, so every spawned child re-entered the harness and re-spawned
-# (bounded only by crashes), and the tree ate the machine overnight
-# (2026-11-16). Four greppable halves:
-#   a) every harness user dispatches its child itself (an argc>1 branch — the
-#      unit label rides argv[1], the only channel);
-#   b) the Windows spawn applies a child environment carrying the marker;
-#   c) the harness refuses to run inside a spawned child — the re-entry guard —
-#      so the next protocol break is a loud red instead of a fork bomb;
-#   d) the dead routing variable stays dead: nothing sets it, so any reader is
-#      a half-rebuilt protocol and fails by name.
-HARNESS = os.path.join(ROOT, 'qimgv/tests/slot_harness.h')
-if not os.path.exists(HARNESS):
-    failures.append(f"R13 cannot run: the harness moved ({HARNESS}) — update this "
-                    "rule, do not let it scan nothing")
-harness_text = text_of(HARNESS) if os.path.exists(HARNESS) else ""
-scanned['R13'] = scanned.get('R13', 0) + 1
+# Rule 13: no suite spawns itself. The per-unit process isolation the hand-
+# written slot_harness used to provide (QProcess re-launching the suite once per
+# unit, plus a re-entry guard against the 2026-11-16 fork bomb) is now the test
+# framework's: gtest_discover_tests registers every TEST_F as its own ctest
+# entry, so each test function already gets a private process — and with it a
+# private TSan thread registry, the reason the harness existed at all.
+#
+# The failure mode the old harness guarded against is not gone, it changed
+# owner: a suite that relaunches its own executable from inside a test re-enters
+# that test and spawns again, unbounded. GoogleTest never does that on its own,
+# so the rule is a plain absence check on the one thing that can re-enter a
+# test — QCoreApplication::applicationFilePath, the suite's own binary.
+# QProcess itself stays legal: thumbnailer_tests starts `sleep`/`ping` to pin
+# waitForProcess against a real child.
 for path, rel in sources():
-    if not rel.startswith('tests/') or rel == 'tests/slot_harness.h':
+    if not rel.startswith('tests/'):
         continue
     text = text_of(path)
-    if 'run_units_one_process_each' not in text:
+    if 'applicationFilePath' not in text:
         continue
     scanned['R13'] = scanned.get('R13', 0) + 1
-    if 'argc > 1' not in text:
-        failures.append(f"R13 harness protocol: {rel} calls run_units_one_process_each "
-                        "but its main has no argc>1 child dispatch — without one, every "
-                        "spawned child re-enters the harness and re-spawns (the "
-                        "2026-11-16 fork bomb)")
-    if 'QIMGV_TEST_UNIT' in text:
-        failures.append(f"R13 harness protocol: {rel} reads QIMGV_TEST_UNIT — the "
-                        "routing variable is dead (nothing sets it; the unit label "
-                        "rides argv[1] now). A reader here is a half-rebuilt protocol: "
-                        "the spawned child would re-enter the harness and re-spawn")
-for needle, what in (
-    ('QIMGV_TEST_HARNESS_CHILD', 'the spawned-child marker'),
-    ('setProcessEnvironment', 'the child environment actually applied to the spawn'),
-    ('proc.kill()', 'the timeout kill (a timed-out waitForFinished does not kill)'),
-):
-    if needle not in harness_text:
-        failures.append(f"R13 harness protocol: slot_harness.h lost {what} ({needle})")
-# d) the exit-code verdict lands before the result-file dump. The Windows
-# branch dumps a red unit's QTest log only when `ok` is false, and the natural
-# reading order (wait → dump → convert the exit code into the verdict) checks
-# the dump against "exited normally" — true for every unit that ran to
-# completion and failed its tests. That ordering shipped once (2026-11-16):
-# five red engine_stack units surfaced as one bare line each, the logs the
-# per-unit files existed to carry never shown. The verdict line must sit above
-# the dump that reads it.
-verdict_at = harness_text.find('exitCode == 0')
-dump_at = harness_text.find('QFile res(resultPath)')
-if verdict_at == -1 or dump_at == -1 or verdict_at > dump_at:
-    failures.append("R13 harness protocol: the exit-code verdict ('exitCode == 0') "
-                    "must be computed BEFORE the per-unit result-file dump reads it, or a "
-                    "unit that fails its tests normally never surfaces its log "
-                    "(the 2026-11-16 unreadable reds)")
-if harness_text.count('QIMGV_TEST_HARNESS_CHILD') < 2:
-    failures.append("R13 harness protocol: slot_harness.h must both set the child "
-                    "marker and read it in the re-entry guard — one half of the guard "
-                    "is the bomb with a lock on only one door")
+    failures.append(f"R13 self-spawn: {rel} launches its own executable "
+                    "(QCoreApplication::applicationFilePath) — a test that re-runs the "
+                    "suite re-enters itself and spawns again (the 2026-11-16 fork bomb). "
+                    "Per-test process isolation is gtest_discover_tests' job now")
+
+# Rule 14: no QTest assertion macro in a GoogleTest translation unit, in ANY
+# preprocessor branch. gtest_qt.h undefs and #pragma-GCC-poison's them, which
+# is the primary guard — but poison is a preprocessor-time check on code that
+# is actually preprocessed, and the branches that matter most are the ones
+# THIS platform does not compile: a `#ifdef Q_OS_WIN` block reached for QSKIP
+# and the Linux-green build never saw it (2026-11-20, thumbnail_store_tests).
+# The same blindness would hit a Windows-only QVERIFY. So the rule is textual:
+# the macro names may appear in a comment, never as code.
+POISONED_MACROS = re.compile(r'\b(QVERIFY2?|QCOMPARE|QFAIL|QSKIP|QEXPECT_FAIL|QTRY_VERIFY2?|QTRY_COMPARE'
+                             r'|QTRY_VERIFY_WITH_TIMEOUT|QTRY_VERIFY2_WITH_TIMEOUT|QTRY_COMPARE_WITH_TIMEOUT)\b')
+for path, rel in sources():
+    if not rel.startswith('tests/') or rel == 'tests/gtest_qt.h':
+        continue
+    for lineno, line in enumerate(text_of(path).splitlines(), 1):
+        code = line.split('//')[0]
+        hit = POISONED_MACROS.search(code)
+        if hit:
+            failures.append(f"R14 QTest macro in a gtest TU: {rel}:{lineno} uses '{hit.group(1)}' — "
+                            "it reports to a result object that only exists inside QTest::qExec, so "
+                            "it is silently green here. Use EXPECT_*/ASSERT_*, ASSERT_TRY_*, or "
+                            "GTEST_SKIP(); the compile-time poison cannot see a branch this "
+                            "platform does not preprocess")
+            break
+    scanned['R14'] = scanned.get('R14', 0) + 1
 
 if failures:
     print("architecture violations:")

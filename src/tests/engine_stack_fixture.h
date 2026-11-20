@@ -14,8 +14,6 @@
 
 #include <cstring>
 
-#include <QTest>
-#include "slot_harness.h"
 #include <QDeadlineTimer> // the convergence deadline in assertMirrorMatchesEngineExport
 #include <QtEndian>
 #include <QGuiApplication>
@@ -105,6 +103,10 @@ class EngineStackFixture {
             qFatal("cannot create the fixture root: %s", qPrintable(fixtureBase));
         if(home.path() == nullptr)
             qFatal("fixture has no isolated home");
+        // process-wide, not a member: gtest builds a fresh fixture object for
+        // every TEST_F, so a member would restart at slot1 and hand each test a
+        // directory an earlier test's engine still holds a watch on
+        static int slotSeq = 0;
         ++slotSeq;
         fixtureDir = fixtureBase + QString("/slot%1").arg(slotSeq);
         if(!QDir().mkpath(fixtureDir))
@@ -292,27 +294,5 @@ class EngineStackFixture {
     coretest::AppSingletons singletons;
     QString fixtureBase;
     QString fixtureDir;
-    int slotSeq = 0;
     bool fixtureReady = false;
 };
-
-// qExec stops a class with "Function not found" when asked for a test function it
-// does not have, which would make `engine_stack_tests someSlot` report a failure in
-// every other class. A positional filter therefore goes only to the classes that own
-// it — and the lookup scans the method table, because a private slot is not where
-// indexOfSlot looks. The yield is -1, never 0: 0 is a legitimate "ran and passed",
-// and a caller that must distinguish "owned it, passed" from "not mine" (the
-// slot-name dispatch in engine_stack_main) would otherwise be unable to.
-inline int runIfOwned(QObject &test, int argc, char **argv) {
-    for(int i = 1; i < argc; ++i) {
-        // -o (a QTest log destination) rides with two value args that are a
-        // path and a format word, not unit-name filters — skip the trio
-        if(std::strcmp(argv[i], "-o") == 0) {
-            i += 2;
-            continue;
-        }
-        if(argv[i][0] != '-' && !slot_harness::owns(test, argv[i]))
-            return -1;
-    }
-    return QTest::qExec(&test, argc, argv);
-}

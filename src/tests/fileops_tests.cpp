@@ -1,4 +1,3 @@
-#include <QTest>
 #include <unistd.h>
 #include <QFile>
 #include <QCryptographicHash>
@@ -6,6 +5,7 @@
 #include <QFileInfo>
 #include <QDateTime>
 
+#include "gtest_qt.h"
 #include "engine_stack_fixture.h"
 #include "utils/fileoperations.h"
 
@@ -16,39 +16,20 @@
 // happened, the revert that reports where it left the trail, and the
 // timestamp restore that makes a copy indistinguishable from the original.
 // No dialogs, no Core — the interactive slots in core.cpp wrap these.
-class TestFileOps : public QObject, protected EngineStackFixture {
-    Q_OBJECT
-  public:
+class TestFileOps : public ::testing::Test, protected EngineStackFixture {
+  protected:
     TestFileOps() : EngineStackFixture("fileops") {
     }
 
-  private slots:
-    void initTestCase() {
-    }
-
-    void copyFileToCopiesContentKeepsSourceAndRestoresTimestamps();
-    void copyFileToNamesItsRefusals();
-    void copyFileToReportsCollisionWithoutForceAndOverwritesWithForce();
-    void copyFileToRejectsADirectoryCollision();
-    void copyFileToReportsAnUnwritableDestination();
-    void moveFileToMovesContentAndRemovesTheSource();
-    void moveFileToReportsASourceItCouldNotRemove();
-    void renameMovesTheFileAndRefusesCollisions();
-    void removeFileAndRemoveDirReportExactResults();
-    void decodeResultNamesEveryOutcome();
-    void moveToTrashRemovesTheFileFromItsPlace();
-
-  private:
+  protected:
     // a file with known content, plus a distinct mtime the timestamp-restore
     // contract can be asserted against
-    // value-returning helpers cannot use QVERIFY2 (its failure path is a bare
-    // return), so they report through qFail and hand back an empty result —
-    // the already-failed test then trips on the very assert that consumes it
+    // a helper cannot assert for its caller: it reports through qFatal, which
+    // aborts the (per-test) process, the same way the shared fixture does
     QString makeFile(const QString &path, const QByteArray &content) {
         QFile f(path);
         if(!f.open(QIODevice::WriteOnly)) {
-            QTest::qFail(qPrintable(QStringLiteral("cannot create %1: %2").arg(path, f.errorString())), __FILE__,
-                         __LINE__);
+            qFatal("cannot create %s: %s", qPrintable(path), qPrintable(f.errorString()));
             return {};
         }
         f.write(content);
@@ -58,8 +39,7 @@ class TestFileOps : public QObject, protected EngineStackFixture {
     QByteArray contentOf(const QString &path) {
         QFile f(path);
         if(!f.open(QIODevice::ReadOnly)) {
-            QTest::qFail(qPrintable(QStringLiteral("cannot read %1: %2").arg(path, f.errorString())), __FILE__,
-                         __LINE__);
+            qFatal("cannot read %s: %s", qPrintable(path), qPrintable(f.errorString()));
             return {};
         }
         return f.readAll();
@@ -67,70 +47,70 @@ class TestFileOps : public QObject, protected EngineStackFixture {
     void stampMTime(const QString &path) {
         // a timestamp no fixture step could produce by accident
         QFile f(path);
-        QVERIFY2(f.open(QIODevice::ReadWrite), qPrintable(path));
+        EXPECT_TRUE(f.open(QIODevice::ReadWrite)) << qPrintable(path);
         QDateTime past = QDateTime::currentDateTimeUtc().addDays(-17);
-        QVERIFY(f.setFileTime(past, QFileDevice::FileModificationTime));
+        EXPECT_TRUE(f.setFileTime(past, QFileDevice::FileModificationTime));
         f.close();
     }
 };
 
-void TestFileOps::copyFileToCopiesContentKeepsSourceAndRestoresTimestamps() {
+TEST_F(TestFileOps, copyFileToCopiesContentKeepsSourceAndRestoresTimestamps) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "original");
     stampMTime(src);
     QString destDir = fixtureDir + "/dest";
-    QVERIFY(QDir().mkpath(destDir));
+    EXPECT_TRUE(QDir().mkpath(destDir));
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, false, result);
 
-    QCOMPARE(result, SUCCESS);
+    EXPECT_EQ(result, SUCCESS);
     QString dest = destDir + "/a.txt";
-    QCOMPARE(contentOf(dest), QByteArray("original")); // content travelled
-    QCOMPARE(contentOf(src), QByteArray("original"));  // and the source stayed
-    QCOMPARE(QFileInfo(dest).lastModified(), QFileInfo(src).lastModified());
-    QVERIFY(!QFileInfo(src).isDir());
+    EXPECT_EQ(contentOf(dest), QByteArray("original")); // content travelled
+    EXPECT_EQ(contentOf(src), QByteArray("original"));  // and the source stayed
+    EXPECT_EQ(QFileInfo(dest).lastModified(), QFileInfo(src).lastModified());
+    EXPECT_TRUE(!QFileInfo(src).isDir());
 }
 
-void TestFileOps::copyFileToNamesItsRefusals() {
+TEST_F(TestFileOps, copyFileToNamesItsRefusals) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
 
     // the destination being the source's own directory is a no-op, not a copy
     FileOpResult result = OTHER_ERROR;
     FileOperations::copyFileTo(src, fixtureDir, false, result);
-    QCOMPARE(result, NOTHING_TO_DO);
+    EXPECT_EQ(result, NOTHING_TO_DO);
 
     result = OTHER_ERROR;
     FileOperations::copyFileTo(fixtureDir + "/missing.txt", fixtureDir + "/dest", false, result);
-    QCOMPARE(result, SOURCE_DOES_NOT_EXIST);
+    EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 
-    QVERIFY(QDir().mkpath(fixtureDir + "/dest"));
+    EXPECT_TRUE(QDir().mkpath(fixtureDir + "/dest"));
     result = OTHER_ERROR;
     FileOperations::copyFileTo(src, fixtureDir + "/nowhere", false, result);
-    QCOMPARE(result, DESTINATION_DOES_NOT_EXIST);
+    EXPECT_EQ(result, DESTINATION_DOES_NOT_EXIST);
 }
 
-void TestFileOps::copyFileToReportsCollisionWithoutForceAndOverwritesWithForce() {
+TEST_F(TestFileOps, copyFileToReportsCollisionWithoutForceAndOverwritesWithForce) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "new");
     QString destDir = fixtureDir + "/dest";
-    QVERIFY(QDir().mkpath(destDir));
+    EXPECT_TRUE(QDir().mkpath(destDir));
     makeFile(destDir + "/a.txt", "old");
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, false, result);
-    QCOMPARE(result, DESTINATION_FILE_EXISTS);
-    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("old")); // untouched without force
+    EXPECT_EQ(result, DESTINATION_FILE_EXISTS);
+    EXPECT_EQ(contentOf(destDir + "/a.txt"), QByteArray("old")); // untouched without force
 
     result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, true, result);
-    QCOMPARE(result, SUCCESS);
-    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("new"));
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_EQ(contentOf(destDir + "/a.txt"), QByteArray("new"));
     // the overwrite moves the old file aside first; the successful copy must
     // have removed it again — no trail left behind
     const QStringList trail = QDir(destDir).entryList(QStringList() << "a.txt*", QDir::Files);
-    QCOMPARE(trail, QStringList{QStringLiteral("a.txt")});
+    EXPECT_EQ(trail, QStringList{QStringLiteral("a.txt")});
 
     // The temporary carries this process's pid. A name that is a pure function
     // of the destination is shared with every other process overwriting the
@@ -144,53 +124,53 @@ void TestFileOps::copyFileToReportsCollisionWithoutForceAndOverwritesWithForce()
     makeFile(destDir + "/a.txt", "old again");
     result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, true, result);
-    QCOMPARE(result, SUCCESS);
-    QVERIFY2(QFile::exists(legacyName), "the overwrite removed a file whose name it does not own");
-    QCOMPARE(contentOf(legacyName), QByteArray("someone else's"));
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_TRUE(QFile::exists(legacyName)) << "the overwrite removed a file whose name it does not own";
+    EXPECT_EQ(contentOf(legacyName), QByteArray("someone else's"));
 }
 
-void TestFileOps::copyFileToRejectsADirectoryCollision() {
+TEST_F(TestFileOps, copyFileToRejectsADirectoryCollision) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
     QString destDir = fixtureDir + "/dest";
-    QVERIFY(QDir(destDir).mkpath(destDir + "/a.txt")); // a DIRECTORY named like the file
+    EXPECT_TRUE(QDir(destDir).mkpath(destDir + "/a.txt")); // a DIRECTORY named like the file
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, true, result); // even force may not clobber a dir
-    QCOMPARE(result, DESTINATION_DIR_EXISTS);
+    EXPECT_EQ(result, DESTINATION_DIR_EXISTS);
 }
 
-void TestFileOps::copyFileToReportsAnUnwritableDestination() {
+TEST_F(TestFileOps, copyFileToReportsAnUnwritableDestination) {
     // act runs its container as root, and root ignores permission bits — "unwritable" is not
     // expressible there. The pin needs a user account to exist. Windows has no
     // POSIX permission-bit model either (a directory's read-only attribute does
     // not stop file creation), so this pin stays where its premise holds.
 #ifdef Q_OS_WIN
-    QSKIP("windows: permission bits cannot make a destination unwritable");
+    GTEST_SKIP() << "windows: permission bits cannot make a destination unwritable";
 #else
     if(geteuid() == 0)
-        QSKIP("running as root: permission bits cannot make a destination unwritable");
+        GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
 #endif
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
     QString destDir = fixtureDir + "/rodest";
-    QVERIFY(QDir().mkpath(destDir));
-    QVERIFY(QFile::setPermissions(destDir, QFile::Permissions(0x5555)));
+    EXPECT_TRUE(QDir().mkpath(destDir));
+    EXPECT_TRUE(QFile::setPermissions(destDir, QFile::Permissions(0x5555)));
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::copyFileTo(src, destDir, false, result);
-    QCOMPARE(result, DESTINATION_NOT_WRITABLE);
+    EXPECT_EQ(result, DESTINATION_NOT_WRITABLE);
 
     // restore so fixture teardown keeps working
     QFile::setPermissions(destDir, QFile::Permissions(0x7755));
 }
 
-void TestFileOps::moveFileToMovesContentAndRemovesTheSource() {
+TEST_F(TestFileOps, moveFileToMovesContentAndRemovesTheSource) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "content");
     stampMTime(src);
     QString destDir = fixtureDir + "/dest";
-    QVERIFY(QDir().mkpath(destDir));
+    EXPECT_TRUE(QDir().mkpath(destDir));
 
     // capture the stamp before the move: after it, the source is gone and
     // QFileInfo(src) is an invalid QDateTime — a trap this test fell into once
@@ -199,10 +179,10 @@ void TestFileOps::moveFileToMovesContentAndRemovesTheSource() {
     FileOpResult result = OTHER_ERROR;
     FileOperations::moveFileTo(src, destDir, false, result);
 
-    QCOMPARE(result, SUCCESS);
-    QVERIFY(!QFileInfo::exists(src)); // the source is gone
-    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("content"));
-    QCOMPARE(QFileInfo(destDir + "/a.txt").lastModified(), srcMTime);
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_TRUE(!QFileInfo::exists(src)); // the source is gone
+    EXPECT_EQ(contentOf(destDir + "/a.txt"), QByteArray("content"));
+    EXPECT_EQ(QFileInfo(destDir + "/a.txt").lastModified(), srcMTime);
 }
 
 // A cross-directory move is a copy followed by a source removal, and those two
@@ -212,57 +192,57 @@ void TestFileOps::moveFileToMovesContentAndRemovesTheSource() {
 // the destination again. The new contract reports the half that actually
 // completed: the destination holds the file, the source is still there, and
 // SOURCE_NOT_REMOVED says so in those words.
-void TestFileOps::moveFileToReportsASourceItCouldNotRemove() {
+TEST_F(TestFileOps, moveFileToReportsASourceItCouldNotRemove) {
     // act runs its container as root, and root ignores permission bits — "unwritable" is not
     // expressible there. The pin needs a user account to exist. Windows has no
     // POSIX permission-bit model either (a directory's read-only attribute does
     // not stop file creation), so this pin stays where its premise holds.
 #ifdef Q_OS_WIN
-    QSKIP("windows: permission bits cannot make a destination unwritable");
+    GTEST_SKIP() << "windows: permission bits cannot make a destination unwritable";
 #else
     if(geteuid() == 0)
-        QSKIP("running as root: permission bits cannot make a destination unwritable");
+        GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
 #endif
     resetFixture();
     QString srcDir = fixtureDir + "/mvsrc";
-    QVERIFY(QDir().mkpath(srcDir));
+    EXPECT_TRUE(QDir().mkpath(srcDir));
     QString src = makeFile(srcDir + "/a.txt", "new");
     QString destDir = fixtureDir + "/mvdst";
-    QVERIFY(QDir().mkpath(destDir));
+    EXPECT_TRUE(QDir().mkpath(destDir));
     makeFile(destDir + "/a.txt", "old");
 
     // the removal happens through removeFile(), which needs a writable source
     // directory on Linux — a read-only one forces the post-copy removal to fail
-    QVERIFY(QFile::setPermissions(srcDir, QFile::Permissions(0x5555)));
+    EXPECT_TRUE(QFile::setPermissions(srcDir, QFile::Permissions(0x5555)));
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::moveFileTo(src, destDir, true, result);
-    QVERIFY(QFile::setPermissions(srcDir, QFile::Permissions(0x7755)));
+    EXPECT_TRUE(QFile::setPermissions(srcDir, QFile::Permissions(0x7755)));
 
-    QCOMPARE(result, SOURCE_NOT_REMOVED);
-    QCOMPARE(contentOf(destDir + "/a.txt"), QByteArray("new")); // the copy stands
-    QCOMPARE(contentOf(src), QByteArray("new"));                // the source is still there
+    EXPECT_EQ(result, SOURCE_NOT_REMOVED);
+    EXPECT_EQ(contentOf(destDir + "/a.txt"), QByteArray("new")); // the copy stands
+    EXPECT_EQ(contentOf(src), QByteArray("new"));                // the source is still there
     // and nothing else was left in the destination directory
     const QStringList trail = QDir(destDir).entryList(QDir::Files, QDir::Name);
-    QCOMPARE(trail, QStringList{QStringLiteral("a.txt")});
+    EXPECT_EQ(trail, QStringList{QStringLiteral("a.txt")});
 }
 
-void TestFileOps::renameMovesTheFileAndRefusesCollisions() {
+TEST_F(TestFileOps, renameMovesTheFileAndRefusesCollisions) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
     makeFile(fixtureDir + "/b.txt", "y");
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::rename(src, "c.txt", false, result);
-    QCOMPARE(result, SUCCESS);
-    QVERIFY(!QFileInfo::exists(fixtureDir + "/a.txt"));
-    QCOMPARE(contentOf(fixtureDir + "/c.txt"), QByteArray("x"));
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/a.txt"));
+    EXPECT_EQ(contentOf(fixtureDir + "/c.txt"), QByteArray("x"));
 
     // renaming onto an existing file is refused without force, and a
     // directory collision is refused even with it
     result = OTHER_ERROR;
     FileOperations::rename(fixtureDir + "/c.txt", "b.txt", false, result);
-    QCOMPARE(result, DESTINATION_FILE_EXISTS);
+    EXPECT_EQ(result, DESTINATION_FILE_EXISTS);
 
     // FORCED overwrite replaces the destination in one rename(2).
     //
@@ -283,82 +263,83 @@ void TestFileOps::renameMovesTheFileAndRefusesCollisions() {
         makeFile(planted, "not ours");
         result = OTHER_ERROR;
         FileOperations::rename(fixtureDir + "/c.txt", "b.txt", true, result);
-        QCOMPARE(result, SUCCESS);
-        QCOMPARE(contentOf(fixtureDir + "/b.txt"), QByteArray("x")); // the source's bytes won
-        QVERIFY(!QFileInfo::exists(fixtureDir + "/c.txt"));
-        QVERIFY2(QFile::exists(planted),
-                 "the rename deleted a file whose name it does not own — the old fixed-md5 backup path");
-        QCOMPARE(contentOf(planted), QByteArray("not ours"));
-        QVERIFY(QFile::remove(planted));
+        EXPECT_EQ(result, SUCCESS);
+        EXPECT_EQ(contentOf(fixtureDir + "/b.txt"), QByteArray("x")); // the source's bytes won
+        EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/c.txt"));
+        EXPECT_TRUE(QFile::exists(planted))
+            << "the rename deleted a file whose name it does not own — the old fixed-md5 backup path";
+        EXPECT_EQ(contentOf(planted), QByteArray("not ours"));
+        EXPECT_TRUE(QFile::remove(planted));
         makeFile(fixtureDir + "/c.txt", "x"); // restore for the cases below
     }
 
-    QVERIFY(QDir(fixtureDir).mkdir("dircollision"));
+    EXPECT_TRUE(QDir(fixtureDir).mkdir("dircollision"));
     result = OTHER_ERROR;
     FileOperations::rename(fixtureDir + "/c.txt", "dircollision", true, result);
-    QCOMPARE(result, DESTINATION_DIR_EXISTS);
+    EXPECT_EQ(result, DESTINATION_DIR_EXISTS);
 
     // the no-op cases: same name and empty name
     result = OTHER_ERROR;
     FileOperations::rename(fixtureDir + "/c.txt", "c.txt", false, result);
-    QCOMPARE(result, NOTHING_TO_DO);
+    EXPECT_EQ(result, NOTHING_TO_DO);
     result = OTHER_ERROR;
     FileOperations::rename(fixtureDir + "/c.txt", "", false, result);
-    QCOMPARE(result, NOTHING_TO_DO);
+    EXPECT_EQ(result, NOTHING_TO_DO);
 }
 
-void TestFileOps::removeFileAndRemoveDirReportExactResults() {
+TEST_F(TestFileOps, removeFileAndRemoveDirReportExactResults) {
     resetFixture();
     QString src = makeFile(fixtureDir + "/a.txt", "x");
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::removeFile(src, result);
-    QCOMPARE(result, SUCCESS);
-    QVERIFY(!QFileInfo::exists(src));
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_TRUE(!QFileInfo::exists(src));
 
     result = OTHER_ERROR;
     FileOperations::removeFile(src, result);
-    QCOMPARE(result, SOURCE_DOES_NOT_EXIST);
+    EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 
     makeFile(fixtureDir + "/subdir/inner.txt", "x"); // the fixture's subdir
     result = OTHER_ERROR;
     FileOperations::removeDir(fixtureDir + "/subdir", false, result);
-    QCOMPARE(result, DIRECTORY_NOT_EMPTY); // non-recursive refuses
-    QVERIFY(QFileInfo::exists(fixtureDir + "/subdir/inner.txt"));
+    EXPECT_EQ(result, DIRECTORY_NOT_EMPTY); // non-recursive refuses
+    EXPECT_TRUE(QFileInfo::exists(fixtureDir + "/subdir/inner.txt"));
 
     result = OTHER_ERROR;
     FileOperations::removeDir(fixtureDir + "/subdir", true, result);
-    QCOMPARE(result, SUCCESS);
-    QVERIFY(!QFileInfo::exists(fixtureDir + "/subdir"));
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/subdir"));
 
     result = OTHER_ERROR;
     FileOperations::removeDir(fixtureDir + "/subdir", true, result);
-    QCOMPARE(result, SOURCE_DOES_NOT_EXIST);
+    EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 }
 
-void TestFileOps::moveToTrashRemovesTheFileFromItsPlace() {
+TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
     // QFile::moveToTrash selects the trash on the SOURCE's filesystem
     // (top-level .Trash-<uid>, freedesktop spec). A fixture under /tmp cannot
     // host one without root, so whether the success path is runnable depends
-    // on the mount topology — probed here, with a visible, reasoned QSKIP when
+    // on the mount topology — probed here, with a visible, reasoned GTEST_SKIP when
     // the topology refuses. The refusal contract below is unconditional: it is
     // the part FileOperations itself owns.
+    resetFixture();
     QString probe = makeFile(fixtureDir + "/trash-probe.txt", "x");
     FileOpResult probeResult = OTHER_ERROR;
     FileOperations::moveToTrash(probe, probeResult);
     if(probeResult != SUCCESS)
-        QSKIP(
-            "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)");
+        GTEST_SKIP()
+            << "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)";
 
-    QVERIFY(!QFileInfo::exists(probe)); // the probe already proved the happy path
-    QVERIFY(!QFileInfo::exists(fixtureDir + "/trash-probe.txt"));
+    EXPECT_TRUE(!QFileInfo::exists(probe)); // the probe already proved the happy path
+    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/trash-probe.txt"));
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::moveToTrash(fixtureDir + "/missing.txt", result);
-    QCOMPARE(result, SOURCE_DOES_NOT_EXIST);
+    EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 }
 
-void TestFileOps::decodeResultNamesEveryOutcome() {
+TEST_F(TestFileOps, decodeResultNamesEveryOutcome) {
     // every outcome must decode to a non-empty human string — the switch has no
     // default branch, so a new FileOpResult without a decode line would also
     // trip the compiler here
@@ -373,14 +354,7 @@ void TestFileOps::decodeResultNamesEveryOutcome() {
                                 NOTHING_TO_DO,
                                 OTHER_ERROR};
     for(FileOpResult r : all)
-        QVERIFY2(!FileOperations::decodeResult(r).isEmpty(),
-                 qPrintable(QStringLiteral("decodeResult(%1) is empty").arg(int(r))));
-    QCOMPARE(FileOperations::decodeResult(SUCCESS), QStringLiteral("Operation completed succesfully."));
+        EXPECT_TRUE(!FileOperations::decodeResult(r).isEmpty())
+            << qPrintable(QStringLiteral("decodeResult(%1) is empty").arg(int(r)));
+    EXPECT_EQ(FileOperations::decodeResult(SUCCESS), QStringLiteral("Operation completed succesfully."));
 }
-
-int runFileOpsTests(int argc, char **argv) {
-    TestFileOps t;
-    return runIfOwned(t, argc, argv);
-}
-
-#include "fileops_tests.moc"

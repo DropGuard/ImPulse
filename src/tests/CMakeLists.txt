@@ -61,9 +61,8 @@ add_executable(engine_stack_tests
     infra_tests.cpp)
 # USE_EXIV2 arrives with qimgv_nongui's PUBLIC compile definitions: one answer
 # to "is Exiv2 available" for every target, instead of each restating it.
-target_link_libraries(engine_stack_tests PRIVATE Qt6::Test qimgv_nongui)
-add_test(NAME ENGINE_STACK COMMAND engine_stack_tests)
-set_tests_properties(ENGINE_STACK PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+target_link_libraries(engine_stack_tests PRIVATE GTest::gtest Qt6::Test qimgv_nongui)
+gtest_discover_tests(engine_stack_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
 
 # Core-level navigation: links the widget tree too, so a real Core can be built
 # and driven under the offscreen platform. OBJECT libraries do not re-export each
@@ -149,12 +148,11 @@ set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300
 # object library and is green on both sides of the keyboard migration. A red
 # probe means a migration plan assumption is wrong, not a regression.
 #
-# The first suite on GoogleTest: discovery and filtering are the framework's
-# (gtest_discover_tests registers every TEST_F as its own ctest case, so each
-# runs in its own process — the isolation the other suites spell out by hand).
+# Discovery and filtering are the framework's: gtest_discover_tests registers
+# every TEST_F as its own ctest case, so each runs in its own process.
 # Qt6::Test stays linked for what only Qt provides: QSignalSpy, QTest::qWait,
 # qWaitForWindowExposed. Assertions are EXPECT_*/ASSERT_*; the QVERIFY/QCOMPARE
-# macros are not used in a gtest TU.
+# macros are poisoned in a gtest TU by gtest_qt.h (see that header).
 add_executable(dispatch_probe_tests dispatch_probe_tests.cpp)
 target_link_libraries(dispatch_probe_tests PRIVATE GTest::gtest Qt6::Test Qt6::Widgets)
 gtest_discover_tests(dispatch_probe_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)

@@ -226,8 +226,7 @@ inline QString writeRectImage(const QString &path) {
     p.fillRect(8, 0, 8, 8, Qt::blue);
     p.end();
     if(!img.save(path, "png")) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot encode %1").arg(path)), __FILE__, __LINE__);
-        return {};
+        qFatal("cannot encode %s", qPrintable(path));
     }
     return path;
 }
@@ -286,8 +285,7 @@ inline QList<ThumbnailWidget *> orderedThumbnails(FolderGridView &grid) {
 inline QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
     const QList<ThumbnailWidget *> widgets = orderedThumbnails(grid);
     if(widgets.count() <= index) {
-        QTest::qFail(qPrintable(QStringLiteral("no thumbnail #%1").arg(index)), __FILE__, __LINE__);
-        return {};
+        qFatal("no thumbnail at index %d", index);
     }
     const QPointF center = widgets.at(index)->mapToScene(widgets.at(index)->boundingRect().center());
     return grid.mapFromScene(center);
@@ -368,8 +366,7 @@ class FakeCropSurface : public QObject, public ICropSurface {
 inline QByteArray contentOf(const QString &path) {
     QFile f(path);
     if(!f.open(QIODevice::ReadOnly)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot read %1").arg(path)), __FILE__, __LINE__);
-        return {};
+        qFatal("cannot read %s", qPrintable(path));
     }
     return f.readAll();
 }

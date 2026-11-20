@@ -118,7 +118,7 @@ flag from whichever road you took.
 
 ```bash
 sudo apt install build-essential cmake ninja-build libgl1-mesa-dev libxkbcommon-dev \
-                 qt6-base-dev libopencv-dev libexiv2-dev libmpv-dev
+                 qt6-base-dev libopencv-dev libexiv2-dev libmpv-dev libgtest-dev
 cmake -S . -B build -G Ninja
 ```
 
@@ -130,7 +130,7 @@ official Qt binaries into a prefix of your choosing:
 pip install aqtinstall
 aqt install-qt linux desktop 6.9.1 linux_gcc_64 -O /opt/qt
 sudo apt install build-essential cmake ninja-build libgl1-mesa-dev libxkbcommon-dev \
-                 libopencv-dev libexiv2-dev libmpv-dev
+                 libopencv-dev libexiv2-dev libmpv-dev libgtest-dev
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
 ```
 
@@ -172,16 +172,25 @@ cd build && ctest -j4                 # the suites, including the architecture r
 cd engine/qimgv-engine && cargo test    # the engine's own suites
 ```
 
-Every suite is one binary with a uniform contract: bare argv runs all units
-(one process per unit — the crash-isolation harness), and argv[1] names a
-single unit or a single test function. The unit's Totals line prints as it
-finishes; a red unit's whole QTest log is surfaced by the harness parent.
+Every suite is a GoogleTest binary (`find_package(GTest CONFIG REQUIRED)` —
+`libgtest-dev` on Debian/Ubuntu; the module-mode `FindGTest` cannot find this
+package, only its config file exists). `gtest_discover_tests` registers every
+`TEST_F` as its own ctest case, so ctest's own process-per-case layout gives
+each test function a private process — and with it a private TSan registry.
+Run one test function by name with GoogleTest's filter, not a positional arg:
 
 ```bash
-build/qimgv/tests/crop_tests                    # all units, one process each
-build/qimgv/tests/crop_tests cropRatioLocks     # one test function
-build/qimgv/tests/engine_stack_tests listing    # one unit (a whole class)
+build/qimgv/tests/crop_tests                            # the whole suite
+build/qimgv/tests/crop_tests --gtest_filter='*cropRatioLocks'
+build/qimgv/tests/engine_stack_tests --gtest_filter='TestListing.*'
 ```
+
+The assertion vocabulary is `EXPECT_*`/`ASSERT_*` only. `gtest_qt.h` poisons
+`QVERIFY`/`QCOMPARE`/`QFAIL`/`QSKIP`/`QTRY_*` because inside a gtest TU those
+report to a QTest result object that never exists and are silently green; the
+event-loop waits are `ASSERT_TRY_TRUE_TIMEOUT` / `ASSERT_TRY_EQ_TIMEOUT`
+(built on `QTest::qWaitFor`, which returns a bool rather than reporting), and
+a skip is `GTEST_SKIP()`
 
 Maintainer gate (runs in the pre-commit hook) — the clazy/clang-tidy/cppcheck/gcc counts are baselined against
 a pinned toolchain, and on a foreign toolchain the gate fails by design (the
