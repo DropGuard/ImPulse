@@ -511,7 +511,7 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
     EXPECT_TRUE(writeBigImage(m_fixtureDir + "/newer.png", "png", QSize(8, 8)));
 #ifdef Q_OS_WIN
     {
-        QFile backdate(fixtureDir + "/newer.png");
+        QFile backdate(m_fixtureDir + "/newer.png");
         EXPECT_TRUE(backdate.open(QIODevice::ReadWrite));
         EXPECT_TRUE(backdate.setFileTime(QDateTime::fromSecsSinceEpoch(before.toSecsSinceEpoch() - 60),
                                          QFileDevice::FileModificationTime));
