@@ -49,6 +49,12 @@ jobs:
             mingw-w64-ucrt-x86_64-opencv
             mingw-w64-ucrt-x86_64-exiv2
             mingw-w64-ucrt-x86_64-mpv
+            mingw-w64-ucrt-x86_64-gtest
+      # The Rust engine is built by corrosion, which looks for rustc in PATH
+      # and ~/.cargo/bin. The Linux job gets it from dtolnay's action; the
+      # msys2 shell inherits the Windows runner's PATH, so rustup's default
+      # install location is visible once this step has run.
+      - uses: dtolnay/rust-toolchain@stable
       - name: configure
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \

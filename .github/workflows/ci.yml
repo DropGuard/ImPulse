@@ -33,7 +33,7 @@ jobs:
           /opt/aqt-venv/bin/pip install -q aqtinstall
           /opt/aqt-venv/bin/aqt install-qt linux desktop 6.9.1 linux_gcc_64 -O /opt/qt
       - name: system deps
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
       - name: configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
       - name: build (warnings are contractual — the fatal families are -Werror)
@@ -57,7 +57,7 @@ jobs:
           /opt/aqt-venv/bin/pip install -q aqtinstall
           /opt/aqt-venv/bin/aqt install-qt linux desktop 6.9.1 linux_gcc_64 -O /opt/qt
       - name: system deps
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
       - name: sanitizer tree (address,undefined — the ASan gate the local tree runs)
         run: |
           cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=address,undefined -DCMAKE_PREFIX_PATH=/opt/qt/6.9.1/gcc_64
@@ -90,7 +90,7 @@ jobs:
             libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
-            libopencv-dev libexiv2-dev libmpv-dev g++-12
+            libopencv-dev libexiv2-dev libmpv-dev g++-12 libgtest-dev
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: qt 6.9.1 via aqtinstall
