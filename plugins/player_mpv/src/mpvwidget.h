@@ -14,16 +14,16 @@
 #include <QSurfaceFormat>
 #include <QTimer>
 
-class MpvWidget Q_DECL_FINAL: public QOpenGLWidget {
+class MpvWidget Q_DECL_FINAL : public QOpenGLWidget {
     Q_OBJECT
-public:
+  public:
     MpvWidget(QWidget *parent = nullptr, Qt::WindowFlags f = Qt::Widget);
     ~MpvWidget() override;
 
-    void command(const QVariant& params);
+    void command(const QVariant &params);
     void setOption(const QString &name, const QVariant &value);
-    void setProperty(const QString& name, const QVariant& value);
-    QVariant getProperty(const QString& name) const;
+    void setProperty(const QString &name, const QVariant &value);
+    QVariant getProperty(const QString &name) const;
     // Related to this:
     // https://github.com/gnome-mpv/gnome-mpv/issues/245
     // Let's hope this wont break more than it fixes
@@ -39,24 +39,24 @@ public:
     int volume();
     void setVolume(int vol);
 
-signals:
+  signals:
     void durationChanged(int value);
     void positionChanged(int value);
     void videoPaused(bool);
     void playbackFinished();
 
-protected:
+  protected:
     void initializeGL() override;
     void paintGL() override;
 
-private slots:
+  private slots:
     void mpvEvents();
     void maybeUpdate();
 
-private:
+  private:
     void handle_mpv_event(mpv_event *event);
     static void on_update(void *ctx);
 
-    mpv_handle *mpv;
-    mpv_render_context *mpv_gl;
+    mpv_handle *m_mpv;
+    mpv_render_context *m_mpv_gl;
 };

@@ -55,7 +55,7 @@ TEST_F(TestThumbnailStore, thumbnailStoreKeysOnTheUriAlone) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("store"));
-    const QString source = fixtureDir + "/img1.jpg";
+    const QString source = m_fixtureDir + "/img1.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
 
     // md5 of the canonical URI, over the URI and nothing else — no size,
@@ -85,7 +85,7 @@ TEST_F(TestThumbnailStore, thumbnailStoreValidityFollowsTheSpecKeys) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("validity"));
-    const QString source = fixtureDir + "/img2.jpg";
+    const QString source = m_fixtureDir + "/img2.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
 
     QImage picture(128, 128, QImage::Format_ARGB32);
@@ -138,7 +138,7 @@ TEST_F(TestThumbnailStore, thumbnailStoreComparesTheSizeKeyWhenTheClockCannot) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("sizekey"));
-    const QString source = fixtureDir + "/img10.jpg";
+    const QString source = m_fixtureDir + "/img10.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     QImage picture(128, 128, QImage::Format_ARGB32);
     picture.fill(Qt::black);
@@ -169,7 +169,7 @@ TEST_F(TestThumbnailStore, anUnreadableSourceIsNeitherReadNorWritten) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("unreadable"));
-    const QString source = fixtureDir + "/secret.png";
+    const QString source = m_fixtureDir + "/secret.png";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     QImage picture(128, 128, QImage::Format_ARGB32);
     picture.fill(Qt::black);
@@ -212,7 +212,7 @@ TEST_F(TestThumbnailStore, theSweepNeverDeletesAnotherProgramsThumbnails) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("shared"));
-    const QString source = fixtureDir + "/img10.jpg";
+    const QString source = m_fixtureDir + "/img10.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     QImage picture(128, 128, QImage::Format_ARGB32);
     picture.fill(Qt::black);
@@ -263,7 +263,7 @@ TEST_F(TestThumbnailStore, aThumbnailAnotherProgramWroteIsACacheHit) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("kio"));
-    const QString source = fixtureDir + "/img1.jpg";
+    const QString source = m_fixtureDir + "/img1.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(800, 600)));
     const QFileInfo info(source);
 
@@ -338,7 +338,7 @@ TEST_F(TestThumbnailStore, savedThumbnailsAndTheirDirectoriesArePrivate) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("private"));
-    const QString source = fixtureDir + "/img1.jpg";
+    const QString source = m_fixtureDir + "/img1.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     QImage picture(128, 128, QImage::Format_ARGB32);
     picture.fill(Qt::black);
@@ -373,7 +373,7 @@ TEST_F(TestThumbnailStore, oneStoredBucketServesEverySmallerRequest) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("buckets"));
-    const QString source = fixtureDir + "/img2.jpg";
+    const QString source = m_fixtureDir + "/img2.jpg";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(1024, 768)));
 
     EXPECT_EQ(ThumbnailCache::bucketForRequest(120, false, QSize()), 128);
@@ -408,9 +408,9 @@ TEST_F(TestThumbnailStore, thumbnailCachePurgesByIdleTimeAndReadRefreshesTheCloc
     auto age = [&now](const QString &path, int days) {
         return setMTimeSecs(path, now.addDays(-days).toSecsSinceEpoch());
     };
-    const QString hot = fixtureDir + "/img1.jpg";
-    const QString stale = fixtureDir + "/img2.jpg";
-    const QString revived = fixtureDir + "/img10.jpg";
+    const QString hot = m_fixtureDir + "/img1.jpg";
+    const QString stale = m_fixtureDir + "/img2.jpg";
+    const QString revived = m_fixtureDir + "/img10.jpg";
     for(const QString &source : {hot, stale, revived})
         EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     for(const QString &source : {hot, stale, revived})
@@ -445,7 +445,7 @@ TEST_F(TestThumbnailStore, theSweepDropsOurOwnOrphansByExistenceNotByAge) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("orphans"));
-    const QString gone = fixtureDir + "/gone.png";
+    const QString gone = m_fixtureDir + "/gone.png";
     EXPECT_TRUE(writeBigImage(gone, "png", QSize(64, 64)));
     QImage picture(128, 128, QImage::Format_ARGB32);
     picture.fill(Qt::black);
@@ -461,7 +461,7 @@ TEST_F(TestThumbnailStore, theSweepDropsOurOwnOrphansByExistenceNotByAge) {
     EXPECT_TRUE(!cache.exists(gone, 128));
 
     // and a live original of the same age is not touched by that pass
-    const QString alive = fixtureDir + "/alive.png";
+    const QString alive = m_fixtureDir + "/alive.png";
     EXPECT_TRUE(writeBigImage(alive, "png", QSize(64, 64)));
     EXPECT_TRUE(cache.save(picture, alive, 128, QFileInfo(alive), QSize(64, 64), false, false));
     EXPECT_EQ(cache.purgeOlderThan(15, ThumbnailCache::cacheMaxBytes).orphanDropped, 0);
@@ -492,10 +492,10 @@ TEST_F(TestThumbnailStore, thumbnailCacheByteCapFiresOnlyOnWhatTheIdleSweepLeave
     auto size = [](const QString &path) {
         return QFileInfo(path).size();
     };
-    const QString newestSrc = fixtureDir + "/img1.jpg";
-    const QString olderSrc = fixtureDir + "/img2.jpg";
-    const QString older2Src = fixtureDir + "/img10.jpg";
-    const QString oldestSrc = fixtureDir + "/skip.txt";
+    const QString newestSrc = m_fixtureDir + "/img1.jpg";
+    const QString olderSrc = m_fixtureDir + "/img2.jpg";
+    const QString older2Src = m_fixtureDir + "/img10.jpg";
+    const QString oldestSrc = m_fixtureDir + "/skip.txt";
     for(const QString &source : {newestSrc, olderSrc, older2Src, oldestSrc})
         EXPECT_TRUE(writeBigImage(source, "png", QSize(64, 64)));
     const QString newest = cache.thumbnailPath(newestSrc, 128);
@@ -562,7 +562,7 @@ TEST_F(TestThumbnailStore, theStoreNeverHoldsACroppedPictureAndSquareDisplayStil
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("cropstore"));
     // a 4:1 source: a crop to square is unmistakable in the arithmetic
-    const QString source = fixtureDir + "/wide.png";
+    const QString source = m_fixtureDir + "/wide.png";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(800, 200)));
     LoadPolicy policy = loadPolicy();
 
@@ -601,7 +601,7 @@ TEST_F(TestThumbnailStore, aSmallerRequestIsServedFromTheStoredLargerBucket) {
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("bucketreuse"));
-    const QString source = fixtureDir + "/big.png";
+    const QString source = m_fixtureDir + "/big.png";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(1200, 900)));
     LoadPolicy policy = loadPolicy();
 
@@ -636,7 +636,7 @@ TEST_F(TestThumbnailStore, aCacheHitStillReportsTheSourceSizeWhenTheEntryCarries
     QTemporaryDir own;
     EXPECT_TRUE(own.isValid());
     ThumbnailCache cache(own.filePath("sizeless"));
-    const QString source = fixtureDir + "/big.png";
+    const QString source = m_fixtureDir + "/big.png";
     EXPECT_TRUE(writeBigImage(source, "png", QSize(1200, 900)));
     LoadPolicy policy = loadPolicy();
 

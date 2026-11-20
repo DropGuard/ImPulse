@@ -21,10 +21,10 @@ TEST_F(TestListing, engineBridgePumpDeliversListed) {
     QSignalSpy listed(&bridge, &EngineBridge::dirListed);
     EXPECT_TRUE(listed.isValid());
 
-    EXPECT_TRUE(bridge.openDir(fixtureDir, 0 /*QIMGV_SORT_NAME*/, false));
+    EXPECT_TRUE(bridge.openDir(m_fixtureDir, 0 /*QIMGV_SORT_NAME*/, false));
     ASSERT_TRY_EQ_TIMEOUT(listed.count(), 1, 10000);
     // the event, not a count, is what says this listing is ours
-    EXPECT_EQ(bridge.listedDirectory(), fixtureDir);
+    EXPECT_EQ(bridge.listedDirectory(), m_fixtureDir);
 
     EXPECT_EQ(bridge.fileCount(), 3); // txt filtered
     EXPECT_EQ(bridge.dirCount(), 1);
@@ -41,7 +41,7 @@ TEST_F(TestListing, directoryManagerOpenIsAsynchronous) {
     QSignalSpy loaded(&dm, &DirectoryManager::loaded);
     QSignalSpy failed(&dm, &DirectoryManager::loadingFailed);
 
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     // THE async assertion: listing must NOT be there yet (old code was sync)
     EXPECT_EQ(dm.fileCount(), 0UL);
     EXPECT_EQ(loaded.count(), 0);
@@ -49,8 +49,8 @@ TEST_F(TestListing, directoryManagerOpenIsAsynchronous) {
     ASSERT_TRY_EQ_TIMEOUT(loaded.count(), 1, 10000);
     EXPECT_EQ(dm.fileCount(), 3UL);
     EXPECT_EQ(dm.dirCount(), 1UL);
-    EXPECT_EQ(dm.filePathAt(0), fixtureDir + "/img1.jpg");
-    EXPECT_EQ(dm.filePathAt(2), fixtureDir + "/img10.jpg");
+    EXPECT_EQ(dm.filePathAt(0), m_fixtureDir + "/img1.jpg");
+    EXPECT_EQ(dm.filePathAt(2), m_fixtureDir + "/img10.jpg");
     EXPECT_EQ(failed.count(), 0);
 }
 
@@ -63,21 +63,21 @@ TEST_F(TestListing, missingDirectoryFailsFast) {
 TEST_F(TestListing, sortingResortsAsynchronously) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
     QSignalSpy resort(&dm, &DirectoryManager::sortingChanged);
     dm.setSortingMode(SORT_NAME_DESC);
     ASSERT_TRY_EQ_TIMEOUT(resort.count(), 1, 10000);
-    EXPECT_EQ(dm.filePathAt(0), fixtureDir + "/img10.jpg");
-    EXPECT_EQ(dm.filePathAt(2), fixtureDir + "/img1.jpg");
+    EXPECT_EQ(dm.filePathAt(0), m_fixtureDir + "/img10.jpg");
+    EXPECT_EQ(dm.filePathAt(2), m_fixtureDir + "/img1.jpg");
 }
 
 TEST_F(TestListing, liveFileCreationArrivesViaWatcher) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     QSignalSpy added(&dm, &DirectoryManager::fileAdded);
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
     // a file appears while the directory is open; on Linux the engine
@@ -85,24 +85,24 @@ TEST_F(TestListing, liveFileCreationArrivesViaWatcher) {
     makeFile("latecomer.jpg");
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 4UL, 10000);
     EXPECT_EQ(added.count(), 1);
-    EXPECT_EQ(added.at(0).at(0).toString(), fixtureDir + "/latecomer.jpg");
+    EXPECT_EQ(added.at(0).at(0).toString(), m_fixtureDir + "/latecomer.jpg");
     // the engine listing is authoritative: natural order kept
-    EXPECT_EQ(dm.filePathAt(0), fixtureDir + "/img1.jpg");
-    EXPECT_EQ(dm.filePathAt(3), fixtureDir + "/latecomer.jpg");
+    EXPECT_EQ(dm.filePathAt(0), m_fixtureDir + "/img1.jpg");
+    EXPECT_EQ(dm.filePathAt(3), m_fixtureDir + "/latecomer.jpg");
 }
 
 TEST_F(TestListing, liveFileDeletionEmitsRemoved) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
-    EXPECT_TRUE(QFile::remove(fixtureDir + "/img2.jpg"));
+    EXPECT_TRUE(QFile::remove(m_fixtureDir + "/img2.jpg"));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 2UL, 10000);
     EXPECT_EQ(removed.count(), 1);
-    EXPECT_EQ(dm.filePathAt(0), fixtureDir + "/img1.jpg");
-    EXPECT_EQ(dm.filePathAt(1), fixtureDir + "/img10.jpg");
+    EXPECT_EQ(dm.filePathAt(0), m_fixtureDir + "/img1.jpg");
+    EXPECT_EQ(dm.filePathAt(1), m_fixtureDir + "/img10.jpg");
 }
 
 TEST_F(TestListing, liveFileModificationKeepsTheMirrorEntryWhole) {
@@ -114,10 +114,10 @@ TEST_F(TestListing, liveFileModificationKeepsTheMirrorEntryWhole) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     QSignalSpy modified(&dm, &DirectoryManager::fileModified);
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
-    QFile f(fixtureDir + "/img2.jpg");
+    QFile f(m_fixtureDir + "/img2.jpg");
     EXPECT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Append));
     EXPECT_TRUE(f.write("appended") == 8);
     f.close();
@@ -125,15 +125,15 @@ TEST_F(TestListing, liveFileModificationKeepsTheMirrorEntryWhole) {
     ASSERT_TRY_TRUE_TIMEOUT(modified.count() >= 1, 10000);
     bool sawImg2Modified = false;
     for(int i = 0; i < modified.count(); ++i)
-        sawImg2Modified |= modified.at(i).at(0).toString() == fixtureDir + "/img2.jpg";
+        sawImg2Modified |= modified.at(i).at(0).toString() == m_fixtureDir + "/img2.jpg";
     EXPECT_TRUE(sawImg2Modified);
 
     // the entry survives the round trip whole: re-stat, not emptied
-    int index = dm.indexOfFile(fixtureDir + "/img2.jpg");
+    int index = dm.indexOfFile(m_fixtureDir + "/img2.jpg");
     EXPECT_TRUE(index >= 0);
     ASSERT_TRY_EQ_TIMEOUT(dm.fileEntryAt(index).size, 9UL, 10000);
     EXPECT_EQ(dm.fileEntryAt(index).name, QStringLiteral("img2.jpg"));
-    EXPECT_EQ(dm.fileEntryAt(index).path, fixtureDir + "/img2.jpg");
+    EXPECT_EQ(dm.fileEntryAt(index).path, m_fixtureDir + "/img2.jpg");
     EXPECT_TRUE(!dm.fileEntryAt(index).isDirectory);
 }
 
@@ -148,26 +148,26 @@ TEST_F(TestListing, liveRenameIsOneEvent) {
     QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
     QSignalSpy added(&dm, &DirectoryManager::fileAdded);
     QSignalSpy renamed(&dm, &DirectoryManager::fileRenamed);
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
-    const int oldIndex = dm.indexOfFile(fixtureDir + "/img2.jpg");
+    const int oldIndex = dm.indexOfFile(m_fixtureDir + "/img2.jpg");
     EXPECT_TRUE(oldIndex >= 0);
 
-    EXPECT_TRUE(QFile::rename(fixtureDir + "/img2.jpg", fixtureDir + "/renamed.jpg"));
+    EXPECT_TRUE(QFile::rename(m_fixtureDir + "/img2.jpg", m_fixtureDir + "/renamed.jpg"));
     ASSERT_TRY_EQ_TIMEOUT(renamed.count(), 1, 10000);
     EXPECT_EQ(removed.count(), 0);
     EXPECT_EQ(added.count(), 0);
-    EXPECT_EQ(renamed.at(0).at(0).toString(), fixtureDir + "/img2.jpg");
-    EXPECT_EQ(renamed.at(0).at(1).toString(), fixtureDir + "/renamed.jpg");
+    EXPECT_EQ(renamed.at(0).at(0).toString(), m_fixtureDir + "/img2.jpg");
+    EXPECT_EQ(renamed.at(0).at(1).toString(), m_fixtureDir + "/renamed.jpg");
     EXPECT_EQ(renamed.at(0).at(2).toInt(), oldIndex);
 
     // one event, and the row it moved is the engine's own row: name sort
     // lands "renamed" after "img1" and "img10", so the entry repositioned —
     // the rename is a move under this mode, not an in-place edit
     EXPECT_EQ(dm.fileCount(), 3UL);
-    const int newIndex = dm.indexOfFile(fixtureDir + "/renamed.jpg");
+    const int newIndex = dm.indexOfFile(m_fixtureDir + "/renamed.jpg");
     EXPECT_TRUE(newIndex != oldIndex);
-    EXPECT_TRUE(!dm.containsFile(fixtureDir + "/img2.jpg"));
+    EXPECT_TRUE(!dm.containsFile(m_fixtureDir + "/img2.jpg"));
     // the entry rode along whole: size is the stat the engine already had,
     // not a re-derive and not a zeroed placeholder
     EXPECT_EQ(dm.fileEntryAt(newIndex).name, QStringLiteral("renamed.jpg"));
@@ -183,7 +183,7 @@ TEST_F(TestListing, overwriteRenameReplacesTheListedRow) {
     // and picture of the file that used to live there.
     resetFixture();
     {
-        QFile f(fixtureDir + "/over.jpg");
+        QFile f(m_fixtureDir + "/over.jpg");
         EXPECT_TRUE(f.open(QIODevice::WriteOnly));
         EXPECT_EQ(f.write(QByteArray(7, 'x')), 7);
     }
@@ -191,10 +191,10 @@ TEST_F(TestListing, overwriteRenameReplacesTheListedRow) {
     QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
     QSignalSpy added(&dm, &DirectoryManager::fileAdded);
     QSignalSpy renamed(&dm, &DirectoryManager::fileRenamed);
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 4UL, 10000);
-    const int source = dm.indexOfFile(fixtureDir + "/over.jpg");
-    const int dest = dm.indexOfFile(fixtureDir + "/img1.jpg");
+    const int source = dm.indexOfFile(m_fixtureDir + "/over.jpg");
+    const int dest = dm.indexOfFile(m_fixtureDir + "/img1.jpg");
     EXPECT_TRUE(source >= 0 && dest >= 0);
 
     // QFile::rename would not do: it maps to RENAME_NOREPLACE and cannot
@@ -209,27 +209,27 @@ TEST_F(TestListing, overwriteRenameReplacesTheListedRow) {
                             reinterpret_cast<const WCHAR *>((fixtureDir + QStringLiteral("/img1.jpg")).utf16()),
                             MOVEFILE_REPLACE_EXISTING));
 #else
-    const QByteArray from = (fixtureDir + "/over.jpg").toLocal8Bit();
-    const QByteArray to = (fixtureDir + "/img1.jpg").toLocal8Bit();
+    const QByteArray from = (m_fixtureDir + "/over.jpg").toLocal8Bit();
+    const QByteArray to = (m_fixtureDir + "/img1.jpg").toLocal8Bit();
     EXPECT_EQ(std::rename(from.constData(), to.constData()), 0);
 #endif
 
     ASSERT_TRY_EQ_TIMEOUT(renamed.count(), 1, 10000);
     EXPECT_EQ(added.count(), 0);
-    EXPECT_EQ(renamed.at(0).at(0).toString(), fixtureDir + "/over.jpg");
-    EXPECT_EQ(renamed.at(0).at(1).toString(), fixtureDir + "/img1.jpg");
+    EXPECT_EQ(renamed.at(0).at(0).toString(), m_fixtureDir + "/over.jpg");
+    EXPECT_EQ(renamed.at(0).at(1).toString(), m_fixtureDir + "/img1.jpg");
     // the row the overwrite took away is announced before the move, because
     // every index after it shifts — including the one just passed to this
     // signal, which is the position the view is holding when it fires
     EXPECT_EQ(removed.count(), 1);
-    EXPECT_EQ(removed.at(0).at(0).toString(), fixtureDir + "/img1.jpg");
+    EXPECT_EQ(removed.at(0).at(0).toString(), m_fixtureDir + "/img1.jpg");
     EXPECT_EQ(renamed.at(0).at(2).toInt(), (source > dest) ? source - 1 : source);
     // four rows became three: an overwrite consumes the destination entry,
     // which is the whole difference between this and a plain rename
     EXPECT_EQ(dm.fileCount(), 3UL);
-    EXPECT_TRUE(!dm.containsFile(fixtureDir + "/over.jpg"));
+    EXPECT_TRUE(!dm.containsFile(m_fixtureDir + "/over.jpg"));
     // and the surviving row now describes the file that is actually there
-    EXPECT_EQ(dm.fileEntryAt(dm.indexOfFile(fixtureDir + "/img1.jpg")).size, 7UL);
+    EXPECT_EQ(dm.fileEntryAt(dm.indexOfFile(m_fixtureDir + "/img1.jpg")).size, 7UL);
     assertMirrorMatchesEngineExport(dm);
 }
 
@@ -240,9 +240,9 @@ TEST_F(TestListing, overwriteRenameReplacesTheListedRow) {
 TEST_F(TestListing, whenListedFiresWhenTheListingLands) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     bool fired = false;
-    dm.whenListed(fixtureDir, [&fired] {
+    dm.whenListed(m_fixtureDir, [&fired] {
         fired = true;
     });
     EXPECT_TRUE(!fired); // armed, the listing is still in flight
@@ -251,21 +251,21 @@ TEST_F(TestListing, whenListedFiresWhenTheListingLands) {
 
 TEST_F(TestListing, whenListedIsSupersededByANewerOpen) {
     resetFixture();
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("second"));
-    QFile f(fixtureDir + "/second/z.jpg");
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("second"));
+    QFile f(m_fixtureDir + "/second/z.jpg");
     EXPECT_TRUE(f.open(QIODevice::WriteOnly));
 
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     bool staleFired = false;
-    dm.whenListed(fixtureDir, [&staleFired] {
+    dm.whenListed(m_fixtureDir, [&staleFired] {
         staleFired = true;
     });
     // a newer open supersedes the queue before the stale listing lands
-    EXPECT_TRUE(dm.setDirectory(fixtureDir + "/second"));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir + "/second"));
     EXPECT_TRUE(!staleFired);
     bool freshFired = false;
-    dm.whenListed(fixtureDir + "/second", [&freshFired] {
+    dm.whenListed(m_fixtureDir + "/second", [&freshFired] {
         freshFired = true;
     });
     ASSERT_TRY_TRUE_TIMEOUT(freshFired, 10000);
@@ -275,9 +275,9 @@ TEST_F(TestListing, whenListedIsSupersededByANewerOpen) {
 TEST_F(TestListing, whenListedCanBeCancelled) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     bool fired = false;
-    qint64 token = dm.whenListed(fixtureDir, [&fired] {
+    qint64 token = dm.whenListed(m_fixtureDir, [&fired] {
         fired = true;
     });
     EXPECT_TRUE(dm.cancelListed(token));
@@ -301,27 +301,27 @@ TEST_F(TestListing, modelFileOperationsRideTheEngineRoundTrip) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy removed(&model, &DirectoryModel::fileRemoved);
     QSignalSpy added(&model, &DirectoryModel::fileAdded);
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 3UL, 10000);
 
     FileOpResult result;
-    model.removeFile(fixtureDir + "/img2.jpg", false, result);
+    model.removeFile(m_fixtureDir + "/img2.jpg", false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
     // the removal signal carries the update when the round trip lands,
     // not synchronously from the operation
     ASSERT_TRY_EQ_TIMEOUT(removed.count(), 1, 10000);
-    EXPECT_EQ(removed.at(0).at(0).toString(), fixtureDir + "/img2.jpg");
+    EXPECT_EQ(removed.at(0).at(0).toString(), m_fixtureDir + "/img2.jpg");
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 2UL, 10000);
 
     // rename in place surfaces as remove+add, exactly like an external one
-    model.renameEntry(fixtureDir + "/img1.jpg", "renamed.jpg", false, result);
+    model.renameEntry(m_fixtureDir + "/img1.jpg", "renamed.jpg", false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(fixtureDir + "/renamed.jpg"), 10000);
-    EXPECT_TRUE(!model.containsFile(fixtureDir + "/img1.jpg"));
+    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(m_fixtureDir + "/renamed.jpg"), 10000);
+    EXPECT_TRUE(!model.containsFile(m_fixtureDir + "/img1.jpg"));
 
     // copy into the watched directory — engine-driven from the start
-    EXPECT_TRUE(QFile::copy(fixtureDir + "/renamed.jpg", fixtureDir + "/copy.jpg"));
-    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(fixtureDir + "/copy.jpg"), 10000);
+    EXPECT_TRUE(QFile::copy(m_fixtureDir + "/renamed.jpg", m_fixtureDir + "/copy.jpg"));
+    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(m_fixtureDir + "/copy.jpg"), 10000);
     EXPECT_EQ(model.fileCount(), 2UL + 1UL);
 }
 
@@ -334,7 +334,7 @@ TEST_F(TestListing, modelFileOperationsRideTheEngineRoundTrip) {
 TEST_F(TestListing, mirrorStaysAFaithfulProjectionOfTheEngineListing) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
     // tricky names — exactly where the two producers used to disagree —
@@ -350,9 +350,9 @@ TEST_F(TestListing, mirrorStaysAFaithfulProjectionOfTheEngineListing) {
 #endif
     makeFile("img 10.jpg");
     makeFile("10.jpg");
-    EXPECT_TRUE(QFile::remove(fixtureDir + "/img1.jpg"));
+    EXPECT_TRUE(QFile::remove(m_fixtureDir + "/img1.jpg"));
     {
-        QFile f(fixtureDir + "/img2.jpg");
+        QFile f(m_fixtureDir + "/img2.jpg");
         EXPECT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Append));
         EXPECT_TRUE(f.write("appended") == 8);
     }
@@ -372,7 +372,7 @@ TEST_F(TestListing, mirrorStaysAFaithfulProjectionOfTheEngineListing) {
     assertMirrorMatchesEngineExport(dm);
 
     {
-        QFile f(fixtureDir + "/10.jpg");
+        QFile f(m_fixtureDir + "/10.jpg");
         EXPECT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Append));
         EXPECT_TRUE(f.write(QByteArray(4096, 'x')));
     }
@@ -380,8 +380,8 @@ TEST_F(TestListing, mirrorStaysAFaithfulProjectionOfTheEngineListing) {
     // divergence — which half is behind, and what both orders actually
     // hold. An unattributed index flake is an unmeasured one (this flake
     // failed three full-ctest runs before it could speak).
-    const QString tenJpg = fixtureDir + QStringLiteral("/10.jpg");
-    const QString img2Jpg = fixtureDir + QStringLiteral("/img2.jpg");
+    const QString tenJpg = m_fixtureDir + QStringLiteral("/10.jpg");
+    const QString img2Jpg = m_fixtureDir + QStringLiteral("/img2.jpg");
     bool reseatLanded = false;
     QDeadlineTimer reseatDeadline(10000);
     while(!((reseatLanded = dm.indexOfFile(tenJpg) > dm.indexOfFile(img2Jpg))) && !reseatDeadline.hasExpired())
@@ -414,7 +414,7 @@ TEST_F(TestListing, mutationsOutsideTheMirroredDirectoryAreDropped) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     auto &bridge = EngineBridge::instance();
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
     const unsigned long before = dm.fileCount();
     EXPECT_TRUE(before > 0);
@@ -436,7 +436,7 @@ TEST_F(TestListing, mutationsOutsideTheMirroredDirectoryAreDropped) {
 
     // the guard must not swallow the real case
     makeFile("legit.jpg");
-    ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(fixtureDir + "/legit.jpg"), 10000);
+    ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(m_fixtureDir + "/legit.jpg"), 10000);
 }
 
 TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
@@ -448,7 +448,7 @@ TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     auto &bridge = EngineBridge::instance();
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
     const unsigned long before = dm.fileCount();
     EXPECT_TRUE(before > 0);
@@ -456,16 +456,16 @@ TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
     QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
 
     // legal destination, foreign source — the shape the guard exists for
-    emit bridge.dirMutated(QIMGV_MUT_RENAMED, fixtureDir + "/img1.jpg", false, 1, 0, 0,
+    emit bridge.dirMutated(QIMGV_MUT_RENAMED, m_fixtureDir + "/img1.jpg", false, 1, 0, 0,
                            QStringLiteral("/some/other/place/x.jpg"));
     EXPECT_EQ(renamed.count(), 0);
     EXPECT_EQ(removed.count(), 0);
     EXPECT_EQ(dm.fileCount(), before);
-    EXPECT_TRUE(dm.containsFile(fixtureDir + "/img1.jpg"));
+    EXPECT_TRUE(dm.containsFile(m_fixtureDir + "/img1.jpg"));
     // the row it would have moved is still the engine's own row
     assertMirrorMatchesEngineExport(dm);
 
     // and a real rename of the same destination still lands
-    EXPECT_TRUE(QFile::rename(fixtureDir + "/img2.jpg", fixtureDir + "/moved.jpg"));
+    EXPECT_TRUE(QFile::rename(m_fixtureDir + "/img2.jpg", m_fixtureDir + "/moved.jpg"));
     ASSERT_TRY_EQ_TIMEOUT(renamed.count(), 1, 10000);
 }

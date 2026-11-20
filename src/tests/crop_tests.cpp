@@ -18,25 +18,25 @@
 #include "gui/crop/croppanel.h"
 class TestCrop : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base, alpha;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base, m_alpha;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        EXPECT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("crop");
-        alpha = QDir(base).filePath("alpha");
-        EXPECT_TRUE(QDir().mkpath(alpha));
-        EXPECT_TRUE(QDir().mkpath(base));
+        EXPECT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("crop");
+        m_alpha = QDir(m_base).filePath("alpha");
+        EXPECT_TRUE(QDir().mkpath(m_alpha));
+        EXPECT_TRUE(QDir().mkpath(m_base));
     }
 };
 
@@ -48,15 +48,15 @@ class TestCrop : public ::testing::Test {
 TEST_F(TestCrop, cropEntryRespectsTheUserZoom) {
     QImage big(2000, 1200, QImage::Format_RGB32);
     big.fill(Qt::darkCyan);
-    EXPECT_TRUE(big.save(QDir(base).filePath("big.png"), "PNG"));
+    EXPECT_TRUE(big.save(QDir(m_base).filePath("big.png"), "PNG"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("big.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("big.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("big.png");
+            return core.currentFilePath() == QDir(m_base).filePath("big.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("big.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("big.png"));
     core.mainWindow()->fitOriginal();
     auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
     ASSERT_TRUE(viewer);
@@ -82,15 +82,15 @@ TEST_F(TestCrop, cropEntryRespectsTheUserZoom) {
 TEST_F(TestCrop, cropEntryPreservesFramedView) {
     QImage big(2000, 1200, QImage::Format_RGB32);
     big.fill(Qt::darkMagenta);
-    EXPECT_TRUE(big.save(QDir(base).filePath("framed.png"), "PNG"));
+    EXPECT_TRUE(big.save(QDir(m_base).filePath("framed.png"), "PNG"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("framed.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("framed.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("framed.png");
+            return core.currentFilePath() == QDir(m_base).filePath("framed.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("framed.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("framed.png"));
     auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
     ASSERT_TRUE(viewer);
     core.mainWindow()->resize(1600, 900);
@@ -124,15 +124,15 @@ TEST_F(TestCrop, cropEntryPreservesFramedView) {
 TEST_F(TestCrop, cropAllowsZoomFineTuning) {
     QImage big(2000, 1200, QImage::Format_RGB32);
     big.fill(Qt::darkYellow);
-    EXPECT_TRUE(big.save(QDir(base).filePath("fine.png"), "PNG"));
+    EXPECT_TRUE(big.save(QDir(m_base).filePath("fine.png"), "PNG"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("fine.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("fine.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("fine.png");
+            return core.currentFilePath() == QDir(m_base).filePath("fine.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("fine.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("fine.png"));
     auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
     ASSERT_TRUE(viewer);
     core.mainWindow()->fitOriginal();
@@ -198,15 +198,15 @@ TEST_F(TestCrop, cropAllowsZoomFineTuning) {
 TEST_F(TestCrop, cropOwnsEnterEvenWithoutSelection) {
     QImage img(64, 32, QImage::Format_RGB32);
     img.fill(Qt::red);
-    EXPECT_TRUE(img.save(QDir(base).filePath("enter.png"), "PNG"));
+    EXPECT_TRUE(img.save(QDir(m_base).filePath("enter.png"), "PNG"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("enter.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("enter.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("enter.png");
+            return core.currentFilePath() == QDir(m_base).filePath("enter.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("enter.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("enter.png"));
     core.mainWindow()->crop()->toggle();
     EXPECT_TRUE(core.mainWindow()->crop()->isActive());
     auto *overlay = core.mainWindow()->findChild<CropOverlay *>();
@@ -215,16 +215,16 @@ TEST_F(TestCrop, cropOwnsEnterEvenWithoutSelection) {
     QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
     QApplication::sendEvent(overlay, &enter);
 
-    EXPECT_TRUE(core.mainWindow()->crop()->isActive());                                          // the surface stayed
-    EXPECT_EQ(core.viewState().viewMode.value(), MODE_DOCUMENT);                                 // no folder switch
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("enter.png"));                         // no navigation
-    EXPECT_TRUE(!core.directoryModel()->getImage(QDir(base).filePath("enter.png"))->isEdited()); // nothing applied
+    EXPECT_TRUE(core.mainWindow()->crop()->isActive());                                            // the surface stayed
+    EXPECT_EQ(core.viewState().viewMode.value(), MODE_DOCUMENT);                                   // no folder switch
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("enter.png"));                         // no navigation
+    EXPECT_TRUE(!core.directoryModel()->getImage(QDir(m_base).filePath("enter.png"))->isEdited()); // nothing applied
 }
 
 TEST_F(TestCrop, cropPanelSurvivesAnEarlyTrigger) {
-    writeImage(QDir(base).filePath("crop.png"));
+    writeImage(QDir(m_base).filePath("crop.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("crop.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("crop.png")));
     core.mainWindow()->crop()->toggle();
     EXPECT_TRUE(core.mainWindow()->crop()->isActive());
     core.mainWindow()->crop()->toggle();
@@ -323,7 +323,7 @@ TEST_F(TestCrop, cropAndSaveWritesTheCroppedFile) {
     Core core;
     coretest::FakeInteractions fake;
     core.setUserInteractions(&fake);
-    const QString img = QDir(alpha).filePath("rect.png");
+    const QString img = QDir(m_alpha).filePath("rect.png");
     coretest::writeRectImage(img);
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(QTest::qWaitFor(

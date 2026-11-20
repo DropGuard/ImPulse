@@ -56,9 +56,9 @@ class TestFileOps : public ::testing::Test, protected EngineStackFixture {
 
 TEST_F(TestFileOps, copyFileToCopiesContentKeepsSourceAndRestoresTimestamps) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "original");
+    QString src = makeFile(m_fixtureDir + "/a.txt", "original");
     stampMTime(src);
-    QString destDir = fixtureDir + "/dest";
+    QString destDir = m_fixtureDir + "/dest";
     EXPECT_TRUE(QDir().mkpath(destDir));
 
     FileOpResult result = OTHER_ERROR;
@@ -74,27 +74,27 @@ TEST_F(TestFileOps, copyFileToCopiesContentKeepsSourceAndRestoresTimestamps) {
 
 TEST_F(TestFileOps, copyFileToNamesItsRefusals) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "x");
+    QString src = makeFile(m_fixtureDir + "/a.txt", "x");
 
     // the destination being the source's own directory is a no-op, not a copy
     FileOpResult result = OTHER_ERROR;
-    FileOperations::copyFileTo(src, fixtureDir, false, result);
+    FileOperations::copyFileTo(src, m_fixtureDir, false, result);
     EXPECT_EQ(result, NOTHING_TO_DO);
 
     result = OTHER_ERROR;
-    FileOperations::copyFileTo(fixtureDir + "/missing.txt", fixtureDir + "/dest", false, result);
+    FileOperations::copyFileTo(m_fixtureDir + "/missing.txt", m_fixtureDir + "/dest", false, result);
     EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 
-    EXPECT_TRUE(QDir().mkpath(fixtureDir + "/dest"));
+    EXPECT_TRUE(QDir().mkpath(m_fixtureDir + "/dest"));
     result = OTHER_ERROR;
-    FileOperations::copyFileTo(src, fixtureDir + "/nowhere", false, result);
+    FileOperations::copyFileTo(src, m_fixtureDir + "/nowhere", false, result);
     EXPECT_EQ(result, DESTINATION_DOES_NOT_EXIST);
 }
 
 TEST_F(TestFileOps, copyFileToReportsCollisionWithoutForceAndOverwritesWithForce) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "new");
-    QString destDir = fixtureDir + "/dest";
+    QString src = makeFile(m_fixtureDir + "/a.txt", "new");
+    QString destDir = m_fixtureDir + "/dest";
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeFile(destDir + "/a.txt", "old");
 
@@ -131,8 +131,8 @@ TEST_F(TestFileOps, copyFileToReportsCollisionWithoutForceAndOverwritesWithForce
 
 TEST_F(TestFileOps, copyFileToRejectsADirectoryCollision) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "x");
-    QString destDir = fixtureDir + "/dest";
+    QString src = makeFile(m_fixtureDir + "/a.txt", "x");
+    QString destDir = m_fixtureDir + "/dest";
     EXPECT_TRUE(QDir(destDir).mkpath(destDir + "/a.txt")); // a DIRECTORY named like the file
 
     FileOpResult result = OTHER_ERROR;
@@ -152,8 +152,8 @@ TEST_F(TestFileOps, copyFileToReportsAnUnwritableDestination) {
         GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
 #endif
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "x");
-    QString destDir = fixtureDir + "/rodest";
+    QString src = makeFile(m_fixtureDir + "/a.txt", "x");
+    QString destDir = m_fixtureDir + "/rodest";
     EXPECT_TRUE(QDir().mkpath(destDir));
     EXPECT_TRUE(QFile::setPermissions(destDir, QFile::Permissions(0x5555)));
 
@@ -167,9 +167,9 @@ TEST_F(TestFileOps, copyFileToReportsAnUnwritableDestination) {
 
 TEST_F(TestFileOps, moveFileToMovesContentAndRemovesTheSource) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "content");
+    QString src = makeFile(m_fixtureDir + "/a.txt", "content");
     stampMTime(src);
-    QString destDir = fixtureDir + "/dest";
+    QString destDir = m_fixtureDir + "/dest";
     EXPECT_TRUE(QDir().mkpath(destDir));
 
     // capture the stamp before the move: after it, the source is gone and
@@ -204,10 +204,10 @@ TEST_F(TestFileOps, moveFileToReportsASourceItCouldNotRemove) {
         GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
 #endif
     resetFixture();
-    QString srcDir = fixtureDir + "/mvsrc";
+    QString srcDir = m_fixtureDir + "/mvsrc";
     EXPECT_TRUE(QDir().mkpath(srcDir));
     QString src = makeFile(srcDir + "/a.txt", "new");
-    QString destDir = fixtureDir + "/mvdst";
+    QString destDir = m_fixtureDir + "/mvdst";
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeFile(destDir + "/a.txt", "old");
 
@@ -229,19 +229,19 @@ TEST_F(TestFileOps, moveFileToReportsASourceItCouldNotRemove) {
 
 TEST_F(TestFileOps, renameMovesTheFileAndRefusesCollisions) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "x");
-    makeFile(fixtureDir + "/b.txt", "y");
+    QString src = makeFile(m_fixtureDir + "/a.txt", "x");
+    makeFile(m_fixtureDir + "/b.txt", "y");
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::rename(src, "c.txt", false, result);
     EXPECT_EQ(result, SUCCESS);
-    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/a.txt"));
-    EXPECT_EQ(contentOf(fixtureDir + "/c.txt"), QByteArray("x"));
+    EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/a.txt"));
+    EXPECT_EQ(contentOf(m_fixtureDir + "/c.txt"), QByteArray("x"));
 
     // renaming onto an existing file is refused without force, and a
     // directory collision is refused even with it
     result = OTHER_ERROR;
-    FileOperations::rename(fixtureDir + "/c.txt", "b.txt", false, result);
+    FileOperations::rename(m_fixtureDir + "/c.txt", "b.txt", false, result);
     EXPECT_EQ(result, DESTINATION_FILE_EXISTS);
 
     // FORCED overwrite replaces the destination in one rename(2).
@@ -258,38 +258,38 @@ TEST_F(TestFileOps, renameMovesTheFileAndRefusesCollisions) {
     // single rename does not know the name and leaves it untouched.
     {
         const QString planted =
-            fixtureDir + "/b.txt_" +
-            QString(QCryptographicHash::hash((fixtureDir + "/b.txt").toUtf8(), QCryptographicHash::Md5).toHex());
+            m_fixtureDir + "/b.txt_" +
+            QString(QCryptographicHash::hash((m_fixtureDir + "/b.txt").toUtf8(), QCryptographicHash::Md5).toHex());
         makeFile(planted, "not ours");
         result = OTHER_ERROR;
-        FileOperations::rename(fixtureDir + "/c.txt", "b.txt", true, result);
+        FileOperations::rename(m_fixtureDir + "/c.txt", "b.txt", true, result);
         EXPECT_EQ(result, SUCCESS);
-        EXPECT_EQ(contentOf(fixtureDir + "/b.txt"), QByteArray("x")); // the source's bytes won
-        EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/c.txt"));
+        EXPECT_EQ(contentOf(m_fixtureDir + "/b.txt"), QByteArray("x")); // the source's bytes won
+        EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/c.txt"));
         EXPECT_TRUE(QFile::exists(planted))
             << "the rename deleted a file whose name it does not own — the old fixed-md5 backup path";
         EXPECT_EQ(contentOf(planted), QByteArray("not ours"));
         EXPECT_TRUE(QFile::remove(planted));
-        makeFile(fixtureDir + "/c.txt", "x"); // restore for the cases below
+        makeFile(m_fixtureDir + "/c.txt", "x"); // restore for the cases below
     }
 
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("dircollision"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("dircollision"));
     result = OTHER_ERROR;
-    FileOperations::rename(fixtureDir + "/c.txt", "dircollision", true, result);
+    FileOperations::rename(m_fixtureDir + "/c.txt", "dircollision", true, result);
     EXPECT_EQ(result, DESTINATION_DIR_EXISTS);
 
     // the no-op cases: same name and empty name
     result = OTHER_ERROR;
-    FileOperations::rename(fixtureDir + "/c.txt", "c.txt", false, result);
+    FileOperations::rename(m_fixtureDir + "/c.txt", "c.txt", false, result);
     EXPECT_EQ(result, NOTHING_TO_DO);
     result = OTHER_ERROR;
-    FileOperations::rename(fixtureDir + "/c.txt", "", false, result);
+    FileOperations::rename(m_fixtureDir + "/c.txt", "", false, result);
     EXPECT_EQ(result, NOTHING_TO_DO);
 }
 
 TEST_F(TestFileOps, removeFileAndRemoveDirReportExactResults) {
     resetFixture();
-    QString src = makeFile(fixtureDir + "/a.txt", "x");
+    QString src = makeFile(m_fixtureDir + "/a.txt", "x");
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::removeFile(src, result);
@@ -300,19 +300,19 @@ TEST_F(TestFileOps, removeFileAndRemoveDirReportExactResults) {
     FileOperations::removeFile(src, result);
     EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 
-    makeFile(fixtureDir + "/subdir/inner.txt", "x"); // the fixture's subdir
+    makeFile(m_fixtureDir + "/subdir/inner.txt", "x"); // the fixture's subdir
     result = OTHER_ERROR;
-    FileOperations::removeDir(fixtureDir + "/subdir", false, result);
+    FileOperations::removeDir(m_fixtureDir + "/subdir", false, result);
     EXPECT_EQ(result, DIRECTORY_NOT_EMPTY); // non-recursive refuses
-    EXPECT_TRUE(QFileInfo::exists(fixtureDir + "/subdir/inner.txt"));
+    EXPECT_TRUE(QFileInfo::exists(m_fixtureDir + "/subdir/inner.txt"));
 
     result = OTHER_ERROR;
-    FileOperations::removeDir(fixtureDir + "/subdir", true, result);
+    FileOperations::removeDir(m_fixtureDir + "/subdir", true, result);
     EXPECT_EQ(result, SUCCESS);
-    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/subdir"));
+    EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/subdir"));
 
     result = OTHER_ERROR;
-    FileOperations::removeDir(fixtureDir + "/subdir", true, result);
+    FileOperations::removeDir(m_fixtureDir + "/subdir", true, result);
     EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 }
 
@@ -324,7 +324,7 @@ TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
     // the topology refuses. The refusal contract below is unconditional: it is
     // the part FileOperations itself owns.
     resetFixture();
-    QString probe = makeFile(fixtureDir + "/trash-probe.txt", "x");
+    QString probe = makeFile(m_fixtureDir + "/trash-probe.txt", "x");
     FileOpResult probeResult = OTHER_ERROR;
     FileOperations::moveToTrash(probe, probeResult);
     if(probeResult != SUCCESS)
@@ -332,10 +332,10 @@ TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
             << "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)";
 
     EXPECT_TRUE(!QFileInfo::exists(probe)); // the probe already proved the happy path
-    EXPECT_TRUE(!QFileInfo::exists(fixtureDir + "/trash-probe.txt"));
+    EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/trash-probe.txt"));
 
     FileOpResult result = OTHER_ERROR;
-    FileOperations::moveToTrash(fixtureDir + "/missing.txt", result);
+    FileOperations::moveToTrash(m_fixtureDir + "/missing.txt", result);
     EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 }
 

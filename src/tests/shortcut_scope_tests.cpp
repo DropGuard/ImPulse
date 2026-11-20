@@ -21,26 +21,26 @@
 
 class TestShortcutScope : public ::testing::Test {
   protected:
-    IsolatedHome home;
-    coretest::AppSingletons singletons;
-    QString base, alpha;
+    IsolatedHome m_home;
+    coretest::AppSingletons m_singletons;
+    QString m_base, m_alpha;
 
     void writeImage(const QString &path) {
         EXPECT_TRUE(makeImageFile(path, QSize(8, 8)));
     }
     QString uniqueDir(const QString &tag) {
-        const QString dir = QDir(base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
+        const QString dir = QDir(m_base).filePath(tag + QStringLiteral("-{}").arg(QCoreApplication::applicationPid()));
         QDir().mkpath(dir);
         return dir;
     }
 
     void SetUp() override {
-        ASSERT_TRUE(home.path() != nullptr);
-        base = QDir(home.path()).filePath("scopes");
-        alpha = QDir(base).filePath("alpha");
-        ASSERT_TRUE(QDir().mkpath(alpha));
-        writeImage(QDir(alpha).filePath("a.png"));
-        writeImage(QDir(alpha).filePath("a.png"));
+        ASSERT_TRUE(m_home.path() != nullptr);
+        m_base = QDir(m_home.path()).filePath("scopes");
+        m_alpha = QDir(m_base).filePath("alpha");
+        ASSERT_TRUE(QDir().mkpath(m_alpha));
+        writeImage(QDir(m_alpha).filePath("a.png"));
+        writeImage(QDir(m_alpha).filePath("a.png"));
     }
 };
 
@@ -60,7 +60,7 @@ class TestShortcutScope : public ::testing::Test {
 // QApplication-under-offscreen rather than going headless.
 TEST_F(TestShortcutScope, pointerFunnelResolvesInspectThenGlobal) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -153,16 +153,16 @@ TEST_F(TestShortcutScope, pointerTokensResolveInOrderAndKeepTheirGlobalFallback)
 // mode (1/2/4, Space) restores the browse arrows: left/right change
 // images again.
 TEST_F(TestShortcutScope, fitOriginalPersistsAndArrowsStayInInspectMode) {
-    writeImage(QDir(base).filePath("insA.png"));
-    writeImage(QDir(base).filePath("insB.png"));
+    writeImage(QDir(m_base).filePath("insA.png"));
+    writeImage(QDir(m_base).filePath("insB.png"));
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(base).filePath("insA.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_base).filePath("insA.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("insA.png");
+            return core.currentFilePath() == QDir(m_base).filePath("insA.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("insA.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("insA.png"));
     core.mainWindow()->fitOriginal();
     auto *viewer = core.mainWindow()->findChild<ViewerWidget *>();
     EXPECT_TRUE(viewer);
@@ -176,16 +176,16 @@ TEST_F(TestShortcutScope, fitOriginalPersistsAndArrowsStayInInspectMode) {
     core.nextImage();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("insB.png");
+            return core.currentFilePath() == QDir(m_base).filePath("insB.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("insB.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("insB.png"));
     EXPECT_EQ(viewer->fitMode(), FIT_ORIGINAL);
 
     // armed: left pans, it never flips images
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left)), QStringLiteral("scrollLeft"));
     EXPECT_TRUE(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("insB.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("insB.png"));
 
     // back in a browse mode the same key navigates again
     core.mainWindow()->fitWindow();
@@ -199,10 +199,10 @@ TEST_F(TestShortcutScope, fitOriginalPersistsAndArrowsStayInInspectMode) {
     EXPECT_TRUE(actionManager->invokeAction(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Left))));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.currentFilePath() == QDir(base).filePath("insA.png");
+            return core.currentFilePath() == QDir(m_base).filePath("insA.png");
         },
         10000));
-    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("insA.png"));
+    EXPECT_EQ(core.currentFilePath(), QDir(m_base).filePath("insA.png"));
 }
 
 // Core::onUpdate: the version-migration path, run from the constructor when
@@ -351,7 +351,7 @@ TEST_F(TestShortcutScope, defaultKeymapProjectsOntoTheRegistry) {
 // Unknown): invalid nullptr parameter") into a log nobody read; this pin
 // is what says it in a suite.
 TEST_F(TestShortcutScope, theFolderViewsHomeButtonReachesTheNavigator) {
-    const QString start = QDir(alpha).filePath("a.png");
+    const QString start = QDir(m_alpha).filePath("a.png");
     Core core;
     EXPECT_TRUE(core.loadPath(start));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -381,7 +381,7 @@ TEST_F(TestShortcutScope, theFolderViewsHomeButtonReachesTheNavigator) {
 
 TEST_F(TestShortcutScope, gridFocusAnswersThroughTheGridsTable) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -417,7 +417,7 @@ TEST_F(TestShortcutScope, gridFocusAnswersThroughTheGridsTable) {
 // either side breaks this test, not the dispatch.
 TEST_F(TestShortcutScope, resolverAnswersTheLiveTableWithoutADeclaimPass) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -462,7 +462,7 @@ TEST_F(TestShortcutScope, tokenExpansionIsTheSharedOne) {
 // leg is asserted by name.
 TEST_F(TestShortcutScope, tokenWalkAnswersThroughTheSameTables) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -503,7 +503,7 @@ TEST_F(TestShortcutScope, tokenWalkAnswersThroughTheSameTables) {
 
 TEST_F(TestShortcutScope, armedInspectSwapsTheProjection) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -537,7 +537,7 @@ TEST_F(TestShortcutScope, armedInspectSwapsTheProjection) {
 // this is the one slot that proves the projection is live and registered.
 TEST_F(TestShortcutScope, windowDeliveryFiresTheProjectedAction) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -573,7 +573,7 @@ TEST_F(TestShortcutScope, windowDeliveryFiresTheProjectedAction) {
 // projection, the grid surface carries its own.
 TEST_F(TestShortcutScope, returnKeyMeansFolderViewInTheDocumentAndGridOpenInTheGrid) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -788,7 +788,7 @@ TEST_F(TestShortcutScope, tombstonesStayInsideTheirScope) {
 // action, with no projection rebuild on the switch itself.
 TEST_F(TestShortcutScope, viewSwitchKeepsBothScopesLiveWithoutRebuilding) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -869,7 +869,7 @@ TEST_F(TestShortcutScope, everyWriteDoorEnforcesDisjointness) {
 // (dispatch_probe_tests). So this drives real keys through the window.
 TEST_F(TestShortcutScope, inspectArmingHandsTheKeyOverWithoutRebuilding) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();
@@ -962,7 +962,7 @@ TEST_F(TestShortcutScope, inspectArmingHandsTheKeyOverWithoutRebuilding) {
 // does not touch.
 TEST_F(TestShortcutScope, inspectArmingKeepsUnclaimedDocumentKeysLive) {
     Core core;
-    EXPECT_TRUE(core.loadPath(QDir(alpha).filePath("a.png")));
+    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.isSettled();

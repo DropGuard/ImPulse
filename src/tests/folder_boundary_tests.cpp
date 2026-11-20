@@ -71,15 +71,15 @@ TEST_F(TestFolderBoundary, adjacentActionEntersTheNextFolderInParentOrder) {
     // itself — routed through the async listing it returns empty here and the
     // feature is dead again.
     resetFixture();
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("alpha"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("beta"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("zeta"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir(".hidden")); // sorts first: proves the skip
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("alpha"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("beta"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("zeta"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir(".hidden")); // sorts first: proves the skip
 
-    const QString alpha = fixtureDir + "/alpha";
-    const QString beta = fixtureDir + "/beta";
-    const QString sub = fixtureDir + "/subdir";
-    const QString zeta = fixtureDir + "/zeta";
+    const QString alpha = m_fixtureDir + "/alpha";
+    const QString beta = m_fixtureDir + "/beta";
+    const QString sub = m_fixtureDir + "/subdir";
+    const QString zeta = m_fixtureDir + "/zeta";
 
     // natural name order: alpha, beta, subdir, zeta
     // the dot dir sorts before alpha and is filtered by the flag: forward
@@ -102,14 +102,14 @@ TEST_F(TestFolderBoundary, folderBoundaryLookupKeepsWatchingTheCurrentFolder) {
     resetFixture();
 
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
 
     auto decision = FolderEnd::decide(FOLDER_END_GOTO_ADJACENT, static_cast<int>(dm.fileCount()), dm.fileCount());
     EXPECT_TRUE(decision.outcome == FolderEnd::Outcome::EnterAdjacentFolder);
     // the transition this keypress would take: nowhere — subdir is the only and
     // therefore the last folder here
-    EXPECT_TRUE(dm.adjacentDirectory(fixtureDir + "/subdir", true, SORT_NAME).isEmpty());
+    EXPECT_TRUE(dm.adjacentDirectory(m_fixtureDir + "/subdir", true, SORT_NAME).isEmpty());
 
     QSignalSpy added(&dm, &DirectoryManager::fileAdded);
     makeFile("after-boundary.jpg");
@@ -127,16 +127,17 @@ TEST_F(TestFolderBoundary, folderNavigationWalksSiblingsInTheOrderTheViewShows) 
     resetFixture();
     // created in reverse name order on purpose, so a degenerate local sort
     // cannot land on the expected order by accident
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("zulu"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("mike"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("bravo"));
-    QStringList names = {fixtureDir + "/bravo", fixtureDir + "/mike", fixtureDir + "/subdir", fixtureDir + "/zulu"};
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("zulu"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("mike"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("bravo"));
+    QStringList names = {m_fixtureDir + "/bravo", m_fixtureDir + "/mike", m_fixtureDir + "/subdir",
+                         m_fixtureDir + "/zulu"};
     QStringList reversed;
     for(int i = names.size() - 1; i >= 0; --i)
         reversed << names.at(i);
 
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.dirCount(), 4UL, 10000);
 
     const SortingMode modes[] = {SORT_NAME, SORT_NAME_DESC, SORT_TIME, SORT_TIME_DESC, SORT_SIZE, SORT_SIZE_DESC};
@@ -171,18 +172,18 @@ TEST_F(TestFolderBoundary, newlyCreatedFoldersKeepTheirPlaceInNameOrder) {
     // and onEngineMutated zeroes modifyTime for dirs) a time or size comparator
     // saw all entries as equal and appended the newcomer at the end of the rows.
     resetFixture();
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("alpha"));
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("zulu"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("alpha"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("zulu"));
 
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.dirCount(), 3UL, 10000); // alpha, subdir, zulu
 
     dm.setSortingMode(SORT_TIME);
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
 
     // a name that belongs in the middle, never at the end
-    EXPECT_TRUE(QDir(fixtureDir).mkdir("mike"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("mike"));
     ASSERT_TRY_EQ_TIMEOUT(dm.dirCount(), 4UL, 10000);
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
 
@@ -193,7 +194,7 @@ TEST_F(TestFolderBoundary, newlyCreatedFoldersKeepTheirPlaceInNameOrder) {
                               QStringLiteral("zulu")};
     EXPECT_EQ(rows, want);
     // navigation walks the same order
-    EXPECT_EQ(dm.adjacentDirectory(fixtureDir + "/mike", true, SORT_TIME), fixtureDir + "/subdir");
+    EXPECT_EQ(dm.adjacentDirectory(m_fixtureDir + "/mike", true, SORT_TIME), m_fixtureDir + "/subdir");
 }
 
 TEST_F(TestFolderBoundary, settlePredicateTracksTheReplyInsteadOfTheRequest) {
@@ -204,7 +205,7 @@ TEST_F(TestFolderBoundary, settlePredicateTracksTheReplyInsteadOfTheRequest) {
     resetFixture();
 
     DirectoryManager dm{EngineBridge::instance()};
-    EXPECT_TRUE(dm.setDirectory(fixtureDir));
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
     EXPECT_TRUE(dm.fileCount() > 1) << "a one-row resort proves nothing";
 

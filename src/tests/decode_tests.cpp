@@ -11,17 +11,17 @@
 // fixtures (the same reason the engine_stack units are separate binaries).
 class DecodeHoldJob : public PoolJob {
   public:
-    DecodeHoldJob(std::atomic_bool *_gate, std::atomic_int *_starts) : gate(_gate), starts(_starts) {
+    DecodeHoldJob(std::atomic_bool *_gate, std::atomic_int *_starts) : m_gate(_gate), m_starts(_starts) {
     }
     void run() override {
-        starts->fetch_add(1);
-        while(!gate->load())
+        m_starts->fetch_add(1);
+        while(!m_gate->load())
             QThread::msleep(1);
     }
 
   private:
-    std::atomic_bool *gate;
-    std::atomic_int *starts;
+    std::atomic_bool *m_gate;
+    std::atomic_int *m_starts;
 };
 
 // the two-tier decode pipeline: DirectoryModel plus Loader
@@ -42,21 +42,21 @@ TEST_F(TestDecode, jpegTwoTierDecodesScaledThenUpgradesToFull) {
     resetFixture();
     const QSize screen = offscreenScreenPixels();
     const QSize orig = screen * 2;
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.jpg", "jpg", orig));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.jpg", "jpg", orig));
 
     WorkerPool pool(2);
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(ready.isValid());
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
 
-    model.load(fixtureDir + "/big.jpg", true); // tier-1 by default
+    model.load(m_fixtureDir + "/big.jpg", true); // tier-1 by default
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
     EXPECT_EQ(ready.at(0).at(2).toBool(), true);
     EXPECT_EQ(spyImage(ready, 0)->size(), screen);
 
-    model.upgradeToFull(fixtureDir + "/big.jpg");
+    model.upgradeToFull(m_fixtureDir + "/big.jpg");
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 2, 10000);
     EXPECT_EQ(ready.at(1).at(2).toBool(), false);
     EXPECT_EQ(spyImage(ready, 1)->size(), orig);
@@ -69,15 +69,15 @@ TEST_F(TestDecode, pngDecodesFullQualityInOneTier) {
     // JPEG-only, and this pins it.
     resetFixture();
     const QSize orig = offscreenScreenPixels() * 2;
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.png", "png", orig));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.png", "png", orig));
 
     WorkerPool pool(2);
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
 
-    model.load(fixtureDir + "/big.png", true);
+    model.load(m_fixtureDir + "/big.png", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
     waitLoaderIdle(model); // a second tier would have arrived by now
     EXPECT_EQ(ready.count(), 1);
@@ -89,15 +89,15 @@ TEST_F(TestDecode, syncLoadIsAlwaysFullQuality) {
     // the editing path: asyncHint=false bypasses the tiers entirely
     resetFixture();
     const QSize orig = offscreenScreenPixels() * 2;
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.jpg", "jpg", orig));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.jpg", "jpg", orig));
 
     WorkerPool pool(2);
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
 
-    model.load(fixtureDir + "/big.jpg", false);
+    model.load(m_fixtureDir + "/big.jpg", false);
     // synchronous: the signal has fired by the time load() returned
     EXPECT_EQ(ready.count(), 1);
     EXPECT_EQ(ready.at(0).at(2).toBool(), false);
@@ -107,24 +107,24 @@ TEST_F(TestDecode, syncLoadIsAlwaysFullQuality) {
 TEST_F(TestDecode, cachedFullImageReflipsWithoutRedecoding) {
     resetFixture();
     const QSize screen = offscreenScreenPixels();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.jpg", "jpg", screen * 2));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.jpg", "jpg", screen * 2));
 
     WorkerPool pool(2);
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
 
-    model.load(fixtureDir + "/big.jpg", true);
+    model.load(m_fixtureDir + "/big.jpg", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
-    model.upgradeToFull(fixtureDir + "/big.jpg");
+    model.upgradeToFull(m_fixtureDir + "/big.jpg");
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 2, 10000);
     EXPECT_TRUE(!ready.at(1).at(2).toBool());
 
     // flipping back to a fully-cached image serves it from the cache and
     // schedules nothing: m_scaledCache forgot the path at the upgrade
     ready.clear();
-    model.load(fixtureDir + "/big.jpg", true);
+    model.load(m_fixtureDir + "/big.jpg", true);
     EXPECT_EQ(ready.count(), 1);
     EXPECT_EQ(ready.at(0).at(2).toBool(), false);
     waitLoaderIdle(model);
@@ -133,26 +133,26 @@ TEST_F(TestDecode, cachedFullImageReflipsWithoutRedecoding) {
 
 TEST_F(TestDecode, upgradeToFullRefusesWhatWasNeverScaled) {
     resetFixture();
-    EXPECT_TRUE(writeBigImage(fixtureDir + "/big.png", "png", offscreenScreenPixels() * 2));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/big.png", "png", offscreenScreenPixels() * 2));
 
     WorkerPool pool(2);
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
 
-    model.load(fixtureDir + "/big.png", true);
+    model.load(m_fixtureDir + "/big.png", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
     ready.clear();
 
     // a full-res image has left m_scaledCache: the upgrade is a no-op,
     // not a third decode of the same file
-    model.upgradeToFull(fixtureDir + "/big.png");
+    model.upgradeToFull(m_fixtureDir + "/big.png");
     waitLoaderIdle(model);
     EXPECT_EQ(ready.count(), 0);
 
     // and a path outside the listing goes nowhere
-    model.upgradeToFull(fixtureDir + "/missing.jpg");
+    model.upgradeToFull(m_fixtureDir + "/missing.jpg");
     waitLoaderIdle(model);
     EXPECT_EQ(ready.count(), 0);
 }
@@ -168,9 +168,9 @@ TEST_F(TestDecode, theFlipWindowPromotesTheStopPointAndDropsThePassedFiles) {
     // real decodable files (the fixture's img*.jpg are placeholders that
     // decode to nothing), named so natural order is w2 < w3 < w10: a
     // flight forward has a neighbor to keep on both stops
-    const QString w2 = fixtureDir + "/w2.png";
-    const QString w3 = fixtureDir + "/w3.png";
-    const QString w10 = fixtureDir + "/w10.png";
+    const QString w2 = m_fixtureDir + "/w2.png";
+    const QString w3 = m_fixtureDir + "/w3.png";
+    const QString w10 = m_fixtureDir + "/w10.png";
     EXPECT_TRUE(writeBigImage(w2, "png", QSize(8, 8)));
     EXPECT_TRUE(writeBigImage(w3, "png", QSize(8, 8)));
     EXPECT_TRUE(writeBigImage(w10, "png", QSize(8, 8)));
@@ -183,7 +183,7 @@ TEST_F(TestDecode, theFlipWindowPromotesTheStopPointAndDropsThePassedFiles) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(ready.isValid());
-    EXPECT_TRUE(model.setDirectory(fixtureDir));
+    EXPECT_TRUE(model.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 6, 10000);
 
     // the flight: two flips forward, each queueing its direction
