@@ -31,15 +31,15 @@ class ClickZoneOverlay : public FloatingWidget {
 
   private:
     QPixmap loadPixmap(QString path);
-    QPixmap pixmapLeft, pixmapRight;
-    QRect mLeftZone, mRightZone;
-    qreal dpr, pixmapDrawScale;
-    bool hiResPixmaps = false;
-    const int zoneSize = 110;
-    bool isPressed = false;
-    bool leftHovered = false, rightHovered = false;
-    bool drawZones = true;
-    ActiveHighlightZone activeZone = HIGHLIGHT_NONE;
+    QPixmap m_pixmapLeft, m_pixmapRight;
+    QRect m_leftZone, m_rightZone;
+    qreal m_dpr, m_pixmapDrawScale;
+    bool m_hiResPixmaps = false;
+    const int m_zoneSize = 110;
+    bool m_isPressed = false;
+    bool m_leftHovered = false, m_rightHovered = false;
+    bool m_drawZones = true;
+    ActiveHighlightZone m_activeZone = HIGHLIGHT_NONE;
     void drawPixmap(QPainter &p, const QPixmap &pixmap, QRect rect);
 
   protected:

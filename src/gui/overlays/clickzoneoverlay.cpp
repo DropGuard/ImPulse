@@ -6,9 +6,9 @@ ClickZoneOverlay::ClickZoneOverlay(FloatingWidgetContainer *parent) : FloatingWi
     if(parent)
         setContainerSize(parent->size());
 
-    dpr = this->devicePixelRatioF();
-    pixmapLeft = loadPixmap(":/res/icons/common/overlay/arrow_left_50.png");
-    pixmapRight = loadPixmap(":/res/icons/common/overlay/arrow_right_50.png");
+    m_dpr = this->devicePixelRatioF();
+    m_pixmapLeft = loadPixmap(":/res/icons/common/overlay/arrow_left_50.png");
+    m_pixmapRight = loadPixmap(":/res/icons/common/overlay/arrow_right_50.png");
 
     connect(settings, &Settings::settingsChanged, this, &ClickZoneOverlay::readSettings);
     readSettings();
@@ -17,27 +17,27 @@ ClickZoneOverlay::ClickZoneOverlay(FloatingWidgetContainer *parent) : FloatingWi
 }
 
 void ClickZoneOverlay::readSettings() {
-    if(settings->clickableEdgesVisible() == drawZones)
+    if(settings->clickableEdgesVisible() == m_drawZones)
         return;
-    drawZones = settings->clickableEdgesVisible();
+    m_drawZones = settings->clickableEdgesVisible();
     update();
 }
 
 QPixmap ClickZoneOverlay::loadPixmap(QString path) {
     QPixmap pixmap;
-    if(dpr >= (1.0 + 0.001)) {
+    if(m_dpr >= (1.0 + 0.001)) {
         path.replace(".", "@2x.");
-        hiResPixmaps = true;
+        m_hiResPixmaps = true;
         pixmap = QPixmap(path);
-        if(dpr >= (2.0 - 0.001))
-            pixmapDrawScale = dpr;
+        if(m_dpr >= (2.0 - 0.001))
+            m_pixmapDrawScale = m_dpr;
         else
-            pixmapDrawScale = 2.0;
-        pixmap.setDevicePixelRatio(pixmapDrawScale);
+            m_pixmapDrawScale = 2.0;
+        pixmap.setDevicePixelRatio(m_pixmapDrawScale);
     } else {
-        hiResPixmaps = false;
+        m_hiResPixmaps = false;
         pixmap = QPixmap(path);
-        pixmapDrawScale = dpr;
+        m_pixmapDrawScale = m_dpr;
     }
     ImageLib::recolor(pixmap, QColor(255, 255, 255));
     if(pixmap.isNull())
@@ -46,11 +46,11 @@ QPixmap ClickZoneOverlay::loadPixmap(QString path) {
 }
 
 QRect ClickZoneOverlay::leftZone() {
-    return mLeftZone;
+    return m_leftZone;
 }
 
 QRect ClickZoneOverlay::rightZone() {
-    return mRightZone;
+    return m_rightZone;
 }
 
 void ClickZoneOverlay::highlightLeft() {
@@ -66,19 +66,19 @@ void ClickZoneOverlay::disableHighlight() {
 }
 
 bool ClickZoneOverlay::isHighlighted() {
-    return (activeZone != HIGHLIGHT_NONE);
+    return (m_activeZone != HIGHLIGHT_NONE);
 }
 
 void ClickZoneOverlay::setPressed(bool mode) {
-    if(isPressed == mode)
+    if(m_isPressed == mode)
         return;
-    isPressed = mode;
+    m_isPressed = mode;
     if(isHighlighted())
         update();
 }
 
 void ClickZoneOverlay::setHighlightedZone(ActiveHighlightZone zone) {
-    activeZone = zone;
+    m_activeZone = zone;
     update();
 }
 
@@ -88,16 +88,16 @@ void ClickZoneOverlay::recalculateGeometry() {
 
 void ClickZoneOverlay::resizeEvent(QResizeEvent *event) {
     Q_UNUSED(event)
-    mLeftZone = QRect(0, 0, zoneSize, height());
-    mRightZone = QRect(width() - zoneSize, 0, zoneSize, height());
+    m_leftZone = QRect(0, 0, m_zoneSize, height());
+    m_rightZone = QRect(width() - m_zoneSize, 0, m_zoneSize, height());
 }
 
 void ClickZoneOverlay::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event)
-    if(activeZone == HIGHLIGHT_NONE || !drawZones || width() <= 250)
+    if(m_activeZone == HIGHLIGHT_NONE || !m_drawZones || width() <= 250)
         return;
     QPainter p(this);
-    if(isPressed)
+    if(m_isPressed)
         p.setOpacity(0.06f);
     else
         p.setOpacity(0.10f);
@@ -105,27 +105,27 @@ void ClickZoneOverlay::paintEvent(QPaintEvent *event) {
     brush.setColor(QColor(200, 200, 200));
     brush.setStyle(Qt::SolidPattern);
 
-    if(activeZone == HIGHLIGHT_LEFT) {
-        p.fillRect(mLeftZone, brush);
-        drawPixmap(p, pixmapLeft, mLeftZone);
+    if(m_activeZone == HIGHLIGHT_LEFT) {
+        p.fillRect(m_leftZone, brush);
+        drawPixmap(p, m_pixmapLeft, m_leftZone);
     }
-    if(activeZone == HIGHLIGHT_RIGHT) {
-        p.fillRect(mRightZone, brush);
-        drawPixmap(p, pixmapRight, mRightZone);
+    if(m_activeZone == HIGHLIGHT_RIGHT) {
+        p.fillRect(m_rightZone, brush);
+        drawPixmap(p, m_pixmapRight, m_rightZone);
     }
 }
 
 // draws pixmap centered inside rect
 void ClickZoneOverlay::drawPixmap(QPainter &p, const QPixmap &pixmap, QRect rect) {
-    if(isPressed)
+    if(m_isPressed)
         p.setOpacity(0.37f);
     else
         p.setOpacity(0.5f);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
     QPointF pos;
-    if(hiResPixmaps) {
-        pos = QPointF(rect.left() + rect.width() / 2 - pixmap.width() / (2 * pixmapDrawScale),
-                      rect.top() + rect.height() / 2 - pixmap.height() / (2 * pixmapDrawScale));
+    if(m_hiResPixmaps) {
+        pos = QPointF(rect.left() + rect.width() / 2 - pixmap.width() / (2 * m_pixmapDrawScale),
+                      rect.top() + rect.height() / 2 - pixmap.height() / (2 * m_pixmapDrawScale));
     } else {
         pos = QPointF(rect.left() + rect.width() / 2 - pixmap.width() / 2,
                       rect.top() + rect.height() / 2 - pixmap.height() / 2);

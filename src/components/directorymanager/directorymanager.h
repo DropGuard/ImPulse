@@ -108,31 +108,31 @@ class DirectoryManager : public QObject {
     static int engineSortMode(SortingMode mode);
 
   private:
-    EngineBridge &mBridge;
-    QRegularExpression regex;
-    std::vector<FSEntry> fileEntryVec, dirEntryVec;
-    const FSEntry defaultEntry;
-    QString mDirectoryPath;
+    EngineBridge &m_bridge;
+    QRegularExpression m_regex;
+    std::vector<FSEntry> m_fileEntryVec, m_dirEntryVec;
+    const FSEntry m_defaultEntry;
+    QString m_directoryPath;
 
     // rust engine mirror (SOURCE_DIRECTORY only)
-    QString mEngineDir;   // dir we asked the engine to open
-    QString mMirroredDir; // dir the vectors currently reflect
-    SortingMode mAppliedSort;
-    QTimer *rescanTimer = nullptr;
-    bool mResyncing = false;
-    // requested from inside the mirror and consumed after mResyncing clears: a
+    QString m_engineDir;   // dir we asked the engine to open
+    QString m_mirroredDir; // dir the vectors currently reflect
+    SortingMode m_appliedSort;
+    QTimer *m_rescanTimer = nullptr;
+    bool m_resyncing = false;
+    // requested from inside the mirror and consumed after m_resyncing clears: a
     // scheduleRescan() call made during mirroring is dropped by its own guard,
     // which is how the engine-behind rescan never used to happen.
-    bool mWantRescan = false;
-    int mRejectedListings = 0;
+    bool m_wantRescan = false;
+    int m_rejectedListings = 0;
     struct PendingListed {
         qint64 token;
         QString dir;
         std::function<void()> action;
     };
-    qint64 nextWhenListedToken = 1;
-    QVector<PendingListed> pendingOnListed;
-    QHash<QString, QPair<quint64, qint64>> mPrevFileMeta; // engine size/mtime per path
+    qint64 m_nextWhenListedToken = 1;
+    QVector<PendingListed> m_pendingOnListed;
+    QHash<QString, QPair<quint64, qint64>> m_prevFileMeta; // engine size/mtime per path
 
     // low-level mirror writes — reserved for the engine event applier; the
     // listing has exactly one writer (the engine) and one reader (the mirror)
@@ -161,8 +161,8 @@ class DirectoryManager : public QObject {
     void readSettings();
     // synced from the settings in readSettings(); the three scan/filter sites
     // read this member instead of reaching for the global
-    bool mShowHiddenFiles = false;
-    SortingMode mSortingMode;
+    bool m_showHiddenFiles = false;
+    SortingMode m_sortingMode;
 
     // Directories only ever order by name: the engine's comparator lands on
     // its name tiebreak because scan.rs gives every directory the same

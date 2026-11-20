@@ -53,7 +53,7 @@ void ActionManager::initActions() {
 }
 
 QAction *ActionManager::addAction(const QString &name) {
-    if(mActions.contains(name))
+    if(m_actions.contains(name))
         qFatal("addAction: '%s' is already registered", qPrintable(name));
     auto *a = new QAction(this);
     a->setObjectName(name);
@@ -61,7 +61,7 @@ QAction *ActionManager::addAction(const QString &name) {
     // ActionManager, not in any window's subtree, so a WindowShortcut context
     // could never resolve
     a->setShortcutContext(Qt::ApplicationShortcut);
-    mActions.insert(name, a);
+    m_actions.insert(name, a);
     return a;
 }
 //------------------------------------------------------------------------------
@@ -72,24 +72,24 @@ QAction *ActionManager::addAction(const QString &name) {
 void ActionManager::attachWindowSurface(QWidget *surface) {
     // a QAction's shortcuts are inert until the action is added to a widget
     // (pinned in dispatch_probe_tests) — the window is that widget
-    if(windowSurface == surface)
+    if(m_windowSurface == surface)
         return;
     // detach: take the actions back off the old window before the pointer is
     // replaced. A QAction's shortcut is live exactly while it is added to a
     // widget, so leaving them on a still-alive surface would keep them firing
     // after the new window attached — the same one-owner rule as everything
     // else in this tree.
-    if(windowSurface) {
-        for(QAction *a : std::as_const(mActions))
-            windowSurface->removeAction(a);
+    if(m_windowSurface) {
+        for(QAction *a : std::as_const(m_actions))
+            m_windowSurface->removeAction(a);
     }
-    windowSurface = surface;
-    if(!windowSurface) {
+    m_windowSurface = surface;
+    if(!m_windowSurface) {
         applyKeyboardProjection();
         return;
     }
-    for(QAction *a : std::as_const(mActions))
-        windowSurface->addAction(a);
+    for(QAction *a : std::as_const(m_actions))
+        m_windowSurface->addAction(a);
     // The same destroyed hook the grid and document surfaces carry. It is
     // not a crash fix today — ActionManager is a never-destructed singleton,
     // so the dangling pointer is only ever compared, never dereferenced, and
@@ -99,29 +99,29 @@ void ActionManager::attachWindowSurface(QWidget *surface) {
     // anyone reads it". The guard makes it explicit, and the guard matters:
     // an unconditional clear would erase a NEWER surface's pointer when an
     // OLDER window dies late.
-    connect(windowSurface, &QObject::destroyed, this, [this](QObject *dead) {
-        if(windowSurface != dead)
+    connect(m_windowSurface, &QObject::destroyed, this, [this](QObject *dead) {
+        if(m_windowSurface != dead)
             return; // a newer surface already replaced this one
-        windowSurface = nullptr;
+        m_windowSurface = nullptr;
         applyKeyboardProjection();
     });
     applyKeyboardProjection();
 }
 //------------------------------------------------------------------------------
 void ActionManager::attachGridSurface(QWidget *surface) {
-    if(gridSurface == surface)
+    if(m_gridSurface == surface)
         return;
-    gridSurface = surface;
-    if(gridSurface) {
+    m_gridSurface = surface;
+    if(m_gridSurface) {
         // the surface dies with the window it belongs to; its QShortcuts are
         // its children, so the projections die with it and the stale pointer
         // is cleaned up here rather than in a destructor nobody owns
-        connect(gridSurface, &QObject::destroyed, this, [this](QObject *dead) {
-            if(gridSurface != dead)
+        connect(m_gridSurface, &QObject::destroyed, this, [this](QObject *dead) {
+            if(m_gridSurface != dead)
                 return; // a newer surface already replaced this one
-            gridSurface = nullptr;
-            gridProjections.clear();
-            gridActive = false;
+            m_gridSurface = nullptr;
+            m_gridProjections.clear();
+            m_gridActive = false;
             applyKeyboardProjection();
         });
     }
@@ -129,16 +129,16 @@ void ActionManager::attachGridSurface(QWidget *surface) {
 }
 //------------------------------------------------------------------------------
 void ActionManager::attachDocumentSurface(QWidget *surface) {
-    if(documentSurface == surface)
+    if(m_documentSurface == surface)
         return;
-    documentSurface = surface;
-    if(documentSurface) {
-        connect(documentSurface, &QObject::destroyed, this, [this](QObject *dead) {
-            if(documentSurface != dead)
+    m_documentSurface = surface;
+    if(m_documentSurface) {
+        connect(m_documentSurface, &QObject::destroyed, this, [this](QObject *dead) {
+            if(m_documentSurface != dead)
                 return; // a newer surface already replaced this one
-            documentSurface = nullptr;
-            documentProjections.clear();
-            inspectProjections.clear(); // both claim sets die with the surface
+            m_documentSurface = nullptr;
+            m_documentProjections.clear();
+            m_inspectProjections.clear(); // both claim sets die with the surface
             applyKeyboardProjection();
         });
     }
@@ -146,9 +146,9 @@ void ActionManager::attachDocumentSurface(QWidget *surface) {
 }
 
 void ActionManager::setGridActive(bool active) {
-    if(gridActive == active)
+    if(m_gridActive == active)
         return;
-    gridActive = active;
+    m_gridActive = active;
     // No projection rebuild. gridActive is consumed by the RESOLVER
     // (actionForKeySequence), not by any projection function: the grid's
     // QShortcuts are gated by Qt's own WidgetWithChildrenShortcut context on
@@ -177,42 +177,42 @@ void ActionManager::eraseAction(QMap<QString, QString> &table, const QString &ac
 
 QMap<QString, QString> &ActionManager::tableFor(Scope scope) {
     switch(scope) {
-    case Scope::Global: return shortcuts;
-    case Scope::Document: return docShortcuts;
-    case Scope::Grid: return gridShortcuts;
-    case Scope::Inspect: return inspectShortcuts;
+    case Scope::Global: return m_shortcuts;
+    case Scope::Document: return m_docShortcuts;
+    case Scope::Grid: return m_gridShortcuts;
+    case Scope::Inspect: return m_inspectShortcuts;
     }
-    return shortcuts; // unreachable: the switch is exhaustive
+    return m_shortcuts; // unreachable: the switch is exhaustive
 }
 
 const QMap<QString, QString> &ActionManager::tableFor(Scope scope) const {
     switch(scope) {
-    case Scope::Global: return shortcuts;
-    case Scope::Document: return docShortcuts;
-    case Scope::Grid: return gridShortcuts;
-    case Scope::Inspect: return inspectShortcuts;
+    case Scope::Global: return m_shortcuts;
+    case Scope::Document: return m_docShortcuts;
+    case Scope::Grid: return m_gridShortcuts;
+    case Scope::Inspect: return m_inspectShortcuts;
     }
-    return shortcuts;
+    return m_shortcuts;
 }
 
 QMap<QString, QString> &ActionManager::defaultsFor(Scope scope) {
     switch(scope) {
-    case Scope::Global: return defaults;
-    case Scope::Document: return docDefaults;
-    case Scope::Grid: return gridDefaults;
-    case Scope::Inspect: return inspectDefaults;
+    case Scope::Global: return m_defaults;
+    case Scope::Document: return m_docDefaults;
+    case Scope::Grid: return m_gridDefaults;
+    case Scope::Inspect: return m_inspectDefaults;
     }
-    return defaults;
+    return m_defaults;
 }
 
 const QMap<QString, QString> &ActionManager::defaultsFor(Scope scope) const {
     switch(scope) {
-    case Scope::Global: return defaults;
-    case Scope::Document: return docDefaults;
-    case Scope::Grid: return gridDefaults;
-    case Scope::Inspect: return inspectDefaults;
+    case Scope::Global: return m_defaults;
+    case Scope::Document: return m_docDefaults;
+    case Scope::Grid: return m_gridDefaults;
+    case Scope::Inspect: return m_inspectDefaults;
     }
-    return defaults;
+    return m_defaults;
 }
 
 void ActionManager::commit(Scope scope, const TableMutator &mutate) {
@@ -248,7 +248,7 @@ QList<QKeySequence> ActionManager::sequencesForToken(const QString &token) {
 // firing. Pointer tokens are exempt (they never ride QShortcutMap).
 bool ActionManager::enforceDisjointness() {
     bool removed = false;
-    for(auto i = shortcuts.begin(); i != shortcuts.end();) {
+    for(auto i = m_shortcuts.begin(); i != m_shortcuts.end();) {
         bool claimed = false;
         // Pointer tokens stay exempt HERE, and the reason is not "they are
         // not part of the family" (scopesClaiming answers for them now): the
@@ -263,7 +263,7 @@ bool ActionManager::enforceDisjointness() {
         if(!isPointerToken(i.key()))
             claimed = !scopesClaiming(i.key()).isEmpty();
         if(claimed) {
-            i = shortcuts.erase(i);
+            i = m_shortcuts.erase(i);
             removed = true;
         } else {
             ++i;
@@ -372,7 +372,7 @@ Scope ActionManager::homeScopeFor(const QString &action) const {
 //------------------------------------------------------------------------------
 QStringList ActionManager::scopeClaimsForToken(const QString &token) const {
     QStringList claims = scopesClaiming(token);
-    const QString globalAction = shortcuts.value(token);
+    const QString globalAction = m_shortcuts.value(token);
     if(!globalAction.isEmpty())
         claims.prepend(globalAction + QStringLiteral(" (global)"));
     return claims;
@@ -394,34 +394,34 @@ void ActionManager::applyKeyboardProjection() {
 // editor inserts.
 void ActionManager::reproject() {
     QMap<QString, QList<QKeySequence>> projected;
-    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
+    for(auto it = m_shortcuts.constBegin(); it != m_shortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue; // pointer tokens never ride QShortcutMap
         projected[it.value()].append(sequencesForToken(it.key()));
     }
     // every registered action gets its projected list — an action with no
     // keyboard claim gets an empty one, clearing stale sequences
-    for(auto it = mActions.constBegin(); it != mActions.constEnd(); ++it)
+    for(auto it = m_actions.constBegin(); it != m_actions.constEnd(); ++it)
         it.value()->setShortcuts(projected.value(it.key()));
 }
 //------------------------------------------------------------------------------
 void ActionManager::rebuildGridShortcuts() {
-    qDeleteAll(gridProjections);
-    gridProjections.clear();
-    if(!gridSurface)
+    qDeleteAll(m_gridProjections);
+    m_gridProjections.clear();
+    if(!m_gridSurface)
         return;
-    for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it) {
+    for(auto it = m_gridShortcuts.constBegin(); it != m_gridShortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue; // pointer tokens never ride QShortcutMap
         const QList<QKeySequence> seqs = sequencesForToken(it.key());
         for(const QKeySequence &seq : seqs) {
-            auto *sc = new QShortcut(seq, gridSurface);
+            auto *sc = new QShortcut(seq, m_gridSurface);
             sc->setContext(Qt::WidgetWithChildrenShortcut);
             const QString actionName = it.value();
             connect(sc, &QShortcut::activated, this, [this, actionName]() {
                 invokeAction(actionName);
             });
-            gridProjections.append(sc);
+            m_gridProjections.append(sc);
         }
     }
 }
@@ -437,43 +437,43 @@ void ActionManager::rebuildGridShortcuts() {
 // deleting and recreating the whole document projection to express what is
 // one boolean of routing.
 void ActionManager::rebuildDocumentShortcuts() {
-    for(const SurfaceClaim &claim : std::as_const(documentProjections))
+    for(const SurfaceClaim &claim : std::as_const(m_documentProjections))
         delete claim.shortcut;
-    documentProjections.clear();
-    for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+    m_documentProjections.clear();
+    for(const SurfaceClaim &claim : std::as_const(m_inspectProjections))
         delete claim.shortcut;
-    inspectProjections.clear();
-    if(!documentSurface)
+    m_inspectProjections.clear();
+    if(!m_documentSurface)
         return;
 
-    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it) {
+    for(auto it = m_docShortcuts.constBegin(); it != m_docShortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue; // pointer tokens never ride QShortcutMap
         const QList<QKeySequence> seqs = sequencesForToken(it.key());
         for(const QKeySequence &seq : seqs) {
-            auto *sc = new QShortcut(seq, documentSurface);
+            auto *sc = new QShortcut(seq, m_documentSurface);
             sc->setContext(Qt::WidgetWithChildrenShortcut);
             sc->setEnabled(false); // applyInspectProjection decides; arming was deferred to it
             const QString actionName = it.value();
             connect(sc, &QShortcut::activated, this, [this, actionName]() {
                 invokeAction(actionName);
             });
-            documentProjections.append({sc, it.key()});
+            m_documentProjections.append({sc, it.key()});
         }
     }
-    for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it) {
+    for(auto it = m_inspectShortcuts.constBegin(); it != m_inspectShortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue;
         const QList<QKeySequence> seqs = sequencesForToken(it.key());
         for(const QKeySequence &seq : seqs) {
-            auto *sc = new QShortcut(seq, documentSurface);
+            auto *sc = new QShortcut(seq, m_documentSurface);
             sc->setContext(Qt::WidgetWithChildrenShortcut);
             sc->setEnabled(false);
             const QString actionName = it.value();
             connect(sc, &QShortcut::activated, this, [this, actionName]() {
                 invokeAction(actionName);
             });
-            inspectProjections.append({sc, it.key()});
+            m_inspectProjections.append({sc, it.key()});
         }
     }
     // the bits are set once, here, so the projection and inspectMode agree the
@@ -493,22 +493,22 @@ void ActionManager::rebuildDocumentShortcuts() {
 // is ever live twice, not even between two statements.
 void ActionManager::applyInspectProjection() {
     QSet<QString> inspectTokens;
-    for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+    for(const SurfaceClaim &claim : std::as_const(m_inspectProjections))
         inspectTokens.insert(claim.token);
 
-    if(inspectMode) {
+    if(m_inspectMode) {
         // document first: give up every claim the inspect layer is about to take
-        for(const SurfaceClaim &claim : std::as_const(documentProjections)) {
+        for(const SurfaceClaim &claim : std::as_const(m_documentProjections)) {
             if(inspectTokens.contains(claim.token))
                 claim.shortcut->setEnabled(false);
         }
-        for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+        for(const SurfaceClaim &claim : std::as_const(m_inspectProjections))
             claim.shortcut->setEnabled(true);
     } else {
         // disarm first, then hand the document's own claims back
-        for(const SurfaceClaim &claim : std::as_const(inspectProjections))
+        for(const SurfaceClaim &claim : std::as_const(m_inspectProjections))
             claim.shortcut->setEnabled(false);
-        for(const SurfaceClaim &claim : std::as_const(documentProjections))
+        for(const SurfaceClaim &claim : std::as_const(m_documentProjections))
             claim.shortcut->setEnabled(true);
     }
 }
@@ -530,8 +530,8 @@ void ActionManager::initShortcuts() {
     // written before a default existed — or carrying only a few entries —
     // still picks the new default up. The old all-or-nothing copy left any
     // config holding at least one entry permanently pinned to its own era.
-    shortcuts = defaults;
-    gridShortcuts = gridDefaults;
+    m_shortcuts = m_defaults;
+    m_gridShortcuts = m_gridDefaults;
     readShortcuts();
     readGridShortcuts();
     readDocShortcuts();
@@ -562,15 +562,15 @@ void ActionManager::removeShortcut(const QString &keys) {
 }
 //------------------------------------------------------------------------------
 QStringList ActionManager::actionList() {
-    return mActions.keys();
+    return m_actions.keys();
 }
 
 QAction *ActionManager::action(const QString &name) const {
-    return mActions.value(name, nullptr);
+    return m_actions.value(name, nullptr);
 }
 //------------------------------------------------------------------------------
 const QMap<QString, QString> &ActionManager::allShortcuts() {
-    return shortcuts;
+    return m_shortcuts;
 }
 //------------------------------------------------------------------------------
 void ActionManager::removeAllShortcuts() {
@@ -601,23 +601,23 @@ void ActionManager::resetDefaults() {
     // this function's shape makes conspicuous, not a map assignment buried
     // among three correct ones (which is exactly how docShortcuts was missed)
     commit(Scope::Global, [&](QMap<QString, QString> &t) {
-        t = defaults;
+        t = m_defaults;
     });
     commit(Scope::Document, [&](QMap<QString, QString> &t) {
-        t = docDefaults;
+        t = m_docDefaults;
     });
     commit(Scope::Grid, [&](QMap<QString, QString> &t) {
-        t = gridDefaults;
+        t = m_gridDefaults;
     });
     commit(Scope::Inspect, [&](QMap<QString, QString> &t) {
-        t = inspectDefaults;
+        t = m_inspectDefaults;
     });
 }
 
 void ActionManager::setDocumentActive(bool active) {
-    if(documentActive == active)
+    if(m_documentActive == active)
         return;
-    documentActive = active;
+    m_documentActive = active;
     // Same shape as setGridActive: only the resolver consumes this flag. The
     // document QShortcuts live on DocumentWidget and are gated by its
     // WidgetWithChildrenShortcut context; the projection does not read
@@ -625,9 +625,9 @@ void ActionManager::setDocumentActive(bool active) {
 }
 //------------------------------------------------------------------------------
 void ActionManager::setInspectMode(bool inspect) {
-    if(inspectMode == inspect)
+    if(m_inspectMode == inspect)
         return;
-    inspectMode = inspect;
+    m_inspectMode = inspect;
     // no object is created or destroyed: the two claim sets are already built
     // on the document surface, and arming is a hand-over of enabled bits per
     // shared token. This was a full qDeleteAll-and-recreate per fit-mode
@@ -677,7 +677,7 @@ void ActionManager::saveShortcuts() {
     // the defaults layer re-seeded the binding on the next launch (initShortcuts
     // copies defaults first), so "unbind" was an operation the app offered and
     // then quietly undid.
-    settings->saveShortcutsWithTombstones(shortcuts, defaults);
+    settings->saveShortcutsWithTombstones(m_shortcuts, m_defaults);
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -713,8 +713,8 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
     // enforceDisjointness() guarantees the global table holds no token a scope
     // table owns, so no de-claim pass is needed here — the global loop below
     // cannot shadow a live grid or document binding.
-    if(gridActive && gridSurface) {
-        for(auto it = gridShortcuts.constBegin(); it != gridShortcuts.constEnd(); ++it) {
+    if(m_gridActive && m_gridSurface) {
+        for(auto it = m_gridShortcuts.constBegin(); it != m_gridShortcuts.constEnd(); ++it) {
             if(isPointerToken(it.key()))
                 continue;
             if(sequencesForToken(it.key()).contains(seq))
@@ -724,10 +724,10 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
     // the document view's map answers only while its surface is on screen —
     // the same condition that decides whether its QShortcuts are live, so the
     // resolver and the dispatcher cannot disagree
-    if(documentActive) {
-        QMap<QString, QString> document = docShortcuts;
-        if(inspectMode)
-            for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+    if(m_documentActive) {
+        QMap<QString, QString> document = m_docShortcuts;
+        if(m_inspectMode)
+            for(auto it = m_inspectShortcuts.constBegin(); it != m_inspectShortcuts.constEnd(); ++it)
                 if(!isPointerToken(it.key()))
                     document.insert(it.key(), it.value());
         for(auto it = document.constBegin(); it != document.constEnd(); ++it) {
@@ -737,7 +737,7 @@ QString ActionManager::actionForKeySequence(const QKeySequence &seq) const {
                 return it.value();
         }
     }
-    for(auto it = shortcuts.constBegin(); it != shortcuts.constEnd(); ++it) {
+    for(auto it = m_shortcuts.constBegin(); it != m_shortcuts.constEnd(); ++it) {
         if(isPointerToken(it.key()))
             continue;
         if(sequencesForToken(it.key()).contains(seq))
@@ -754,22 +754,22 @@ QString ActionManager::actionForToken(const QString &token) const {
     // scrolls or pages), so what reaches this funnel at all is a pointer
     // event no surface wanted: it has no surface to rank, and its tables are
     // inspect -> doc -> global.
-    if(!isPointerToken(token) && gridActive && gridSurface) {
-        auto it = gridShortcuts.constFind(token);
-        if(it != gridShortcuts.constEnd())
+    if(!isPointerToken(token) && m_gridActive && m_gridSurface) {
+        auto it = m_gridShortcuts.constFind(token);
+        if(it != m_gridShortcuts.constEnd())
             return it.value();
     }
-    if(inspectMode) {
-        auto it = inspectShortcuts.constFind(token);
-        if(it != inspectShortcuts.constEnd())
+    if(m_inspectMode) {
+        auto it = m_inspectShortcuts.constFind(token);
+        if(it != m_inspectShortcuts.constEnd())
             return it.value();
     }
-    if(documentActive) {
-        auto it = docShortcuts.constFind(token);
-        if(it != docShortcuts.constEnd())
+    if(m_documentActive) {
+        auto it = m_docShortcuts.constFind(token);
+        if(it != m_docShortcuts.constEnd())
             return it.value();
     }
-    return shortcuts.value(token);
+    return m_shortcuts.value(token);
 }
 
 bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const {
@@ -790,13 +790,13 @@ bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent
 // popup (FVOptionsPopup), and its bare navigation tokens would name keys
 // whose meaning at that surface is gridOpen/goUp, not this action.
 const QString ActionManager::shortcutForAction(const QString &action) {
-    const QString doc = docShortcuts.key(action, QString());
+    const QString doc = m_docShortcuts.key(action, QString());
     if(!doc.isEmpty())
         return doc;
-    const QString inspect = inspectShortcuts.key(action, QString());
+    const QString inspect = m_inspectShortcuts.key(action, QString());
     if(!inspect.isEmpty())
         return inspect;
-    return shortcuts.key(action, "");
+    return m_shortcuts.key(action, "");
 }
 
 // The reverse query a floating surface uses to build its veto list: given an
@@ -811,11 +811,11 @@ const QString ActionManager::shortcutForAction(const QString &action) {
 // subject-changing action the overlays must arbitrate; the veto predicate
 // itself (isSubjectChangingAction) is where that decision lives.
 const QList<QString> ActionManager::shortcutsForAction(const QString &action) {
-    QList<QString> keys = shortcuts.keys(action);
-    for(auto it = docShortcuts.constBegin(); it != docShortcuts.constEnd(); ++it)
+    QList<QString> keys = m_shortcuts.keys(action);
+    for(auto it = m_docShortcuts.constBegin(); it != m_docShortcuts.constEnd(); ++it)
         if(it.value() == action)
             keys << it.key();
-    for(auto it = inspectShortcuts.constBegin(); it != inspectShortcuts.constEnd(); ++it)
+    for(auto it = m_inspectShortcuts.constBegin(); it != m_inspectShortcuts.constEnd(); ++it)
         if(it.value() == action && !keys.contains(it.key()))
             keys << it.key();
     return keys;
@@ -828,7 +828,7 @@ bool ActionManager::invokeAction(const QString &actionName) {
         // validateAction just proved the lookup succeeds; trigger() on a
         // stateless token is the whole dispatch — the same one-way fire the
         // invokeMethod-by-name dance used to perform
-        mActions.value(actionName)->trigger();
+        m_actions.value(actionName)->trigger();
         return true;
     } else if(type == ActionType::ACTION_SCRIPT) {
         QString scriptName = actionName;
@@ -858,7 +858,7 @@ void ActionManager::validateShortcuts(QMap<QString, QString> &map) {
 }
 //------------------------------------------------------------------------------
 inline ActionType ActionManager::validateAction(const QString &actionName) {
-    if(mActions.contains(actionName))
+    if(m_actions.contains(actionName))
         return ActionType::ACTION_NORMAL;
     if(actionName.startsWith("s:")) {
         QString scriptName = actionName;
@@ -890,31 +890,31 @@ static void migrateLegacyTokenNames(QMap<QString, QString> &map) {
 }
 
 void ActionManager::readShortcuts() {
-    settings->readShortcuts(shortcuts);
-    migrateLegacyTokenNames(shortcuts);
-    validateShortcuts(shortcuts);
+    settings->readShortcuts(m_shortcuts);
+    migrateLegacyTokenNames(m_shortcuts);
+    validateShortcuts(m_shortcuts);
 }
 
 void ActionManager::readGridShortcuts() {
-    settings->readShortcuts(gridShortcuts, QStringLiteral("gridShortcuts"));
-    migrateLegacyTokenNames(gridShortcuts);
-    validateShortcuts(gridShortcuts);
+    settings->readShortcuts(m_gridShortcuts, QStringLiteral("gridShortcuts"));
+    migrateLegacyTokenNames(m_gridShortcuts);
+    validateShortcuts(m_gridShortcuts);
 }
 
 // the inspect layer's user overrides: defaults first, config entries overlay
 // them — the same insert-if-present semantic the global table carries
 void ActionManager::readDocShortcuts() {
-    docShortcuts = docDefaults;
-    settings->readShortcuts(docShortcuts, QStringLiteral("docShortcuts"));
-    migrateLegacyTokenNames(docShortcuts);
-    validateShortcuts(docShortcuts);
+    m_docShortcuts = m_docDefaults;
+    settings->readShortcuts(m_docShortcuts, QStringLiteral("docShortcuts"));
+    migrateLegacyTokenNames(m_docShortcuts);
+    validateShortcuts(m_docShortcuts);
 }
 
 void ActionManager::readInspectShortcuts() {
-    inspectShortcuts = inspectDefaults;
-    settings->readShortcuts(inspectShortcuts, QStringLiteral("inspectShortcuts"));
-    migrateLegacyTokenNames(inspectShortcuts);
-    validateShortcuts(inspectShortcuts);
+    m_inspectShortcuts = m_inspectDefaults;
+    settings->readShortcuts(m_inspectShortcuts, QStringLiteral("inspectShortcuts"));
+    migrateLegacyTokenNames(m_inspectShortcuts);
+    validateShortcuts(m_inspectShortcuts);
 }
 
 //------------------------------------------------------------------------------

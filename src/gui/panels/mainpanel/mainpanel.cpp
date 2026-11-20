@@ -141,7 +141,7 @@ void MainPanel::paintEvent(QPaintEvent *event) {
     // borders
     QPainter p(this);
     p.setPen(settings->colorScheme().folderview_hc);
-    switch(mPosition) {
+    switch(m_position) {
     case PANEL_TOP: p.drawLine(rect().bottomLeft(), rect().bottomRight()); break;
     case PANEL_BOTTOM:
         p.fillRect(rect().left(), rect().top(), width(), 3, settings->colorScheme().folderview);
