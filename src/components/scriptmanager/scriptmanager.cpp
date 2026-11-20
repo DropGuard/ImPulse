@@ -79,7 +79,7 @@ void ScriptManager::processArguments(QStringList &cmd, const std::shared_ptr<Ima
     for(auto &i : cmd) {
         if(i.contains("%file%"))
             i.replace("%file%", img.get()->filePath());
-#ifdef __WIN32
+#ifdef _WIN32
         // force "\" as a directory separator
         i.replace("/", "\\");
         i.replace("\\\\", "\\");

@@ -23,7 +23,7 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 
-#ifdef __WIN32
+#ifdef _WIN32
 #include <tchar.h>
 #endif
 
@@ -200,21 +200,13 @@ void Core::showInDirectory() {
         if(reply.isError())
             m_overlays->showMessage(tr("No file manager is available to reveal the file"));
     });
-#elif __WIN32
+#elif defined(_WIN32)
+    // _WIN32, not __WIN32: the latter is not a macro any compiler defines, so
+    // this branch never compiled and every platform fell through to the
+    // QDesktopServices fallback below.
     QStringList args;
     args << "/select," << QDir::toNativeSeparators(selectedPath());
     QProcess::startDetached("explorer", args);
-#elif __APPLE__
-    QStringList args;
-    args << "-e";
-    args << "tell application \"Finder\"";
-    args << "-e";
-    args << "activate";
-    args << "-e";
-    args << "select POSIX file \"" + selectedPath() + "\"";
-    args << "-e";
-    args << "end tell";
-    QProcess::startDetached("osascript", args);
 #else
     QDesktopServices::openUrl(QUrl::fromLocalFile(m_model->directoryPath()));
 #endif

@@ -24,7 +24,7 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 
-#ifdef __WIN32
+#ifdef _WIN32
 #include <tchar.h>
 #endif
 
@@ -444,7 +444,7 @@ void Core::setWallpaper() {
         m_overlays->showMessage("Set wallpaper: file not supported");
         return;
     }
-#ifdef __WIN32
+#ifdef _WIN32
     // set fit mode (registry)
     LONG status;
     HKEY hKey;

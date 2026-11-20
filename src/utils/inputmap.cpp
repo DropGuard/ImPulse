@@ -291,25 +291,13 @@ void InputMap::initModMap() {
 }
 
 QString InputMap::keyNameCtrl() {
-#ifdef __APPLE__
-    return "⌘";
-#else
     return "Ctrl";
-#endif
 }
 
 QString InputMap::keyNameAlt() {
-#ifdef __APPLE__
-    return "⌥";
-#else
     return "Alt";
-#endif
 }
 
 QString InputMap::keyNameShift() {
-#ifdef __APPLE__
-    return "⇧";
-#else
     return "Shift";
-#endif
 }
