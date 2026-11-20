@@ -1,5 +1,4 @@
-#include <QTest>
-#include <gtest/gtest.h>
+#include "gtest_qt.h"
 #include <utility>
 #include <QSignalSpy>
 #include <QApplication>
@@ -48,7 +47,12 @@ TEST_F(TestOverlayKeys, overlayEscDismissesTheSurface) {
     writeImage(QDir(base).filePath("esc.png"));
     Core core;
     EXPECT_TRUE(core.loadPath(QDir(base).filePath("esc.png")));
-    QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("esc.png"), 10000);
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core.currentFilePath() == QDir(base).filePath("esc.png");
+        },
+        10000));
+    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("esc.png"));
     QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, 0, 1);
 
     // copy overlay (serves copy and move alike)
@@ -82,7 +86,11 @@ TEST_F(TestOverlayKeys, overlayEscDismissesTheSurface) {
     auto *cropOverlay = core.mainWindow()->findChild<CropOverlay *>();
     EXPECT_TRUE(cropOverlay);
     QApplication::sendEvent(cropOverlay, &esc);
-    QTRY_COMPARE_WITH_TIMEOUT(!core.mainWindow()->crop()->isActive(), true, 5000);
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return !core.mainWindow()->crop()->isActive();
+        },
+        5000));
 }
 
 // The save prompt keeps the disk off the bare keys: Save and Save as are
@@ -97,7 +105,11 @@ TEST_F(TestOverlayKeys, saveConfirmOverlayAnswersItsKeys) {
     writeImage(QDir(base).filePath("svkeys.png"));
     Core core;
     EXPECT_TRUE(core.loadPath(QDir(base).filePath("svkeys.png")));
-    QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core.isSettled();
+        },
+        10000));
     settings->setShowSaveOverlay(true);
     core.mainWindow()->overlays()->showSaveOverlay();
     auto *saveOverlay = core.mainWindow()->findChild<SaveConfirmOverlay *>();
@@ -162,7 +174,7 @@ TEST_F(TestOverlayKeys, saveConfirmOverlayAnswersItsKeys) {
     core.mainWindow()->show();
     EXPECT_TRUE(QTest::qWaitForWindowExposed(core.mainWindow()));
     QSignalSpy mapSave(actionManager->action("save"), &QAction::triggered);
-    coretest::deliverWindowKey(saveOverlay, Qt::Key_S, Qt::ControlModifier);
+    ASSERT_TRUE(coretest::deliverWindowKey(saveOverlay, Qt::Key_S, Qt::ControlModifier));
     EXPECT_EQ(mapSave.count(), 1); // through the map, no veto: the chord is the prompt's own answer
     EXPECT_TRUE(!saveOverlay->isVisible());
 }
@@ -183,7 +195,11 @@ TEST_F(TestOverlayKeys, surfacesConsumeTheWalkButStillYieldDisplayKeys) {
     writeImage(b);
     Core core;
     EXPECT_TRUE(core.loadPath(a));
-    QTRY_VERIFY_WITH_TIMEOUT(core.isSettled(), 10000);
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core.isSettled();
+        },
+        10000));
     EXPECT_EQ(core.currentFilePath(), a);
 
     auto press = [](QWidget *w, Qt::Key key, const char *keyName, Qt::KeyboardModifiers mods = Qt::NoModifier) {
@@ -270,7 +286,12 @@ TEST_F(TestOverlayKeys, loadFailureOfUnviewedFileStaysSilent) {
     deps.overlays = &overlayFake;
     Core core(deps);
     EXPECT_TRUE(core.loadPath(QDir(base).filePath("keep.png")));
-    QTRY_COMPARE_WITH_TIMEOUT(core.currentFilePath(), QDir(base).filePath("keep.png"), 10000);
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core.currentFilePath() == QDir(base).filePath("keep.png");
+        },
+        10000));
+    EXPECT_EQ(core.currentFilePath(), QDir(base).filePath("keep.png"));
     // the constructor's version/first-run message already landed here —
     // baseline it, the way the old FakeInteractions test did
     int before = overlayFake.messageCalls;

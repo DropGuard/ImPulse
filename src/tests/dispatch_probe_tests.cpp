@@ -12,8 +12,7 @@
 // popup contract ("the menu owns its keys") is pinned behaviorally in
 // gui_widget_tests instead — an open ContextMenu must not let an application
 // shortcut change viewer state behind it, whichever way the grab lands.
-#include <QtTest/QTest>
-#include <gtest/gtest.h>
+#include "gtest_qt.h"
 #include <QAction>
 #include <QApplication>
 #include <QDialog>
