@@ -45,11 +45,23 @@ jobs:
           echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list >/dev/null
           sudo apt-get update && sudo apt-get install -y clang-format-21
           sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
+      # the lint gate's other three instruments. Versions matter the same way
+      # the formatter's did: the baseline counts are a property of the
+      # toolchain that produced them, and lint.py fingerprints the tools and
+      # fails by name when they move.
+      - name: lint instruments (clazy, clang-tidy, cppcheck)
+        run: |
+          sudo apt-get install -y clang-tidy-21 clazy cppcheck
+          sudo ln -sf /usr/bin/clang-tidy-21 /usr/local/bin/clang-tidy
+      # LINT_TESTS=ON puts the static-analysis gate into ctest, so this job
+      # runs the same four gates the pre-commit hook runs — which is the point
+      # of a clean machine: the hook can be skipped with --no-verify, and it
+      # skips itself when a tool is missing.
       - name: configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
-      - name: the suites
+      - name: the suites (includes FORMAT_RULES, ARCH_RULES, LINT)
         run: cd build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
       - name: rust suite
         run: cargo test --manifest-path engine/qimgv-engine/Cargo.toml
