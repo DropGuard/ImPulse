@@ -48,7 +48,7 @@ class DocumentInfo {
     QMimeType mimeType() const;
 
     // file extension (guessed from mime-type)
-    QString format() const;
+    const QString &format() const;
     int exifOrientation() const;
 
     QDateTime lastModified() const;

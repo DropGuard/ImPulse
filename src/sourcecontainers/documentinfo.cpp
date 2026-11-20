@@ -46,7 +46,7 @@ QMimeType DocumentInfo::mimeType() const {
     return m_mimeType;
 }
 
-QString DocumentInfo::format() const {
+const QString &DocumentInfo::format() const {
     return m_format;
 }
 
@@ -141,7 +141,10 @@ bool DocumentInfo::detectAnimatedWebP() {
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         in.skipRawData(12);
-        char *buf = static_cast<char *>(malloc(5));
+        // a stack buffer, not malloc: the size is a compile-time constant, and
+        // an unchecked allocation is a null dereference on the one path where
+        // memory is already short
+        char buf[5];
         buf[4] = '\0';
         in.readRawData(buf, 4);
         if(strcmp(buf, "VP8X") == 0) {
@@ -152,7 +155,6 @@ bool DocumentInfo::detectAnimatedWebP() {
                 result = true;
             }
         }
-        free(buf);
     }
     return result;
 }
@@ -169,13 +171,12 @@ bool DocumentInfo::detectAnimatedAvif() {
     if(f.open(QFile::ReadOnly)) {
         QDataStream in(&f);
         in.skipRawData(4); // skip box size
-        char *buf = static_cast<char *>(malloc(9));
+        char buf[9];
         buf[8] = '\0';
         in.readRawData(buf, 8);
         if(strcmp(buf, "ftypavis") == 0) {
             result = true;
         }
-        free(buf);
     }
     return result;
 }
@@ -269,21 +270,11 @@ void DocumentInfo::loadExifTags() {
         }
     }
 
-// this should work with both 0.28 and <0.28
-#if not EXIV2_TEST_VERSION(0, 28, 0)
-#ifdef __WIN32
-    catch(Exiv2::BasicError<wchar_t> &e) {
-        qDebug() << "Caught Exiv2::BasicError exception:\n" << e.what() << "\n";
-        return;
-    }
-#else
-    catch(Exiv2::BasicError<char> &e) {
-        qDebug() << "Caught Exiv2::BasicError exception:\n" << e.what() << "\n";
-        return;
-    }
-#endif
-#endif
-
+    // One handler for both Exiv2 eras. 0.27's BasicError<char> IS Error (a
+    // typedef), so a narrower catch before this one is unreachable and GCC 13
+    // rejects the pair under -Wexceptions; 0.28 removed the BasicError
+    // template entirely, so the branch that used to guard it never compiled
+    // anywhere. Both facts point at the same code: this handler alone.
     catch(Exiv2::Error &e) {
         qDebug() << "Caught Exiv2 exception:\n" << e.what() << "\n";
         return;

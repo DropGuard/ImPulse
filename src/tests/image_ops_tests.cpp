@@ -712,7 +712,10 @@ TEST_F(TestImageOps, editingAnImageCarriesItsExifXmpAndIptcOntoTheSavedFile) {
     // so a carried "rotate 90 CW" would make every viewer rotate them again
     auto orientation = exif.findKey(Exiv2::ExifKey("Exif.Image.Orientation"));
     EXPECT_TRUE(orientation != exif.end()) << "orientation was dropped instead of reset";
-    EXPECT_EQ(orientation->toInt64(), qint64(1));
+    // toUint32, not toInt64: the latter is Exiv2 0.28's API and the CI runs
+    // 0.27 (Ubuntu 24.04), where Exifdatum has no such member. Orientation is
+    // a uint16 in the spec, and toUint32 has been on Metadatum throughout.
+    EXPECT_EQ(orientation->toUint32(), 1u);
 
     // the file is still a valid image after Exiv2 rewrote it
     QImage back(dest);
