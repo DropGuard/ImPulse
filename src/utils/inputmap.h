@@ -16,8 +16,8 @@ class InputMap {
   private:
     void initKeyMap();
     void initModMap();
-    QMap<quint32, QString> keyMap;
-    QMap<QString, Qt::KeyboardModifier> modMap;
+    QMap<quint32, QString> m_keyMap;
+    QMap<QString, Qt::KeyboardModifier> m_modMap;
 };
 
 extern InputMap *inputMap;

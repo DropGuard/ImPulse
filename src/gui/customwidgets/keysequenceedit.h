@@ -21,7 +21,7 @@ class KeySequenceEdit : public QPushButton {
 
   private:
     void processEvent(QEvent *e);
-    QString mSequence;
+    QString m_sequence;
 
   signals:
     void edited();

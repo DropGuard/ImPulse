@@ -12,6 +12,6 @@ class FloatingMessageProxy {
     void init();
 
   private:
-    FloatingWidgetContainer *container;
-    QPointer<FloatingMessage> overlay;
+    FloatingWidgetContainer *m_container;
+    QPointer<FloatingMessage> m_overlay;
 };

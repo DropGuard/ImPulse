@@ -29,9 +29,9 @@ void ThumbnailStrip::setupLayout() {
 
 ThumbnailWidget *ThumbnailStrip::createThumbnailWidget() {
     ThumbnailWidget *widget = new ThumbnailWidget();
-    widget->setPadding(thumbPadding);
-    widget->setMargins(thumbMarginX, thumbMarginY);
-    widget->setThumbStyle(mCurrentStyle);
+    widget->setPadding(m_thumbPadding);
+    widget->setMargins(m_thumbMarginX, m_thumbMarginY);
+    widget->setThumbStyle(m_currentStyle);
     widget->setThumbnailSize(m_thumbnailSize);
     return widget;
 }
@@ -121,27 +121,27 @@ void ThumbnailStrip::focusOnSelection() {
 
 void ThumbnailStrip::readSettings() {
     if(settings->thumbPanelStyle() == TH_PANEL_SIMPLE)
-        mCurrentStyle = THUMB_SIMPLE;
+        m_currentStyle = THUMB_SIMPLE;
     else
-        mCurrentStyle = THUMB_NORMAL_CENTERED;
+        m_currentStyle = THUMB_NORMAL_CENTERED;
 
     m_thumbnailSize = qBound(20, settings->panelPreviewsSize(), 300);
 
     if(settings->panelPosition() == PANEL_TOP || settings->panelPosition() == PANEL_BOTTOM) {
         ThumbnailView::setOrientation(Qt::Horizontal);
-        thumbMarginX = 2;
-        thumbMarginY = 4;
+        m_thumbMarginX = 2;
+        m_thumbMarginY = 4;
     } else {
         ThumbnailView::setOrientation(Qt::Vertical);
-        thumbMarginX = 12;
-        thumbMarginY = 2;
+        m_thumbMarginX = 12;
+        m_thumbMarginY = 2;
     }
 
     // apply style, size & reposition
     for(int i = 0; i < m_thumbnails.count(); i++) {
-        m_thumbnails.at(i)->setPadding(thumbPadding);
-        m_thumbnails.at(i)->setMargins(thumbMarginX, thumbMarginY);
-        m_thumbnails.at(i)->setThumbStyle(mCurrentStyle);
+        m_thumbnails.at(i)->setPadding(m_thumbPadding);
+        m_thumbnails.at(i)->setMargins(m_thumbMarginX, m_thumbMarginY);
+        m_thumbnails.at(i)->setThumbStyle(m_currentStyle);
         m_thumbnails.at(i)->setThumbnailSize(m_thumbnailSize);
     }
     updateThumbnailPositions(0, m_thumbnails.count() - 1);
@@ -153,9 +153,9 @@ void ThumbnailStrip::readSettings() {
 QSize ThumbnailStrip::itemSize() {
     if(!m_thumbnails.count()) {
         ThumbnailWidget w;
-        w.setPadding(thumbPadding);
-        w.setMargins(thumbMarginX, thumbMarginY);
-        w.setThumbStyle(mCurrentStyle);
+        w.setPadding(m_thumbPadding);
+        w.setMargins(m_thumbMarginX, m_thumbMarginY);
+        w.setThumbStyle(m_currentStyle);
         w.setThumbnailSize(m_thumbnailSize);
         return w.boundingRect().size().toSize();
     } else {

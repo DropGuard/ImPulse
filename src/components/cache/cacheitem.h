@@ -16,6 +16,6 @@ class CacheItem {
     int lockStatus();
 
   private:
-    std::shared_ptr<Image> contents;
-    QSemaphore sem;
+    std::shared_ptr<Image> m_contents;
+    QSemaphore m_sem;
 };

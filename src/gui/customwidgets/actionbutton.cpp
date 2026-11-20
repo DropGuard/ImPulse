@@ -2,7 +2,7 @@
 
 #include <utility>
 
-ActionButton::ActionButton(QWidget *parent) : IconButton(parent), mTriggerMode(TriggerMode::ClickTrigger) {
+ActionButton::ActionButton(QWidget *parent) : IconButton(parent), m_triggerMode(TriggerMode::ClickTrigger) {
     this->setFocusPolicy(Qt::NoFocus);
     this->setProperty("checked", false);
 }
@@ -19,25 +19,25 @@ ActionButton::ActionButton(QString _actionName, QString _iconPath, int _size, QW
 }
 
 void ActionButton::setAction(QString _actionName) {
-    actionName = std::move(_actionName);
+    m_actionName = std::move(_actionName);
 }
 
 void ActionButton::setTriggerMode(TriggerMode mode) {
-    mTriggerMode = mode;
+    m_triggerMode = mode;
 }
 
 TriggerMode ActionButton::triggerMode() {
-    return mTriggerMode;
+    return m_triggerMode;
 }
 
 void ActionButton::mousePressEvent(QMouseEvent *event) {
     IconButton::mousePressEvent(event);
-    if(mTriggerMode == TriggerMode::PressTrigger && event->button() == Qt::LeftButton)
-        actionManager->invokeAction(actionName);
+    if(m_triggerMode == TriggerMode::PressTrigger && event->button() == Qt::LeftButton)
+        actionManager->invokeAction(m_actionName);
 }
 
 void ActionButton::mouseReleaseEvent(QMouseEvent *event) {
     IconButton::mouseReleaseEvent(event);
-    if(mTriggerMode == TriggerMode::ClickTrigger && rect().contains(event->pos()) && event->button() == Qt::LeftButton)
-        actionManager->invokeAction(actionName);
+    if(m_triggerMode == TriggerMode::ClickTrigger && rect().contains(event->pos()) && event->button() == Qt::LeftButton)
+        actionManager->invokeAction(m_actionName);
 }

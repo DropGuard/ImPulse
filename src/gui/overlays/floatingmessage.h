@@ -32,10 +32,10 @@ class FloatingMessage : public OverlayWidget {
     void setText(const QString &text);
 
   private:
-    QTimer visibilityTimer;
-    int hideDelay;
-    FloatingWidgetPosition preferredPosition;
-    Ui::FloatingMessage *ui;
+    QTimer m_visibilityTimer;
+    int m_hideDelay;
+    FloatingWidgetPosition m_preferredPosition;
+    Ui::FloatingMessage *m_ui;
     void doShowMessage(QString text, FloatingMessageIcon icon, int duration);
     void setIcon(FloatingMessageIcon icon);
 

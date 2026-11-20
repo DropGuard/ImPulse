@@ -2,42 +2,43 @@
 #include "ui_resizedialog.h"
 
 ResizeDialog::ResizeDialog(QSize initialSize, QWidget *parent)
-    : QDialog(parent), ui(new Ui::ResizeDialog), lastEdited(0) {
-    ui->setupUi(this);
+    : QDialog(parent), m_ui(new Ui::ResizeDialog), m_lastEdited(0) {
+    m_ui->setupUi(this);
     setWindowModality(Qt::ApplicationModal);
-    ui->percent->setFocus();
+    m_ui->percent->setFocus();
 
-    this->originalSize = initialSize;
-    targetSize = initialSize;
+    this->m_originalSize = initialSize;
+    m_targetSize = initialSize;
 
-    ui->width->setValue(initialSize.width());
-    ui->height->setValue(initialSize.height());
+    m_ui->width->setValue(initialSize.width());
+    m_ui->height->setValue(initialSize.height());
 
-    ui->resetButton->setText(tr("Reset:") + " " + QString::number(initialSize.width()) + " x " +
-                             QString::number(initialSize.height()));
+    m_ui->resetButton->setText(tr("Reset:") + " " + QString::number(initialSize.width()) + " x " +
+                               QString::number(initialSize.height()));
 
-    desktopSize = qApp->primaryScreen()->size();
-    connect(ui->byPercentage, &QRadioButton::toggled, this, &ResizeDialog::onPercentageRadioButton);
-    connect(ui->byAbsoluteSize, &QRadioButton::toggled, this, &ResizeDialog::onAbsoluteSizeRadioButton);
-    connect(ui->percent, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ResizeDialog::percentChanged);
-    connect(ui->width, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::widthChanged);
-    connect(ui->height, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::heightChanged);
-    connect(ui->keepAspectRatio, &QCheckBox::toggled, this, &ResizeDialog::onAspectRatioCheckbox);
-    connect(ui->resComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ResizeDialog::setCommonResolution);
-    connect(ui->fitDesktopButton, &QPushButton::pressed, this, &ResizeDialog::fitDesktop);
-    connect(ui->fillDesktopButton, &QPushButton::pressed, this, &ResizeDialog::fillDesktop);
-    connect(ui->resetButton, &QPushButton::pressed, this, &ResizeDialog::reset);
-    connect(ui->cancelButton, &QPushButton::pressed, this, &ResizeDialog::reject);
-    connect(ui->okButton, &QPushButton::pressed, this, &ResizeDialog::sizeSelect);
+    m_desktopSize = qApp->primaryScreen()->size();
+    connect(m_ui->byPercentage, &QRadioButton::toggled, this, &ResizeDialog::onPercentageRadioButton);
+    connect(m_ui->byAbsoluteSize, &QRadioButton::toggled, this, &ResizeDialog::onAbsoluteSizeRadioButton);
+    connect(m_ui->percent, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ResizeDialog::percentChanged);
+    connect(m_ui->width, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::widthChanged);
+    connect(m_ui->height, qOverload<int>(&QSpinBox::valueChanged), this, &ResizeDialog::heightChanged);
+    connect(m_ui->keepAspectRatio, &QCheckBox::toggled, this, &ResizeDialog::onAspectRatioCheckbox);
+    connect(m_ui->resComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this,
+            &ResizeDialog::setCommonResolution);
+    connect(m_ui->fitDesktopButton, &QPushButton::pressed, this, &ResizeDialog::fitDesktop);
+    connect(m_ui->fillDesktopButton, &QPushButton::pressed, this, &ResizeDialog::fillDesktop);
+    connect(m_ui->resetButton, &QPushButton::pressed, this, &ResizeDialog::reset);
+    connect(m_ui->cancelButton, &QPushButton::pressed, this, &ResizeDialog::reject);
+    connect(m_ui->okButton, &QPushButton::pressed, this, &ResizeDialog::sizeSelect);
 }
 
 ResizeDialog::~ResizeDialog() {
-    delete ui;
+    delete m_ui;
 }
 
 void ResizeDialog::sizeSelect() {
-    if(targetSize != originalSize)
-        emit sizeSelected(targetSize);
+    if(m_targetSize != m_originalSize)
+        emit sizeSelected(m_targetSize);
     this->accept();
 }
 
@@ -55,109 +56,109 @@ void ResizeDialog::setCommonResolution(int index) {
     case 9: res = QSize(2560, 1600); break;
     case 10: res = QSize(3840, 1600); break;
     case 11: res = QSize(3840, 2160); break;
-    default: res = originalSize; break;
+    default: res = m_originalSize; break;
     }
-    if(ui->keepAspectRatio->isChecked())
-        targetSize = originalSize.scaled(res, Qt::KeepAspectRatio);
+    if(m_ui->keepAspectRatio->isChecked())
+        m_targetSize = m_originalSize.scaled(res, Qt::KeepAspectRatio);
     else
-        targetSize = originalSize.scaled(res, Qt::IgnoreAspectRatio);
+        m_targetSize = m_originalSize.scaled(res, Qt::IgnoreAspectRatio);
     updateToTargetValues();
 }
 
 QSize ResizeDialog::newSize() {
-    return targetSize;
+    return m_targetSize;
 }
 
 void ResizeDialog::widthChanged(int newWidth) {
-    lastEdited = 0;
-    float factor = static_cast<float>(newWidth) / originalSize.width();
-    targetSize.setWidth(newWidth);
-    if(ui->keepAspectRatio->isChecked()) {
-        targetSize.setHeight(static_cast<int>(originalSize.height() * factor));
+    m_lastEdited = 0;
+    float factor = static_cast<float>(newWidth) / m_originalSize.width();
+    m_targetSize.setWidth(newWidth);
+    if(m_ui->keepAspectRatio->isChecked()) {
+        m_targetSize.setHeight(static_cast<int>(m_originalSize.height() * factor));
     }
     updateToTargetValues();
 }
 
 void ResizeDialog::heightChanged(int newHeight) {
-    lastEdited = 1;
-    float factor = static_cast<float>(newHeight) / originalSize.height();
-    targetSize.setHeight(newHeight);
-    if(ui->keepAspectRatio->isChecked()) {
-        targetSize.setWidth(static_cast<int>(originalSize.width() * factor));
+    m_lastEdited = 1;
+    float factor = static_cast<float>(newHeight) / m_originalSize.height();
+    m_targetSize.setHeight(newHeight);
+    if(m_ui->keepAspectRatio->isChecked()) {
+        m_targetSize.setWidth(static_cast<int>(m_originalSize.width() * factor));
     }
     updateToTargetValues();
 }
 
 void ResizeDialog::updateToTargetValues() {
-    ui->width->blockSignals(true);
-    ui->height->blockSignals(true);
-    ui->width->setValue(targetSize.width());
-    ui->height->setValue(targetSize.height());
-    ui->width->blockSignals(false);
-    ui->height->blockSignals(false);
+    m_ui->width->blockSignals(true);
+    m_ui->height->blockSignals(true);
+    m_ui->width->setValue(m_targetSize.width());
+    m_ui->height->setValue(m_targetSize.height());
+    m_ui->width->blockSignals(false);
+    m_ui->height->blockSignals(false);
 }
 
 void ResizeDialog::fitDesktop() {
-    targetSize = originalSize.scaled(desktopSize, Qt::KeepAspectRatio);
+    m_targetSize = m_originalSize.scaled(m_desktopSize, Qt::KeepAspectRatio);
     updateToTargetValues();
 }
 
 void ResizeDialog::fillDesktop() {
-    targetSize = originalSize.scaled(desktopSize, Qt::KeepAspectRatioByExpanding);
+    m_targetSize = m_originalSize.scaled(m_desktopSize, Qt::KeepAspectRatioByExpanding);
     updateToTargetValues();
 }
 
 void ResizeDialog::onAspectRatioCheckbox() {
     resetResCheckBox();
-    (lastEdited) ? heightChanged(ui->height->value()) : widthChanged(ui->width->value());
+    (m_lastEdited) ? heightChanged(m_ui->height->value()) : widthChanged(m_ui->width->value());
 }
 
 void ResizeDialog::onAbsoluteSizeRadioButton() {
-    ui->width->blockSignals(true);
-    ui->height->blockSignals(true);
-    ui->percent->blockSignals(true);
-    ui->keepAspectRatio->blockSignals(true);
+    m_ui->width->blockSignals(true);
+    m_ui->height->blockSignals(true);
+    m_ui->percent->blockSignals(true);
+    m_ui->keepAspectRatio->blockSignals(true);
 
-    ui->width->setEnabled(true);
-    ui->height->setEnabled(true);
-    ui->percent->setEnabled(false);
-    ui->keepAspectRatio->setEnabled(true);
+    m_ui->width->setEnabled(true);
+    m_ui->height->setEnabled(true);
+    m_ui->percent->setEnabled(false);
+    m_ui->keepAspectRatio->setEnabled(true);
 
-    ui->width->blockSignals(false);
-    ui->height->blockSignals(false);
-    ui->percent->blockSignals(false);
-    ui->keepAspectRatio->blockSignals(false);
+    m_ui->width->blockSignals(false);
+    m_ui->height->blockSignals(false);
+    m_ui->percent->blockSignals(false);
+    m_ui->keepAspectRatio->blockSignals(false);
 }
 
 void ResizeDialog::onPercentageRadioButton() {
-    ui->width->blockSignals(true);
-    ui->height->blockSignals(true);
-    ui->percent->blockSignals(true);
-    ui->keepAspectRatio->blockSignals(true);
+    m_ui->width->blockSignals(true);
+    m_ui->height->blockSignals(true);
+    m_ui->percent->blockSignals(true);
+    m_ui->keepAspectRatio->blockSignals(true);
 
-    ui->width->setEnabled(false);
-    ui->height->setEnabled(false);
-    ui->percent->setEnabled(true);
-    ui->keepAspectRatio->setChecked(true);
-    ui->keepAspectRatio->setEnabled(false);
-    percentChanged(ui->percent->value());
+    m_ui->width->setEnabled(false);
+    m_ui->height->setEnabled(false);
+    m_ui->percent->setEnabled(true);
+    m_ui->keepAspectRatio->setChecked(true);
+    m_ui->keepAspectRatio->setEnabled(false);
+    percentChanged(m_ui->percent->value());
 
-    ui->width->blockSignals(false);
-    ui->height->blockSignals(false);
-    ui->percent->blockSignals(false);
-    ui->keepAspectRatio->blockSignals(false);
+    m_ui->width->blockSignals(false);
+    m_ui->height->blockSignals(false);
+    m_ui->percent->blockSignals(false);
+    m_ui->keepAspectRatio->blockSignals(false);
 }
 
 void ResizeDialog::resetResCheckBox() {
-    ui->resComboBox->blockSignals(true);
-    ui->resComboBox->setCurrentIndex(0);
-    ui->resComboBox->blockSignals(false);
+    m_ui->resComboBox->blockSignals(true);
+    m_ui->resComboBox->setCurrentIndex(0);
+    m_ui->resComboBox->blockSignals(false);
 }
 
 void ResizeDialog::percentChanged(double newPercent) {
     double scale = newPercent / 100.;
-    targetSize.setWidth(originalSize.width() * scale);
-    targetSize.setHeight(originalSize.height() * scale);
+    m_targetSize.setWidth(m_originalSize.width() * scale);
+    m_targetSize.setHeight(m_originalSize.height() * scale);
 
     updateToTargetValues();
 }
@@ -174,7 +175,7 @@ void ResizeDialog::keyPressEvent(QKeyEvent *event) {
 
 void ResizeDialog::reset() {
     resetResCheckBox();
-    targetSize = originalSize;
+    m_targetSize = m_originalSize;
     updateToTargetValues();
 }
 

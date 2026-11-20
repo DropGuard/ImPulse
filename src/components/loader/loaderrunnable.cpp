@@ -6,7 +6,7 @@ Q_LOGGING_CATEGORY(lcLoaderPerf, "qimgv.perf.loader", QtInfoMsg)
 #include <QElapsedTimer>
 
 LoaderRunnable::LoaderRunnable(QString _path, bool _scaled, const LoadPolicy &_policy)
-    : path(_path), scaled(_scaled), policy(_policy) {
+    : m_path(_path), m_scaled(_scaled), m_policy(_policy) {
 }
 
 void LoaderRunnable::run() {
@@ -18,10 +18,10 @@ void LoaderRunnable::run() {
     // ever real decode failures.
     QElapsedTimer t;
     t.start();
-    auto image = ImageFactory::createImage(path, scaled, policy);
+    auto image = ImageFactory::createImage(m_path, m_scaled, m_policy);
     // the RESULT decides the tier: only formats with native scaled decode
     // (JPEG) produce a tier-1 image; everything else decodes full here
-    bool resultScaled = scaled && image.has_value() && (*image)->isScaledResult();
+    bool resultScaled = m_scaled && image.has_value() && (*image)->isScaledResult();
     qCDebug(lcLoaderPerf) << "L:" << t.elapsed() << "ms" << (resultScaled ? "[scaled]" : "[full]");
-    emit finished(image, path, resultScaled);
+    emit finished(image, m_path, resultScaled);
 }

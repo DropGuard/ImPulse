@@ -17,8 +17,8 @@ class SharedResources {
     QPixmap *getPixmap(ShrIcon icon, qreal dpr);
 
   private:
-    QPixmap *mLoadingIcon72 = nullptr;
-    QPixmap *mLoadingErrorIcon72 = nullptr;
+    QPixmap *m_loadingIcon72 = nullptr;
+    QPixmap *m_loadingErrorIcon72 = nullptr;
 };
 
 extern SharedResources *shrRes;

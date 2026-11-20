@@ -26,5 +26,5 @@ class InfoBar : public QWidget {
     void wheelEvent(QWheelEvent *event) override;
 
   private:
-    Ui::InfoBar *ui;
+    Ui::InfoBar *m_ui;
 };

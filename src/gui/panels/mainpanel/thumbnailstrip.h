@@ -23,12 +23,12 @@ class ThumbnailStrip : public ThumbnailView {
     void readSettings();
 
   private:
-    const int thumbPadding = 9;
-    int thumbMarginX = 2, thumbMarginY = 4;
+    const int m_thumbPadding = 9;
+    int m_thumbMarginX = 2, m_thumbMarginY = 4;
     void updateThumbnailPositions(int start, int end);
     void updateThumbnailPositions();
     void setupLayout();
-    ThumbnailStyle mCurrentStyle;
+    ThumbnailStyle m_currentStyle;
 
   public slots:
     void focusOn(int index) override;

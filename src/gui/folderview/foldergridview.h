@@ -44,11 +44,11 @@ class FolderGridView : public ThumbnailView {
     void setDragHover(int index) override;
 
   private:
-    FlowLayout *flowLayout;
-    QGraphicsWidget holderWidget;
-    int shiftedCol;
+    FlowLayout *m_flowLayout;
+    QGraphicsWidget m_holderWidget;
+    int m_shiftedCol;
     void scrollToCurrent();
-    int lastDragTarget = -1;
+    int m_lastDragTarget = -1;
 
   private slots:
     void onitemSelected();

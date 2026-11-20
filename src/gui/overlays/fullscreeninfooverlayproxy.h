@@ -21,7 +21,7 @@ class FullscreenInfoOverlayProxy {
     void setInfo(const QString &position, const QString &fileName, const QString &info);
 
   private:
-    FloatingWidgetContainer *container;
-    QPointer<FullscreenInfoOverlay> infoOverlay;
-    InfoOverlayStateBuffer stateBuf;
+    FloatingWidgetContainer *m_container;
+    QPointer<FullscreenInfoOverlay> m_infoOverlay;
+    InfoOverlayStateBuffer m_stateBuf;
 };

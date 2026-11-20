@@ -1,56 +1,56 @@
 #include "menuitem.h"
 
 MenuItem::MenuItem(QWidget *parent) : QWidget(parent) {
-    mLayout.setContentsMargins(6, 0, 8, 0);
-    mLayout.setSpacing(2);
+    m_layout.setContentsMargins(6, 0, 8, 0);
+    m_layout.setSpacing(2);
 
     setAccessibleName("MenuItem");
     this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-    mTextLabel.setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    mShortcutLabel.setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    mIconWidget.setMinimumSize(26, 26); // 5px padding from stylesheet
+    m_textLabel.setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_shortcutLabel.setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_iconWidget.setMinimumSize(26, 26); // 5px padding from stylesheet
 
-    mIconWidget.installEventFilter(this);
+    m_iconWidget.installEventFilter(this);
 
-    // the spacer's ownership goes to mLayout the moment it is added, so it is a
+    // the spacer's ownership goes to m_layout the moment it is added, so it is a
     // local: a member here is a future delete-double-free waiting to be written
     auto spacer = new QSpacerItem(3, 1, QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-    mIconWidget.setAttribute(Qt::WA_TransparentForMouseEvents, true);
-    mIconWidget.setAccessibleName("MenuItemIcon");
-    mTextLabel.setAccessibleName("MenuItemText");
-    mShortcutLabel.setAccessibleName("MenuItemShortcutLabel");
-    mLayout.addWidget(&mIconWidget);
-    mLayout.addWidget(&mTextLabel);
-    mLayout.addSpacerItem(spacer);
-    mLayout.addWidget(&mShortcutLabel);
-    mLayout.setStretch(1, 1);
+    m_iconWidget.setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_iconWidget.setAccessibleName("MenuItemIcon");
+    m_textLabel.setAccessibleName("MenuItemText");
+    m_shortcutLabel.setAccessibleName("MenuItemShortcutLabel");
+    m_layout.addWidget(&m_iconWidget);
+    m_layout.addWidget(&m_textLabel);
+    m_layout.addSpacerItem(spacer);
+    m_layout.addWidget(&m_shortcutLabel);
+    m_layout.setStretch(1, 1);
 
-    setLayout(&mLayout);
+    setLayout(&m_layout);
 }
 
 void MenuItem::setText(const QString &text) {
-    this->mTextLabel.setText(text);
+    this->m_textLabel.setText(text);
 }
 
 QString MenuItem::text() {
-    return mTextLabel.text();
+    return m_textLabel.text();
 }
 
 void MenuItem::setShortcutText(const QString &text) {
-    this->mShortcutLabel.setText(text);
+    this->m_shortcutLabel.setText(text);
     this->adjustSize();
 }
 
 QString MenuItem::shortcut() {
-    return mShortcutLabel.text();
+    return m_shortcutLabel.text();
 }
 
 void MenuItem::setIconPath(const QString &path) {
-    mIconWidget.setIconPath(path);
+    m_iconWidget.setIconPath(path);
 }
 
 void MenuItem::setPassthroughClicks(bool mode) {
-    passthroughClicks = mode;
+    m_passthroughClicks = mode;
 }
 
 void MenuItem::paintEvent(QPaintEvent *event) {
@@ -70,13 +70,13 @@ void MenuItem::onClick() {
 void MenuItem::mousePressEvent(QMouseEvent *event) {
     onPress();
     QWidget::mousePressEvent(event);
-    if(!passthroughClicks)
+    if(!m_passthroughClicks)
         event->accept();
 }
 
 void MenuItem::mouseReleaseEvent(QMouseEvent *event) {
     onClick();
     QWidget::mouseReleaseEvent(event);
-    if(!passthroughClicks)
+    if(!m_passthroughClicks)
         event->accept();
 }

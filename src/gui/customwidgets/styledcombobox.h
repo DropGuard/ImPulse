@@ -18,9 +18,9 @@ class StyledComboBox : public QComboBox {
     void keyPressEvent(QKeyEvent *event) override;
 
   private:
-    bool hiResPixmap;
-    QPixmap downArrow;
-    qreal dpr, pixmapDrawScale;
+    bool m_hiResPixmap;
+    QPixmap m_downArrow;
+    qreal m_dpr, m_pixmapDrawScale;
 };
 
 #endif // STYLEDCOMBOBOX_H

@@ -5,18 +5,18 @@ FileSystemModelCustom::FileSystemModelCustom(QObject *parent) : QFileSystemModel
     QString iconPath = ":/res/icons/common/menuitem/folder16.png";
     if(dpr >= (1.0 + 0.001))
         iconPath.replace(".", "@2x.");
-    folderIcon.load(iconPath);
-    ImageLib::recolor(this->folderIcon, settings->colorScheme().icons);
+    m_folderIcon.load(iconPath);
+    ImageLib::recolor(this->m_folderIcon, settings->colorScheme().icons);
 
     // `settings` outlives every object, so bind the connection to this one
     connect(settings, &Settings::settingsChanged, this, [this]() {
-        ImageLib::recolor(this->folderIcon, settings->colorScheme().icons);
+        ImageLib::recolor(this->m_folderIcon, settings->colorScheme().icons);
     });
 }
 
 QVariant FileSystemModelCustom::data(const QModelIndex &index, int role) const {
     if(role == Qt::DecorationRole)
-        return folderIcon;
+        return m_folderIcon;
     return QFileSystemModel::data(index, role);
 }
 

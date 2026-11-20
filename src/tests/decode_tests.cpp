@@ -122,7 +122,7 @@ TEST_F(TestDecode, cachedFullImageReflipsWithoutRedecoding) {
     EXPECT_TRUE(!ready.at(1).at(2).toBool());
 
     // flipping back to a fully-cached image serves it from the cache and
-    // schedules nothing: mScaledCache forgot the path at the upgrade
+    // schedules nothing: m_scaledCache forgot the path at the upgrade
     ready.clear();
     model.load(fixtureDir + "/big.jpg", true);
     EXPECT_EQ(ready.count(), 1);
@@ -145,7 +145,7 @@ TEST_F(TestDecode, upgradeToFullRefusesWhatWasNeverScaled) {
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
     ready.clear();
 
-    // a full-res image has left mScaledCache: the upgrade is a no-op,
+    // a full-res image has left m_scaledCache: the upgrade is a no-op,
     // not a third decode of the same file
     model.upgradeToFull(fixtureDir + "/big.png");
     waitLoaderIdle(model);

@@ -18,10 +18,10 @@ class EntryInfoItem : public QWidget {
     void paintEvent(QPaintEvent *event) override;
 
   private:
-    QString name;
-    QString value;
-    QHBoxLayout layout;
-    QLabel nameLabel, valueLabel;
+    QString m_name;
+    QString m_value;
+    QHBoxLayout m_layout;
+    QLabel m_nameLabel, m_valueLabel;
 };
 
 #endif // ENTRYINFOITEM_H

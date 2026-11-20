@@ -6,10 +6,10 @@
 #include <QMessageBox>
 #include <QCoreApplication>
 
-ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) : QDialog(parent), ui(new Ui::ShortcutCreatorDialog) {
-    ui->setupUi(this);
+ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) : QDialog(parent), m_ui(new Ui::ShortcutCreatorDialog) {
+    m_ui->setupUi(this);
     setWindowTitle("Add shortcut");
-    scriptList = scriptManager->scriptNames();
+    m_scriptList = scriptManager->scriptNames();
 
     // The chooser reads the action table: display names grouped by category,
     // with the stable name in the item data (the visible text is translated
@@ -21,50 +21,50 @@ ShortcutCreatorDialog::ShortcutCreatorDialog(QWidget *parent) : QDialog(parent),
         if(row.policy == ActionDesc::Policy::Reserved)
             continue;
         const QString category = tr(row.category);
-        if(actionList.isEmpty() || lastCategory != category) {
+        if(m_actionList.isEmpty() || m_lastCategory != category) {
             // a disabled header item makes the grouping visible without a
             // second widget; it carries no action name, so it cannot be picked
-            ui->actionsComboBox->addItem(QStringLiteral("— ") + category + QStringLiteral(" —"));
-            auto *model = qobject_cast<QStandardItemModel *>(ui->actionsComboBox->model());
+            m_ui->actionsComboBox->addItem(QStringLiteral("— ") + category + QStringLiteral(" —"));
+            auto *model = qobject_cast<QStandardItemModel *>(m_ui->actionsComboBox->model());
             if(model) {
-                QStandardItem *header = model->item(ui->actionsComboBox->count() - 1);
+                QStandardItem *header = model->item(m_ui->actionsComboBox->count() - 1);
                 header->setFlags(header->flags() & ~Qt::ItemIsEnabled);
             }
-            lastCategory = category;
+            m_lastCategory = category;
         }
-        ui->actionsComboBox->addItem(tr(row.display));
-        const int idx = ui->actionsComboBox->count() - 1;
-        ui->actionsComboBox->setItemData(idx, QString::fromLatin1(row.name), Qt::UserRole);
-        ui->actionsComboBox->setItemData(idx, static_cast<int>(row.policy), Qt::UserRole + 1);
-        actionList << QString::fromLatin1(row.name);
+        m_ui->actionsComboBox->addItem(tr(row.display));
+        const int idx = m_ui->actionsComboBox->count() - 1;
+        m_ui->actionsComboBox->setItemData(idx, QString::fromLatin1(row.name), Qt::UserRole);
+        m_ui->actionsComboBox->setItemData(idx, static_cast<int>(row.policy), Qt::UserRole + 1);
+        m_actionList << QString::fromLatin1(row.name);
     }
     // land on the first real action, not on a header
-    for(int i = 0; i < ui->actionsComboBox->count(); ++i) {
-        if(!ui->actionsComboBox->itemData(i, Qt::UserRole).toString().isEmpty()) {
-            ui->actionsComboBox->setCurrentIndex(i);
+    for(int i = 0; i < m_ui->actionsComboBox->count(); ++i) {
+        if(!m_ui->actionsComboBox->itemData(i, Qt::UserRole).toString().isEmpty()) {
+            m_ui->actionsComboBox->setCurrentIndex(i);
             break;
         }
     }
 
-    ui->scriptsComboBox->addItems(scriptList);
-    ui->scriptsComboBox->setCurrentIndex(0);
+    m_ui->scriptsComboBox->addItems(m_scriptList);
+    m_ui->scriptsComboBox->setCurrentIndex(0);
 }
 
 ShortcutCreatorDialog::~ShortcutCreatorDialog() {
-    delete ui;
+    delete m_ui;
 }
 
 QString ShortcutCreatorDialog::selectedAction() {
-    if(ui->actionsRadioButton->isChecked()) {
+    if(m_ui->actionsRadioButton->isChecked()) {
         // the item DATA, never the visible text: the text is translated
-        const QString name = ui->actionsComboBox->currentData(Qt::UserRole).toString();
+        const QString name = m_ui->actionsComboBox->currentData(Qt::UserRole).toString();
         return name; // empty on a category header, which save treats as "no action"
     }
-    return "s:" + ui->scriptsComboBox->currentText();
+    return "s:" + m_ui->scriptsComboBox->currentText();
 }
 
 QString ShortcutCreatorDialog::selectedShortcut() {
-    return ui->sequenceEdit->sequence();
+    return m_ui->sequenceEdit->sequence();
 }
 
 void ShortcutCreatorDialog::onShortcutEdited() {
@@ -75,34 +75,34 @@ void ShortcutCreatorDialog::onShortcutEdited() {
     // ones. The dialog used to stitch that half on itself through a separate
     // reader that saw only the global table, which is exactly how the
     // three-table hand-written version forgot the document table once.
-    const QString sequence = ui->sequenceEdit->sequence();
+    const QString sequence = m_ui->sequenceEdit->sequence();
     const QStringList held = actionManager->scopeClaimsForToken(sequence);
     if(!held.isEmpty())
-        ui->warningLabel->setText("This shortcut is used for: " + held.join(QStringLiteral(", ")) + ". Replace?");
+        m_ui->warningLabel->setText("This shortcut is used for: " + held.join(QStringLiteral(", ")) + ". Replace?");
     else
-        ui->warningLabel->setText("");
+        m_ui->warningLabel->setText("");
 }
 
 void ShortcutCreatorDialog::setAction(const QString &action) {
     if(action.startsWith(QLatin1String("s:"))) {
-        ui->scriptsRadioButton->setChecked(true);
-        const int index = ui->scriptsComboBox->findText(action.mid(2));
+        m_ui->scriptsRadioButton->setChecked(true);
+        const int index = m_ui->scriptsComboBox->findText(action.mid(2));
         if(index != -1)
-            ui->scriptsComboBox->setCurrentIndex(index);
+            m_ui->scriptsComboBox->setCurrentIndex(index);
         return;
     }
     // by the stable name in the item data — findText would search the display
     // text, which a translated UI changes
-    for(int i = 0; i < ui->actionsComboBox->count(); ++i) {
-        if(ui->actionsComboBox->itemData(i, Qt::UserRole).toString() == action) {
-            ui->actionsComboBox->setCurrentIndex(i);
+    for(int i = 0; i < m_ui->actionsComboBox->count(); ++i) {
+        if(m_ui->actionsComboBox->itemData(i, Qt::UserRole).toString() == action) {
+            m_ui->actionsComboBox->setCurrentIndex(i);
             return;
         }
     }
 }
 
 void ShortcutCreatorDialog::setShortcut(const QString &shortcut) {
-    ui->sequenceEdit->setText(shortcut);
+    m_ui->sequenceEdit->setText(shortcut);
 }
 
 // The confirmation a System action's rebinding needs. The dialog does not

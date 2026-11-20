@@ -1,17 +1,17 @@
 #include "keysequenceedit.h"
 
-KeySequenceEdit::KeySequenceEdit(QWidget *parent) : QPushButton(parent), mSequence("") {
+KeySequenceEdit::KeySequenceEdit(QWidget *parent) : QPushButton(parent), m_sequence("") {
     setFocusPolicy(Qt::StrongFocus); // the capture device must be focusable on every style
     QPushButton::setText(tr("[Enter sequence]"));
 }
 
 const QString &KeySequenceEdit::sequence() {
-    return mSequence;
+    return m_sequence;
 }
 
 void KeySequenceEdit::setText(const QString &text) {
-    mSequence = text;
-    QPushButton::setText(mSequence);
+    m_sequence = text;
+    QPushButton::setText(m_sequence);
 }
 
 // The capture device: it must see every raw key, including the ones the
@@ -51,8 +51,8 @@ void KeySequenceEdit::processEvent(QEvent *e) {
         return;
     QString tmp = ShortcutBuilder::fromEvent(inputEvent);
     if(!tmp.isEmpty()) {
-        mSequence = tmp;
-        this->setText(mSequence);
+        m_sequence = tmp;
+        this->setText(m_sequence);
         emit edited();
     }
 }

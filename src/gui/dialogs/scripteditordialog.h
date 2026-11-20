@@ -28,7 +28,7 @@ class ScriptEditorDialog : public QDialog {
     void selectScriptPath();
 
   private:
-    Ui::ScriptEditorDialog *ui;
-    bool editMode;
-    QString editTarget;
+    Ui::ScriptEditorDialog *m_ui;
+    bool m_editMode;
+    QString m_editTarget;
 };

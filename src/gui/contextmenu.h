@@ -21,7 +21,7 @@ class ContextMenu : public QWidget {
     void setImageEntriesEnabled(bool mode);
     // keyboard navigation state, for tests and for the keymap docs
     int navigationIndex() const {
-        return selectedIndex;
+        return m_selectedIndex;
     }
 
   public slots:
@@ -29,9 +29,9 @@ class ContextMenu : public QWidget {
     void setGeometry(QRect geom);
 
   private:
-    Ui::ContextMenu *ui;
-    QTimer mTimer;
-    int selectedIndex = -1;
+    Ui::ContextMenu *m_ui;
+    QTimer m_timer;
+    int m_selectedIndex = -1;
 
     QList<ContextMenuItem *> visibleItems() const;
     void moveSelection(int delta);

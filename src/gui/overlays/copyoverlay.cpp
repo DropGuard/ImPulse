@@ -4,20 +4,20 @@
 #include "components/actionmanager/actionmanager.h"
 #include "shortcutbuilder.h"
 
-CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent), ui(new Ui::CopyOverlay) {
-    ui->setupUi(this);
+CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent), m_ui(new Ui::CopyOverlay) {
+    m_ui->setupUi(this);
     hide();
     setFadeEnabled(true);
 
-    ui->closeButton->setIconPath(":/res/icons/common/overlay/close-dim16.png");
-    ui->headerIcon->setIconPath(":/res/icons/common/overlay/copy16.png");
-    ui->headerLabel->setText(tr("Copy to..."));
-    mode = OVERLAY_COPY;
+    m_ui->closeButton->setIconPath(":/res/icons/common/overlay/close-dim16.png");
+    m_ui->headerIcon->setIconPath(":/res/icons/common/overlay/copy16.png");
+    m_ui->headerLabel->setText(tr("Copy to..."));
+    m_mode = OVERLAY_COPY;
 
     createShortcuts();
 
-    paths = settings->savedPaths();
-    if(paths.count() < maxPathCount)
+    m_paths = settings->savedPaths();
+    if(m_paths.count() < m_maxPathCount)
         createDefaultPaths();
     createPathWidgets();
 
@@ -31,7 +31,7 @@ CopyOverlay::CopyOverlay(FloatingWidgetContainer *parent) : OverlayWidget(parent
 }
 
 CopyOverlay::~CopyOverlay() {
-    delete ui;
+    delete m_ui;
 }
 
 void CopyOverlay::show() {
@@ -44,49 +44,49 @@ void CopyOverlay::hide() {
 }
 
 void CopyOverlay::setDialogMode(CopyOverlayMode _mode) {
-    mode = _mode;
-    if(mode == OVERLAY_COPY) {
-        ui->headerIcon->setIconPath(":/res/icons/common/overlay/copy16.png");
-        ui->headerLabel->setText(tr("Copy to..."));
+    m_mode = _mode;
+    if(m_mode == OVERLAY_COPY) {
+        m_ui->headerIcon->setIconPath(":/res/icons/common/overlay/copy16.png");
+        m_ui->headerLabel->setText(tr("Copy to..."));
     } else {
-        ui->headerIcon->setIconPath(":/res/icons/common/overlay/move16.png");
-        ui->headerLabel->setText(tr("Move to..."));
+        m_ui->headerIcon->setIconPath(":/res/icons/common/overlay/move16.png");
+        m_ui->headerLabel->setText(tr("Move to..."));
     }
 }
 
 CopyOverlayMode CopyOverlay::operationMode() {
-    return mode;
+    return m_mode;
 }
 
 void CopyOverlay::removePathWidgets() {
-    for(int i = 0; i < pathWidgets.count(); i++) {
-        QWidget *tmp = pathWidgets.at(i);
-        ui->pathSelectorsLayout->removeWidget(tmp);
+    for(int i = 0; i < m_pathWidgets.count(); i++) {
+        QWidget *tmp = m_pathWidgets.at(i);
+        m_ui->pathSelectorsLayout->removeWidget(tmp);
         delete tmp;
     }
-    pathWidgets.clear();
+    m_pathWidgets.clear();
 }
 
 void CopyOverlay::createPathWidgets() {
     removePathWidgets();
-    int count = (paths.length() > maxPathCount) ? maxPathCount : paths.length();
+    int count = (m_paths.length() > m_maxPathCount) ? m_maxPathCount : m_paths.length();
     for(int i = 0; i < count; i++) {
         PathSelectorMenuItem *item = new PathSelectorMenuItem(this);
-        item->setDirectory(paths.at(i));
-        item->setShortcutText(shortcuts.key(i));
+        item->setDirectory(m_paths.at(i));
+        item->setShortcutText(m_shortcuts.key(i));
         connect(item, &PathSelectorMenuItem::directorySelected, this, &CopyOverlay::requestFileOperation);
-        pathWidgets.append(item);
-        ui->pathSelectorsLayout->addWidget(item);
+        m_pathWidgets.append(item);
+        m_ui->pathSelectorsLayout->addWidget(item);
     }
 }
 
 void CopyOverlay::createShortcuts() {
-    for(int i = 0; i < maxPathCount; i++)
-        shortcuts.insert(QString::number(i + 1), i);
+    for(int i = 0; i < m_maxPathCount; i++)
+        m_shortcuts.insert(QString::number(i + 1), i);
 }
 
 void CopyOverlay::requestFileOperation(const QString &path) {
-    if(mode == OVERLAY_COPY)
+    if(m_mode == OVERLAY_COPY)
         emit copyRequested(path);
     else
         emit moveRequested(path);
@@ -105,30 +105,30 @@ void CopyOverlay::readSettings() {
 // for some reason, duplicate folders may appear in the configuration
 // we remove duplicate directories
 void CopyOverlay::saveSettings() {
-    paths.clear();
+    m_paths.clear();
     QStringList temp;
-    for(int i = 0; i < pathWidgets.count(); i++) {
-        QString path = pathWidgets.at(i)->path();
+    for(int i = 0; i < m_pathWidgets.count(); i++) {
+        QString path = m_pathWidgets.at(i)->path();
         if(!path.isEmpty()) {
             if(!temp.contains(path)) {
                 temp << path;
-                paths << pathWidgets.at(i)->directory();
+                m_paths << m_pathWidgets.at(i)->directory();
             }
         }
     }
-    settings->setSavedPaths(paths);
+    settings->setSavedPaths(m_paths);
 }
 
 void CopyOverlay::createDefaultPaths() {
     QString home = QDir::homePath();
-    if(paths.count() < 1 || paths.at(0).isEmpty() || paths.at(0)[0] == '@') {
-        paths.clear();
-        paths << home;
+    if(m_paths.count() < 1 || m_paths.at(0).isEmpty() || m_paths.at(0)[0] == '@') {
+        m_paths.clear();
+        m_paths << home;
     }
-    if(paths.count() == 1 && paths.at(0) == home) {
+    if(m_paths.count() == 1 && m_paths.at(0) == home) {
         QDir dir(home);
         foreach(QFileInfo mfi, dir.entryInfoList()) {
-            if(paths.count() >= maxPathCount) {
+            if(m_paths.count() >= m_maxPathCount) {
                 break;
             }
             if(mfi.isFile()) {
@@ -146,7 +146,7 @@ void CopyOverlay::createDefaultPaths() {
                 QString qpath(home + "/" + mfi.fileName());
                 QFileInfo qinfo(qpath);
                 if(qinfo.permission(QFile::WriteUser | QFile::ReadGroup)) {
-                    paths << qpath;
+                    m_paths << qpath;
                 }
             }
         }
@@ -187,8 +187,8 @@ void CopyOverlay::keyPressEvent(QKeyEvent *event) {
     if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
         return;
     QString key = actionManager->keyForNativeScancode(event->nativeScanCode());
-    if(shortcuts.contains(key)) {
-        requestFileOperation(pathWidgets.at(shortcuts[key])->directory());
+    if(m_shortcuts.contains(key)) {
+        requestFileOperation(m_pathWidgets.at(m_shortcuts[key])->directory());
         return;
     }
     // the menu names a target for a specific file: walking to another image

@@ -21,6 +21,6 @@ class Video : public Image {
   private:
     void load() override;
 
-    uint srcWidth = 0;
-    uint srcHeight = 0;
+    uint m_srcWidth = 0;
+    uint m_srcHeight = 0;
 };

@@ -49,7 +49,7 @@ class EngineHandle {
     struct Impl;
     // Defined in the .cpp: Impl is incomplete here, so this is also what makes
     // the destructor's ordering (see above) stay out of the header.
-    std::unique_ptr<Impl> d;
+    std::unique_ptr<Impl> m_d;
     // EngineBridge issues the FFI calls; it reads d->engine and nothing else.
     // A narrower door than a public accessor: no other type can reach it.
     friend class EngineBridge;
@@ -138,7 +138,7 @@ class EngineBridge : public QObject {
     void drainEvents();
 
   private:
-    EngineHandle engine;
-    quint32 sessionEpoch = 0;
-    QString mListedDir;
+    EngineHandle m_engine;
+    quint32 m_sessionEpoch = 0;
+    QString m_listedDir;
 };

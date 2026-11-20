@@ -1,7 +1,7 @@
 #include "zoomindicatoroverlayproxy.h"
 
 ZoomIndicatorOverlayProxy::ZoomIndicatorOverlayProxy(FloatingWidgetContainer *parent)
-    : container(parent), overlay(nullptr) {
+    : m_container(parent), m_overlay(nullptr) {
 }
 
 ZoomIndicatorOverlayProxy::~ZoomIndicatorOverlayProxy() {
@@ -14,30 +14,30 @@ ZoomIndicatorOverlayProxy::~ZoomIndicatorOverlayProxy() {
 
 void ZoomIndicatorOverlayProxy::show() {
     init();
-    overlay->show();
+    m_overlay->show();
 }
 
 void ZoomIndicatorOverlayProxy::show(int duration) {
     init();
-    overlay->show(duration);
+    m_overlay->show(duration);
 }
 
 void ZoomIndicatorOverlayProxy::hide() {
-    if(overlay)
-        overlay->hide();
+    if(m_overlay)
+        m_overlay->hide();
 }
 
 void ZoomIndicatorOverlayProxy::setScale(qreal scale) {
-    if(overlay) {
-        overlay->setScale(scale);
+    if(m_overlay) {
+        m_overlay->setScale(scale);
     } else {
-        stateBuf.scale = scale;
+        m_stateBuf.scale = scale;
     }
 }
 
 void ZoomIndicatorOverlayProxy::init() {
-    if(overlay)
+    if(m_overlay)
         return;
-    overlay = new ZoomIndicatorOverlay(container);
-    overlay->setScale(stateBuf.scale);
+    m_overlay = new ZoomIndicatorOverlay(m_container);
+    m_overlay->setScale(m_stateBuf.scale);
 }

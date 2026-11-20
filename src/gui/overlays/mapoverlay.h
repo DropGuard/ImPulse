@@ -69,7 +69,7 @@ class MapOverlay : public QWidget {
     virtual void enterEvent(QEvent *);
 
   private:
-    bool visibilityEnabled = false, imageDoesNotFit = false;
+    bool m_visibilityEnabled = false, m_imageDoesNotFit = false;
     class MapOverlayPrivate;
-    MapOverlayPrivate *d;
+    MapOverlayPrivate *m_d;
 };

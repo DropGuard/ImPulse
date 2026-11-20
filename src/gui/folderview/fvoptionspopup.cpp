@@ -3,19 +3,19 @@
 
 #include "components/actionmanager/actionmanager.h"
 
-FVOptionsPopup::FVOptionsPopup(QWidget *parent) : QWidget(parent), ui(new Ui::FVOptionsPopup) {
-    ui->setupUi(this);
+FVOptionsPopup::FVOptionsPopup(QWidget *parent) : QWidget(parent), m_ui(new Ui::FVOptionsPopup) {
+    m_ui->setupUi(this);
 
     setWindowFlags(Qt::Popup);
     setAttribute(Qt::WA_TranslucentBackground, true);
 
-    ui->viewSimpleButton->setText(QObject::tr("Simple"));
-    ui->viewExtendedButton->setText(QObject::tr("Extended"));
-    ui->viewFoldersButton->setText(QObject::tr("Extended + Folders"));
+    m_ui->viewSimpleButton->setText(QObject::tr("Simple"));
+    m_ui->viewExtendedButton->setText(QObject::tr("Extended"));
+    m_ui->viewFoldersButton->setText(QObject::tr("Extended + Folders"));
 
-    connect(ui->viewSimpleButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectSimpleView);
-    connect(ui->viewExtendedButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectExtendedView);
-    connect(ui->viewFoldersButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectFoldersView);
+    connect(m_ui->viewSimpleButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectSimpleView);
+    connect(m_ui->viewExtendedButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectExtendedView);
+    connect(m_ui->viewFoldersButton, &ContextMenuItem::pressed, this, &FVOptionsPopup::selectFoldersView);
 
     // force size recalculation
     this->adjustSize();
@@ -27,25 +27,25 @@ FVOptionsPopup::FVOptionsPopup(QWidget *parent) : QWidget(parent), ui(new Ui::FV
 }
 
 FVOptionsPopup::~FVOptionsPopup() {
-    delete ui;
+    delete m_ui;
 }
 
 void FVOptionsPopup::setSimpleView() {
-    ui->viewSimpleButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
-    ui->viewExtendedButton->setIconPath("");
-    ui->viewFoldersButton->setIconPath("");
+    m_ui->viewSimpleButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
+    m_ui->viewExtendedButton->setIconPath("");
+    m_ui->viewFoldersButton->setIconPath("");
 }
 
 void FVOptionsPopup::setExtendedView() {
-    ui->viewSimpleButton->setIconPath("");
-    ui->viewExtendedButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
-    ui->viewFoldersButton->setIconPath("");
+    m_ui->viewSimpleButton->setIconPath("");
+    m_ui->viewExtendedButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
+    m_ui->viewFoldersButton->setIconPath("");
 }
 
 void FVOptionsPopup::setFoldersView() {
-    ui->viewSimpleButton->setIconPath("");
-    ui->viewExtendedButton->setIconPath("");
-    ui->viewFoldersButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
+    m_ui->viewSimpleButton->setIconPath("");
+    m_ui->viewExtendedButton->setIconPath("");
+    m_ui->viewFoldersButton->setIconPath(":res/icons/common/buttons/panel-small/add-new12.png");
 }
 
 void FVOptionsPopup::selectSimpleView() {

@@ -3,20 +3,20 @@
 #include "components/actionmanager/actionmanager.h"
 
 SaveConfirmOverlay::SaveConfirmOverlay(FloatingWidgetContainer *parent)
-    : OverlayWidget(parent), ui(new Ui::SaveConfirmOverlay) {
-    ui->setupUi(this);
-    connect(ui->saveButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveClicked);
-    connect(ui->saveAsButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveAsClicked);
-    connect(ui->discardButton, &QPushButton::clicked, this, &SaveConfirmOverlay::discardClicked);
-    ui->closeButton->setIconPath(":res/icons/common/overlay/close-dim16.png");
-    ui->headerIcon->setIconPath(":res/icons/common/overlay/edit16.png");
+    : OverlayWidget(parent), m_ui(new Ui::SaveConfirmOverlay) {
+    m_ui->setupUi(this);
+    connect(m_ui->saveButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveClicked);
+    connect(m_ui->saveAsButton, &QPushButton::clicked, this, &SaveConfirmOverlay::saveAsClicked);
+    connect(m_ui->discardButton, &QPushButton::clicked, this, &SaveConfirmOverlay::discardClicked);
+    m_ui->closeButton->setIconPath(":res/icons/common/overlay/close-dim16.png");
+    m_ui->headerIcon->setIconPath(":res/icons/common/overlay/edit16.png");
     // the answers' keys on their faces — the platform standards for the two
     // writes (they live in the global table and work through this surface's
     // fall-through), Esc for the way out. The translated .ui text stays the
     // base, the hint is decoration.
-    ui->saveButton->setText(ui->saveButton->text() + QStringLiteral("  [Ctrl+S]"));
-    ui->saveAsButton->setText(ui->saveAsButton->text() + QStringLiteral("  [Ctrl+Shift+S]"));
-    ui->discardButton->setText(ui->discardButton->text() + QStringLiteral("  [Esc]"));
+    m_ui->saveButton->setText(m_ui->saveButton->text() + QStringLiteral("  [Ctrl+S]"));
+    m_ui->saveAsButton->setText(m_ui->saveAsButton->text() + QStringLiteral("  [Ctrl+Shift+S]"));
+    m_ui->discardButton->setText(m_ui->discardButton->text() + QStringLiteral("  [Esc]"));
     readSettings();
     connect(settings, &Settings::settingsChanged, this, &SaveConfirmOverlay::readSettings);
 
@@ -79,5 +79,5 @@ void SaveConfirmOverlay::readSettings() {
 }
 
 SaveConfirmOverlay::~SaveConfirmOverlay() {
-    delete ui;
+    delete m_ui;
 }

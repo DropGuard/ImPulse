@@ -27,12 +27,12 @@ class DirectoryPresenter : public QObject {
     // it retires the SIGNAL()/SLOT() strings this used to be - strings that also
     // forced disconnectView to mirror all five signatures by hand.
     template <typename View> void setView(View *newView) {
-        if(view)
+        if(m_view)
             return; // the binding is already live
-        view = newView;
-        viewSender = newView; // a QPointer: it goes null with the widget
-        if(model)
-            view->populate(mShowDirs ? model->totalCount() : model->fileCount());
+        m_view = newView;
+        m_viewSender = newView; // a QPointer: it goes null with the widget
+        if(m_model)
+            m_view->populate(m_showDirs ? m_model->totalCount() : m_model->fileCount());
 
         connect(newView, &View::itemActivated, this, &DirectoryPresenter::onItemActivated);
         connect(newView, &View::thumbnailsRequested, this, &DirectoryPresenter::generateThumbnails);
@@ -46,8 +46,8 @@ class DirectoryPresenter : public QObject {
         // being handed to disconnect() at all: Qt has already dropped the
         // connections by then, so this is the contract made explicit rather
         // than a crash observed (ASan flagged nothing without it).
-        viewTeardown = [this, newView]() {
-            if(!viewSender)
+        m_viewTeardown = [this, newView]() {
+            if(!m_viewSender)
                 return;
             disconnect(newView, &View::itemActivated, this, &DirectoryPresenter::onItemActivated);
             disconnect(newView, &View::thumbnailsRequested, this, &DirectoryPresenter::generateThumbnails);
@@ -98,16 +98,16 @@ class DirectoryPresenter : public QObject {
 
   private:
     // observes; the Qt parent tree owns the view widget
-    IDirectoryView *view = nullptr;
+    IDirectoryView *m_view = nullptr;
     // the same widget, seen as the QObject it also is: the teardown needs to
     // ask whether it is still there, and QPointer answers that truthfully
-    QPointer<QObject> viewSender;
-    std::function<void()> viewTeardown;
-    std::shared_ptr<DirectoryModel> model = nullptr;
+    QPointer<QObject> m_viewSender;
+    std::function<void()> m_viewTeardown;
+    std::shared_ptr<DirectoryModel> m_model = nullptr;
     // shared with every other presenter, owned by Core (architecture rule R9):
     // one executor per engine event. Two presenters each holding their own
     // made the broadcast ThumbNext run the same decode twice and hand two mpv
     // writers one frame file
-    Thumbnailer &thumbnailer;
-    bool mShowDirs;
+    Thumbnailer &m_thumbnailer;
+    bool m_showDirs;
 };

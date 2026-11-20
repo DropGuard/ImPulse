@@ -44,10 +44,10 @@ class RenameOverlay : public OverlayWidget, public IPendingSurface {
     void onCancel();
 
   private:
-    Ui::RenameOverlay *ui;
-    bool backdrop = false;
-    QString origName;
-    QList<QString> keyFilter;
-    QList<QKeySequence> keyFilterSequences;
+    Ui::RenameOverlay *m_ui;
+    bool m_backdrop = false;
+    QString m_origName;
+    QList<QString> m_keyFilter;
+    QList<QKeySequence> m_keyFilterSequences;
     void selectName();
 };

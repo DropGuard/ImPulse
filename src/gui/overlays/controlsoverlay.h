@@ -16,10 +16,10 @@ class ControlsOverlay : public FloatingWidget {
     void show();
 
   private:
-    QHBoxLayout layout;
-    ActionButton *closeButton, *settingsButton, *folderViewButton;
-    QGraphicsOpacityEffect *fadeEffect;
-    QPropertyAnimation *fadeAnimation;
+    QHBoxLayout m_layout;
+    ActionButton *m_closeButton, *m_settingsButton, *m_folderViewButton;
+    QGraphicsOpacityEffect *m_fadeEffect;
+    QPropertyAnimation *m_fadeAnimation;
     QSize contentsSize();
     void fitToContents();
 

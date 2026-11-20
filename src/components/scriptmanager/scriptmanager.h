@@ -38,7 +38,7 @@ class ScriptManager : public QObject {
 
   private:
     explicit ScriptManager(QObject *parent = nullptr);
-    QMap<QString, Script> scripts; // <name, script>
+    QMap<QString, Script> m_scripts; // <name, script>
 };
 
 extern ScriptManager *scriptManager;

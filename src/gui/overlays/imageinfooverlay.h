@@ -23,7 +23,7 @@ class ImageInfoOverlay : public OverlayWidget {
     void wheelEvent(QWheelEvent *event) override;
 
   private:
-    Ui::ImageInfoOverlay *ui;
-    QList<EntryInfoItem *> entries;
-    QLabel entryStub;
+    Ui::ImageInfoOverlay *m_ui;
+    QList<EntryInfoItem *> m_entries;
+    QLabel m_entryStub;
 };

@@ -105,5 +105,5 @@ class ThumbnailCache {
     PurgeReport purgeOlderThan(int days, qint64 byteCap);
 
   private:
-    QString rootPath;
+    QString m_rootPath;
 };

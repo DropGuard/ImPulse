@@ -10,11 +10,11 @@
 #include <QImageWriter>
 
 DialogHost::DialogHost(MW *windowArg, DocumentWidget *docWidgetArg)
-    : QObject(windowArg), window(windowArg), docWidget(docWidgetArg) {
+    : QObject(windowArg), m_window(windowArg), m_docWidget(docWidgetArg) {
 }
 
 bool DialogHost::showConfirmation(const QString &title, const QString &msg) {
-    QMessageBox msgBox(window);
+    QMessageBox msgBox(m_window);
     msgBox.setWindowTitle(title);
     msgBox.setText(msg);
     msgBox.setIcon(QMessageBox::Warning);
@@ -29,9 +29,9 @@ bool DialogHost::showConfirmation(const QString &title, const QString &msg) {
 }
 
 void DialogHost::showOpenDialog(const QString &path) {
-    docWidget->hideFloatingPanel();
+    m_docWidget->hideFloatingPanel();
 
-    QFileDialog dialog(window);
+    QFileDialog dialog(m_window);
     QStringList imageFilter;
     imageFilter.append(settings->supportedFormatsFilter());
     imageFilter.append("All Files (*)");
@@ -50,7 +50,7 @@ void DialogHost::showSaveDialog(const QString &filePath) {
 }
 
 QString DialogHost::getSaveFileName(const QString &filePath) {
-    docWidget->hideFloatingPanel();
+    m_docWidget->hideFloatingPanel();
     QStringList filters;
     // generate filter for writable images
     // todo: some may need to be blacklisted
@@ -106,7 +106,7 @@ QString DialogHost::getSaveFileName(const QString &filePath) {
     // some platform dialogs and is dropped by others (the portal backends
     // have a history of it). setDirectory + selectFile is the documented
     // form every backend forwards.
-    QFileDialog dialog(window);
+    QFileDialog dialog(m_window);
     dialog.setWindowTitle(tr("Save File as..."));
     dialog.setDirectory(fi.absolutePath());
     dialog.selectFile(fi.fileName());
@@ -121,14 +121,14 @@ QString DialogHost::getSaveFileName(const QString &filePath) {
 }
 
 void DialogHost::showResizeDialog(QSize initialSize) {
-    ResizeDialog dialog(initialSize, window);
+    ResizeDialog dialog(initialSize, m_window);
     connect(&dialog, &ResizeDialog::sizeSelected, this, &DialogHost::resizeRequested);
     dialog.exec();
 }
 
 DialogResult DialogHost::fileReplaceDialog(const QString &src, const QString &dst, FileReplaceMode mode,
                                            bool multiple) {
-    FileReplaceDialog dialog(window);
+    FileReplaceDialog dialog(m_window);
     dialog.setModal(true);
     dialog.setSource(src);
     dialog.setDestination(dst);
@@ -141,14 +141,14 @@ DialogResult DialogHost::fileReplaceDialog(const QString &src, const QString &ds
 }
 
 void DialogHost::showSettings() {
-    docWidget->hideFloatingPanel();
-    SettingsDialog settingsDialog(window);
+    m_docWidget->hideFloatingPanel();
+    SettingsDialog settingsDialog(m_window);
     settingsDialog.exec();
 }
 
 void DialogHost::showScriptSettings() {
-    docWidget->hideFloatingPanel();
-    SettingsDialog settingsDialog(window);
+    m_docWidget->hideFloatingPanel();
+    SettingsDialog settingsDialog(m_window);
     settingsDialog.switchToPage(4);
     settingsDialog.exec();
 }

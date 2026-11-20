@@ -2,7 +2,7 @@
 
 #include <utility>
 
-FloatingMessageProxy::FloatingMessageProxy(FloatingWidgetContainer *parent) : container(parent), overlay(nullptr) {
+FloatingMessageProxy::FloatingMessageProxy(FloatingWidgetContainer *parent) : m_container(parent), m_overlay(nullptr) {
 }
 
 FloatingMessageProxy::~FloatingMessageProxy() {
@@ -11,17 +11,17 @@ FloatingMessageProxy::~FloatingMessageProxy() {
 
 void FloatingMessageProxy::showMessage(QString text, FloatingMessageIcon icon, int duration) {
     init();
-    overlay->showMessage(std::move(text), icon, duration);
+    m_overlay->showMessage(std::move(text), icon, duration);
 }
 
 void FloatingMessageProxy::showMessage(QString text, FloatingWidgetPosition position, FloatingMessageIcon icon,
                                        int duration) {
     init();
-    overlay->showMessage(std::move(text), position, icon, duration);
+    m_overlay->showMessage(std::move(text), position, icon, duration);
 }
 
 void FloatingMessageProxy::init() {
-    if(overlay)
+    if(m_overlay)
         return;
-    overlay = new FloatingMessage(container);
+    m_overlay = new FloatingMessage(m_container);
 }

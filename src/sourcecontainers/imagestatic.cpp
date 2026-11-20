@@ -7,7 +7,7 @@
 #include <time.h>
 
 ImageStatic::ImageStatic(std::unique_ptr<DocumentInfo> _info, bool scaled, const LoadPolicy &policy)
-    : Image(std::move(_info)), mScaledRequest(scaled), mAllocationLimitMb(policy.allocationLimitMb) {
+    : Image(std::move(_info)), m_scaledRequest(scaled), m_allocationLimitMb(policy.allocationLimitMb) {
     load();
 }
 
@@ -16,10 +16,10 @@ ImageStatic::~ImageStatic() {
 
 //load image data from disk
 void ImageStatic::load() {
-    if(mLoadAttempted) {
+    if(m_loadAttempted) {
         return;
     }
-    if(mDocInfo->mimeType().name() == "image/vnd.microsoft.icon")
+    if(m_docInfo->mimeType().name() == "image/vnd.microsoft.icon")
         loadICO();
     else
         loadGeneric();
@@ -35,16 +35,16 @@ void ImageStatic::loadGeneric() {
      *
      * tldr: qimage bad
      */
-    QImageReader r(mPath, mDocInfo->format().toStdString().c_str());
-    r.setAllocationLimit(mAllocationLimitMb);
+    QImageReader r(m_path, m_docInfo->format().toStdString().c_str());
+    r.setAllocationLimit(m_allocationLimitMb);
     // the file's own dimensions, read from the header — available before any
     // pixel decode; the title/info surfaces report these so a tier-2 upgrade
     // never rewrites them. Rotating transformations (EXIF 6/8 arrive as the
     // Rotate90 flag) swap what the header calls width and height
-    mOriginalSize = r.size();
-    if(mOriginalSize.isValid() && (mDocInfo->exifOrientation() & QImageIOHandler::TransformationRotate90))
-        mOriginalSize.transpose();
-    if(mScaledRequest && mDocInfo->format() == "jpg") {
+    m_originalSize = r.size();
+    if(m_originalSize.isValid() && (m_docInfo->exifOrientation() & QImageIOHandler::TransformationRotate90))
+        m_originalSize.transpose();
+    if(m_scaledRequest && m_docInfo->format() == "jpg") {
         // tier-1: decode at screen resolution via libjpeg DCT scaling
         // (1/2 edge = 1/4 pixels). Full-res follows as tier-2 upgrade.
         // JPEG-only: other formats scale AFTER full decode in Qt, which
@@ -53,13 +53,13 @@ void ImageStatic::loadGeneric() {
         QSize screen = QApplication::primaryScreen()->size() * QApplication::primaryScreen()->devicePixelRatio();
         if(orig.isValid() && (orig.width() > screen.width() || orig.height() > screen.height())) {
             r.setScaledSize(orig.scaled(screen, Qt::KeepAspectRatio));
-            mScaledApplied = true;
+            m_scaledApplied = true;
         }
     }
     QImage *tmp = new QImage();
     r.read(tmp);
     std::unique_ptr<const QImage> img(tmp);
-    img = ImageLib::exifRotated(std::move(img), mDocInfo.get()->exifOrientation());
+    img = ImageLib::exifRotated(std::move(img), m_docInfo.get()->exifOrientation());
     // scaling this format via qt results in transparent background
     // it rare enough so lets just convert it to the closest working thing
     if(img->format() == QImage::Format_Mono) {
@@ -69,18 +69,18 @@ void ImageStatic::loadGeneric() {
         // issue #653). RGB32 keeps the palette while still dodging the
         // transparent-background scaling that motivated the conversion.
         *imgConverted = img->convertToFormat(QImage::Format_RGB32);
-        image.reset(imgConverted);
+        m_image.reset(imgConverted);
     } else {
         // set image
-        image = std::move(img);
+        m_image = std::move(img);
     }
-    mLoadAttempted = true;
+    m_loadAttempted = true;
 }
 
 // TODO: move this out somewhere to use in other places
 void ImageStatic::loadICO() {
     // Big brain code. It's mostly for small ico files so whatever. I'm not patching Qt for this.
-    QIcon icon(mPath);
+    QIcon icon(m_path);
     const QList<QSize> sizes = icon.availableSizes();
     QSize maxSize(0, 0);
     for(const QSize &sz : sizes)
@@ -88,8 +88,8 @@ void ImageStatic::loadICO() {
             maxSize = sz;
     QPixmap iconPix = icon.pixmap(maxSize);
     std::unique_ptr<const QImage> img(new QImage(iconPix.toImage()));
-    image = std::move(img);
-    mLoadAttempted = true;
+    m_image = std::move(img);
+    m_loadAttempted = true;
 }
 
 bool ImageStatic::save(QString destPath, int jpegQuality) {
@@ -101,59 +101,59 @@ bool ImageStatic::save(QString destPath, int jpegQuality) {
     // ORIGINAL path even when saving elsewhere: an edit changes pixels, not
     // provenance, so a Save As copy keeps the camera and GPS the file was shot
     // with. An edit that never happened has nothing to carry.
-    const QString metadataSource = wasEdited ? mPath : QString();
+    const QString metadataSource = wasEdited ? m_path : QString();
     const bool success =
-        FileOperations::saveWithBackup(*(wasEdited ? imageEdited : image), destPath, jpegQuality, metadataSource);
+        FileOperations::saveWithBackup(*(wasEdited ? m_imageEdited : m_image), destPath, jpegQuality, metadataSource);
     // An edit is consumed by a write that actually happened. Swapping and
     // discarding before consulting `success` threw the user's unsaved edit away
     // on every failed save, and left the in-memory image claiming it was saved.
     if(success && wasEdited) {
-        image.swap(imageEdited);
+        m_image.swap(m_imageEdited);
         discardEditedImage();
     }
-    if(destPath == mPath && success)
-        mDocInfo->refresh();
+    if(destPath == m_path && success)
+        m_docInfo->refresh();
     return success;
 }
 
 std::shared_ptr<const QImage> ImageStatic::getSourceImage() {
-    return image;
+    return m_image;
 }
 
 std::shared_ptr<const QImage> ImageStatic::getImage() {
-    return isEdited() ? imageEdited : image;
+    return isEdited() ? m_imageEdited : m_image;
 }
 
 int ImageStatic::height() {
-    return isEdited() ? imageEdited->height() : image->height();
+    return isEdited() ? m_imageEdited->height() : m_image->height();
 }
 
 int ImageStatic::width() {
-    return isEdited() ? imageEdited->width() : image->width();
+    return isEdited() ? m_imageEdited->width() : m_image->width();
 }
 
 QSize ImageStatic::size() {
-    return isEdited() ? imageEdited->size() : image->size();
+    return isEdited() ? m_imageEdited->size() : m_image->size();
 }
 
 QSize ImageStatic::originalSize() {
-    return mOriginalSize.isValid() ? mOriginalSize : size();
+    return m_originalSize.isValid() ? m_originalSize : size();
 }
 
 bool ImageStatic::setEditedImage(std::unique_ptr<const QImage> imageEditedNew) {
     if(imageEditedNew && imageEditedNew->width() != 0) {
         discardEditedImage();
-        imageEdited = std::move(imageEditedNew);
-        mEdited = true;
+        m_imageEdited = std::move(imageEditedNew);
+        m_edited = true;
         return true;
     }
     return false;
 }
 
 bool ImageStatic::discardEditedImage() {
-    if(imageEdited) {
-        imageEdited.reset();
-        mEdited = false;
+    if(m_imageEdited) {
+        m_imageEdited.reset();
+        m_edited = false;
         return true;
     }
     return false;

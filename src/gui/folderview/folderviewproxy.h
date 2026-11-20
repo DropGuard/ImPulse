@@ -69,8 +69,8 @@ class FolderViewProxy : public QWidget, public IDirectoryView {
     void draggedOver(int) override;
 
   private:
-    FolderView *folderView = nullptr;
-    QVBoxLayout layout;
-    FolderViewStateBuffer stateBuf;
-    QMutex m;
+    FolderView *m_folderView = nullptr;
+    QVBoxLayout m_layout;
+    FolderViewStateBuffer m_stateBuf;
+    QMutex m_m;
 };

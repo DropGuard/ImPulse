@@ -14,8 +14,8 @@ class Thumbnail {
     std::shared_ptr<QImage> image();
 
   private:
-    QString mName, mInfo;
-    std::shared_ptr<QImage> mImage;
-    int mSize;
-    bool mHasAlphaChannel;
+    QString m_name, m_info;
+    std::shared_ptr<QImage> m_image;
+    int m_size;
+    bool m_hasAlphaChannel;
 };

@@ -16,5 +16,5 @@ class FullscreenInfoOverlay : public OverlayWidget {
     void setInfo(const QString &pos, const QString &fileName, const QString &info);
 
   private:
-    Ui::FullscreenInfoOverlay *ui;
+    Ui::FullscreenInfoOverlay *m_ui;
 };

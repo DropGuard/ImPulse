@@ -36,7 +36,7 @@ class VideoControlsProxyWrapper : public QObject {
     void onVideoMuted(bool);
 
   private:
-    FloatingWidgetContainer *container;
-    QPointer<VideoControls> videoControls;
-    VideoControlsStateBuffer stateBuf;
+    FloatingWidgetContainer *m_container;
+    QPointer<VideoControls> m_videoControls;
+    VideoControlsStateBuffer m_stateBuf;
 };

@@ -29,6 +29,6 @@ class SidePanel : public QWidget {
     void paintEvent(QPaintEvent *) override;
 
   private:
-    Ui::SidePanel *ui;
-    SidePanelWidget *mWidget;
+    Ui::SidePanel *m_ui;
+    SidePanelWidget *m_widget;
 };

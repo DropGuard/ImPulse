@@ -58,11 +58,11 @@ class CopyOverlay : public OverlayWidget, public IPendingSurface {
     void createDefaultPaths();
     void createPathWidgets();
     void createShortcuts();
-    Ui::CopyOverlay *ui;
-    QList<PathSelectorMenuItem *> pathWidgets;
-    const int maxPathCount = 9;
-    QStringList paths;
-    QMap<QString, int> shortcuts;
-    CopyOverlayMode mode;
+    Ui::CopyOverlay *m_ui;
+    QList<PathSelectorMenuItem *> m_pathWidgets;
+    const int m_maxPathCount = 9;
+    QStringList m_paths;
+    QMap<QString, int> m_shortcuts;
+    CopyOverlayMode m_mode;
     void removePathWidgets();
 };

@@ -23,8 +23,8 @@ class ImageAnimated : public Image {
 
   private:
     void load() override;
-    QSize mSize;
-    int mFrameCount;
-    std::shared_ptr<QMovie> movie;
+    QSize m_size;
+    int m_frameCount;
+    std::shared_ptr<QMovie> m_movie;
     void loadMovie();
 };

@@ -7,22 +7,22 @@ ColorSelectorButton::ColorSelectorButton(QWidget *parent) : ClickableLabel(paren
 }
 
 void ColorSelectorButton::setColor(QColor &newColor) {
-    mColor = newColor;
+    m_color = newColor;
     update();
 }
 
 void ColorSelectorButton::setDescription(QString text) {
-    this->mDescription = std::move(text);
+    this->m_description = std::move(text);
 }
 
 QColor ColorSelectorButton::color() {
-    return mColor;
+    return m_color;
 }
 
 void ColorSelectorButton::showColorSelector() {
-    QColor newColor = QColorDialog::getColor(mColor, this, mDescription);
+    QColor newColor = QColorDialog::getColor(m_color, this, m_description);
     if(newColor.isValid()) {
-        mColor = newColor;
+        m_color = newColor;
         update();
     }
 }
@@ -36,5 +36,5 @@ void ColorSelectorButton::paintEvent(QPaintEvent *e) {
         p.setOpacity(0.5f);
     p.setPen(QColor(40, 40, 40));
     p.drawRect(QRectF(0.5f, 0.5f, width() - 1.0f, height() - 1.0f));
-    p.fillRect(rect().adjusted(2, 2, -2, -2), mColor);
+    p.fillRect(rect().adjusted(2, 2, -2, -2), m_color);
 }

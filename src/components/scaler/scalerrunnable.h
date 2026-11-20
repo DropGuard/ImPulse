@@ -17,5 +17,5 @@ class ScalerRunnable : public QObject, public PoolJob {
     void finished(std::shared_ptr<const QImage>, ScalerRequest);
 
   private:
-    ScalerRequest req;
+    ScalerRequest m_req;
 };

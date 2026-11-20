@@ -1,11 +1,11 @@
 #include "infobarproxy.h"
 
-InfoBarProxy::InfoBarProxy(QWidget *parent) : QWidget(parent), infoBar(nullptr) {
+InfoBarProxy::InfoBarProxy(QWidget *parent) : QWidget(parent), m_infoBar(nullptr) {
     setAccessibleName("InfoBarProxy");
     this->setMinimumHeight(23);
     this->setMaximumHeight(23);
-    layout.setContentsMargins(0, 0, 0, 0);
-    setLayout(&layout);
+    m_layout.setContentsMargins(0, 0, 0, 0);
+    setLayout(&m_layout);
 }
 
 InfoBarProxy::~InfoBarProxy() {
@@ -14,24 +14,24 @@ InfoBarProxy::~InfoBarProxy() {
 }
 
 void InfoBarProxy::setInfo(const QString &position, const QString &fileName, const QString &info) {
-    if(infoBar) {
-        infoBar->setInfo(position, fileName, info);
+    if(m_infoBar) {
+        m_infoBar->setInfo(position, fileName, info);
     } else {
-        stateBuf.position = position;
-        stateBuf.fileName = fileName;
-        stateBuf.info = info;
+        m_stateBuf.position = position;
+        m_stateBuf.fileName = fileName;
+        m_stateBuf.info = info;
     }
 }
 
 void InfoBarProxy::init() {
-    if(infoBar)
+    if(m_infoBar)
         return;
-    infoBar = new InfoBar(this);
-    setFocusProxy(infoBar);
-    layout.addWidget(infoBar);
-    setLayout(&layout);
-    if(!stateBuf.fileName.isEmpty())
-        infoBar->setInfo(stateBuf.position, stateBuf.fileName, stateBuf.info);
+    m_infoBar = new InfoBar(this);
+    setFocusProxy(m_infoBar);
+    m_layout.addWidget(m_infoBar);
+    setLayout(&m_layout);
+    if(!m_stateBuf.fileName.isEmpty())
+        m_infoBar->setInfo(m_stateBuf.position, m_stateBuf.fileName, m_stateBuf.info);
 }
 
 void InfoBarProxy::paintEvent(QPaintEvent *event) {

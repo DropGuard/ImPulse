@@ -23,8 +23,8 @@ class Randomizer {
     void setCurrent(int _current);
 
   private:
-    int currentIndex;
-    std::vector<int> vec;
+    int m_currentIndex;
+    std::vector<int> m_vec;
     void fill();
     int indexOf(int n);
 };

@@ -20,6 +20,6 @@ class ActionButton : public IconButton {
   protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
-    QString actionName;
-    TriggerMode mTriggerMode;
+    QString m_actionName;
+    TriggerMode m_triggerMode;
 };

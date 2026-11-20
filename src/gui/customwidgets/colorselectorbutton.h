@@ -21,8 +21,8 @@ class ColorSelectorButton : public ClickableLabel {
     void showColorSelector();
 
   private:
-    QColor mColor;
-    QString mDescription;
+    QColor m_color;
+    QString m_description;
 };
 
 #endif // COLORSELECTORBUTTON_H

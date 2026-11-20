@@ -5,116 +5,116 @@
 #include <QSet>
 
 DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
-    : QObject(parent), dirManager(bridge), loader(pool) {
-    scaler = new Scaler(&cache, pool);
+    : QObject(parent), m_dirManager(bridge), m_loader(pool) {
+    scaler = new Scaler(&m_cache, pool);
 
-    connect(&dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
-    connect(&dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
-    connect(&dirManager, &DirectoryManager::fileModified, this, &DirectoryModel::onFileModified);
-    connect(&dirManager, &DirectoryManager::fileRenamed, this, &DirectoryModel::onFileRenamed);
-    connect(&dirManager, &DirectoryManager::dirRemoved, this, &DirectoryModel::dirRemoved);
-    connect(&dirManager, &DirectoryManager::dirAdded, this, &DirectoryModel::dirAdded);
-    connect(&dirManager, &DirectoryManager::dirRenamed, this, &DirectoryModel::dirRenamed);
+    connect(&m_dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
+    connect(&m_dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
+    connect(&m_dirManager, &DirectoryManager::fileModified, this, &DirectoryModel::onFileModified);
+    connect(&m_dirManager, &DirectoryManager::fileRenamed, this, &DirectoryModel::onFileRenamed);
+    connect(&m_dirManager, &DirectoryManager::dirRemoved, this, &DirectoryModel::dirRemoved);
+    connect(&m_dirManager, &DirectoryManager::dirAdded, this, &DirectoryModel::dirAdded);
+    connect(&m_dirManager, &DirectoryManager::dirRenamed, this, &DirectoryModel::dirRenamed);
 
-    connect(&dirManager, &DirectoryManager::loaded, this, &DirectoryModel::loaded);
-    connect(&dirManager, &DirectoryManager::sortingChanged, this, &DirectoryModel::onSortingChanged);
-    connect(&loader, &Loader::loadFinished, this, &DirectoryModel::onImageReady);
-    connect(&loader, &Loader::loadFailed, this, &DirectoryModel::loadFailed);
+    connect(&m_dirManager, &DirectoryManager::loaded, this, &DirectoryModel::loaded);
+    connect(&m_dirManager, &DirectoryManager::sortingChanged, this, &DirectoryModel::onSortingChanged);
+    connect(&m_loader, &Loader::loadFinished, this, &DirectoryModel::onImageReady);
+    connect(&m_loader, &Loader::loadFailed, this, &DirectoryModel::loadFailed);
 }
 
 DirectoryModel::~DirectoryModel() {
-    loader.clearTasks();
+    m_loader.clearTasks();
     delete scaler;
 }
 
 int DirectoryModel::totalCount() const {
-    return dirManager.totalCount();
+    return m_dirManager.totalCount();
 }
 
 int DirectoryModel::fileCount() const {
-    return dirManager.fileCount();
+    return m_dirManager.fileCount();
 }
 
 int DirectoryModel::dirCount() const {
-    return dirManager.dirCount();
+    return m_dirManager.dirCount();
 }
 
 int DirectoryModel::indexOfFile(const QString &filePath) const {
-    return dirManager.indexOfFile(filePath);
+    return m_dirManager.indexOfFile(filePath);
 }
 
 int DirectoryModel::indexOfDir(const QString &filePath) const {
-    return dirManager.indexOfDir(filePath);
+    return m_dirManager.indexOfDir(filePath);
 }
 
 SortingMode DirectoryModel::sortingMode() const {
-    return dirManager.sortingMode();
+    return m_dirManager.sortingMode();
 }
 
 const FSEntry &DirectoryModel::fileEntryAt(int index) const {
-    return dirManager.fileEntryAt(index);
+    return m_dirManager.fileEntryAt(index);
 }
 
 QString DirectoryModel::fileNameAt(int index) const {
-    return dirManager.fileNameAt(index);
+    return m_dirManager.fileNameAt(index);
 }
 
 QString DirectoryModel::filePathAt(int index) const {
-    return dirManager.filePathAt(index);
+    return m_dirManager.filePathAt(index);
 }
 
 QString DirectoryModel::dirNameAt(int index) const {
-    return dirManager.dirNameAt(index);
+    return m_dirManager.dirNameAt(index);
 }
 
 QString DirectoryModel::dirPathAt(int index) const {
-    return dirManager.dirPathAt(index);
+    return m_dirManager.dirPathAt(index);
 }
 
 QString DirectoryModel::directoryPath() const {
-    return dirManager.directoryPath();
+    return m_dirManager.directoryPath();
 }
 
 bool DirectoryModel::containsFile(const QString &filePath) const {
-    return dirManager.containsFile(filePath);
+    return m_dirManager.containsFile(filePath);
 }
 
 bool DirectoryModel::containsDir(const QString &dirPath) const {
-    return dirManager.containsDir(dirPath);
+    return m_dirManager.containsDir(dirPath);
 }
 
 bool DirectoryModel::isEmpty() const {
-    return dirManager.isEmpty();
+    return m_dirManager.isEmpty();
 }
 
 QString DirectoryModel::firstFile() const {
-    return dirManager.firstFile();
+    return m_dirManager.firstFile();
 }
 
 QString DirectoryModel::lastFile() const {
-    return dirManager.lastFile();
+    return m_dirManager.lastFile();
 }
 
 QString DirectoryModel::nextOf(const QString &filePath) const {
-    return dirManager.nextOfFile(filePath);
+    return m_dirManager.nextOfFile(filePath);
 }
 
 QString DirectoryModel::prevOf(const QString &filePath) const {
-    return dirManager.prevOfFile(filePath);
+    return m_dirManager.prevOfFile(filePath);
 }
 
 QDateTime DirectoryModel::lastModified(const QString &filePath) const {
-    return dirManager.lastModified(filePath);
+    return m_dirManager.lastModified(filePath);
 }
 
 // -----------------------------------------------------------------------------
 
 QString DirectoryModel::adjacentDirectory(const QString &dirPath, bool forward) {
-    return dirManager.adjacentDirectory(dirPath, forward, sortingMode());
+    return m_dirManager.adjacentDirectory(dirPath, forward, sortingMode());
 }
 
 void DirectoryModel::setSortingMode(SortingMode mode) {
-    dirManager.setSortingMode(mode);
+    m_dirManager.setSortingMode(mode);
 }
 
 void DirectoryModel::removeFile(const QString &filePath, bool trash, FileOpResult &result) {
@@ -154,25 +154,25 @@ void DirectoryModel::moveFileTo(const QString &srcFile, const QString &destDirPa
 }
 // -----------------------------------------------------------------------------
 bool DirectoryModel::setDirectory(const QString &path) {
-    cache.clear();
-    return dirManager.setDirectory(path);
+    m_cache.clear();
+    return m_dirManager.setDirectory(path);
 }
 
 qint64 DirectoryModel::whenListed(const QString &dirPath, std::function<void()> action) {
-    return dirManager.whenListed(dirPath, std::move(action));
+    return m_dirManager.whenListed(dirPath, std::move(action));
 }
 
 bool DirectoryModel::cancelListed(qint64 token) {
-    return dirManager.cancelListed(token);
+    return m_dirManager.cancelListed(token);
 }
 
 void DirectoryModel::unload(int index) {
     QString filePath = this->filePathAt(index);
-    cache.remove(filePath);
+    m_cache.remove(filePath);
 }
 
 void DirectoryModel::unload(const QString &filePath) {
-    cache.remove(filePath);
+    m_cache.remove(filePath);
 }
 
 void DirectoryModel::unloadExcept(const QString &filePath, bool keepNearby) {
@@ -182,15 +182,15 @@ void DirectoryModel::unloadExcept(const QString &filePath, bool keepNearby) {
         list << prevOf(filePath);
         list << nextOf(filePath);
     }
-    cache.trimTo(list);
+    m_cache.trimTo(list);
 }
 
 bool DirectoryModel::loaderBusy() const {
-    return loader.isBusy();
+    return m_loader.isBusy();
 }
 
 bool DirectoryModel::listingSettled() const {
-    return dirManager.isSettled();
+    return m_dirManager.isSettled();
 }
 
 void DirectoryModel::onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
@@ -198,12 +198,12 @@ void DirectoryModel::onImageReady(std::shared_ptr<Image> img, const QString &pat
         emit loadFailed(path);
         return;
     }
-    cache.remove(path);
-    cache.insert(img);
+    m_cache.remove(path);
+    m_cache.insert(img);
     if(scaled)
-        mScaledCache.insert(path);
+        m_scaledCache.insert(path);
     else
-        mScaledCache.remove(path);
+        m_scaledCache.remove(path);
     emit imageReady(img, path, scaled);
 }
 
@@ -212,9 +212,9 @@ bool DirectoryModel::saveFile(const QString &filePath) {
 }
 
 bool DirectoryModel::saveFile(const QString &filePath, const QString &destPath) {
-    if(!containsFile(filePath) || !cache.contains(filePath))
+    if(!containsFile(filePath) || !m_cache.contains(filePath))
         return false;
-    auto img = cache.get(filePath);
+    auto img = m_cache.get(filePath);
     if(img->save(destPath, settings->JPEGSaveQuality())) {
         // listing changes (modified/new) surface through the engine's watch
         // and arrive via fileModified/fileAdded — same as any external edit
@@ -237,7 +237,7 @@ void DirectoryModel::onFileModified(const QString &filePath) {
     QDateTime modTime = lastModified(filePath);
     if(!modTime.isValid())
         return;
-    auto img = cache.get(filePath);
+    auto img = m_cache.get(filePath);
     if(!img) {
         // nothing cached to compare against: the mirror saw it, pass it on
         emit fileModified(filePath);
@@ -250,14 +250,14 @@ void DirectoryModel::onFileModified(const QString &filePath) {
     // cache.remove() the user's edits away; the divergence is announced as
     // its own edge, once per (path, disk mtime).
     if(img->isEdited()) {
-        if(announcedDivergences.value(filePath) != modTime) {
-            announcedDivergences.insert(filePath, modTime);
+        if(m_announcedDivergences.value(filePath) != modTime) {
+            m_announcedDivergences.insert(filePath, modTime);
             emit divergenceDetected(filePath);
         }
         return;
     }
     reload(filePath);
-    announcedDivergences.remove(filePath); // any divergence is resolved
+    m_announcedDivergences.remove(filePath); // any divergence is resolved
     emit fileModified(filePath);
 }
 
@@ -278,11 +278,11 @@ void DirectoryModel::onFileRenamed(const QString &filePath, const QString &newPa
 }
 
 bool DirectoryModel::isLoaded(int index) const {
-    return cache.contains(filePathAt(index));
+    return m_cache.contains(filePathAt(index));
 }
 
 bool DirectoryModel::isLoaded(const QString &filePath) const {
-    return cache.contains(filePath);
+    return m_cache.contains(filePath);
 }
 
 std::shared_ptr<Image> DirectoryModel::getImageAt(int index) {
@@ -293,22 +293,22 @@ std::shared_ptr<Image> DirectoryModel::getImageAt(int index) {
 // if image is not cached, loads it in the main thread
 // for async access use loadAsync(), then catch onImageReady()
 std::shared_ptr<Image> DirectoryModel::getImage(const QString &filePath) {
-    std::shared_ptr<Image> img = cache.get(filePath);
+    std::shared_ptr<Image> img = m_cache.get(filePath);
     if(img)
         return img;
     // the one place absence is flattened back into a null pointer, because the
     // callers of getImage() hand it straight to sinks that test for it
     // (guiSetImage, getMimeDataForImage). Everything upstream of this line
     // carries std::optional and cannot forward the question unknowingly.
-    return loader.load(filePath, LoadPolicy::fromSettings()).value_or(nullptr);
+    return m_loader.load(filePath, LoadPolicy::fromSettings()).value_or(nullptr);
 }
 
 void DirectoryModel::updateImage(const QString &filePath, std::shared_ptr<Image> img) {
     if(containsFile(filePath) /*& cache.contains(filePath)*/) {
-        if(!cache.contains(filePath)) {
-            cache.insert(img);
+        if(!m_cache.contains(filePath)) {
+            m_cache.insert(img);
         } else {
-            cache.insert(img);
+            m_cache.insert(img);
             emit imageUpdated(filePath);
         }
     }
@@ -319,33 +319,33 @@ void DirectoryModel::load(const QString &filePath, bool asyncHint) {
 }
 
 void DirectoryModel::load(const QString &filePath, bool asyncHint, bool scaled) {
-    if(!containsFile(filePath) || loader.isLoading(filePath))
+    if(!containsFile(filePath) || m_loader.isLoading(filePath))
         return;
-    if(!cache.contains(filePath)) {
+    if(!m_cache.contains(filePath)) {
         if(asyncHint) {
-            loader.loadAsyncPriority(filePath, LoadPolicy::fromSettings());
+            m_loader.loadAsyncPriority(filePath, LoadPolicy::fromSettings());
         } else {
             // sync path (editing): full quality
-            auto img = loader.load(filePath, LoadPolicy::fromSettings());
+            auto img = m_loader.load(filePath, LoadPolicy::fromSettings());
             if(img) {
-                cache.insert(*img);
+                m_cache.insert(*img);
                 emit imageReady(*img, filePath, false);
             } else {
                 emit loadFailed(filePath);
             }
         }
     } else {
-        bool cachedScaled = mScaledCache.contains(filePath);
+        bool cachedScaled = m_scaledCache.contains(filePath);
         // instant display from cache; a tier-1 cached image upgrades to full
         if(cachedScaled && scaled)
-            loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
-        emit imageReady(cache.get(filePath), filePath, cachedScaled);
+            m_loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
+        emit imageReady(m_cache.get(filePath), filePath, cachedScaled);
     }
 }
 
 void DirectoryModel::reload(const QString &filePath) {
-    if(cache.contains(filePath)) {
-        cache.remove(filePath);
+    if(m_cache.contains(filePath)) {
+        m_cache.remove(filePath);
         load(filePath, false);
     }
 }
@@ -361,25 +361,25 @@ void DirectoryModel::loadFocused(const QString &filePath, bool forward, bool wit
         if(!neighbor.isEmpty())
             window.insert(neighbor);
     }
-    loader.loadWindow(filePath, window, LoadPolicy::fromSettings());
+    m_loader.loadWindow(filePath, window, LoadPolicy::fromSettings());
     // the direction neighbor no earlier flip submitted
     if(!neighbor.isEmpty())
         preload(neighbor);
-    if(cache.contains(filePath)) {
-        bool cachedScaled = mScaledCache.contains(filePath);
+    if(m_cache.contains(filePath)) {
+        bool cachedScaled = m_scaledCache.contains(filePath);
         if(cachedScaled)
-            loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
-        emit imageReady(cache.get(filePath), filePath, cachedScaled);
+            m_loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
+        emit imageReady(m_cache.get(filePath), filePath, cachedScaled);
     }
 }
 
 void DirectoryModel::preload(const QString &filePath) {
-    if(containsFile(filePath) && !cache.contains(filePath))
-        loader.loadAsync(filePath, LoadPolicy::fromSettings()); // tier-1 scaled
+    if(containsFile(filePath) && !m_cache.contains(filePath))
+        m_loader.loadAsync(filePath, LoadPolicy::fromSettings()); // tier-1 scaled
 }
 
 // tier-2: full-res re-decode of a tier-1 cached image
 void DirectoryModel::upgradeToFull(const QString &filePath) {
-    if(containsFile(filePath) && !loader.isLoading(filePath) && mScaledCache.contains(filePath))
-        loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
+    if(containsFile(filePath) && !m_loader.isLoading(filePath) && m_scaledCache.contains(filePath))
+        m_loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
 }

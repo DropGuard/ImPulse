@@ -3,26 +3,26 @@
 #include <utility>
 
 EntryInfoItem::EntryInfoItem(QWidget *parent) : QWidget(parent) {
-    layout.setContentsMargins(9, 0, 9, 0);
-    layout.setSpacing(0);
-    layout.addWidget(&nameLabel);
-    layout.addWidget(&valueLabel);
-    setLayout(&layout);
+    m_layout.setContentsMargins(9, 0, 9, 0);
+    m_layout.setSpacing(0);
+    m_layout.addWidget(&m_nameLabel);
+    m_layout.addWidget(&m_valueLabel);
+    setLayout(&m_layout);
 
-    nameLabel.setFixedSize(120, 30);
-    valueLabel.setFixedSize(142, 30);
+    m_nameLabel.setFixedSize(120, 30);
+    m_valueLabel.setFixedSize(142, 30);
 
     // add some padding for easier text selection
-    valueLabel.setContentsMargins(3, 0, 0, 0);
-    valueLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
-    valueLabel.setCursor(Qt::IBeamCursor);
+    m_valueLabel.setContentsMargins(3, 0, 0, 0);
+    m_valueLabel.setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_valueLabel.setCursor(Qt::IBeamCursor);
 }
 
 void EntryInfoItem::setInfo(QString _name, QString _value) {
-    name = std::move(_name);
-    value = std::move(_value);
-    nameLabel.setText(name);
-    valueLabel.setText(value);
+    m_name = std::move(_name);
+    m_value = std::move(_value);
+    m_nameLabel.setText(m_name);
+    m_valueLabel.setText(m_value);
 };
 
 void EntryInfoItem::paintEvent(QPaintEvent *event) {
