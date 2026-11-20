@@ -12,6 +12,14 @@
 # handle_mpv_event) and camelBack everywhere else, and a Case rule would
 # rewrite one of them into the other's style for no benefit.
 Checks: '-*,readability-identifier-naming'
+# HeaderFilterRegex lives HERE, not on lint.py's command line, so the rule holds
+# for a bare `clang-tidy foo.cpp` too — an editor, a one-off probe, a future
+# CI job that never heard of scripts/lint.py. clang-tidy's default suppresses
+# every diagnostic located in a header, which is where a member declaration
+# lives; a check whose subject is members is silently blind without this.
+# The pattern is a path suffix, not an absolute path, so it survives a clone
+# somewhere else.
+HeaderFilterRegex: '(^|/)qimgv/'
 CheckOptions:
   - key: readability-identifier-naming.PrivateMemberPrefix
     value: 'm_'
