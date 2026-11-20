@@ -363,6 +363,12 @@ def clazy_counts(srcs, version, memo):
         for line in out.splitlines():
             m = CLAZY.match(line)
             if m:
+                # non-pod-global-static is what a parameterized test IS:
+                # INSTANTIATE_TEST_SUITE_P expands to a global object holding
+                # the parameter table, and gtest constructs it before main by
+                # design. Flagging the framework's own shape teaches nothing.
+                if m.group(3) == 'non-pod-global-static' and '/tests/' in m.group(1):
+                    continue
                 found[m.group(3)].add((m.group(1), m.group(2)))
         if unfinished(status_of(out)):
             crashes.append((e['file'], status_of(out), summarize(out)))

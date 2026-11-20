@@ -9,6 +9,26 @@ class TestFolderBoundary : public ::testing::Test, protected EngineStackFixture 
     }
 };
 
+// The sorting modes the sibling walk is checked against, as a parameter so
+// each is its own ctest case: a disagreement names the mode, instead of
+// pointing at "the loop" in one verdict.
+struct SortingModeCase {
+    SortingMode mode;
+    const char *suffix;
+};
+
+// Without this, a failure prints "GetParam() = 16-byte object <04-00 ...>" —
+// the parameter's bytes, which say nothing about which mode disagreed.
+inline void PrintTo(const SortingModeCase &c, std::ostream *os) {
+    *os << c.suffix;
+}
+
+class TestFolderBoundarySorting : public ::testing::TestWithParam<SortingModeCase>, protected EngineStackFixture {
+  protected:
+    TestFolderBoundarySorting() : EngineStackFixture("folder-boundary") {
+    }
+};
+
 // "After reaching the end of a folder" is a setting with three values, so what
 // gets pinned here is the behavior each value produces — not the absence of one
 // old bug. decide() takes the mode by value, so these cases inject the value and
@@ -123,7 +143,7 @@ TEST_F(TestFolderBoundary, folderBoundaryLookupKeepsWatchingTheCurrentFolder) {
 // mode the two were free to disagree: std::sort over an all-equivalent range is
 // not stable, so "the next folder" could be a different one than the next row.
 
-TEST_F(TestFolderBoundary, folderNavigationWalksSiblingsInTheOrderTheViewShows) {
+TEST_P(TestFolderBoundarySorting, folderNavigationWalksSiblingsInTheOrderTheViewShows) {
     resetFixture();
     // created in reverse name order on purpose, so a degenerate local sort
     // cannot land on the expected order by accident
@@ -140,30 +160,37 @@ TEST_F(TestFolderBoundary, folderNavigationWalksSiblingsInTheOrderTheViewShows) 
     EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
     ASSERT_TRY_EQ_TIMEOUT(dm.dirCount(), 4UL, 10000);
 
-    const SortingMode modes[] = {SORT_NAME, SORT_NAME_DESC, SORT_TIME, SORT_TIME_DESC, SORT_SIZE, SORT_SIZE_DESC};
-    for(SortingMode mode : modes) {
-        dm.setSortingMode(mode);
-        ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
-        // the rows are the check, not the mode: sortingMode() reports the
-        // mode this instance *asked* for, which is written before the
-        // engine is told and so was true the moment the call returned
-        QStringList view;
-        for(unsigned long i = 0; i < dm.dirCount(); ++i)
-            view << dm.dirPathAt(int(i));
+    const SortingMode mode = GetParam().mode;
+    dm.setSortingMode(mode);
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+    // the rows are the check, not the mode: sortingMode() reports the mode
+    // this instance *asked* for, which is written before the engine is told
+    // and so was true the moment the call returned
+    QStringList view;
+    for(unsigned long i = 0; i < dm.dirCount(); ++i)
+        view << dm.dirPathAt(int(i));
 
-        // walking the siblings must reproduce the rows, in the same direction
-        QStringList walked;
-        QString cur = dm.dirPathAt(0);
-        while(!cur.isEmpty() && walked.size() <= names.size()) {
-            walked << cur;
-            cur = dm.adjacentDirectory(cur, true, mode);
-        }
-
-        const QStringList &want = (mode == SORT_NAME_DESC) ? reversed : names;
-        EXPECT_EQ(view, want);
-        EXPECT_EQ(walked, want);
+    // walking the siblings must reproduce the rows, in the same direction
+    QStringList walked;
+    QString cur = dm.dirPathAt(0);
+    while(!cur.isEmpty() && walked.size() <= names.size()) {
+        walked << cur;
+        cur = dm.adjacentDirectory(cur, true, mode);
     }
+
+    const QStringList &want = (mode == SORT_NAME_DESC) ? reversed : names;
+    EXPECT_EQ(view, want);
+    EXPECT_EQ(walked, want);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    SortingModes, TestFolderBoundarySorting,
+    ::testing::Values(SortingModeCase{SORT_NAME, "name"}, SortingModeCase{SORT_NAME_DESC, "nameDesc"},
+                      SortingModeCase{SORT_TIME, "time"}, SortingModeCase{SORT_TIME_DESC, "timeDesc"},
+                      SortingModeCase{SORT_SIZE, "size"}, SortingModeCase{SORT_SIZE_DESC, "sizeDesc"}),
+    [](const ::testing::TestParamInfo<SortingModeCase> &p) {
+        return p.param.suffix;
+    });
 
 TEST_F(TestFolderBoundary, newlyCreatedFoldersKeepTheirPlaceInNameOrder) {
     // The other half of the same rule: a folder arriving through the watcher is
