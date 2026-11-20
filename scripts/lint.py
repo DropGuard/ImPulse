@@ -68,6 +68,15 @@ TIDY_EXCLUDE = ['bugprone-narrowing-conversions',
 # part of the gate so the convention cannot rot the way an unenforced one did.
 TIDY_CHECKS = '-*,bugprone-*,readability-identifier-naming' + ''.join(',-' + c for c in TIDY_EXCLUDE)
 DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+)\]$')
+# The check set is explicit, not clazy's default. AGENTS.md documents
+# level0,level1,detaching for the build-clazy tree, where clazy is the compiler
+# and reads CLAZY_CHECKS from the environment; clazy-standalone does NOT read
+# that variable, so an unqualified invocation would silently run its own
+# default (level1). The two sets happen to be identical today — verified by
+# diffing --list-checks — but "identical today" is not a rule: the moment
+# upstream moves a check between levels, the gate and the documented set part
+# ways with nothing to show for it.
+CLAZY_CHECKS = 'level0,level1,detaching'
 CLAZY = re.compile(r'^(/[^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
 TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[((?:bugprone|readability)-[a-z0-9-]+)(?:,.*)?\]$')
 CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
@@ -327,11 +336,15 @@ def clazy_counts(srcs, version, memo):
     def one(e):
         # the include graph is the gcc pass's depfile — same TU, same db
         # command, so the graph is identical and needs no re-derivation
-        key = None if NOCACHE else tu_key(e, 'clazy', e['command'], version, read_deps(e), memo)
+        # the checks selection is part of the verdict, so it rides in the key
+        # (the clang-tidy pass does the same with TIDY_CHECKS)
+        key = None if NOCACHE else tu_key(e, 'clazy', e['command'] + ' ' + CLAZY_CHECKS,
+                                          version, read_deps(e), memo)
         out = cache_read('clazy', key)
         hit = out is not None
         if not hit:
-            out, status = run_status(['clazy-standalone', '-p', BUILD, e['file']], ROOT)
+            out, status = run_status(['clazy-standalone', '-p', BUILD, '--checks=' + CLAZY_CHECKS, e['file']],
+                                     ROOT)
             # The status is cached with the output: a crashed TU stays visible
             # on a warm run instead of becoming a silent zero once cached.
             out = f'{STATUS_PREFIX}{status}\n' + out

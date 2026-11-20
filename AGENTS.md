@@ -45,13 +45,24 @@ cmake --build build --target check-crop_tests
 # ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
 # --no-cache forces the full scan.
 python3 scripts/lint.py build --gate
-# style gate over the whole tree (3rdparty excluded). A ctest, not only a hook
-# stage: a hook that skips for a missing tool leaves no trace, which is how the
-# Windows port's fifteen hand-formatted files arrived. Skips (77) and names the
-# missing tool rather than pretending to have checked.
+# style gate over the whole tree. A ctest, not only a hook stage: a hook that
+# skips for a missing tool leaves no trace, which is how the Windows port's
+# fifteen hand-formatted files arrived. Skips (77) and names the missing tool
+# rather than pretending to have checked.
+#
+# "The whole tree" means qimgv/tests/tree_scope.py's ROOTS (qimgv/ and
+# plugins/), and this file, the architecture rules and the pre-commit hook all
+# ask that module instead of naming a root. They each used to name qimgv/
+# themselves, and each therefore missed plugins/ — six owned plugin files were
+# never formatted while this gate reported the tree clean. A root is added in
+# ONE place now.
 python3 qimgv/tests/format_rules.py
 
-# clazy, separate configured tree (clazy 1.17 + level0/level1/detaching)
+# clazy, separate configured tree (clazy 1.17 + level0/level1/detaching).
+# CLAZY_CHECKS is read here because clazy is the compiler in this tree;
+# clazy-standalone (which scripts/lint.py runs) does NOT read it, so the gate
+# passes --checks= explicitly rather than trusting a default that happens to
+# match today.
 CLAZY_CHECKS="level0,level1,detaching" cmake --build build-clazy -j$(nproc)
 
 # style: .clang-format is the tree's own (derived from it, 2026-11-10); the

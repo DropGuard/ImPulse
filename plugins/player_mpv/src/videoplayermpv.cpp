@@ -12,7 +12,7 @@ VideoPlayerMpv::VideoPlayerMpv(QWidget *parent) : VideoPlayer(parent) {
 
     m_mpv = new MpvWidget(this);
     QVBoxLayout *vl = new QVBoxLayout();
-    vl->setContentsMargins(0,0,0,0);
+    vl->setContentsMargins(0, 0, 0, 0);
     vl->addWidget(m_mpv);
     setLayout(vl);
 
@@ -21,7 +21,7 @@ VideoPlayerMpv::VideoPlayerMpv(QWidget *parent) : VideoPlayer(parent) {
 
     connect(m_mpv, &MpvWidget::durationChanged, this, &VideoPlayer::durationChanged);
     connect(m_mpv, &MpvWidget::positionChanged, this, &VideoPlayer::positionChanged);
-    connect(m_mpv, &MpvWidget::videoPaused,     this, &VideoPlayer::videoPaused);
+    connect(m_mpv, &MpvWidget::videoPaused, this, &VideoPlayer::videoPaused);
     connect(m_mpv, &MpvWidget::playbackFinished, this, &VideoPlayer::playbackFinished);
 }
 

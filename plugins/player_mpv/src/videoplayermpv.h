@@ -4,22 +4,22 @@
 #include <QKeyEvent>
 
 #if defined QIMGV_PLAYER_MPV_LIBRARY
- #define TEST_COMMON_DLLSPEC Q_DECL_EXPORT
+#define TEST_COMMON_DLLSPEC Q_DECL_EXPORT
 #else
- #define TEST_COMMON_DLLSPEC Q_DECL_IMPORT
+#define TEST_COMMON_DLLSPEC Q_DECL_IMPORT
 #endif
 
 class MpvWidget;
 
 class VideoPlayerMpv : public VideoPlayer {
     Q_OBJECT
-public:
+  public:
     explicit VideoPlayerMpv(QWidget *parent = nullptr);
     bool showVideo(QString file) override;
     void setVideoUnscaled(bool mode) override;
     int volume() override;
 
-public slots:
+  public slots:
     void seek(int pos) override;
     void seekRelative(int pos) override;
     void pauseResume() override;
@@ -36,21 +36,20 @@ public slots:
     void hide() override;
     void setLoopPlayback(bool mode) override;
 
-protected:
+  protected:
     void paintEvent(QPaintEvent *event) override;
 
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
 
-// playbackFinished() comes from VideoPlayer — re-declaring it here would
-// make this class' signal a different one, and consumers connect through
-// &VideoPlayer::playbackFinished (viewerwidget.cpp:53). A re-declaration is
-// silent: the base-pointer connection receives nothing. Rule R6.
+    // playbackFinished() comes from VideoPlayer — re-declaring it here would
+    // make this class' signal a different one, and consumers connect through
+    // &VideoPlayer::playbackFinished (viewerwidget.cpp:53). A re-declaration is
+    // silent: the base-pointer connection receives nothing. Rule R6.
 
-private:
+  private:
     MpvWidget *m_mpv;
-
 };
 
 extern "C" TEST_COMMON_DLLSPEC VideoPlayer *CreatePlayerWidget();

@@ -9,8 +9,10 @@ invisible to every review on a machine that did have the tool. A ctest that
 can skip with a named reason (77) is at least recorded in the run, and a ctest
 that runs green proves the whole tree, not just the staged files.
 
-Scope mirrors the pre-commit hook exactly: qimgv/**/*.cpp|h, 3rdparty
-excluded. Vendored upstream code is not this tree's to reformat.
+Scope is tree_scope.ROOTS, the same module the pre-commit hook and the
+architecture rules ask — the roots used to be spelled out per gate, and each
+spelled `qimgv/` alone, so the six plugin files this tree owns were never
+formatted while this rule reported a clean tree.
 
 Skips (77) when clang-format is absent, and names how to arm it.
 """
@@ -20,16 +22,13 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SRC = os.path.join(ROOT, 'qimgv')
-SKIP_DIRS = {'3rdparty'}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tree_scope  # noqa: E402  (needs the path above first)
 
 
 def sources():
-    for dirpath, dirnames, filenames in os.walk(SRC):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-        for f in filenames:
-            if f.endswith(('.cpp', '.h')):
-                yield os.path.join(dirpath, f)
+    for path, _rel in tree_scope.sources():
+        yield path
 
 
 def main():
