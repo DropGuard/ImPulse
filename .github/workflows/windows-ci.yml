@@ -56,6 +56,24 @@ jobs:
             mingw-w64-ucrt-x86_64-mpv
             mingw-w64-ucrt-x86_64-gtest
             mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-cppcheck
+            mingw-w64-ucrt-x86_64-clang-tools-extra
+      # PROBE, to be removed once it has answered: can the lint instruments the
+      # Linux job runs also exist here, in the environment that has exiv2 and
+      # mpv? If they do, this job can check the Windows branches itself and the
+      # textual rule (R15) that stands in for that becomes unnecessary. clazy is
+      # clang64-only in msys2, so it is not in this list — the question is
+      # whether clang-tidy and cppcheck are enough without it.
+      - name: probe (do the lint instruments exist on ucrt64?)
+        shell: msys2 {0}
+        run: |
+          for t in clang-tidy cppcheck clang-format clazy-standalone; do
+            if command -v "$t" >/dev/null 2>&1; then
+              echo "PRESENT  $t  $(command -v $t)"
+            else
+              echo "ABSENT   $t"
+            fi
+          done
       - name: configure
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
