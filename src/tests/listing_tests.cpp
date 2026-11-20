@@ -205,8 +205,8 @@ TEST_F(TestListing, overwriteRenameReplacesTheListedRow) {
     // produce. MoveFileEx(REPLACE_EXISTING) is rename(2)'s overwrite
     // atomics on this platform, the same spelling FileOperations::rename
     // uses for the forced-overwrite branch.
-    EXPECT_TRUE(MoveFileExW(reinterpret_cast<const WCHAR *>((fixtureDir + QStringLiteral("/over.jpg")).utf16()),
-                            reinterpret_cast<const WCHAR *>((fixtureDir + QStringLiteral("/img1.jpg")).utf16()),
+    EXPECT_TRUE(MoveFileExW(reinterpret_cast<const WCHAR *>((m_fixtureDir + QStringLiteral("/over.jpg")).utf16()),
+                            reinterpret_cast<const WCHAR *>((m_fixtureDir + QStringLiteral("/img1.jpg")).utf16()),
                             MOVEFILE_REPLACE_EXISTING));
 #else
     const QByteArray from = (m_fixtureDir + "/over.jpg").toLocal8Bit();

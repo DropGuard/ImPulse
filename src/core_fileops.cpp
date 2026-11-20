@@ -216,7 +216,7 @@ void Core::showInDirectory() {
     args << "end tell";
     QProcess::startDetached("osascript", args);
 #else
-    QDesktopServices::openUrl(QUrl::fromLocalFile(model->directoryPath()));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_model->directoryPath()));
 #endif
 }
 

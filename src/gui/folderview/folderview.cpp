@@ -27,7 +27,7 @@ FolderView::FolderView(QWidget *parent) : FloatingWidgetContainer(parent), m_ui(
     header->hideSection(3); // mod date
 
 #ifdef _WIN32
-    dirModel->setRootPath("");
+    m_dirModel->setRootPath("");
 #else
     m_dirModel->setRootPath(QDir::homePath());
     QModelIndex idx = m_dirModel->index(m_dirModel->rootPath());
