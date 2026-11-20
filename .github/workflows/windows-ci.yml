@@ -1,12 +1,20 @@
 name: windows-ci
 # Windows joined the supported-platforms table (DEVELOPING.md, "Linux and
-# Windows (msys2)"): this job mirrors the local ucrt64 recipe step for step —
-# the same pacman package set the dev machine installs, the same configure
-# flags (EXIV2, VIDEO_SUPPORT and OPENCV_SUPPORT all on), the same suites
-# ctest runs locally. Deliberately NO aqtinstall: Qt 6.12 comes from the
-# msys2 packages themselves, so the job never faces the Qt-download problem
-# the aqt-based Linux jobs face in constrained networks — pacman walks its
-# own mirrors.
+# Windows (msys2)").
+#
+# clang64, not ucrt64. The tree used ucrt64 because exiv2 and mpv were said to
+# be packaged only there — checked on 2026-11-21 and no longer true: both are
+# in clang64 (and clangarm64 and ucrt64). clang64 is the better single
+# environment because it is the only one that also carries clazy, so the same
+# tree that builds and tests the code can run the lint gate on it, seeing the
+# branches this platform actually preprocesses.
+#
+# The three msys2 environments are NOT interchangeable: each has its own C/C++
+# runtime ABI, and mixing their libraries produces link errors or silent
+# breakage. One environment, every package from it.
+#
+# Deliberately NO aqtinstall: Qt 6.12 comes from the msys2 packages, so the
+# job never faces the Qt-download problem the aqt-based Linux job did.
 #
 # Trigger policy: workflow_dispatch and pushes to the integration trunk (and
 # to windows-port while that branch is still the port's workbench). The
@@ -22,7 +30,7 @@ on:
   push:
     branches: [rustcore, windows-port]
 jobs:
-  windows-ucrt64:
+  windows-clang64:
     runs-on: windows-latest
     defaults:
       run:
@@ -34,64 +42,43 @@ jobs:
       # does not read — measured, corrosion still said "rustc not found" with
       # the action's step green above it. The msys2 package puts rustc on the
       # shell's own PATH, which is the one corrosion resolves.
-      - name: install the ucrt64 toolchain and libraries (the dev machine's exact set)
+      - name: install the clang64 toolchain and libraries
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: CLANG64
           update: true
           release: false
           install: >-
             git
-            mingw-w64-ucrt-x86_64-toolchain
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-pkgconf
-            mingw-w64-ucrt-x86_64-python
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-imageformats
-            mingw-w64-ucrt-x86_64-qt6-svg
-            mingw-w64-ucrt-x86_64-qt6-tools
-            mingw-w64-ucrt-x86_64-opencv
-            mingw-w64-ucrt-x86_64-exiv2
-            mingw-w64-ucrt-x86_64-mpv
-            mingw-w64-ucrt-x86_64-gtest
-            mingw-w64-ucrt-x86_64-rust
-            mingw-w64-ucrt-x86_64-cppcheck
-            mingw-w64-ucrt-x86_64-clang-tools-extra
-      # PROBE, to be removed once it has answered: can the lint instruments the
-      # Linux job runs also exist here, in the environment that has exiv2 and
-      # mpv? If they do, this job can check the Windows branches itself and the
-      # textual rule (R15) that stands in for that becomes unnecessary. clazy is
-      # clang64-only in msys2, so it is not in this list — the question is
-      # whether clang-tidy and cppcheck are enough without it.
-      - name: probe (do the lint instruments exist on ucrt64?)
-        shell: msys2 {0}
-        run: |
-          for t in clang-tidy cppcheck clang-format clazy-standalone; do
-            if command -v "$t" >/dev/null 2>&1; then
-              echo "PRESENT  $t  $(command -v $t)"
-            else
-              echo "ABSENT   $t"
-            fi
-          done
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-pkgconf
+            mingw-w64-clang-x86_64-python
+            mingw-w64-clang-x86_64-qt6-base
+            mingw-w64-clang-x86_64-qt6-imageformats
+            mingw-w64-clang-x86_64-qt6-svg
+            mingw-w64-clang-x86_64-qt6-tools
+            mingw-w64-clang-x86_64-opencv
+            mingw-w64-clang-x86_64-exiv2
+            mingw-w64-clang-x86_64-mpv
+            mingw-w64-clang-x86_64-gtest
+            mingw-w64-clang-x86_64-rust
+            mingw-w64-clang-x86_64-cppcheck
+            mingw-w64-clang-x86_64-clang-tools-extra
+            mingw-w64-clang-x86_64-clazy
       - name: configure
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON \
             -DEXIV2=ON -DVIDEO_SUPPORT=ON -DOPENCV_SUPPORT=ON
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j"$(nproc)"
-      # Every test runs here. The -E drops three entries that are gates rather
-      # than tests — FORMAT_RULES, ARCH_RULES and LINT_CACHE read the tree's
-      # text, so their verdict is the same on any platform and the Linux job
-      # runs them once against a pinned formatter and toolchain. Repeating them
-      # on msys2 means keeping a second formatter version in step (24.04's
-      # clang-format 18 disagreed with 21 on chained <<) while telling us
-      # nothing about Windows.
-      #
-      # What is left is the whole point: the suites, compiled and run by the
-      # compiler that sees the #ifdef _WIN32 branches.
-      - name: the suites (only the three text gates are the Linux job's)
+      # Everything, including the three gates. This environment carries
+      # clang-format, clang-tidy, cppcheck and clazy, so the tree's checks run
+      # here against the compiler that preprocesses the Windows branches —
+      # which is the one thing Linux cannot do. Nothing is excluded: a gate
+      # that only ever runs where the code already builds is half a gate.
+      - name: the suites and the gates
         run: |
           cd build
-          QT_QPA_PLATFORM=offscreen ctest --output-on-failure \
-            -E 'FORMAT_RULES|ARCH_RULES|LINT' 
+          QT_QPA_PLATFORM=offscreen ctest --output-on-failure
