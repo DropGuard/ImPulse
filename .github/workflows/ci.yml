@@ -19,6 +19,13 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * *"
+# A newer push makes an older run's verdict irrelevant: cancel it rather than
+# let it finish behind the new one. `github.ref` keeps a tag push and a branch
+# push from cancelling each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     # The same distribution the tree is developed on. Everything below used to

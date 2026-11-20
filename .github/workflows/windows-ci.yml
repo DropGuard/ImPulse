@@ -29,6 +29,13 @@ on:
   workflow_dispatch:
   push:
     branches: [rustcore, windows-port]
+# A newer push makes an older run's verdict irrelevant: cancel it rather than
+# let it finish behind the new one. `github.ref` keeps a tag push and a branch
+# push from cancelling each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-clang64:
     runs-on: windows-latest
