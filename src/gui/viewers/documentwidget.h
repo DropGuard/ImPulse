@@ -37,10 +37,10 @@ class DocumentWidget : public FloatingWidgetContainer {
     void mouseMoveEvent(QMouseEvent *event) override;
 
   private:
-    QBoxLayout *layout, *layoutRoot;
-    ViewerWidget *mViewWidget = nullptr;
-    InfoBarProxy *mInfoBar = nullptr;
-    MainPanel *mainPanel = nullptr;
-    bool mPanelPinned, mPanelEnabled, mPanelFullscreenOnly, avoidPanelFlag, mIsFullscreen, mInteractionEnabled,
-        mAllowPanelInit;
+    QBoxLayout *m_layout, *m_layoutRoot;
+    ViewerWidget *m_viewWidget = nullptr;
+    InfoBarProxy *m_infoBar = nullptr;
+    MainPanel *m_mainPanel = nullptr;
+    bool m_panelPinned, m_panelEnabled, m_panelFullscreenOnly, m_avoidPanelFlag, m_isFullscreen, m_interactionEnabled,
+        m_allowPanelInit;
 };

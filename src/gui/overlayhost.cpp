@@ -10,167 +10,167 @@
 #include "settings.h"
 
 OverlayHost::OverlayHost(MW *containerArg, ViewerWidget *viewerArg, DocumentWidget *docWidgetArg)
-    : IOverlayHost(containerArg), container(containerArg), viewer(viewerArg), docWidget(docWidgetArg) {
-    floatingMessage = new FloatingMessageProxy(viewer); // todo: use additional one for folderview?
-    imageInfoOverlay = new ImageInfoOverlayProxy(viewer);
-    controlsOverlay = new ControlsOverlay(docWidget);
+    : IOverlayHost(containerArg), m_container(containerArg), m_viewer(viewerArg), m_docWidget(docWidgetArg) {
+    m_floatingMessage = new FloatingMessageProxy(m_viewer); // todo: use additional one for folderview?
+    m_imageInfoOverlay = new ImageInfoOverlayProxy(m_viewer);
+    m_controlsOverlay = new ControlsOverlay(m_docWidget);
 }
 
 OverlayHost::~OverlayHost() {
-    delete floatingMessage;
-    delete imageInfoOverlay;
+    delete m_floatingMessage;
+    delete m_imageInfoOverlay;
 }
 
 void OverlayHost::setupCopyOverlay() {
-    copyOverlay = new CopyOverlay(viewer);
-    pendingSurfaces.append(copyOverlay);
-    connect(copyOverlay, &CopyOverlay::copyRequested, this, &OverlayHost::copyRequested);
-    connect(copyOverlay, &CopyOverlay::moveRequested, this, &OverlayHost::moveRequested);
+    m_copyOverlay = new CopyOverlay(m_viewer);
+    m_pendingSurfaces.append(m_copyOverlay);
+    connect(m_copyOverlay, &CopyOverlay::copyRequested, this, &OverlayHost::copyRequested);
+    connect(m_copyOverlay, &CopyOverlay::moveRequested, this, &OverlayHost::moveRequested);
 }
 
 void OverlayHost::setupSaveOverlay() {
     // not a pending surface: this prompt IS the projection of an uncommitted
     // edit (Core shows it from isEdited()), and that state is already the
     // lock's condition. Registering it would answer the same question twice.
-    saveOverlay = new SaveConfirmOverlay(viewer);
-    connect(saveOverlay, &SaveConfirmOverlay::saveClicked, this, &OverlayHost::saveRequested);
-    connect(saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &OverlayHost::saveAsClicked);
-    connect(saveOverlay, &SaveConfirmOverlay::discardClicked, this, &OverlayHost::discardEditsRequested);
+    m_saveOverlay = new SaveConfirmOverlay(m_viewer);
+    connect(m_saveOverlay, &SaveConfirmOverlay::saveClicked, this, &OverlayHost::saveRequested);
+    connect(m_saveOverlay, &SaveConfirmOverlay::saveAsClicked, this, &OverlayHost::saveAsClicked);
+    connect(m_saveOverlay, &SaveConfirmOverlay::discardClicked, this, &OverlayHost::discardEditsRequested);
 }
 
 void OverlayHost::setupRenameOverlay() {
-    renameOverlay = new RenameOverlay(container);
-    pendingSurfaces.append(renameOverlay);
-    renameOverlay->setName(QString());
-    connect(renameOverlay, &RenameOverlay::renameRequested, this, &OverlayHost::renameRequested);
+    m_renameOverlay = new RenameOverlay(m_container);
+    m_pendingSurfaces.append(m_renameOverlay);
+    m_renameOverlay->setName(QString());
+    connect(m_renameOverlay, &RenameOverlay::renameRequested, this, &OverlayHost::renameRequested);
 }
 
 void OverlayHost::triggerCopyOverlay() {
-    if(!viewer->isDisplaying())
+    if(!m_viewer->isDisplaying())
         return;
-    if(!copyOverlay)
+    if(!m_copyOverlay)
         setupCopyOverlay();
 
-    if(container->currentViewMode() == MODE_FOLDERVIEW)
+    if(m_container->currentViewMode() == MODE_FOLDERVIEW)
         return;
-    if(copyOverlay->operationMode() == OVERLAY_COPY) {
-        copyOverlay->isHidden() ? copyOverlay->show() : copyOverlay->hide();
+    if(m_copyOverlay->operationMode() == OVERLAY_COPY) {
+        m_copyOverlay->isHidden() ? m_copyOverlay->show() : m_copyOverlay->hide();
     } else {
-        copyOverlay->setDialogMode(OVERLAY_COPY);
-        copyOverlay->show();
+        m_copyOverlay->setDialogMode(OVERLAY_COPY);
+        m_copyOverlay->show();
     }
 }
 
 void OverlayHost::triggerMoveOverlay() {
-    if(!viewer->isDisplaying())
+    if(!m_viewer->isDisplaying())
         return;
-    if(!copyOverlay)
+    if(!m_copyOverlay)
         setupCopyOverlay();
 
-    if(container->currentViewMode() == MODE_FOLDERVIEW)
+    if(m_container->currentViewMode() == MODE_FOLDERVIEW)
         return;
-    if(copyOverlay->operationMode() == OVERLAY_MOVE) {
-        copyOverlay->isHidden() ? copyOverlay->show() : copyOverlay->hide();
+    if(m_copyOverlay->operationMode() == OVERLAY_MOVE) {
+        m_copyOverlay->isHidden() ? m_copyOverlay->show() : m_copyOverlay->hide();
     } else {
-        copyOverlay->setDialogMode(OVERLAY_MOVE);
-        copyOverlay->show();
+        m_copyOverlay->setDialogMode(OVERLAY_MOVE);
+        m_copyOverlay->show();
     }
 }
 
 void OverlayHost::showSaveOverlay() {
     if(!settings->showSaveOverlay())
         return;
-    if(!saveOverlay)
+    if(!m_saveOverlay)
         setupSaveOverlay();
-    saveOverlay->show();
-    saveOverlay->setFocus();
+    m_saveOverlay->show();
+    m_saveOverlay->setFocus();
 }
 
 void OverlayHost::hideSaveOverlay() {
-    if(!saveOverlay)
+    if(!m_saveOverlay)
         return;
-    saveOverlay->hide();
+    m_saveOverlay->hide();
 }
 
 void OverlayHost::toggleRenameOverlay(const QString &currentName) {
-    if(!renameOverlay)
+    if(!m_renameOverlay)
         setupRenameOverlay();
-    if(renameOverlay->isHidden()) {
-        renameOverlay->setBackdropEnabled((container->currentViewMode() == MODE_FOLDERVIEW));
-        renameOverlay->setName(currentName);
-        renameOverlay->show();
+    if(m_renameOverlay->isHidden()) {
+        m_renameOverlay->setBackdropEnabled((m_container->currentViewMode() == MODE_FOLDERVIEW));
+        m_renameOverlay->setName(currentName);
+        m_renameOverlay->show();
     } else {
-        renameOverlay->hide();
+        m_renameOverlay->hide();
     }
 }
 
 void OverlayHost::toggleImageInfoOverlay() {
-    if(container->currentViewMode() == MODE_FOLDERVIEW)
+    if(m_container->currentViewMode() == MODE_FOLDERVIEW)
         return;
-    if(imageInfoOverlay->isHidden())
-        imageInfoOverlay->show();
+    if(m_imageInfoOverlay->isHidden())
+        m_imageInfoOverlay->show();
     else
-        imageInfoOverlay->hide();
+        m_imageInfoOverlay->hide();
 }
 
 void OverlayHost::setExifInfo(const QMap<QString, QString> &exifInfo) {
-    if(imageInfoOverlay)
-        imageInfoOverlay->setExifInfo(exifInfo);
+    if(m_imageInfoOverlay)
+        m_imageInfoOverlay->setExifInfo(exifInfo);
 }
 
 void OverlayHost::showMessageDirectory(const QString &dirName) {
-    floatingMessage->showMessage(dirName, FloatingMessageIcon::ICON_DIRECTORY, 1700);
+    m_floatingMessage->showMessage(dirName, FloatingMessageIcon::ICON_DIRECTORY, 1700);
 }
 
 void OverlayHost::showMessage(const QString &text, int duration) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::NO_ICON, duration);
+    m_floatingMessage->showMessage(text, FloatingMessageIcon::NO_ICON, duration);
 }
 
 void OverlayHost::showMessageSuccess(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_SUCCESS, 1500);
+    m_floatingMessage->showMessage(text, FloatingMessageIcon::ICON_SUCCESS, 1500);
 }
 
 void OverlayHost::showWarning(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_WARNING, 1500);
+    m_floatingMessage->showMessage(text, FloatingMessageIcon::ICON_WARNING, 1500);
 }
 
 void OverlayHost::showError(const QString &text) {
-    floatingMessage->showMessage(text, FloatingMessageIcon::ICON_ERROR, 2800);
+    m_floatingMessage->showMessage(text, FloatingMessageIcon::ICON_ERROR, 2800);
 }
 
 void OverlayHost::updateControlsOverlay() {
     auto pos = settings->panelPosition();
     if(!settings->panelEnabled() || pos == PANEL_BOTTOM || pos == PANEL_LEFT)
-        controlsOverlay->show();
+        m_controlsOverlay->show();
     else
-        controlsOverlay->hide();
+        m_controlsOverlay->hide();
 }
 
 void OverlayHost::hideControlsOverlay() {
-    controlsOverlay->hide();
+    m_controlsOverlay->hide();
 }
 
 bool OverlayHost::hasPendingSurface() const {
-    for(const IPendingSurface *surface : pendingSurfaces)
+    for(const IPendingSurface *surface : m_pendingSurfaces)
         if(surface->isPending())
             return true;
     return false;
 }
 
 void OverlayHost::hideTransientOverlays() {
-    if(copyOverlay)
-        copyOverlay->hide();
-    if(renameOverlay)
-        renameOverlay->hide();
-    imageInfoOverlay->hide();
+    if(m_copyOverlay)
+        m_copyOverlay->hide();
+    if(m_renameOverlay)
+        m_renameOverlay->hide();
+    m_imageInfoOverlay->hide();
 }
 
 void OverlayHost::setRenameOverlayName(const QString &name) {
-    if(renameOverlay)
-        renameOverlay->setName(name);
+    if(m_renameOverlay)
+        m_renameOverlay->setName(name);
 }
 
 void OverlayHost::saveCopySettings() {
-    if(copyOverlay)
-        copyOverlay->saveSettings();
+    if(m_copyOverlay)
+        m_copyOverlay->saveSettings();
 }

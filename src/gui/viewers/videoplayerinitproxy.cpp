@@ -6,13 +6,13 @@
 #define QIMGV_PLAYER_PLUGIN ""
 #endif
 
-VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent), player(nullptr) {
+VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent), m_player(nullptr) {
     setAccessibleName("VideoPlayerInitProxy");
     setMouseTracking(true);
-    layout.setContentsMargins(0, 0, 0, 0);
-    setLayout(&layout);
+    m_layout.setContentsMargins(0, 0, 0, 0);
+    setLayout(&m_layout);
     connect(settings, &Settings::settingsChanged, this, &VideoPlayerInitProxy::onSettingsChanged);
-    libFile = QIMGV_PLAYER_PLUGIN;
+    m_libFile = QIMGV_PLAYER_PLUGIN;
 #ifdef _WIN32
     libDirs << QApplication::applicationDirPath() + "/plugins";
 #else
@@ -20,8 +20,8 @@ VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent
     // as fallbacks so installs that predate the rename keep playing video
     QDir impulseLib(QApplication::applicationDirPath() + "/../lib/impulse");
     QDir legacyLib(QApplication::applicationDirPath() + "/../lib/qimgv");
-    libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".") << "/usr/lib/impulse" << "/usr/lib64/impulse"
-            << (legacyLib.makeAbsolute() ? legacyLib.path() : ".") << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
+    m_libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".") << "/usr/lib/impulse" << "/usr/lib64/impulse"
+              << (legacyLib.makeAbsolute() ? legacyLib.path() : ".") << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
 #endif
 }
 
@@ -29,70 +29,70 @@ VideoPlayerInitProxy::~VideoPlayerInitProxy() {
 }
 
 void VideoPlayerInitProxy::onSettingsChanged() {
-    if(!player)
+    if(!m_player)
         return;
-    player->setMuted(!settings->playVideoSounds());
-    player->setVideoUnscaled(!settings->expandImage());
+    m_player->setMuted(!settings->playVideoSounds());
+    m_player->setVideoUnscaled(!settings->expandImage());
 }
 
 VideoPlayer *VideoPlayerInitProxy::getPlayer() {
-    return player;
+    return m_player;
 }
 
 bool VideoPlayerInitProxy::isInitialized() {
-    return (player != nullptr);
+    return (m_player != nullptr);
 }
 
 inline bool VideoPlayerInitProxy::initPlayer() {
 #ifndef USE_MPV
     return false;
 #endif
-    if(player)
+    if(m_player)
         return true;
 
     QFileInfo pluginFile;
-    for(const auto &dir : std::as_const(libDirs)) {
-        pluginFile.setFile(dir + "/" + libFile);
+    for(const auto &dir : std::as_const(m_libDirs)) {
+        pluginFile.setFile(dir + "/" + m_libFile);
         if(pluginFile.isFile() && pluginFile.isReadable()) {
-            playerLib.setFileName(pluginFile.absoluteFilePath());
+            m_playerLib.setFileName(pluginFile.absoluteFilePath());
             break;
         }
     }
-    if(playerLib.fileName().isEmpty()) {
-        qDebug() << "Could not find" << libFile << "in the following directories:" << libDirs;
+    if(m_playerLib.fileName().isEmpty()) {
+        qDebug() << "Could not find" << m_libFile << "in the following directories:" << m_libDirs;
         return false;
     }
 
     // load lib
     typedef VideoPlayer *(*createPlayerWidgetFn)();
-    createPlayerWidgetFn fn = reinterpret_cast<createPlayerWidgetFn>(playerLib.resolve("CreatePlayerWidget"));
+    createPlayerWidgetFn fn = reinterpret_cast<createPlayerWidgetFn>(m_playerLib.resolve("CreatePlayerWidget"));
     if(fn) {
         VideoPlayer *pl = fn();
-        player = pl;
+        m_player = pl;
     }
-    if(!player) {
-        qDebug() << "Could not load:" << playerLib.fileName() << ". Wrong plugin version?";
+    if(!m_player) {
+        qDebug() << "Could not load:" << m_playerLib.fileName() << ". Wrong plugin version?";
         return false;
     }
 
-    player->setMuted(!settings->playVideoSounds());
-    player->setVideoUnscaled(!settings->expandImage());
-    player->setVolume(settings->volume());
+    m_player->setMuted(!settings->playVideoSounds());
+    m_player->setVideoUnscaled(!settings->expandImage());
+    m_player->setVolume(settings->volume());
 
-    player->setParent(this);
-    layout.addWidget(player);
-    player->hide();
-    setFocusProxy(player);
+    m_player->setParent(this);
+    m_layout.addWidget(m_player);
+    m_player->hide();
+    setFocusProxy(m_player);
     // signal-to-signal forwarding, pointer form: both endpoints are the same
     // four VideoPlayer signals (this class inherits them and must not
     // re-declare them — R6), and the compiler now checks every name/signature
-    connect(player, &VideoPlayer::durationChanged, this, &VideoPlayer::durationChanged);
-    connect(player, &VideoPlayer::positionChanged, this, &VideoPlayer::positionChanged);
-    connect(player, &VideoPlayer::videoPaused, this, &VideoPlayer::videoPaused);
-    connect(player, &VideoPlayer::playbackFinished, this, &VideoPlayer::playbackFinished);
+    connect(m_player, &VideoPlayer::durationChanged, this, &VideoPlayer::durationChanged);
+    connect(m_player, &VideoPlayer::positionChanged, this, &VideoPlayer::positionChanged);
+    connect(m_player, &VideoPlayer::videoPaused, this, &VideoPlayer::videoPaused);
+    connect(m_player, &VideoPlayer::playbackFinished, this, &VideoPlayer::playbackFinished);
 
-    if(eventFilterObj)
-        player->installEventFilter(eventFilterObj);
+    if(m_eventFilterObj)
+        m_player->installEventFilter(m_eventFilterObj);
 
     return true;
 }
@@ -100,122 +100,122 @@ inline bool VideoPlayerInitProxy::initPlayer() {
 bool VideoPlayerInitProxy::showVideo(QString file) {
     if(!initPlayer())
         return false;
-    return player->showVideo(file);
+    return m_player->showVideo(file);
 }
 
 void VideoPlayerInitProxy::seek(int pos) {
-    if(!player)
+    if(!m_player)
         return;
-    player->seek(pos);
+    m_player->seek(pos);
 }
 
 void VideoPlayerInitProxy::seekRelative(int pos) {
-    if(!player)
+    if(!m_player)
         return;
-    player->seekRelative(pos);
+    m_player->seekRelative(pos);
 }
 
 void VideoPlayerInitProxy::pauseResume() {
-    if(!player)
+    if(!m_player)
         return;
-    player->pauseResume();
+    m_player->pauseResume();
 }
 
 void VideoPlayerInitProxy::frameStep() {
-    if(!player)
+    if(!m_player)
         return;
-    player->frameStep();
+    m_player->frameStep();
 }
 
 void VideoPlayerInitProxy::frameStepBack() {
-    if(!player)
+    if(!m_player)
         return;
-    player->frameStepBack();
+    m_player->frameStepBack();
 }
 
 void VideoPlayerInitProxy::stop() {
-    if(!player)
+    if(!m_player)
         return;
-    player->stop();
+    m_player->stop();
 }
 
 void VideoPlayerInitProxy::setPaused(bool mode) {
-    if(!player)
+    if(!m_player)
         return;
-    player->setPaused(mode);
+    m_player->setPaused(mode);
 }
 
 void VideoPlayerInitProxy::setMuted(bool mode) {
-    if(!player)
+    if(!m_player)
         return;
-    player->setMuted(mode);
+    m_player->setMuted(mode);
 }
 
 bool VideoPlayerInitProxy::muted() {
-    if(!player)
+    if(!m_player)
         return true;
-    return player->muted();
+    return m_player->muted();
 }
 
 void VideoPlayerInitProxy::volumeUp() {
-    if(!player)
+    if(!m_player)
         return;
-    player->volumeUp();
-    settings->setVolume(player->volume());
+    m_player->volumeUp();
+    settings->setVolume(m_player->volume());
 }
 
 void VideoPlayerInitProxy::volumeDown() {
-    if(!player)
+    if(!m_player)
         return;
-    player->volumeDown();
-    settings->setVolume(player->volume());
+    m_player->volumeDown();
+    settings->setVolume(m_player->volume());
 }
 
 void VideoPlayerInitProxy::setVolume(int vol) {
-    if(!player)
+    if(!m_player)
         return;
-    player->setVolume(vol);
+    m_player->setVolume(vol);
 }
 
 int VideoPlayerInitProxy::volume() {
-    if(!player)
+    if(!m_player)
         return 0;
-    return player->volume();
+    return m_player->volume();
 }
 
 void VideoPlayerInitProxy::setVideoUnscaled(bool mode) {
-    if(!player)
+    if(!m_player)
         return;
-    player->setVideoUnscaled(mode);
+    m_player->setVideoUnscaled(mode);
 }
 
 void VideoPlayerInitProxy::setLoopPlayback(bool mode) {
-    if(!player)
+    if(!m_player)
         return;
-    player->setLoopPlayback(mode);
+    m_player->setLoopPlayback(mode);
 }
 
 void VideoPlayerInitProxy::show() {
     if(initPlayer()) {
-        layout.removeWidget(errorLabel);
-        player->show();
-    } else if(!errorLabel) {
-        errorLabel = new QLabel(this);
-        errorLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
-        errorLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+        m_layout.removeWidget(m_errorLabel);
+        m_player->show();
+    } else if(!m_errorLabel) {
+        m_errorLabel = new QLabel(this);
+        m_errorLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+        m_errorLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
         //errorLabel->setAlignment(Qt::AlignVCenter);
-        QString errString = "Could not load " + libFile + " from:";
-        for(const auto &path : std::as_const(libDirs))
+        QString errString = "Could not load " + m_libFile + " from:";
+        for(const auto &path : std::as_const(m_libDirs))
             errString.append("\n" + path + "/");
-        errorLabel->setText(errString);
-        layout.addWidget(errorLabel);
+        m_errorLabel->setText(errString);
+        m_layout.addWidget(m_errorLabel);
     }
     VideoPlayer::show();
 }
 
 void VideoPlayerInitProxy::hide() {
-    if(player)
-        player->hide();
+    if(m_player)
+        m_player->hide();
     VideoPlayer::hide();
 }
 
@@ -224,12 +224,12 @@ void VideoPlayerInitProxy::paintEvent(QPaintEvent *event) {
 }
 
 void VideoPlayerInitProxy::installEventFilter(QObject *filterObj) {
-    eventFilterObj = filterObj;
-    if(player)
-        player->installEventFilter(eventFilterObj);
+    m_eventFilterObj = filterObj;
+    if(m_player)
+        m_player->installEventFilter(m_eventFilterObj);
 }
 
 void VideoPlayerInitProxy::removeEventFilter(QObject *filterObj) {
-    if(player)
-        player->removeEventFilter(filterObj);
+    if(m_player)
+        m_player->removeEventFilter(filterObj);
 }

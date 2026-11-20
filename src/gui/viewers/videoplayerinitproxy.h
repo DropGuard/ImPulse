@@ -46,15 +46,15 @@ class VideoPlayerInitProxy : public VideoPlayer {
     void paintEvent(QPaintEvent *event) override;
 
   private:
-    QLibrary playerLib;
-    VideoPlayer *player = nullptr;
+    QLibrary m_playerLib;
+    VideoPlayer *m_player = nullptr;
     bool initPlayer();
-    QVBoxLayout layout;
-    QLabel *errorLabel = nullptr;
-    QObject *eventFilterObj = nullptr;
+    QVBoxLayout m_layout;
+    QLabel *m_errorLabel = nullptr;
+    QObject *m_eventFilterObj = nullptr;
 
-    QString libFile;
-    QStringList libDirs;
+    QString m_libFile;
+    QStringList m_libDirs;
 
   private slots:
     void onSettingsChanged();
