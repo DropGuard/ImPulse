@@ -241,15 +241,14 @@ TEST_F(TestGuiWidgets, pendingRegistryHoldsOnlyTypedButUnsubmittedInput) {
                                                   "away from a target the user has not chosen";
     QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
     QApplication::sendEvent(copyOverlay, &esc);
-    {
-        const bool qt_test_held = QTest::qWaitFor(
-            [&] {
-                return !copyOverlay->isVisible();
-            },
-            QTest::Internal::defaultTryTimeout);
-        EXPECT_TRUE(!copyOverlay->isVisible())
-            << (qt_test_held ? "" : "the condition did not hold before the deadline");
-    }
+    // the gtest vocabulary's wait, not QTest::Internal::defaultTryTimeout: the
+    // latter is private QTest API and does not exist in every 6.x
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return !copyOverlay->isVisible();
+        },
+        5000))
+        << "the copy overlay stayed visible past the deadline";
     EXPECT_TRUE(!overlays->hasPendingSurface());
 
     // the rename field: same class, same answer
@@ -259,15 +258,12 @@ TEST_F(TestGuiWidgets, pendingRegistryHoldsOnlyTypedButUnsubmittedInput) {
     EXPECT_TRUE(overlays->hasPendingSurface()) << "the rename field did not register: a half-typed name "
                                                   "would be dropped by a walk";
     QApplication::sendEvent(renameOverlay, &esc);
-    {
-        const bool qt_test_held = QTest::qWaitFor(
-            [&] {
-                return !renameOverlay->isVisible();
-            },
-            QTest::Internal::defaultTryTimeout);
-        EXPECT_TRUE(!renameOverlay->isVisible())
-            << (qt_test_held ? "" : "the condition did not hold before the deadline");
-    }
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return !renameOverlay->isVisible();
+        },
+        5000))
+        << "the rename overlay stayed visible past the deadline";
     EXPECT_TRUE(!overlays->hasPendingSurface());
 
     // the crop surface: pending only once the crop is APPLIED, and then
