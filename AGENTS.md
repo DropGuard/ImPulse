@@ -59,6 +59,16 @@ CLAZY_CHECKS="level0,level1,detaching" cmake --build build-clazy -j$(nproc)
 # git config blame.ignoreRevsFile .git-blame-ignore-revs (one line per clone)
 clang-format -i <files>
 
+# naming: .clang-tidy asserts one thing — data members carry m_, public members
+# do not. A public field is interface, and a type with public fields is a value
+# (CachedThumbnail, the wire structs), so the prefix would leak a private
+# marker into an API and make the two cases look alike. Case is deliberately
+# unasserted: the mpv plugin is snake_case. scripts/lint.py runs the check with
+# --header-filter=.* (without it every header diagnostic is suppressed, which
+# is where a member declaration lives) and excludes generated code by the same
+# SKIP the other passes use. -Wshadow is an error in the build now, not a
+# baseline: with members prefixed, a shadow is a mistake rather than a style.
+
 # line coverage (logic/GUI layers reported separately; ranks test work only, not a gate)
 python3 scripts/coverage.py
 

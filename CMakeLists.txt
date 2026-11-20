@@ -95,6 +95,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # and the remainder runs on demand against a baseline that may only shrink.
 add_compile_options(-Werror=sign-compare)
 add_compile_options(-Werror=unused-parameter)
+# -Wshadow, re-armed once the member sweep made it satisfiable. The family sat
+# in lint.py's REPORT list (report-only) because the tree had one live site: a
+# local named `base` shadowing a fixture member (#612). With members uniformly
+# m_-prefixed a shadow is now almost always a mistake rather than a style
+# choice — and the one idiom that legitimately shadows, a constructor parameter
+# named after its member, is what the prefix removes. Zero findings at the
+# 2026-11-21 census, so it enters as an error rather than a baseline.
+add_compile_options(-Wshadow -Werror=shadow)
 # -Wuse-after-free is a GCC check; the clang driver that clazy wraps accepts the
 # flag only by warning that it does not know it, so asking for it there would
 # print two lines per TU and enforce nothing.

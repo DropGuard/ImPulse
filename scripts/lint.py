@@ -44,7 +44,10 @@ GATED = {'sign-compare', 'use-after-free', 'unused-parameter'}
 # the scan entirely (REPORT drives the gcc pass cost): the bulk is GUI
 # coordinate truncation that is the intent, not a bug, and scanning them cost
 # every TU on every run while producing nothing anyone acts on.
-REPORT = ['-Wshadow', '-Wold-style-cast', '-Wsuggest-override']
+# -Wshadow moved to the build itself (-Werror=shadow in the root CMakeLists):
+# once every member is m_-prefixed, a shadow is a mistake, not a style choice,
+# and a family that is an error in the build must not also be a baseline here.
+REPORT = ['-Wold-style-cast', '-Wsuggest-override']
 # policy-frozen families: the findings are real, but every fix was judged a
 # non-improvement for this tree, so they are filtered out instead of counted —
 # the numbers cannot rot, and the gate stops paying to re-derive them.
@@ -60,10 +63,13 @@ TIDY_EXCLUDE = ['bugprone-narrowing-conversions',
                 'bugprone-integer-division',
                 'bugprone-parent-virtual-call',
                 'bugprone-implicit-widening-of-multiplication-result']
-TIDY_CHECKS = '-*,bugprone-*' + ''.join(',-' + c for c in TIDY_EXCLUDE)
+# readability-identifier-naming rides along: .clang-tidy carries the rule (the
+# m_ prefix on private/protected members, no prefix on public ones), and it is
+# part of the gate so the convention cannot rot the way an unenforced one did.
+TIDY_CHECKS = '-*,bugprone-*,readability-identifier-naming' + ''.join(',-' + c for c in TIDY_EXCLUDE)
 DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+)\]$')
 CLAZY = re.compile(r'^(/[^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
-TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[(bugprone-[a-z0-9-]+)(?:,.*)?\]$')
+TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[((?:bugprone|readability)-[a-z0-9-]+)(?:,.*)?\]$')
 CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
 SKIP = ('/3rdparty/', '_autogen/', '/corrosion/')
 
@@ -359,7 +365,12 @@ def clang_tidy_counts(srcs, version, memo):
         out = cache_read('clang-tidy', key)
         hit = out is not None
         if not hit:
-            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
+            # --header-filter=.* : without it clang-tidy suppresses every
+            # diagnostic whose location is in a header, which is where the
+            # naming rule's subject — a member declaration — actually lives.
+            # Measured: a probe field in cache.h passed the gate unseen.
+            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS,
+                                      '--header-filter=.*', '--quiet', e['file']], ROOT)
             out = f'{STATUS_PREFIX}{status}\n' + out
             cache_write('clang-tidy', key, out)
         for line in out.splitlines():
@@ -369,6 +380,12 @@ def clang_tidy_counts(srcs, version, memo):
                 # guards the access but the macro is invisible to tidy's
                 # dataflow. Production code stays armed.
                 if m.group(3) == 'bugprone-unchecked-optional-access' and '/tests/' in m.group(1):
+                    continue
+                # Generated code is not review surface: with --header-filter=.*
+                # the ui_*.h AUTOGEN output comes back too, and its reserved
+                # identifiers are uic's spelling, not ours. The same SKIP the
+                # other passes use.
+                if any(s in m.group(1) for s in SKIP):
                     continue
                 found[m.group(3)].add((m.group(1), m.group(2)))
         if unfinished(status_of(out)):
