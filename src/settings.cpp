@@ -251,7 +251,23 @@ void Settings::sync() {
 }
 //------------------------------------------------------------------------------
 QString Settings::tmpDir() {
-    return mTmpDir->path() + "/";
+    // Scratch space, resolved once in setupCache() at construction. Something
+    // outside this class can remove it afterwards — a tmpfiles.d sweep on a
+    // long-running session, a user emptying the cache — and a path that does
+    // not exist fails at the open, far from here. The clipboard's edited-image
+    // export is the case that made it visible: its QTemporaryFile falls back
+    // to a FIXED file name when the open fails, so two exports share one file
+    // and the second consumer reads the first's pixels.
+    //
+    // Re-creating on read is the cheap half of the contract "you asked for
+    // scratch space, here is some". It is NOT a substitute for isolation: a
+    // directory that a caller removed on purpose comes back as a fresh empty
+    // one under the same name, which is what a scratch dir is for and is not
+    // what a test that wants its own environment can rely on.
+    const QString path = mTmpDir->path();
+    if(!mTmpDir->exists())
+        QDir().mkpath(path);
+    return path + "/";
 }
 //------------------------------------------------------------------------------
 void Settings::fillVideoFormats() {
