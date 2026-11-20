@@ -36,7 +36,7 @@ def main():
         sys.exit(r.stdout[-2000:] + r.stderr[-2000:])
 
     env = dict(os.environ, QT_QPA_PLATFORM='offscreen')
-    for rel in ('qimgv/tests/engine_stack_tests', 'qimgv/tests/core_nav_tests'):
+    for rel in ('src/tests/engine_stack_tests', 'src/tests/core_nav_tests'):
         subprocess.run([os.path.join(BUILD, rel)], cwd=BUILD, env=env,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -62,11 +62,11 @@ def main():
 
         for entry in files:
             src = os.path.normpath(absolutize(entry['file']))
-            if not src.startswith(os.path.join(ROOT, 'qimgv', '')):
+            if not src.startswith(os.path.join(ROOT, 'src', '')):
                 continue
             if '/build-cov/' in src or src.endswith('.moc') or '3rdparty' in src:
                 continue
-            rel = src.replace(os.path.join(ROOT, 'qimgv', ''), '')
+            rel = src.replace(os.path.join(ROOT, 'src', ''), '')
             slot = stats.setdefault(rel, [0, 0])
             for line in entry['lines']:
                 slot[0 if line['count'] > 0 else 1] += 1

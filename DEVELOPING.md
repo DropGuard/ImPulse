@@ -4,7 +4,7 @@ The contributor-facing companion to the README: the platform contract, the
 architecture, the build, and the verification machinery. The operating
 discipline (each rule mapped to the incident that earned it) lives in
 [AGENTS.md](AGENTS.md); the structural rules themselves are executable —
-`qimgv/tests/architecture_rules.py` runs as part of ctest.
+`src/tests/architecture_rules.py` runs as part of ctest.
 
 ## Platform: Linux and Windows (msys2)
 
@@ -140,7 +140,7 @@ Either way, then:
 cmake --build build -j$(nproc)
 ```
 
-The binary is `build/qimgv/impulse`. For desktop integration (menu entry,
+The binary is `build/src/impulse`. For desktop integration (menu entry,
 icons, portal registration) run `scripts/install-user.sh` after the build — it
 installs into `$HOME/.local` and needs no root.
 
@@ -180,9 +180,9 @@ each test function a private process — and with it a private TSan registry.
 Run one test function by name with GoogleTest's filter, not a positional arg:
 
 ```bash
-build/qimgv/tests/crop_tests                            # the whole suite
-build/qimgv/tests/crop_tests --gtest_filter='*cropRatioLocks'
-build/qimgv/tests/engine_stack_tests --gtest_filter='TestListing.*'
+build/src/tests/crop_tests                            # the whole suite
+build/src/tests/crop_tests --gtest_filter='*cropRatioLocks'
+build/src/tests/engine_stack_tests --gtest_filter='TestListing.*'
 ```
 
 The assertion vocabulary is `EXPECT_*`/`ASSERT_*` only. `gtest_qt.h` poisons
@@ -209,7 +209,7 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 ```
 
 The thread-sanitizer tree uses the same option with `thread`. Its enumerated
-third-party noise baseline is `qimgv/tests/tsan-noise.supp`, and a report naming an
+third-party noise baseline is `src/tests/tsan-noise.supp`, and a report naming an
 in-tree frame is still a failure. The engine's pure layer is checked with Miri
 (`scripts/miri.sh`). New tests are run by name before their suite is trusted: a
 green suite is only evidence if the test you think ran actually ran.
@@ -226,7 +226,7 @@ headless smoke green there), but the release step needs the real GitHub API
 and is only proven on a runner.
 
 A tag push lands a **draft** release with `ImPulse-<version>-x86_64.AppImage`
-and its sha256; the tag must match the version in `qimgv/appversion.cpp`.
+and its sha256; the tag must match the version in `src/appversion.cpp`.
 Publish the draft only after the bundle has survived a start on a real
 desktop — that check is the one thing CI cannot do
 (`gh release edit <tag> --draft=false`, or the web UI).

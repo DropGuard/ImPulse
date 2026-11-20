@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 BUILD="${1:-build}"
 PREFIX="${2:-$HOME/.local}"
 
-if [ ! -f "$BUILD/qimgv/impulse" ]; then
+if [ ! -f "$BUILD/src/impulse" ]; then
     echo "no impulse binary under $BUILD/ — run cmake --build first" >&2
     exit 1
 fi

@@ -108,19 +108,19 @@ jobs:
           cmake --build build-appimage -j$(nproc)
       - name: assemble the AppDir
         run: |
-          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' qimgv/appversion.cpp | tr ',' '.')
+          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' src/appversion.cpp | tr ',' '.')
           APPDIR=AppDir
           mkdir -p "$APPDIR/usr/bin/plugins" \
                    "$APPDIR/usr/share/applications" \
                    "$APPDIR/usr/share/metainfo" \
                    "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
                    "$APPDIR/usr/share/impulse/translations"
-          cp build-appimage/qimgv/impulse "$APPDIR/usr/bin/"
+          cp build-appimage/src/impulse "$APPDIR/usr/bin/"
           cp build-appimage/plugins/player_mpv/player_mpv.so "$APPDIR/usr/bin/plugins/"
-          cp qimgv/distrib/impulse.desktop "$APPDIR/usr/share/applications/"
-          cp qimgv/distrib/impulse.appdata.xml "$APPDIR/usr/share/metainfo/"
-          cp qimgv/distrib/hicolor/scalable/apps/impulse.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
-          cp build-appimage/qimgv/translations/*.qm "$APPDIR/usr/share/impulse/translations/"
+          cp src/distrib/impulse.desktop "$APPDIR/usr/share/applications/"
+          cp src/distrib/impulse.appdata.xml "$APPDIR/usr/share/metainfo/"
+          cp src/distrib/hicolor/scalable/apps/impulse.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
+          cp build-appimage/src/translations/*.qm "$APPDIR/usr/share/impulse/translations/"
       - name: linuxdeploy with the Qt plugin deployer (one 6.9.1 world inside)
         run: |
           curl -sL --retry 5 --retry-all-errors -o linuxdeploy.AppImage \
@@ -156,7 +156,7 @@ jobs:
                 AppDir/usr/lib/libstdc++.so*
       - name: pack
         run: |
-          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' qimgv/appversion.cpp | tr ',' '.')
+          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' src/appversion.cpp | tr ',' '.')
           export APPIMAGE_EXTRACT_AND_RUN=1
           ./appimagetool.AppImage --appimage-extract-and-run AppDir "ImPulse-${VERSION}-x86_64.AppImage"
       - name: smoke (the bundle must survive a headless start)
@@ -175,7 +175,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' qimgv/appversion.cpp | tr ',' '.')
+          VERSION=$(grep -oP 'appVersion\(\K[0-9,]+' src/appversion.cpp | tr ',' '.')
           # a tag that disagrees with the shipped version string would publish a lie
           test "v${VERSION}" = "${GITHUB_REF_NAME}" || {
               echo "tag ${GITHUB_REF_NAME} does not match appversion v${VERSION}" >&2

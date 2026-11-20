@@ -24,7 +24,7 @@ set(TS_FILES
     "ja_JP.ts"
 )
 list(TRANSFORM TS_FILES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/res/translations/)
-set_source_files_properties(${TS_FILES} PROPERTIES OUTPUT_LOCATION ${PROJECT_BINARY_DIR}/qimgv/translations)
+set_source_files_properties(${TS_FILES} PROPERTIES OUTPUT_LOCATION ${PROJECT_BINARY_DIR}/src/translations)
 
 # ADD EXECUTABLE
 # Everything that does not need the widget tree lives in the qimgv_nongui object
@@ -217,10 +217,10 @@ install(FILES distrib/impulse.appdata.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDI
 
 # Install internationalization language files
 if(WIN32)
-    install(DIRECTORY "${PROJECT_BINARY_DIR}/qimgv/translations" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY "${PROJECT_BINARY_DIR}/src/translations" DESTINATION "${CMAKE_INSTALL_BINDIR}")
 else()
     ADD_DEFINITIONS(-DTRANSLATIONS_PATH="${CMAKE_INSTALL_FULL_DATAROOTDIR}/impulse/translations")
-    install(DIRECTORY "${PROJECT_BINARY_DIR}/qimgv/translations" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/impulse")
+    install(DIRECTORY "${PROJECT_BINARY_DIR}/src/translations" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/impulse")
 endif()
 
 # uninstall target
