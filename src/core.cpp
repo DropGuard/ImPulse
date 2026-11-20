@@ -504,7 +504,6 @@ void Core::scalingRequest(QSize size, ScalingFilter filter) {
     }
 }
 
-// TODO: don't use connect? otherwise there is no point using unique_ptr
 void Core::onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req) {
     // Staleness is owned layer by layer, and each predicate here names its
     // own: existence — nothing is handed to a closed viewer; identity — a
