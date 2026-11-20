@@ -1076,7 +1076,7 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     // The refusable subject on this platform is a file held open with no
     // sharing — the shell's recycle cannot take it while the handle
     // lives, and it stays a visible, existing refusal.
-    const QString longFile = QDir(alpha).filePath(QStringLiteral("locked.png"));
+    const QString longFile = QDir(m_alpha).filePath(QStringLiteral("locked.png"));
     writeImage(longFile);
     HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
                               0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
