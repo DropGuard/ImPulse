@@ -12,14 +12,19 @@ import os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, 'qimgv')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tree_scope  # noqa: E402  (needs the path above first)
 
 def sources():
-    for dirpath, dirnames, filenames in os.walk(SRC):
-        dirnames[:] = [d for d in dirnames if d not in ('3rdparty', 'res', 'translations')]
-        for f in filenames:
-            if f.endswith(('.cpp', '.h')):
-                path = os.path.join(dirpath, f)
-                yield path, os.path.relpath(path, SRC).replace(os.sep, '/')
+    # The roots come from tree_scope, the same module the format rule and the
+    # pre-commit hook ask: each gate used to name qimgv/ itself, and each
+    # therefore missed plugins/ — nine of these rules never saw plugin code.
+    # root-relative, which is what every rule below was written against
+    # ('gui/overlays/x.cpp', 'core.h', 'tests/...'). The plugin files arrive
+    # as 'player_mpv/src/x.cpp' — no rule's prefix matches them, so they are
+    # scanned (R2, R3, R10, R11, R14) without any rule changing meaning.
+    for path, rel in tree_scope.sources(repo_relative=False):
+        yield path, rel
 
 def text_of(path):
     return open(path, encoding='utf-8', errors='replace').read()
@@ -172,7 +177,7 @@ BASE_RE = re.compile(r'^\s*class\s+(\w+)\b[^;{]*?:\s*((?:\w+\s*:\s*)?public\s+\w
 SIG_RE = re.compile(r'^\s*(?:void|[A-Za-z_]\w*<[^>]*>)\s+(\w+)\s*\([^;]*\)\s*;')
 MODE_END = re.compile(r'^\s*(public|protected|private|signals|Q_SIGNALS|slots)\b')
 signals_of, parents = {}, {}
-for root in (SRC, os.path.join(ROOT, 'plugins')):
+for root in (SRC, os.path.join(ROOT, 'plugins')):  # R6's own walk: plugins carry signals too
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in ('3rdparty', 'res', 'translations')]
         for f in filenames:

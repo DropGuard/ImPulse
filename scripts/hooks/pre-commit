@@ -48,8 +48,14 @@ if have nproc; then JOBS=$(nproc); else JOBS=4; fi
 # format gate on staged C++ files (working-tree contents, same scan surface as
 # the lint gate): the tree's style is .clang-format, and an unformatted file
 # dies at the commit that introduced it
+# The roots are the same ones the ctest gates walk (qimgv/tests/tree_scope.py):
+# this filter used to be ^qimgv/ alone, so a plugin edit bypassed format
+# checking at commit time while the ctest — walking the same narrow root —
+# reported the tree clean. Vendored files are excluded by name there too.
 STAGED_CPP=$(git diff --cached --name-only --diff-filter=ACMR \
-    | grep -E '^qimgv/.*\.(cpp|h)$' | grep -v '/3rdparty/' || true)
+    | grep -E '^(qimgv|plugins)/.*\.(cpp|h|hpp)$' \
+    | grep -v '/3rdparty/' \
+    | grep -v '^plugins/player_mpv/src/qthelper\.hpp$' || true)
 if [ -n "$STAGED_CPP" ]; then
     if ! have clang-format; then
         echo "pre-commit: clang-format not found — format gate skipped (install clang-format to arm it)" >&2
