@@ -14,7 +14,7 @@ VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent
     connect(settings, &Settings::settingsChanged, this, &VideoPlayerInitProxy::onSettingsChanged);
     m_libFile = QIMGV_PLAYER_PLUGIN;
 #ifdef _WIN32
-    libDirs << QApplication::applicationDirPath() + "/plugins";
+    m_libDirs << QApplication::applicationDirPath() + "/plugins";
 #else
     // the plugin layout follows the app's name; the lib/qimgv variants stay
     // as fallbacks so installs that predate the rename keep playing video

@@ -20,7 +20,7 @@ SlidePanel::SlidePanel(FloatingWidgetContainer *parent)
     m_timeline.setEndFrame(m_animationDuration);
     // For some reason 16 feels janky on windows. Linux is fine.
 #ifdef _WIN32
-    timeline.setUpdateInterval(8);
+    m_timeline.setUpdateInterval(8);
 #else
     m_timeline.setUpdateInterval(16);
 #endif
