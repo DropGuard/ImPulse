@@ -365,12 +365,12 @@ def clang_tidy_counts(srcs, version, memo):
         out = cache_read('clang-tidy', key)
         hit = out is not None
         if not hit:
-            # --header-filter=.* : without it clang-tidy suppresses every
-            # diagnostic whose location is in a header, which is where the
-            # naming rule's subject — a member declaration — actually lives.
-            # Measured: a probe field in cache.h passed the gate unseen.
-            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS,
-                                      '--header-filter=.*', '--quiet', e['file']], ROOT)
+            # the header filter is in .clang-tidy, not here: a rule that only
+            # holds when this script runs it is not the tree's rule. clang-tidy's
+            # default suppresses header diagnostics, which is where a member
+            # declaration lives — measured: a probe field in cache.h passed
+            # unseen until the filter moved into the project config.
+            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
             out = f'{STATUS_PREFIX}{status}\n' + out
             cache_write('clang-tidy', key, out)
         for line in out.splitlines():
