@@ -17,31 +17,43 @@ gone, and the `inotify` crate rides the linux target gate.
 
 Distro packages named `qimgv` install upstream, not this fork.
 
-### Windows specifics (msys2 / ucrt64)
+### Windows specifics (msys2 / clang64)
 
-The supported Windows toolchain is msys2's **ucrt64** environment: gcc with the
-Qt 6.12 stack, ninja, Corrosion driving cargo inside the same build, and the
-full feature set (exiv2 and libmpv are packaged for ucrt64 and **not** for the
-mingw64 environment — msvcrt-based mingw64 is where those repos stop).
-Configure exactly as on Linux (`cmake -S . -B build -G Ninja` from an msys2
-shell, with ucrt64's bin first on PATH so the configure finds its own Qt).
+The supported Windows toolchain is msys2's **clang64** environment: clang with
+the Qt 6.12 stack, ninja, Corrosion driving cargo inside the same build, and
+the full feature set. Configure exactly as on Linux
+(`cmake -S . -B build -G Ninja` from an msys2 shell, with clang64's bin first
+on PATH so the configure finds its own Qt).
+
+**One environment, never a mix.** msys2's `clang64`, `ucrt64` and `mingw64`
+each carry their own C/C++ runtime ABI; linking libraries from two of them
+produces link errors at best and silent breakage at worst. Every package comes
+from clang64.
+
+clang64 rather than ucrt64, which this section used to name. The reason given
+for ucrt64 was that exiv2 and libmpv were packaged only there; checked
+2026-11-21, both are in clang64 as well. clang64 wins because it is the only
+environment that also carries **clazy**, so the machine that builds the code
+can also run the lint gate on it — and clang's warnings match what the Linux
+tree measures, where gcc's do not.
+
 The Rust side stays `x86_64-pc-windows-gnu`; its self-contained CRT objects
-link cleanly against ucrt64 gcc through the pure C ABI (measured, zero
-undefined symbols). The git gate is bash-shaped by design — run git from the
-msys2 shell, where bash, the coreutils and the hook's environment exist; from
-a bare cmd the hook's interpreter is not resolvable. Tools the machine does
-not have are skipped loudly by the hook, never silently:
-cppcheck/clang-tidy (the lint baseline), clang-format, rustfmt and Miri each
-name their absence, and cmake/ctest/pytest-equivalents are read from the
-configure-time cache rather than hoped for on PATH.
+link cleanly through the pure C ABI (measured, zero undefined symbols). The git
+gate is bash-shaped by design — run git from the msys2 shell, where bash, the
+coreutils and the hook's environment exist; from a bare cmd the hook's
+interpreter is not resolvable. Tools the machine does not have are skipped
+loudly by the hook, never silently: cppcheck/clang-tidy (the lint baseline),
+clang-format, rustfmt and Miri each name their absence, and
+cmake/ctest/pytest-equivalents are read from the configure-time cache rather
+than hoped for on PATH.
 
 Feature availability on this toolchain, measured rather than assumed:
 
-| Option | msys2 ucrt64 | note |
+| Option | msys2 clang64 | note |
 | --- | --- | --- |
-| `EXIV2` | ON | mingw-w64-ucrt-x86_64-exiv2 0.28; its 0.28 API takes UTF-8 narrow paths on every platform (`QString::toStdString`, not the old wide-char helper) |
-| `VIDEO_SUPPORT` | ON | mingw-w64-ucrt-x86_64-mpv 0.42; the plugin builds as `build/plugins/player_mpv/player_mpv.dll` |
-| `OPENCV_SUPPORT` | ON | mingw-w64-ucrt-x86_64-opencv 5.0 |
+| `EXIV2` | ON | mingw-w64-clang-x86_64-exiv2 0.28; its 0.28 API takes UTF-8 narrow paths on every platform (`QString::toStdString`, not the old wide-char helper) |
+| `VIDEO_SUPPORT` | ON | mingw-w64-clang-x86_64-mpv 0.42; the plugin builds as `build/plugins/player_mpv/player_mpv.dll` |
+| `OPENCV_SUPPORT` | ON | mingw-w64-clang-x86_64-opencv 5.0 |
 
 Windows file-system facts the code is written against (each pinned by a test):
 
