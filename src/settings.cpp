@@ -162,10 +162,10 @@ Settings::Settings(QObject *parent) : QObject(parent) {
                                  : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
     m_confDir = new QDir(confBase);
     m_confDir->mkpath(confBase);
-    settingsConf =
+    m_settingsConf =
         new QSettings(m_confDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
-    stateConf = new QSettings(m_confDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
-    themeConf = new QSettings(m_confDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
+    m_stateConf = new QSettings(m_confDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
+    m_themeConf = new QSettings(m_confDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
 #endif
     fillVideoFormats();
     // cache paths live in the constructor, not in an external protocol: a
