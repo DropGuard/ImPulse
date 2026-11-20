@@ -21,44 +21,38 @@ on:
     - cron: "0 3 * * *"
 jobs:
   build-test:
-    runs-on: ubuntu-24.04
+    # The same distribution the tree is developed on. Everything below used to
+    # be a workaround for running an older one: Qt from aqtinstall because
+    # noble's apt Qt is 6.4, clang-format from LLVM's repo because noble ships
+    # 18, and an Exiv2 0.27 that rejected API the code uses. None of that is
+    # about the code — it was the runner, and this runner exists.
+    #
+    # The gates are also only meaningful when both sides run the same
+    # instruments: clazy reads a compiler's AST, so GCC 13 and GCC 15 disagree
+    # about Qt's inlined containers and report different findings for identical
+    # source. Matching the distribution matches the compiler, the formatter and
+    # the library versions in one move.
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # the apt Qt on noble is 6.4.x and the hard floor is 6.9 (CMakeLists
-      # pins it); aqt supplies 6.10.2
-      - name: install qt (aqtinstall directly — the wrapper action breaks under act)
+      - name: system deps (Qt, OpenCV, Exiv2, mpv, GTest, the lint instruments)
         run: |
-          python3 -m venv /opt/aqt-venv
-          /opt/aqt-venv/bin/pip install -q aqtinstall
-          /opt/aqt-venv/bin/aqt install-qt linux desktop 6.10.2 linux_gcc_64 -O /opt/qt
-      - name: system deps
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
-      # clang-format from LLVM's repo, not 24.04's 18: the style gate compares
-      # its output against a tree formatted by 21, and the two disagree on
-      # chained << alignment (measured: thumbnailerrunnable.cpp). A format gate
-      # is only meaningful when both sides run the same formatter — otherwise
-      # it reports the version skew as if it were the tree's debt.
-      - name: clang-format 21 (the version the tree is formatted with)
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc >/dev/null
-          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list >/dev/null
-          sudo apt-get update && sudo apt-get install -y clang-format-21
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build cmake file python3-venv \
+            qt6-base-dev libqt6svg6-dev libgl1-mesa-dev libxkbcommon-dev \
+            libopencv-dev libexiv2-dev libmpv-dev libgtest-dev \
+            clang-format-21 clang-tidy-21 clazy cppcheck
+          # the tree calls them by their unversioned names
           sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
-      # the lint gate's other three instruments. Versions matter the same way
-      # the formatter's did: the baseline counts are a property of the
-      # toolchain that produced them, and lint.py fingerprints the tools and
-      # fails by name when they move.
-      - name: lint instruments (clazy, clang-tidy, cppcheck)
-        run: |
-          sudo apt-get install -y clang-tidy-21 clazy cppcheck
           sudo ln -sf /usr/bin/clang-tidy-21 /usr/local/bin/clang-tidy
       # LINT_TESTS=ON puts the static-analysis gate into ctest, so this job
       # runs the same four gates the pre-commit hook runs — which is the point
       # of a clean machine: the hook can be skipped with --no-verify, and it
       # skips itself when a tool is missing.
       - name: configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLINT_TESTS=ON
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
       - name: the suites (includes FORMAT_RULES, ARCH_RULES, LINT)
@@ -68,29 +62,24 @@ jobs:
 
   deep-checks:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
-      - name: install qt (aqtinstall directly — the wrapper action breaks under act)
+      - name: system deps (see the build-test job for why this runner)
         run: |
-          python3 -m venv /opt/aqt-venv
-          /opt/aqt-venv/bin/pip install -q aqtinstall
-          /opt/aqt-venv/bin/aqt install-qt linux desktop 6.10.2 linux_gcc_64 -O /opt/qt
-      - name: system deps
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libopencv-dev libexiv2-dev libgl1-mesa-dev python3-venv cmake file libmpv-dev libxkbcommon-dev libgtest-dev
-      # ctest here runs FORMAT_RULES too; see the build-test job for why 21.
-      - name: clang-format 21 (the version the tree is formatted with)
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc >/dev/null
-          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list >/dev/null
-          sudo apt-get update && sudo apt-get install -y clang-format-21
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build cmake file python3-venv \
+            qt6-base-dev libqt6svg6-dev libgl1-mesa-dev libxkbcommon-dev \
+            libopencv-dev libexiv2-dev libmpv-dev libgtest-dev \
+            clang-format-21
           sudo ln -sf /usr/bin/clang-format-21 /usr/local/bin/clang-format
       - name: sanitizer tree (address,undefined — the ASan gate the local tree runs)
         run: |
-          cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=address,undefined -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
+          cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=address,undefined
           cmake --build build-asan -j$(nproc)
           cd build-asan && QT_QPA_PLATFORM=offscreen ASAN_OPTIONS=detect_leaks=1 ctest --output-on-failure
       - name: miri over the pure layer (the armed race test must fail to pass)
@@ -134,7 +123,7 @@ jobs:
           CXX: g++-12
         run: |
           cmake -S . -B build-appimage -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
+           
           cmake --build build-appimage -j$(nproc)
       - name: assemble the AppDir
         run: |
