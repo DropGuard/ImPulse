@@ -320,9 +320,13 @@ set_tests_properties(ENGINE_RUST PROPERTIES TIMEOUT 600)
 option(LINT_TESTS "Add the static-analysis sweep to ctest" OFF)
 if(LINT_TESTS)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    # --show-sites: a red LINT in CI has to name the file:line it is about.
+    # Without it the log says "9 strict-iterators" and the only way to learn
+    # more is to reproduce locally — which, on a different compiler, may not
+    # reproduce at all.
     add_test(NAME LINT
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/lint.py
-                     --gate ${CMAKE_CURRENT_BINARY_DIR})
+                     --gate --show-sites ${CMAKE_CURRENT_BINARY_DIR})
     set_tests_properties(LINT PROPERTIES LABELS lint TIMEOUT 3600)
 endif()
 

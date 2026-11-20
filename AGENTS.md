@@ -58,12 +58,15 @@ python3 scripts/lint.py build --gate
 # ONE place now.
 python3 src/tests/format_rules.py
 
-# clazy, separate configured tree (clazy 1.17 + level0/level1/detaching).
+# clazy, separate configured tree (clazy 1.17, level0 + level1). The detaching
+# checks live IN level1, so there is no `detaching` group to name: passing it
+# made clazy print "Invalid check: detaching" on every TU and run level0,level1
+# regardless — harmless, which is why the wrong spelling survived.
 # CLAZY_CHECKS is read here because clazy is the compiler in this tree;
 # clazy-standalone (which scripts/lint.py runs) does NOT read it, so the gate
 # passes --checks= explicitly rather than trusting a default that happens to
 # match today.
-CLAZY_CHECKS="level0,level1,detaching" cmake --build build-clazy -j$(nproc)
+CLAZY_CHECKS="level0,level1" cmake --build build-clazy -j$(nproc)
 
 # style: .clang-format is the tree's own (derived from it, 2026-11-10); the
 # hook checks staged files. Blame should skip the reformat commit:
