@@ -6,7 +6,7 @@ the worst place to store rules. Read it before editing it.
 ## What this repo is
 
 ImPulse — a qimgv-fork lineage (KDE/Qt6-first, GPL, Linux + Windows). The binary is `impulse`. the Rust trunk is `engine/`. The architecture law is stated once in [DEVELOPING.md](DEVELOPING.md) and enforced mechanically by
-`qimgv/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
+`src/tests/architecture_rules.py` (R1 gui isolation, R2 FFI caller
 whitelist, R3 rust seal, R4 settings deref, R5 ABI pin, R6 signal
 redeclaration, R7 mirror-writer monopoly, R8 settings-table keys, R9
 single-Thumbnailer owner, R10 fd-shell purity (both shells: `fd.rs`,
@@ -50,13 +50,13 @@ python3 scripts/lint.py build --gate
 # fifteen hand-formatted files arrived. Skips (77) and names the missing tool
 # rather than pretending to have checked.
 #
-# "The whole tree" means qimgv/tests/tree_scope.py's ROOTS (qimgv/ and
+# "The whole tree" means src/tests/tree_scope.py's ROOTS (src/ and
 # plugins/), and this file, the architecture rules and the pre-commit hook all
-# ask that module instead of naming a root. They each used to name qimgv/
-# themselves, and each therefore missed plugins/ — six owned plugin files were
+# ask that module instead of naming a root. They each used to name the main
+# root themselves, and each therefore missed plugins/ — six owned plugin files were
 # never formatted while this gate reported the tree clean. A root is added in
 # ONE place now.
-python3 qimgv/tests/format_rules.py
+python3 src/tests/format_rules.py
 
 # clazy, separate configured tree (clazy 1.17 + level0/level1/detaching).
 # CLAZY_CHECKS is read here because clazy is the compiler in this tree;
@@ -86,7 +86,7 @@ python3 scripts/coverage.py
 # dev tripwire: any qWarning aborts with a stack. Silent-rot bugs (the Qt6-dead
 # @Variant serialization was a live one) surface on first contact. Startup
 # warnings now reach the session log (handler installs before any config read).
-QT_FATAL_WARNINGS=1 build/qimgv/qimgv <path>
+QT_FATAL_WARNINGS=1 build/src/impulse <path>
 
 # sanitizer tree (separate dir; default build untouched). Note: suites can go red
 # on LSan exit leaks even with all asserts passing — evidence is in
@@ -96,7 +96,7 @@ cmake --build build-asan -j$(nproc) && cd build-asan && ASAN_OPTIONS=detect_leak
 
 # the thread-sanitizer tree is the same option with `thread`. Its state is
 # documented at the option itself (QIMGV_SANITIZERS block of CMakeLists.txt)
-# and its noise baseline lives in qimgv/tests/tsan-noise.supp: out of the gate
+# and its noise baseline lives in src/tests/tsan-noise.supp: out of the gate
 # on enumerated third-party internals (QtGui's own pooled threads racing the
 # QArrayData region around image save/read), with any report naming one of our
 # frames still a failure. The harness spawns one process per class / per test
@@ -119,7 +119,7 @@ memory (2026-11-09/10) is what let #636's and #612's findings ride into
 history on green suites alone; it then sat at push time because a full
 scan cost ~2m20s, until the per-TU cache (2026-11-10) made it cheap enough
 to gate every commit. The `--no-verify`
-escape hatch exists, but a red gate entering history is how f8e8b216's six
+escape hatch exists, but a red gate entering history is how the signature sweep's six
 silent regressions went unseen.
 
 ## Discipline (each maps to an incident)
@@ -132,8 +132,9 @@ baselines). What remains here is the part needing judgment.
    next. Failed a dozen times in a single day.
 2. **A fix and the test pinning it ship in the same commit; behavior-adjacent
    refactors must prove their innocence.** Detection delay is the tuition.
-   Signature-only sweeps are not automatically behavior-preserving — f8e8b216
-   renamed signatures, claimed "no behavior change", shipped six regressions.
+   Signature-only sweeps are not automatically behavior-preserving — the
+   signature sweep renamed signatures, claimed "no behavior change", shipped six
+   regressions.
    Read the full `git show` diff line by line in the function body; anything
    that could change behavior gets pinned.
 3. **No implicit context**: cwd dependencies, singleton ordering, uninitialized
@@ -163,7 +164,7 @@ baselines). What remains here is the part needing judgment.
    an unattributed 1/200 is unmeasured.
 7. **A green suite is only evidence if the test you think ran actually ran.**
    QTest cannot see test functions declared below `private:`; a filter typo
-   runs nothing. The ownership probe (3e4c2f37) passed five suites while
+   runs nothing. The ownership probe passed five suites while
    itself never executing — caught by running the new test by name and seeing
    "Function not found". Before trusting a suite, run the new test by name
    and watch it PASS. The mirror also holds: a red suite can be a binary that

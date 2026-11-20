@@ -11,14 +11,14 @@
 import os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SRC = os.path.join(ROOT, 'qimgv')
+SRC = os.path.join(ROOT, 'src')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tree_scope  # noqa: E402  (needs the path above first)
 
 def sources():
     # The roots come from tree_scope, the same module the format rule and the
-    # pre-commit hook ask: each gate used to name qimgv/ itself, and each
-    # therefore missed plugins/ — nine of these rules never saw plugin code.
+    # pre-commit hook ask: each gate used to name the main root itself, and
+    # each therefore missed plugins/ — nine of these rules never saw plugin code.
     # root-relative, which is what every rule below was written against
     # ('gui/overlays/x.cpp', 'core.h', 'tests/...'). The plugin files arrive
     # as 'player_mpv/src/x.cpp' — no rule's prefix matches them, so they are

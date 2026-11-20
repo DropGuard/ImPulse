@@ -2,8 +2,9 @@
 
 Every gate that walks the tree — the format rule, the architecture rules, the
 pre-commit hook — asks this module instead of naming a root itself. They had
-each named `qimgv/` and each therefore missed `plugins/`: the hook's staged
-filter was `^qimgv/`, so a plugin edit bypassed format checking entirely, and
+each named the main root and each therefore missed `plugins/`: the hook's
+staged filter matched only that root, so a plugin edit bypassed format
+checking entirely, and
 the format ctest walked the same narrow root and reported a clean tree while
 six of the plugin's seven files were unformatted. A gate that scans nothing is
 indistinguishable from a passing one, which is the failure this module exists
@@ -20,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 # The roots this tree owns. `engine/` is Rust and is gated by cargo/rustfmt,
 # not by these walkers.
-ROOTS = ('qimgv', 'plugins')
+ROOTS = ('src', 'plugins')
 
 SKIP_DIRS = {'3rdparty', 'res', 'translations', 'build', 'build-clazy', 'target'}
 
@@ -40,7 +41,7 @@ def sources(suffixes=CPP_SUFFIXES, repo_relative=True):
     """Yield (absolute_path, rel) for every owned source file.
 
     `rel` is repo-relative by default. Pass repo_relative=False to get it
-    relative to the file's own root (qimgv/ or plugins/): the architecture
+    relative to the file's own root (src/ or plugins/): the architecture
     rules were written against paths like 'gui/overlays/x.cpp' and 'core.h',
     and they keep working unchanged against that form.
     """

@@ -11,7 +11,7 @@ that runs green proves the whole tree, not just the staged files.
 
 Scope is tree_scope.ROOTS, the same module the pre-commit hook and the
 architecture rules ask — the roots used to be spelled out per gate, and each
-spelled `qimgv/` alone, so the six plugin files this tree owns were never
+spelled the main root alone, so the six plugin files this tree owns were never
 formatted while this rule reported a clean tree.
 
 Skips (77) when clang-format is absent, and names how to arm it.

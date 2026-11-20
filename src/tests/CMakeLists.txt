@@ -140,7 +140,7 @@ gtest_discover_tests(gui_widget_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEO
 # executable architecture rules (ArchUnit-style): gui isolation, FFI caller
 # allowlist, rust internal seal
 add_test(NAME ARCH_RULES
-         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/architecture_rules.py)
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/architecture_rules.py)
 set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300)
 
 # Dispatch probes: QShortcutMap behavior pinned against the offscreen platform
@@ -170,14 +170,14 @@ gtest_discover_tests(harness_sanity_tests PROPERTIES ENVIRONMENT "${TSAN_ENV}" T
 # fifteen hand-formatted files arrived), while a skip here is recorded in the
 # run and a pass here covers the whole tree, not the staged subset.
 add_test(NAME FORMAT_RULES
-         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/format_rules.py)
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/format_rules.py)
 set_tests_properties(FORMAT_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 # lint cache contract: cold==warm, header fan-out, include shadowing. Skips
 # (77) where the lint tools are not installed — the gate itself needs them,
 # but a bare configure-and-test should not fail on their absence.
 add_test(NAME LINT_CACHE
-         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/qimgv/tests/lint_cache_test.py)
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/lint_cache_test.py)
 set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 # The flip-flight instrument: manual measurement, never a gate. Drives real

@@ -129,7 +129,7 @@ endif()
 # against the UI thread) is clean. What it cannot answer: the Rust side shows up
 # only through memcpy interception, so the arena/listing reports name both
 # accesses and see neither one's ordering — noise, not a queue of bugs; that
-# noise is machine-absorbed by qimgv/tests/tsan-noise.supp, and a NEW report
+# noise is machine-absorbed by src/tests/tsan-noise.supp, and a NEW report
 # shape (any frame of ours) still fails the run.
 #
 # The registry CHECK that used to kill both long suites
@@ -194,7 +194,7 @@ endif()
 # offset) still fails the run. The engine-boundary face of the noise is
 # suppressed for real — a set ordering bug left ENGINE_CONTRACT's suppression
 # property expanding to an empty env and 32 reports a run that looked like
-# residue and were just a missing baseline (qimgv/tests/CMakeLists.txt,
+# residue and were just a missing baseline (src/tests/CMakeLists.txt,
 # TSAN_ENV).
 # The Rust half is measured by Miri over the semantics layer, on the seam the
 # watcher split made explicit (watcher/apply is libc-free semantics; watcher/fd
@@ -291,11 +291,11 @@ endif()
 ##############################################################
 
 # Must be at the top level: enable_testing() only generates a CTestTestfile for
-# the directory it is called in and below, so calling it from qimgv/tests left
+# the directory it is called in and below, so calling it from src/tests left
 # `ctest` in the build root discovering zero tests.
 enable_testing()
 
-add_subdirectory(qimgv)
+add_subdirectory(src)
 
 if(VIDEO_SUPPORT)
     add_subdirectory(plugins/player_mpv)
