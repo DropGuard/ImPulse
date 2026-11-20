@@ -1,8 +1,8 @@
-#include <QTest>
 #include <QThread>
 #include <atomic>
 #include <thread>
 
+#include "gtest_qt.h"
 #include "engine_stack_fixture.h"
 #include "components/workerpool/workerpool.h"
 
@@ -10,26 +10,10 @@
 // persistent workers (the TSan-tree pin for "our pools stop churning
 // threads"), explicit ownership (drain returns unstarted jobs, the pool is
 // the single deleter), priority order, and per-owner waiting.
-class TestWorkerPool : public QObject, protected EngineStackFixture {
-    Q_OBJECT
-  public:
+class TestWorkerPool : public ::testing::Test, protected EngineStackFixture {
+  protected:
     TestWorkerPool() : EngineStackFixture("workerpool") {
     }
-
-  private slots:
-    void initTestCase() {
-    }
-
-    void persistentWorkersSurviveSubmitAndDrainWaves();
-    void typedQueryRejectsAForeignJob();
-    void drainReturnsExactlyTheUnstartedJobs();
-    void priorityOrderIsHonoredWithinASharedPool();
-    void waitForOwnerWaitsOnlyForItsOwner();
-    void waitForAllWaitsForEveryOwner();
-    void cancelReachesQueuedJobs();
-    void cancelReachesAJobInsideRun();
-    void cancelSparesOtherOwners();
-    void cancelDoesNotSatisfyWaiters();
 };
 
 namespace {
@@ -117,7 +101,7 @@ class CancelGatedJob : public PoolJob {
 
 } // namespace
 
-void TestWorkerPool::persistentWorkersSurviveSubmitAndDrainWaves() {
+TEST_F(TestWorkerPool, persistentWorkersSurviveSubmitAndDrainWaves) {
     // The TSan-tree pin for "our pools stop churning threads": QThreadPool's
     // waitForDone() joined every pool thread on every wave (through the
     // unintercepted pthread_clockjoin_np), so the next wave's pthread_create
@@ -134,38 +118,38 @@ void TestWorkerPool::persistentWorkersSurviveSubmitAndDrainWaves() {
             pool.waitForAll();
         }
     }
-    QCOMPARE(runs.load(), 400);
-    QCOMPARE(deaths.load(), 400);
+    EXPECT_EQ(runs.load(), 400);
+    EXPECT_EQ(deaths.load(), 400);
 }
 
-void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
+TEST_F(TestWorkerPool, drainReturnsExactlyTheUnstartedJobs) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, runs{0}, deaths{0};
     {
         WorkerPool pool(1); // a single worker: the first job occupies it
         pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
-        QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000); // worker is inside run()
+        ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000); // worker is inside run()
         for(int i = 0; i < 3; ++i)
             pool.submit(PoolOwner::Loader, 0, std::make_unique<CountingJob>(&runs, &deaths));
 
         auto taken = pool.drain(PoolOwner::Loader);
-        QVERIFY2(taken.size() == 3, "only the queued jobs come back, not the running one");
-        QCOMPARE(runs.load(), 0); // so none of them ever ran
-        taken.clear();            // caller deletes what it took back
-        QCOMPARE(deaths.load(), 3);
+        EXPECT_TRUE(taken.size() == 3) << "only the queued jobs come back, not the running one";
+        EXPECT_EQ(runs.load(), 0); // so none of them ever ran
+        taken.clear();             // caller deletes what it took back
+        EXPECT_EQ(deaths.load(), 3);
 
         gate = true; // the running job finishes normally
         pool.waitForOwner(PoolOwner::Loader);
-        QCOMPARE(runs.load(), 0); // drained jobs never ran
+        EXPECT_EQ(runs.load(), 0); // drained jobs never ran
         // the gated job was pool-deleted. The destructor lands on the worker
         // thread right after run() returns — the documented order — but
         // waitForOwner's guarantee is run() completion, not the destructor's
         // instant: under load the two are observable apart (measured one full
         // gap apart on a busy desktop). What is pinned here is that the pool
         // destroys it, which must still hold.
-        QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 4, 10000);
+        ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 4, 10000);
     }
-    QCOMPARE(deaths.load(), 4);
+    EXPECT_EQ(deaths.load(), 4);
 }
 
 // The typed query refuses to reinterpret a job it does not own. An owner holds
@@ -173,7 +157,7 @@ void TestWorkerPool::drainReturnsExactlyTheUnstartedJobs() {
 // the query answers "no match" with a warning naming both, instead of handing
 // the caller a mis-typed reference. Observed through the return value rather
 // than a death test, so a query can never take the process down.
-void TestWorkerPool::typedQueryRejectsAForeignJob() {
+TEST_F(TestWorkerPool, typedQueryRejectsAForeignJob) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, deaths{0};
     WorkerPool pool(1);
@@ -190,57 +174,71 @@ void TestWorkerPool::typedQueryRejectsAForeignJob() {
     // hold the only worker with a Maintenance job so the foreign one stays
     // QUEUED — a queued job is what the query walks first
     pool.submit(PoolOwner::Maintenance, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
-    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
 
     // the only job under Thumbnailer is the foreign type
     pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<ForeignJob>());
 
     bool reached = false;
-    // typeid(...).name() is the mangled spelling ("N12_GLOBAL__N_1..."), so the
-    // regex anchors on the message's own words, not the type's
-    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("hasQueuedOrRunning: owner .* holds a job")));
+    // The warning is the contract, not decoration: a typed query that meets a
+    // foreign job must SAY so where the query runs, because the alternative —
+    // a silent "no match" — is indistinguishable from a genuine one. QTest's
+    // ignoreMessage only works inside QTest::qExec (measured: it is a no-op
+    // here, the message prints and nothing is checked), so the handler is ours.
+    // the message is matched on its own words: typeid(...).name() is the mangled
+    // spelling, and pinning that would pin the compiler.
+    static QStringList warned;
+    warned.clear();
+    QtMessageHandler previous =
+        qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &message) {
+            if(type == QtWarningMsg)
+                warned << message;
+        });
     const bool found = pool.hasQueuedOrRunning<GatedJob>(PoolOwner::Thumbnailer, [&](const GatedJob &) {
         reached = true;
         return true;
     });
-    QVERIFY2(!found, "the query reported a match for a job it could not type");
-    QVERIFY2(!reached, "the caller's lambda ran on a job of the wrong type");
+    qInstallMessageHandler(previous);
+    EXPECT_TRUE(!found) << "the query reported a match for a job it could not type";
+    EXPECT_TRUE(!reached) << "the caller's lambda ran on a job of the wrong type";
+    EXPECT_EQ(warned.size(), 1);
+    EXPECT_TRUE(!warned.isEmpty() && warned.first().startsWith(QStringLiteral("hasQueuedOrRunning: owner")));
 
     gate.store(true);
     pool.waitForOwner(PoolOwner::Thumbnailer);
     pool.waitForOwner(PoolOwner::Maintenance);
 }
 
-void TestWorkerPool::priorityOrderIsHonoredWithinASharedPool() {
+TEST_F(TestWorkerPool, priorityOrderIsHonoredWithinASharedPool) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, next{0}, deaths{0};
     int order[3] = {0, 0, 0};
     WorkerPool pool(1);
     pool.submit(PoolOwner::Scaler, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths)); // occupies
-    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
     // submitted low first: priority, not submission order, decides
     pool.submit(PoolOwner::Loader, 0, std::make_unique<OrderJob>(0, &next, order));
     pool.submit(PoolOwner::Loader, 2, std::make_unique<OrderJob>(2, &next, order));
     pool.submit(PoolOwner::Scaler, 1, std::make_unique<OrderJob>(1, &next, order));
     gate = true;
     pool.waitForAll();
-    QCOMPARE(order[0], 2);
-    QCOMPARE(order[1], 1);
-    QCOMPARE(order[2], 0);
+    EXPECT_EQ(order[0], 2);
+    EXPECT_EQ(order[1], 1);
+    EXPECT_EQ(order[2], 0);
 }
 
-void TestWorkerPool::waitForOwnerWaitsOnlyForItsOwner() {
+TEST_F(TestWorkerPool, waitForOwnerWaitsOnlyForItsOwner) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, runs{0}, deaths{0};
     WorkerPool pool(2);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
-    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
     pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<CountingJob>(&runs, &deaths));
     // returns while Loader is still held: ownership scopes the wait
     pool.waitForOwner(PoolOwner::Thumbnailer);
-    QCOMPARE(runs.load(), 1);
-    QCOMPARE(starts.load(), 1);
-    QVERIFY2(!gate.load(), "waitForOwner(Thumbnailer) must not wait out the Loader job");
+    EXPECT_EQ(runs.load(), 1);
+    EXPECT_EQ(starts.load(), 1);
+    EXPECT_TRUE(!gate.load()) << "waitForOwner(Thumbnailer) must not wait out the Loader job";
     gate = true;
     pool.waitForOwner(PoolOwner::Loader);
     pool.waitForAll();
@@ -251,16 +249,16 @@ void TestWorkerPool::waitForOwnerWaitsOnlyForItsOwner() {
 // queue, not by the pipeline the changed setting actually feeds. The
 // narrow form already has a test above; this pins the width of the wide
 // one, because that width is the part that runs on the UI thread.
-void TestWorkerPool::waitForAllWaitsForEveryOwner() {
+TEST_F(TestWorkerPool, waitForAllWaitsForEveryOwner) {
     std::atomic_bool gate{false};
     std::atomic_int loaderStarts{0}, thumbRuns{0}, deaths{0};
     WorkerPool pool(2);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &loaderStarts, &deaths));
-    QTRY_COMPARE_WITH_TIMEOUT(loaderStarts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(loaderStarts.load(), 1, 10000);
     pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<CountingJob>(&thumbRuns, &deaths));
     pool.waitForOwner(PoolOwner::Thumbnailer);
-    QCOMPARE(thumbRuns.load(), 1);     // one owner is provably finished with...
-    QVERIFY(loaderStarts.load() == 1); // ...while another is still inside a job
+    EXPECT_EQ(thumbRuns.load(), 1);        // one owner is provably finished with...
+    EXPECT_TRUE(loaderStarts.load() == 1); // ...while another is still inside a job
 
     std::atomic_bool returned{false};
     std::thread waiter([&pool, &returned]() {
@@ -268,15 +266,15 @@ void TestWorkerPool::waitForAllWaitsForEveryOwner() {
         returned.store(true);
     });
     QThread::msleep(100);
-    QVERIFY2(!returned.load(), "waitForAll() returned while a Loader job was still running");
+    EXPECT_TRUE(!returned.load()) << "waitForAll() returned while a Loader job was still running";
     gate = true;
     waiter.join(); // it was waiting: opening the gate releases it
-    QVERIFY(returned.load());
+    EXPECT_TRUE(returned.load());
     // the pool destroys completed jobs on its worker thread, so the death
     // count catches up asynchronously — asserting it as an instant value is
     // a race this test authored, and it was the one red that arrived
     // unnamed in the ASan sweep
-    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 2, 10000);
 }
 
 // cancel() marks; what the pool does with the mark is exactly three facts: a
@@ -284,12 +282,12 @@ void TestWorkerPool::waitForAllWaitsForEveryOwner() {
 // a job marked inside run() observes the mark at its own seam, the mark
 // reaches nothing outside the owner it was given, and it satisfies no waiter
 // — only a retire does.
-void TestWorkerPool::cancelReachesQueuedJobs() {
+TEST_F(TestWorkerPool, cancelReachesQueuedJobs) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, runs{0}, deaths{0};
     WorkerPool pool(1);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
-    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<CountingJob>(&runs, &deaths));
     pool.cancel(PoolOwner::Loader);
     gate = true;
@@ -297,11 +295,11 @@ void TestWorkerPool::cancelReachesQueuedJobs() {
     // the pop checkpoint is where cancel reaches a queued job: the marked job
     // is discarded there, so it never runs — cancel reaches queued jobs by
     // making sure they never start
-    QCOMPARE(runs.load(), 0);
-    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
+    EXPECT_EQ(runs.load(), 0);
+    ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 2, 10000);
 }
 
-void TestWorkerPool::cancelReachesAJobInsideRun() {
+TEST_F(TestWorkerPool, cancelReachesAJobInsideRun) {
     std::atomic_bool sawMark{false};
     std::atomic_int deaths{0};
     WorkerPool pool(1);
@@ -312,11 +310,11 @@ void TestWorkerPool::cancelReachesAJobInsideRun() {
     // it can only return once the running record was retired, so a record
     // that leaked would hang here rather than pass
     pool.waitForOwner(PoolOwner::Loader);
-    QCOMPARE(sawMark.load(), true);
-    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 1, 10000);
+    EXPECT_EQ(sawMark.load(), true);
+    ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 1, 10000);
 }
 
-void TestWorkerPool::cancelSparesOtherOwners() {
+TEST_F(TestWorkerPool, cancelSparesOtherOwners) {
     std::atomic_bool loaderMark{false}, scalerMark{false};
     std::atomic_int deaths{0};
     WorkerPool pool(2);
@@ -324,40 +322,33 @@ void TestWorkerPool::cancelSparesOtherOwners() {
     pool.submit(PoolOwner::Scaler, 0, std::make_unique<CancelGatedJob>(&scalerMark, &deaths));
     QThread::msleep(50);
     pool.cancel(PoolOwner::Loader);
-    QTRY_COMPARE_WITH_TIMEOUT(loaderMark.load(), true, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(loaderMark.load(), true, 10000);
     QThread::msleep(100);
-    QVERIFY2(!scalerMark.load(), "cancel(Loader) marked a job that belongs to Scaler");
+    EXPECT_TRUE(!scalerMark.load()) << "cancel(Loader) marked a job that belongs to Scaler";
     pool.cancel(PoolOwner::Scaler);
     pool.waitForAll();
-    QCOMPARE(scalerMark.load(), true);
-    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 2, 10000);
+    EXPECT_EQ(scalerMark.load(), true);
+    ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 2, 10000);
 }
 
-void TestWorkerPool::cancelDoesNotSatisfyWaiters() {
+TEST_F(TestWorkerPool, cancelDoesNotSatisfyWaiters) {
     std::atomic_bool gate{false};
     std::atomic_int starts{0}, deaths{0};
     WorkerPool pool(1);
     pool.submit(PoolOwner::Loader, 0, std::make_unique<GatedJob>(&gate, &starts, &deaths));
-    QTRY_COMPARE_WITH_TIMEOUT(starts.load(), 1, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
     std::atomic_bool returned{false};
     std::thread waiter([&pool, &returned]() {
         pool.waitForOwner(PoolOwner::Loader);
         returned.store(true);
     });
     QThread::msleep(100);
-    QVERIFY(!returned.load()); // blocked on the running job, as designed
+    EXPECT_TRUE(!returned.load()); // blocked on the running job, as designed
     pool.cancel(PoolOwner::Loader);
     QThread::msleep(100);
-    QVERIFY2(!returned.load(), "cancel() satisfied a waiter without a retire");
+    EXPECT_TRUE(!returned.load()) << "cancel() satisfied a waiter without a retire";
     gate = true;
     waiter.join(); // the retire, not the cancel, is what released it
-    QVERIFY(returned.load());
-    QTRY_COMPARE_WITH_TIMEOUT(deaths.load(), 1, 10000);
+    EXPECT_TRUE(returned.load());
+    ASSERT_TRY_EQ_TIMEOUT(deaths.load(), 1, 10000);
 }
-
-int runWorkerPoolTests(int argc, char **argv) {
-    TestWorkerPool t;
-    return runIfOwned(t, argc, argv);
-}
-
-#include "workerpool_tests.moc"

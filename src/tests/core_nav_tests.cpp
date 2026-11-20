@@ -127,8 +127,7 @@ QList<ThumbnailWidget *> orderedThumbnails(FolderGridView &grid) {
 QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
     const QList<ThumbnailWidget *> widgets = orderedThumbnails(grid);
     if(widgets.count() <= index) {
-        QTest::qFail(qPrintable(QStringLiteral("no thumbnail #%1").arg(index)), __FILE__, __LINE__);
-        return {};
+        qFatal("no thumbnail at index %d", index);
     }
     const QPointF center = widgets.at(index)->mapToScene(widgets.at(index)->boundingRect().center());
     return grid.mapFromScene(center);

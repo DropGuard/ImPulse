@@ -5,7 +5,7 @@
 // QSettings) and, previously, the EngineBridge — the bridge became
 // constructible per-test, and these helpers cover the rest.
 
-#include <QTest>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QCoreApplication>
 
@@ -18,13 +18,14 @@
 // the lifetime of the object. Construct it BEFORE anything touches Settings —
 // QStandardPaths and QSettings both resolve through these values lazily, so
 // the earlier the better.
-// value-returning file helpers for tests: they report through qFail (a bare
-// return inside these would be a compile error, and three copies of that
-// mistake across two suites is the reason this lives here)
+// value-returning file helpers for tests. A helper cannot assert for its
+// caller, and QTest::qFail reports to a result object that only exists inside
+// QTest::qExec — in a gtest translation unit it is silent. qFatal names the
+// path and aborts the (per-test) process instead.
 inline QString writeTestFile(const QString &path, const QByteArray &content) {
     QFile f(path);
     if(!f.open(QIODevice::WriteOnly)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot create %1: %2").arg(path, f.errorString())), __FILE__, __LINE__);
+        qFatal("cannot create %s: %s", qPrintable(path), qPrintable(f.errorString()));
         return {};
     }
     f.write(content);
@@ -34,29 +35,26 @@ inline QString writeTestFile(const QString &path, const QByteArray &content) {
 inline QByteArray readTestFile(const QString &path) {
     QFile f(path);
     if(!f.open(QIODevice::ReadOnly)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot read %1: %2").arg(path, f.errorString())), __FILE__, __LINE__);
+        qFatal("cannot read %s: %s", qPrintable(path), qPrintable(f.errorString()));
         return {};
     }
     return f.readAll();
 }
 
-// writes <dir>/<name> with the given content, reports through qFail and
-// returns the full path (the convention shared by both suites' fixtures)
+// writes <dir>/<name> with the given content and returns the full path
 inline QString makeTxt(const QString &dir, const QString &name, const char *content) {
     return writeTestFile(QDir(dir).filePath(name), content);
 }
 
-// writes an image file of the given size/format, solid fill. Reports through
-// qFail and still returns false so QVERIFY-style callers can fail their own
-// frame.
+// writes an image file of the given size/format, solid fill. Aborts on a
+// failed encode: the callers' own asserts would otherwise compare against a
+// file that was never written.
 inline bool makeImageFile(const QString &path, const QSize &size, const char *format = "PNG",
                           QColor fill = QColor(Qt::red)) {
     QImage img(size, QImage::Format_RGB32);
     img.fill(fill);
-    if(!img.save(path, format)) {
-        QTest::qFail(qPrintable(QStringLiteral("cannot create %1").arg(path)), __FILE__, __LINE__);
-        return false;
-    }
+    if(!img.save(path, format))
+        qFatal("cannot create %s", qPrintable(path));
     return true;
 }
 
