@@ -185,8 +185,10 @@ cd engine/qimgv-engine && cargo test    # the engine's own suites
 ```
 
 Every suite is a GoogleTest binary (`find_package(GTest CONFIG REQUIRED)` —
-`libgtest-dev` on Debian/Ubuntu; the module-mode `FindGTest` cannot find this
-package, only its config file exists). `gtest_discover_tests` registers every
+`libgtest-dev` and `libgmock-dev` on Debian/Ubuntu; they are separate packages
+exporting separate targets, and the suites link both through
+`QIMGV_GTEST_TARGETS`. The module-mode `FindGTest` cannot find either, only
+their config files exist). `gtest_discover_tests` registers every
 `TEST_F` as its own ctest case, so ctest's own process-per-case layout gives
 each test function a private process — and with it a private TSan registry.
 Run one test function by name with GoogleTest's filter, not a positional arg:
@@ -203,6 +205,19 @@ report to a QTest result object that never exists and are silently green; the
 event-loop waits are `ASSERT_TRY_TRUE_TIMEOUT` / `ASSERT_TRY_EQ_TIMEOUT`
 (built on `QTest::qWaitFor`, which returns a bool rather than reporting), and
 a skip is `GTEST_SKIP()`
+
+`coretest::MockCoreView` is gmock over `ICoreView`, and
+`coretest::RecordingView` beside it is a plain tally. They answer different
+questions: the mock is right when the CALLS are the contract ("delivered
+exactly once for the path on screen, never for one nobody is looking at"), and
+the tally is right when only the side effects matter ("what size arrived, in
+what order"). Neither replaces the other, and a test that would have to
+declare ten irrelevant expectations wants the tally.
+
+A table of values that each deserve their own verdict is `TEST_P`, not a loop:
+a failure then names the case. `folder_boundary_tests` shows the shape —
+`INSTANTIATE_TEST_SUITE_P` plus a `PrintTo` so gtest prints the mode's name
+rather than its bytes.
 
 Maintainer gate (runs in the pre-commit hook) — the clazy/clang-tidy/cppcheck/gcc counts are baselined against
 a pinned toolchain, and on a foreign toolchain the gate fails by design (the
