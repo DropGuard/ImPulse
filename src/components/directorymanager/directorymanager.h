@@ -156,6 +156,7 @@ class DirectoryManager : public QObject {
     // overwrite — the engine removed the destination entry, so the mirror drops
     // that row before splicing the source into the engine's position.
     void applyEngineRename(const QString &from, const QString &to, bool isDir, quint64 size, qint64 mtimeMs, int index);
+    void markBehind();
     void scheduleRescan();
     // a landed listing is the definition of agreement: it clears any repair
     // the mirror still owed from an earlier pass

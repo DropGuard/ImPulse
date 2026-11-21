@@ -288,12 +288,12 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     if(!m_bridge.exportListing(listing, fileCount, dirCount, exportRevision)) {
         // the engine has no listing to hand over: make the next openDir the
         // authority rather than guessing an order here
-        scheduleRescan();
+        markBehind();
         return;
     }
     std::vector<EngineBridge::EngineEntry> files, dirs;
     if(!EngineBridge::parseListing(listing, files, dirs)) {
-        scheduleRescan();
+        markBehind();
         return;
     }
     if(quint32(exportRevision) != quint32(revision)) {
@@ -302,13 +302,13 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
         // version the event does not own. Both sides compare in the wire's own
         // width — the low 32 bits of the engine's u64 counter, the only thing
         // equality is ever asked to mean.
-        scheduleRescan();
+        markBehind();
         return;
     }
     if(files.size() != m_fileEntryVec.size() || dirs.size() != m_dirEntryVec.size()) {
         // not a permutation: something arrived or left without the mirror
         // hearing about it. A listing resync is the path that can say so.
-        scheduleRescan();
+        markBehind();
         return;
     }
 
@@ -325,7 +325,7 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     for(const auto &f : files) {
         const auto it = byPath.constFind(f.path);
         if(it == byPath.constEnd()) {
-            scheduleRescan(); // a path the mirror never held
+            markBehind(); // a path the mirror never held
             return;
         }
         reorderedFiles.push_back(*it);
@@ -333,7 +333,7 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     for(const auto &d : dirs) {
         const auto it = byPath.constFind(d.path);
         if(it == byPath.constEnd()) {
-            scheduleRescan(); // a path the mirror never held
+            markBehind(); // a path the mirror never held
             return;
         }
         reorderedDirs.push_back(*it);
@@ -433,6 +433,22 @@ std::filesystem::file_time_type DirectoryManager::fileTimeFromMs(qint64 ms) {
 // mark a landed listing makes.
 void DirectoryManager::markListingInSync() {
     m_wantRescan = false;
+}
+
+// The one way to say "the mirror is behind the engine". Called from every
+// branch that discovers a disagreement — the nine sites that used to choose
+// between scheduleRescan() and setting m_wantRescan themselves. The choice is
+// not theirs to make: a rescan already in flight was exported before this
+// disagreement existed, so the retry has to wait for it, and that is a fact
+// about the state machine rather than about the branch that noticed.
+void DirectoryManager::markBehind() {
+    if(m_resyncing) {
+        // consumed by the DirListed tail of the rescan in progress; scheduling
+        // here would be dropped by scheduleRescan's own guard
+        m_wantRescan = true;
+        return;
+    }
+    scheduleRescan();
 }
 
 void DirectoryManager::scheduleRescan() {
@@ -616,7 +632,7 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
         // by its own guard while m_resyncing is held.
         if(tracing)
             qDebug() << "[mirror trace] drop (resync in progress)" << path;
-        m_wantRescan = true;
+        markBehind();
         return;
     }
     // A mutation edits the listing the vectors currently hold, so its path has
@@ -643,7 +659,7 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
             // row on a quiet directory forever.
             if(tracing)
                 qDebug() << "[mirror trace] drop (already mirrored)" << path;
-            scheduleRescan();
+            markBehind();
             return;
         }
         FSEntry entry;
@@ -672,7 +688,7 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
                        << "mirrored:" << m_mirroredDir;
             // the engine's revision moved for a rename this side cannot apply:
             // drift, repaired like the rest
-            scheduleRescan();
+            markBehind();
             return;
         }
         applyEngineRename(oldPath, path, isDir, size, mtimeMs, index);
@@ -759,7 +775,7 @@ bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &list
         // for another listing.
         qWarning() << "[DirectoryManager] listing arena rejected:" << listing.size() << "bytes, header claimed"
                    << newFileCount << "files +" << newDirCount << "dirs";
-        m_wantRescan = true;
+        markBehind();
         return false;
     }
     qDebug() << "[DirectoryManager] arena pull+parse" << parseTimer.elapsed() << "ms; parsed" << files.size() << "files"
