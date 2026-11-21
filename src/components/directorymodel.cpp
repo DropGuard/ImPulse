@@ -5,8 +5,7 @@
 #include <QSet>
 
 DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
-    : QObject(parent), m_dirManager(bridge), m_loader(pool) {
-    scaler = new Scaler(&m_cache, pool);
+    : QObject(parent), scaler(std::make_unique<Scaler>(&m_cache, pool)), m_dirManager(bridge), m_loader(pool) {
 
     connect(&m_dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
     connect(&m_dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
@@ -24,7 +23,6 @@ DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *
 
 DirectoryModel::~DirectoryModel() {
     m_loader.clearTasks();
-    delete scaler;
 }
 
 int DirectoryModel::totalCount() const {
@@ -304,13 +302,11 @@ std::shared_ptr<Image> DirectoryModel::getImage(const QString &filePath) {
 }
 
 void DirectoryModel::updateImage(const QString &filePath, std::shared_ptr<Image> img) {
-    if(containsFile(filePath) /*& cache.contains(filePath)*/) {
-        if(!m_cache.contains(filePath)) {
-            m_cache.insert(img);
-        } else {
-            m_cache.insert(img);
+    if(containsFile(filePath)) {
+        const bool cached = m_cache.contains(filePath);
+        m_cache.insert(img);
+        if(cached)
             emit imageUpdated(filePath);
-        }
     }
 }
 

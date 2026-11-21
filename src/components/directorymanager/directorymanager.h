@@ -29,8 +29,6 @@ class EngineBridge;
 
 class DirectoryManager;
 
-typedef bool (DirectoryManager::*CompareFunction)(const FSEntry &e1, const FSEntry &e2) const;
-
 //TODO: rename? EntrySomething?
 
 class DirectoryManager : public QObject {
@@ -184,8 +182,7 @@ class DirectoryManager : public QObject {
 
     // Directories only ever order by name: the engine's comparator lands on
     // its name tiebreak because scan.rs gives every directory the same
-    // size/mtime defaults. The bypass's local sort and the engine's own order
-    // both ask for this one rule.
+    // size/mtime defaults.
 
     bool checkFileRange(int index) const;
     bool checkDirRange(int index) const;

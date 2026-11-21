@@ -22,6 +22,8 @@ class Cache {
     std::shared_ptr<Image> get(const QString &path);
     bool release(const QString &path);
     bool reserve(const QString &path);
+    // test-only: the cache's contents as keys, so a suite can assert what a
+    // duplicate insert or a trim actually stored. Production reads through get.
     const QList<QString> keys() const;
 
   private:

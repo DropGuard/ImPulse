@@ -19,7 +19,8 @@ class DirectoryModel : public QObject {
     DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent = nullptr);
     ~DirectoryModel() override;
 
-    Scaler *scaler = nullptr;
+    // public: Core connects its scalingFinished and drives requests through it
+    std::unique_ptr<Scaler> scaler;
 
     void load(const QString &filePath, bool asyncHint);
     void load(const QString &filePath, bool asyncHint, bool scaled);

@@ -87,13 +87,11 @@ EngineHandle::~EngineHandle() {
 }
 
 void EngineHandle::adopt(void *created) {
-    auto *adopted = static_cast<qimgv_engine *>(created);
-    if(m_d->engine == adopted)
-        return;
-    qimgv_engine *old = m_d->engine;
-    m_d->engine = adopted;
-    if(old)
-        qimgv_engine_free(old);
+    // called once, from the constructor, while m_d->engine is still null: the
+    // engine is born here and never re-adopted over a live one (the destructor
+    // is the only thing that frees it, and it joins the engine's threads first)
+    Q_ASSERT(!m_d->engine);
+    m_d->engine = static_cast<qimgv_engine *>(created);
 }
 
 EngineHandle::operator bool() const {
@@ -141,10 +139,6 @@ int EngineBridge::dirCount() const {
         return 0;
     const int n = qimgv_engine_dir_count(m_engine.m_d->engine);
     return n < 0 ? 0 : n;
-}
-
-bool EngineBridge::supportsWatching() {
-    return qimgv_engine_supports_watching() != 0;
 }
 
 bool EngineBridge::traceEnabled() {

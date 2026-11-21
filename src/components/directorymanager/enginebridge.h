@@ -96,7 +96,9 @@ class EngineBridge : public QObject {
     // engine's own event, not from what was requested.
     const QString &listedDirectory() const;
 
-    // synchronous reads of the engine's current listing (for mirroring)
+    // synchronous reads of the engine's current listing. Test-only today:
+    // production mirrors through exportListing below, and everything here
+    // answers for the PREVIOUS directory until the scan lands (see above).
     int fileCount() const;
     int dirCount() const;
     bool entryAt(int index, bool dirs, EngineEntry &out) const;
@@ -118,7 +120,6 @@ class EngineBridge : public QObject {
     // An empty result means "accept everything" (the FFI constructor's NULL).
     static QByteArray extensionListFor(const QList<QByteArray> &formats);
 
-    static bool supportsWatching();
     // The event-path trace, on when QIMGV_ENGINE_TRACE is set to anything but
     // "0". The engine reads the same variable name on its side, so a line
     // printed here and a line printed there are the same run; the seq in

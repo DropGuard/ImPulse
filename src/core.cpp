@@ -201,7 +201,7 @@ void Core::connectComponents() {
     connect(m_overlays, &IOverlayHost::renameRequested, this, &Core::renameCurrentSelection);
     connect(m_overlays, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
 
-    connect(m_model->scaler, &Scaler::scalingFinished, this, &Core::onScalingFinished);
+    connect(m_model->scaler.get(), &Scaler::scalingFinished, this, &Core::onScalingFinished);
 
     if(m_mw)
         connectWindowComponents();
