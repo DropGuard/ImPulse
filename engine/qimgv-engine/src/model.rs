@@ -90,6 +90,15 @@ impl DirectoryState {
         self.reorder();
     }
 
+    /// Records the sort a listing is asked for, without reordering anything.
+    /// For an open: the listing this mode will govern does not exist yet, and
+    /// resorting the outgoing one would spend an O(n log n) pass on rows
+    /// `replace_all` is about to discard — and strand a revision bump that no
+    /// event will ever carry. The reorder happens when the listing lands.
+    pub fn set_sort_mode(&mut self, sort: SortMode) {
+        self.sort = sort;
+    }
+
     fn reorder(&mut self) {
         // the one place an order is decided, so the one place the version
         // moves for an order change

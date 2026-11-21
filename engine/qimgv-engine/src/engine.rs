@@ -238,7 +238,10 @@ impl Engine {
                                 Err(_) | Ok(Command::Shutdown) => break,
                                 Ok(Command::OpenDir { path, sort, epoch: e }) => {
                                     if let Some(mode) = sort {
-                                        state_write(&state).resort(mode);
+                                        // record the mode, reorder nothing: the outgoing
+                                        // listing is about to be replaced wholesale, and a
+                                        // resort here would strand a bump no event carries
+                                        state_write(&state).set_sort_mode(mode);
                                     }
                                     let mut req = ListingRequest {
                                         dir: path.clone(),
