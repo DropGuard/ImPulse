@@ -162,16 +162,14 @@ void EngineBridge::stopWatch() {
         qimgv_engine_stop_watch(m_engine.m_d->engine);
 }
 
-bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount, quint64 &revision) {
+bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount) {
     if(!m_engine)
         return false;
     uint32_t needed = 0, fc = 0, dc = 0;
-    uint64_t rev = 0;
-    if(qimgv_engine_export_listing(m_engine.m_d->engine, nullptr, 0, &needed, &fc, &dc, &rev) == QIMGV_OK) {
+    if(qimgv_engine_export_listing(m_engine.m_d->engine, nullptr, 0, &needed, &fc, &dc) == QIMGV_OK) {
         out.clear(); // empty listing
         fileCount = fc;
         dirCount = dc;
-        revision = rev;
         return true;
     }
     // Probe-then-write is two lock passes, and the listing is not frozen between
@@ -182,7 +180,7 @@ bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &d
     for(int attempt = 0;; ++attempt) {
         out.resize(int(needed));
         const int rc = qimgv_engine_export_listing(m_engine.m_d->engine, reinterpret_cast<unsigned char *>(out.data()),
-                                                   size_t(out.size()), &needed, &fc, &dc, &rev);
+                                                   size_t(out.size()), &needed, &fc, &dc);
         if(rc == QIMGV_OK) {
             // A successful write fills `needed` bytes and no more, and `needed`
             // may be SMALLER than the buffer this loop grew to on a previous
@@ -199,9 +197,6 @@ bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &d
     }
     fileCount = fc;
     dirCount = dc;
-    // `rev` came back with the pass that actually wrote these bytes: an earlier
-    // round's number would name a listing the caller does not hold
-    revision = rev;
     return true;
 }
 
@@ -364,10 +359,9 @@ void EngineBridge::drainEvents() {
             emit dirListed(subject);
         } else if(ev.kind == QIMGV_EVENT_SORT_CHANGED) {
             m_listedDir = subject;
-            emit sortChanged(subject, ev.revision);
+            emit sortChanged(subject);
         } else if(ev.kind == QIMGV_EVENT_DIR_MUTATED) {
-            emit dirMutated(mut.kind, subject, mut.is_dir != 0, mut.size, mut.mtime_ms, mut.index, oldPath,
-                            ev.revision);
+            emit dirMutated(mut.kind, subject, mut.is_dir != 0, mut.size, mut.mtime_ms, mut.index, oldPath);
         } else if(ev.kind == QIMGV_EVENT_OPEN_FAILED) {
             qWarning() << "[EngineBridge] open failed:" << subject << "code" << ev.code
                        << (qimgv_last_error() ? qimgv_last_error() : "");

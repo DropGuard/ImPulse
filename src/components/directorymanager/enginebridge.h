@@ -100,11 +100,8 @@ class EngineBridge : public QObject {
     int fileCount() const;
     int dirCount() const;
     bool entryAt(int index, bool dirs, EngineEntry &out) const;
-    // Bulk pull: the whole listing serialized in one engine lock pass, and the
-    // version it was taken at. The two come back together because they mean
-    // one thing — without the revision a reader can only compare two pulls and
-    // hope nothing moved between them.
-    bool exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount, quint64 &revision);
+    // bulk pull: the whole listing serialized in one engine lock pass
+    bool exportListing(QByteArray &out, quint32 &fileCount, quint32 &dirCount);
     // Decodes the arena produced by exportListing (wire format documented in
     // model.rs::write_listing). Static and side-effect free so the producer and
     // this consumer can be round-tripped against each other in a test.
@@ -131,10 +128,10 @@ class EngineBridge : public QObject {
   signals:
     void dirListed(const QString &dirPath);
     // the same rows, reordered: the mirror permutes what it holds
-    void sortChanged(const QString &dirPath, quint64 revision);
+    void sortChanged(const QString &dirPath);
     void openFailed(const QString &dirPath, int statusCode);
     void dirMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
-                    const QString &oldPath, quint64 revision);
+                    const QString &oldPath);
 
   private:
     static void notifyCb(void *user);

@@ -79,42 +79,6 @@ TEST_F(TestListing, aSortIsAPermutationNotARelisting) {
     EXPECT_EQ(dm.filePathAt(2), m_fixtureDir + "/img1.jpg");
 }
 
-// The revision is what makes "the mirror and the engine at one instant" a
-// question with an answer. Every path that changes the rows moves it — the
-// initial listing, a watcher mutation, a sort — and it always equals the
-// number the engine reports for the listing it came from.
-TEST_F(TestListing, theMirrorRevisionTracksTheEngineItApplied) {
-    resetFixture();
-    DirectoryManager dm{EngineBridge::instance()};
-    auto &bridge = EngineBridge::instance();
-    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
-    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
-
-    auto exportRevision = [&bridge]() {
-        QByteArray arena;
-        quint32 fc = 0, dc = 0;
-        quint64 rev = 0;
-        return bridge.exportListing(arena, fc, dc, rev) ? rev : 0;
-    };
-
-    ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() != 0, 10000);
-    ASSERT_TRY_EQ_TIMEOUT(dm.appliedRevision(), exportRevision(), 10000);
-
-    const quint64 afterListing = dm.appliedRevision();
-
-    // a watcher mutation moves both
-    makeFile("revision-moves.jpg");
-    ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(m_fixtureDir + "/revision-moves.jpg"), 10000);
-    EXPECT_TRUE(dm.appliedRevision() > afterListing) << "a mutation did not move the mirror's revision";
-    ASSERT_TRY_EQ_TIMEOUT(dm.appliedRevision(), exportRevision(), 10000);
-
-    // and a sort does too, without touching the row set
-    const quint64 afterMutation = dm.appliedRevision();
-    dm.setSortingMode(SORT_NAME_DESC);
-    ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() > afterMutation, 10000);
-    ASSERT_TRY_EQ_TIMEOUT(dm.appliedRevision(), exportRevision(), 10000);
-}
-
 TEST_F(TestListing, missingDirectoryFailsFast) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
@@ -481,8 +445,7 @@ TEST_F(TestListing, mutationsOutsideTheMirroredDirectoryAreDropped) {
     EXPECT_TRUE(before > 0);
 
     QSignalSpy added(&dm, &DirectoryManager::fileAdded);
-    emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/x.jpg"), false, 1, 0, 0, QString(),
-                           dm.appliedRevision());
+    emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/x.jpg"), false, 1, 0, 0, QString());
     EXPECT_EQ(added.count(), 0);
     EXPECT_EQ(dm.fileCount(), before);
     EXPECT_TRUE(!dm.containsFile(QStringLiteral("/some/other/place/x.jpg")));
@@ -492,8 +455,7 @@ TEST_F(TestListing, mutationsOutsideTheMirroredDirectoryAreDropped) {
     // collide — it would simply gain a row for a file that is not here, at
     // an index computed against the other folder's order.
     const QString twin = QFileInfo(dm.filePathAt(0)).fileName();
-    emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/") + twin, false, 1, 0, 1, QString(),
-                           dm.appliedRevision());
+    emit bridge.dirMutated(QIMGV_MUT_ADDED, QStringLiteral("/some/other/place/") + twin, false, 1, 0, 1, QString());
     EXPECT_EQ(added.count(), 0);
     EXPECT_EQ(dm.fileCount(), before);
 
@@ -520,7 +482,7 @@ TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
 
     // legal destination, foreign source — the shape the guard exists for
     emit bridge.dirMutated(QIMGV_MUT_RENAMED, m_fixtureDir + "/img1.jpg", false, 1, 0, 0,
-                           QStringLiteral("/some/other/place/x.jpg"), dm.appliedRevision());
+                           QStringLiteral("/some/other/place/x.jpg"));
     EXPECT_EQ(renamed.count(), 0);
     EXPECT_EQ(removed.count(), 0);
     EXPECT_EQ(dm.fileCount(), before);

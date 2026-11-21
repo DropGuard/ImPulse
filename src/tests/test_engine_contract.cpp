@@ -195,20 +195,12 @@ int main() {
 
     // bulk export: the cap=0 probe must report the size, then fit exactly
     uint32_t needed = 0, fc = 0, dc = 0;
-    uint64_t revision = 0;
-    CHECK(qimgv_engine_export_listing(engine, nullptr, 0, &needed, &fc, &dc, &revision) == QIMGV_ERR_TRUNCATED);
+    CHECK(qimgv_engine_export_listing(engine, nullptr, 0, &needed, &fc, &dc) == QIMGV_ERR_TRUNCATED);
     CHECK(needed > 8);
     std::vector<unsigned char> arena(needed);
-    CHECK(qimgv_engine_export_listing(engine, arena.data(), arena.size(), &needed, &fc, &dc, &revision) == QIMGV_OK);
+    CHECK(qimgv_engine_export_listing(engine, arena.data(), arena.size(), &needed, &fc, &dc) == QIMGV_OK);
     CHECK(fc == 2);
     CHECK(dc == 1);
-    // the revision travels with the bytes: two exports of an unchanged listing
-    // report the same number, and it is not the "no listing" zero
-    CHECK(revision != 0);
-    uint32_t needed2 = 0, fc2 = 0, dc2 = 0;
-    uint64_t revision2 = 0;
-    CHECK(qimgv_engine_export_listing(engine, nullptr, 0, &needed2, &fc2, &dc2, &revision2) == QIMGV_ERR_TRUNCATED);
-    CHECK(revision2 == revision);
 
     qimgv_engine_free(engine);
 

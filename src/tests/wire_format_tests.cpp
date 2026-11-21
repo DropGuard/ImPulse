@@ -29,8 +29,7 @@ TEST_F(TestWireFormat, listingArenaRoundTripsThroughTheCppParser) {
 
     QByteArray arena;
     quint32 fc = 0, dc = 0;
-    quint64 revision = 0;
-    EXPECT_TRUE(bridge.exportListing(arena, fc, dc, revision));
+    EXPECT_TRUE(bridge.exportListing(arena, fc, dc));
     EXPECT_EQ(int(fc), bridge.fileCount());
     EXPECT_EQ(int(dc), bridge.dirCount());
 
@@ -69,8 +68,7 @@ TEST_F(TestWireFormat, unicodeNamesSurviveTheArenaByteForByte) {
 
     QByteArray arena;
     quint32 fc = 0, dc = 0;
-    quint64 revision = 0;
-    EXPECT_TRUE(bridge.exportListing(arena, fc, dc, revision));
+    EXPECT_TRUE(bridge.exportListing(arena, fc, dc));
     std::vector<EngineBridge::EngineEntry> files, dirs;
     EXPECT_TRUE(EngineBridge::parseListing(arena, files, dirs));
 
@@ -93,8 +91,7 @@ TEST_F(TestWireFormat, truncatedArenaStopsAtARecordBoundary) {
 
     QByteArray arena;
     quint32 fc = 0, dc = 0;
-    quint64 revision = 0;
-    EXPECT_TRUE(bridge.exportListing(arena, fc, dc, revision));
+    EXPECT_TRUE(bridge.exportListing(arena, fc, dc));
     std::vector<EngineBridge::EngineEntry> fullFiles, fullDirs;
     EXPECT_TRUE(EngineBridge::parseListing(arena, fullFiles, fullDirs));
     EXPECT_EQ(int(fullFiles.size()), 3);

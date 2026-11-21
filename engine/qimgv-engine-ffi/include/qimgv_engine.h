@@ -92,13 +92,6 @@ typedef struct qimgv_event {
      * both, which is the difference between "the mirror did not apply it" and
      * "the engine never emitted it". Set QIMGV_ENGINE_TRACE=1 to get both. */
     uint32_t seq;
-    /* The listing version this event leaves the engine at — for DIR_MUTATED
-     * and SORT_CHANGED, the version after the change; for DIR_LISTED, the
-     * version of the listing it announces. A mirror applies the event and
-     * stores this, so `mirror.revision == export.revision` means the rows and
-     * that export came from the same listing. High 32 bits of the engine's
-     * u64 counter; 0 means "no listing". */
-    uint32_t revision;
 } qimgv_event;
 
 typedef struct qimgv_mutation {
@@ -148,12 +141,11 @@ QIMGV_PIN("qimgv_entry_meta.mtime_ms", offsetof(qimgv_entry_meta, mtime_ms) == 1
 QIMGV_PIN("qimgv_entry_meta.is_dir", offsetof(qimgv_entry_meta, is_dir) == 24);
 
 /* (int,int,u32,u32) */
-QIMGV_PIN("qimgv_event", sizeof(qimgv_event) == 20);
+QIMGV_PIN("qimgv_event", sizeof(qimgv_event) == 16);
 QIMGV_PIN("qimgv_event.kind", offsetof(qimgv_event, kind) == 0);
 QIMGV_PIN("qimgv_event.code", offsetof(qimgv_event, code) == 4);
 QIMGV_PIN("qimgv_event.epoch", offsetof(qimgv_event, epoch) == 8);
 QIMGV_PIN("qimgv_event.seq", offsetof(qimgv_event, seq) == 12);
-QIMGV_PIN("qimgv_event.revision", offsetof(qimgv_event, revision) == 16);
 
 /* (int32,int32,u64,int64,int32) — index packs at 24, size pads to 32 */
 QIMGV_PIN("qimgv_mutation", sizeof(qimgv_mutation) == 32);
@@ -268,18 +260,10 @@ int qimgv_engine_take_event(qimgv_engine *engine, qimgv_event *out,
  * (little-endian: u32 file_count, u32 dir_count, then per entry
  * u64 handle, u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
  * name bytes, path bytes — files first, then dirs). Call with cap=0 to
- * query `needed_out`; returns QIMGV_ERR_TRUNCATED when cap is too small.
- *
- * `revision_out` receives the listing's version, read under the same lock as
- * the bytes: it names the listing THIS copy came from. A reader comparing the
- * mirror against an export asks the mirror for its own revision and needs the
- * two to match — that is what makes "same instant" a question with an answer
- * instead of a guess about timing. */
+ * query `needed_out`; returns QIMGV_ERR_TRUNCATED when cap is too small. */
 int qimgv_engine_export_listing(qimgv_engine *engine, unsigned char *buf,
                                 size_t cap, uint32_t *needed_out,
-                                uint32_t *file_count_out, uint32_t *dir_count_out,
-                                uint64_t *revision_out);
-
+                                uint32_t *file_count_out, uint32_t *dir_count_out);
 
 /* Pure function — thread-safe, does not touch the engine instance. One file
  * open, header-only parse. Parse failures are QIMGV_OK with FMT_UNKNOWN and

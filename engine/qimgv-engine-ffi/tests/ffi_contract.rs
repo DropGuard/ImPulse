@@ -38,7 +38,6 @@ fn take_event(engine: *mut QimgvEngine, timeout: Duration) -> Option<(c_int, c_i
             code: QIMGV_OK,
             epoch: 0,
             seq: 0,
-            revision: 0,
         };
         let mut buf = [0 as c_char; 512];
         let mut m = QimgvMutation {
@@ -122,7 +121,6 @@ fn fresh_engine_state_and_free() {
             code: QIMGV_OK,
             epoch: 0,
             seq: 0,
-            revision: 0,
         };
         let mut buf = [0 as c_char; 64];
         let mut m = QimgvMutation {
@@ -316,7 +314,6 @@ fn open_dir_event_queries_and_truncation() {
             code: QIMGV_OK,
             epoch: 0,
             seq: 0,
-            revision: 0,
         };
         let mut buf = [0 as c_char; 64];
         let mut m = QimgvMutation {
@@ -648,7 +645,6 @@ fn a_truncated_take_event_still_owes_the_same_event() {
         code: QIMGV_OK,
         epoch: 0,
         seq: 0,
-        revision: 0,
     };
     let mut tiny = [0 as c_char; 8];
     let mut m = QimgvMutation {
@@ -680,7 +676,6 @@ fn a_truncated_take_event_still_owes_the_same_event() {
         code: QIMGV_OK,
         epoch: 0,
         seq: 0,
-        revision: 0,
     };
     let mut big = vec![0 as c_char; 4096];
     let deadline = Instant::now() + Duration::from_secs(5);
