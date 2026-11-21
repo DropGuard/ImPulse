@@ -31,8 +31,13 @@ pipeline thread).
 ## Everyday commands
 
 ```bash
-# build (warnings are contractual: -Wall -Wextra -Wpedantic, zero is normal)
-cmake --build build -j$(nproc)
+# build (warnings are contractual: -Wall -Wextra -Wpedantic, zero is normal).
+# scripts/build.sh refreshes the mtime of any source whose inode changed but
+# whose mtime did not — cp -p / mv / tar -x restore the old mtime and ninja
+# then prints nothing, so the tree tests a binary that is not the code (rule
+# 7). Plain `cmake --build` is fine for a tree nothing has restored into; the
+# wrapper is the one that cannot be surprised.
+scripts/build.sh
 
 # all tests — the check targets are build-system targets whose DEPENDS fuse
 # the build in front of the run (the LLVM idiom): a green suite on a stale
