@@ -96,22 +96,28 @@ The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
 carry engine-side indices and watcher-statted data, and C++ only splices. The
 monopoly is enforced by a test, not by convention.
 
-**Known wrinkle: one `epoch` field carries three ideas.** An `OpenDir` allocates
-a session id, and `DirListed` reports the one its scan ran under. But `SetSort`
-and `IncludePath` also emit `DirListed` — reusing the event rather than adding
-one — and stamp it with whatever session happens to be current, because they
-have no session of their own. On the C++ side `onEngineDirListed` filters by
-directory, not by session, so a sort change walks the full resync path:
-vectors rebuilt, `fileAdded`/`fileRemoved` re-emitted, for a change that only
-reordered rows.
+**A sort is a permutation, and says so.** `SetSort` used to emit `DirListed`,
+so a reorder walked the full resync path — vectors rebuilt, every row compared
+for arrival and departure — for a change that only moved rows. `SortChanged`
+is its own event now, and the mirror permutes what it already holds by walking
+the engine's export order (that order is still the engine's decision; this
+side only rearranges). No arrival or departure is emitted, because none
+happened.
 
-Nothing is wrong today — the rebuild produces the right listing, and a sort
-that arrives mid-resync is why `mirrorMatchesEngineExport` takes its export
-twice. But the abstraction is carrying three things: session identity, listing
-revision, and sort revision. A `SortChanged { sort_revision }` event would let
-the mirror reorder its own vectors instead of rebuilding, and would let the
-session field mean one thing. It is not done here because it moves the ABI
-(R5), the engine's event set, and the convergence contract at once.
+`IncludePath` still emits `DirListed`: it can change what the listing
+contains, so it is a listing event in fact.
+
+**Open: the mirror has no revision.** A reader that wants "the mirror and the
+engine at the same instant" has no way to ask for one — the export and the
+rows are read separately, and a resync between them makes two honest snapshots
+disagree. `mirrorMatchesEngineExport` works around this by exporting twice and
+requiring the two to be identical, which is rebuilding a consistency guarantee
+by hand in a test helper.
+
+The shape that would fix it: an export that carries the revision it was taken
+at, and a mirror that reports its own, so a reader can retry on a mismatch
+instead of guessing the window. Not done — the only consumer today is that
+test helper, and it moves the ABI and the mirror's state model together.
 
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
