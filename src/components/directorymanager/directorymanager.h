@@ -121,18 +121,27 @@ class DirectoryManager : public QObject {
     const FSEntry m_defaultEntry;
     QString m_directoryPath;
 
-    // rust engine mirror (SOURCE_DIRECTORY only)
-    QString m_engineDir;   // dir we asked the engine to open
-    QString m_mirroredDir; // dir the vectors currently reflect
+    // --- the mirror's position against the engine's -----------------------
+    //
+    // Two layers, and knowing which one a field belongs to is the difference
+    // between reading this class and reverse-engineering it.
+    //
+    // POSITION: where the rows stand. These answer "are the vectors the
+    // engine's rows", and they are the only fields isSettled() reads as
+    // POSITION — the rest of its conditions are about whether work is still
+    // owed, not about where the mirror is.
+    QString m_engineDir;   // the directory we asked the engine to open
+    QString m_mirroredDir; // the directory the vectors currently reflect
     SortingMode m_appliedSort;
-    QTimer *m_rescanTimer = nullptr;
-    bool m_resyncing = false;
     quint64 m_appliedRevision = 0;
-    // requested from inside the mirror and consumed after m_resyncing clears: a
-    // scheduleRescan() call made during mirroring is dropped by its own guard,
-    // which is how the engine-behind rescan never used to happen.
-    bool m_wantRescan = false;
-    int m_rejectedListings = 0;
+
+    // OWED WORK: how the mirror catches up when position says it is behind.
+    // None of these is a fact about the mirror's contents; each is a step in
+    // flight or a step remembered.
+    QTimer *m_rescanTimer = nullptr;
+    bool m_resyncing = false;   // a listing is being applied right now
+    bool m_wantRescan = false;  // markBehind() ran while m_resyncing held
+    int m_rejectedListings = 0; // consecutive refusals, for the log level
     struct PendingListed {
         qint64 token;
         QString dir;

@@ -57,7 +57,11 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     }
     m_directoryPath = dirPath;
     m_engineDir = dirPath;
-    m_appliedSort = m_sortingMode;
+    // NOT m_appliedSort: the sort is not applied yet — the listing that will
+    // carry it has not arrived. Assigning it here made isSettled() true the
+    // instant a directory was reopened while its rows were still the previous
+    // pass's. It moves when a listing lands (mirrorEngineListing), which is
+    // the same moment m_mirroredDir does.
     markListingInSync();
     // a newer open supersedes everything armed for the previous session
     m_pendingOnListed.clear();
@@ -366,8 +370,23 @@ SortingMode DirectoryManager::sortingMode() const {
 }
 
 bool DirectoryManager::isSettled() const {
-    return m_mirroredDir == m_engineDir && m_appliedSort == m_sortingMode && !m_resyncing && !m_wantRescan &&
-           !(m_rescanTimer && m_rescanTimer->isActive());
+    // Two questions, both of which have to be no:
+    //
+    //   POSITION — are the vectors the rows of the directory and sort that
+    //     were asked for? m_appliedSort is not redundant with the directory
+    //     comparison at the moment a listing lands (both move together), but
+    //     setDirectory() assigns it optimistically, so on a same-directory
+    //     reopen it is the sort that is already true while the rows are still
+    //     the previous pass's. The revision is the precise form of the same
+    //     fact and is carried for readers that want it; here the two names
+    //     stay because they read as the same sentence.
+    //
+    //   OWED WORK — is a catch-up step in flight (or remembered, or
+    //     scheduled)? These say nothing about where the mirror is; they say
+    //     the mirror is not done moving.
+    const bool positionMatches = m_mirroredDir == m_engineDir && m_appliedSort == m_sortingMode;
+    const bool workOwed = m_resyncing || m_wantRescan || (m_rescanTimer && m_rescanTimer->isActive());
+    return positionMatches && !workOwed;
 }
 
 // Entry management
