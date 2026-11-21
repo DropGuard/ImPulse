@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use qimgv_engine::watcher::{
     Applied, DropReason, IgnoreReason, Out, Pairer, RawWatchEvent, RawWatchKind, Record,
-    WatchAction, apply_event, classify, event_is_live, is_dir_mask, subject_path,
+    WatchAction, apply_event, apply_event_with_stats, classify, event_is_live, is_dir_mask,
+    subject_path,
 };
 use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode, WatchChangeKind};
 
@@ -168,6 +169,29 @@ fn apply_created_adds_directories_even_though_the_filter_rejects_their_names() {
     }
     assert_eq!(st.dir_count(), 1);
     assert_eq!(st.file_count(), 1, "the pre-existing file is untouched");
+}
+
+#[test]
+fn a_cold_prestat_falls_back_to_a_live_stat() {
+    // apply_event_with_stats must be total over ANY Prestat, the empty one
+    // included: a prediction miss that read as "the file vanished" would
+    // return StatFailed and silently drop a mutation. The live-stat fallback
+    // is what makes the engine's prestat an optimization rather than a
+    // correctness requirement — this pin holds that door open.
+    let (mut st, dir, p) = state_with_file();
+    let filter = NameFilter::from_extensions(["jpg"]);
+    let mut overrides: std::collections::HashSet<std::path::PathBuf> = Default::default();
+
+    std::fs::write(&p, b"new content").unwrap();
+    let ev = raw_event(dir.path(), Some("a.jpg"), false, RawWatchKind::Modified);
+    let cold = qimgv_engine::watcher::Prestat::default();
+    assert!(matches!(
+        apply_event_with_stats(&mut st, &filter, &mut overrides, false, &ev, &cold),
+        WatchAction::Changed {
+            kind: qimgv_engine::watcher::Applied::Modified,
+            ..
+        }
+    ));
 }
 
 #[test]
