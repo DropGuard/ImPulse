@@ -373,13 +373,13 @@ bool DirectoryManager::isSettled() const {
     // Two questions, both of which have to be no:
     //
     //   POSITION — are the vectors the rows of the directory and sort that
-    //     were asked for? m_appliedSort is not redundant with the directory
-    //     comparison at the moment a listing lands (both move together), but
-    //     setDirectory() assigns it optimistically, so on a same-directory
-    //     reopen it is the sort that is already true while the rows are still
-    //     the previous pass's. The revision is the precise form of the same
-    //     fact and is carried for readers that want it; here the two names
-    //     stay because they read as the same sentence.
+    //     were asked for? m_appliedSort is not redundant, and not the same
+    //     fact as the revision either: between a sort request and the engine
+    //     processing it, mutations still arrive in the engine's old order
+    //     and the mirror applies them faithfully — rows match the engine and
+    //     the revision matches, while a request is pending. This term is
+    //     what names that pending state; nothing else in the predicate sees
+    //     it.
     //
     //   OWED WORK — is a catch-up step in flight (or remembered, or
     //     scheduled)? These say nothing about where the mirror is; they say
