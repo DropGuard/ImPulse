@@ -96,29 +96,6 @@ The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
 carry engine-side indices and watcher-statted data, and C++ only splices. The
 monopoly is enforced by a test, not by convention.
 
-**A sort is a permutation, and says so.** `SetSort` used to emit `DirListed`,
-so a reorder walked the full resync path — vectors rebuilt, every row compared
-for arrival and departure — for a change that only moved rows. `SortChanged`
-is its own event now, and the mirror permutes what it already holds by walking
-the engine's export order (that order is still the engine's decision; this
-side only rearranges). No arrival or departure is emitted, because none
-happened.
-
-`IncludePath` still emits `DirListed`: it can change what the listing
-contains, so it is a listing event in fact.
-
-**Open: the mirror has no revision.** A reader that wants "the mirror and the
-engine at the same instant" has no way to ask for one — the export and the
-rows are read separately, and a resync between them makes two honest snapshots
-disagree. `mirrorMatchesEngineExport` works around this by exporting twice and
-requiring the two to be identical, which is rebuilding a consistency guarantee
-by hand in a test helper.
-
-The shape that would fix it: an export that carries the revision it was taken
-at, and a mirror that reports its own, so a reader can retry on a mismatch
-instead of guessing the window. Not done — the only consumer today is that
-test helper, and it moves the ABI and the mirror's state model together.
-
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
 killing one and growing another — so the thumbnail survives, the selection stays

@@ -67,9 +67,10 @@ pub enum Event {
     DirListed { dir: PathBuf, epoch: u64 },
     /// The rows are the same and their order is not. A sort, not a listing:
     /// the mirror permutes what it already holds instead of rebuilding it,
-    /// and the view re-reads. Kept apart from DirListed because the two put
-    /// very different loads on a large folder, and because DirListed's epoch
-    /// is a session id that a sort has none of.
+    /// and the view re-reads. Kept apart from DirListed because on a large
+    /// folder the two are very different loads — rebuilding the model to move
+    /// pointers is work whose answer is already known. The epoch is the
+    /// current session's: a sort belongs to it, but allocates none.
     SortChanged { dir: PathBuf, epoch: u64 },
     OpenFailed {
         dir: PathBuf,
