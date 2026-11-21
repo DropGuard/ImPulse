@@ -108,7 +108,9 @@ refresh_replaced_mtimes() {
         while IFS= read -r -d '' f; do
             m=$(stat -c %Y "$f" 2>/dev/null) || continue
             c=$(stat -c %Z "$f" 2>/dev/null) || continue
-            [ "$m" -lt "$c" ] && touch -c "$f"
+            if [ "$m" -lt "$c" ]; then
+                touch -c "$f"
+            fi
         done
 }
 refresh_replaced_mtimes
