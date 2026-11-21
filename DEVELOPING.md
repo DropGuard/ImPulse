@@ -96,6 +96,23 @@ The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
 carry engine-side indices and watcher-statted data, and C++ only splices. The
 monopoly is enforced by a test, not by convention.
 
+**Known wrinkle: one `epoch` field carries three ideas.** An `OpenDir` allocates
+a session id, and `DirListed` reports the one its scan ran under. But `SetSort`
+and `IncludePath` also emit `DirListed` — reusing the event rather than adding
+one — and stamp it with whatever session happens to be current, because they
+have no session of their own. On the C++ side `onEngineDirListed` filters by
+directory, not by session, so a sort change walks the full resync path:
+vectors rebuilt, `fileAdded`/`fileRemoved` re-emitted, for a change that only
+reordered rows.
+
+Nothing is wrong today — the rebuild produces the right listing, and a sort
+that arrives mid-resync is why `mirrorMatchesEngineExport` takes its export
+twice. But the abstraction is carrying three things: session identity, listing
+revision, and sort revision. A `SortChanged { sort_revision }` event would let
+the mirror reorder its own vectors instead of rebuilding, and would let the
+session field mean one thing. It is not done here because it moves the ABI
+(R5), the engine's event set, and the convergence contract at once.
+
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
 killing one and growing another — so the thumbnail survives, the selection stays
