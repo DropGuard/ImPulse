@@ -15,7 +15,6 @@ class Scaler : public QObject {
 
   signals:
     void scalingFinished(std::shared_ptr<const QImage> result, const ScalerRequest &request);
-    void acceptScalingResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
   public slots:
     void requestScaled(const ScalerRequest &req);
@@ -24,7 +23,6 @@ class Scaler : public QObject {
     // every slot here runs on this object's thread: the pool reports through a
     // queued connection, so the state machine below has exactly one owner
     void onTaskFinish(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
-    void slotForwardScaledResult(std::shared_ptr<const QImage> image, const ScalerRequest &req);
 
   private:
     WorkerPool &m_pool;

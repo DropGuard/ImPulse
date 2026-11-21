@@ -15,7 +15,6 @@ Scaler::Scaler(Cache *_cache, WorkerPool &_pool, QObject *parent)
     // on the UI thread. DirectConnection used to run these slots on the pool
     // thread, where they wrote `running`/`buffered`/`startedRequest` and reached
     // Cache's QMap through a semaphore that nothing else in the app shared.
-    connect(this, &Scaler::acceptScalingResult, this, &Scaler::slotForwardScaledResult, Qt::QueuedConnection);
 }
 
 Scaler::~Scaler() {
@@ -93,16 +92,17 @@ void Scaler::onTaskFinish(std::shared_ptr<const QImage> scaled, const ScalerRequ
         // the discarded result frees itself
         startRequest(m_bufferedRequest);
     } else {
-        emit acceptScalingResult(scaled, req);
+        if(!scaled)
+            return;
+        // Delivered synchronously, on this thread, at a settled point in the
+        // machine: running is false and the buffers are consumed by the time
+        // this emit fires, so a consumer that re-requests from inside its
+        // delivery lands on the clean !running path instead of racing a
+        // half-updated state. QImage crosses the signal boundary — implicitly
+        // shared, and the paint-device conversion is the view's job, on the
+        // GUI thread.
+        emit scalingFinished(scaled, req);
     }
-}
-
-void Scaler::slotForwardScaledResult(std::shared_ptr<const QImage> image, const ScalerRequest &req) {
-    if(!image)
-        return;
-    // QImage crosses the signal boundary — implicitly shared, and the paint-
-    // device conversion is the view's job, on the GUI thread
-    emit scalingFinished(image, req);
 }
 
 void Scaler::startRequest(const ScalerRequest &req) {

@@ -616,17 +616,11 @@ TEST_F(TestMachinery, documentInfoReadsExifOrientationAndTags) {
     EXPECT_EQ(doc.getExifTags().value(QStringLiteral("Date/Time")), QStringLiteral("2024:01:02 03:04:05"));
 }
 
-// The scale pipeline is: worker thread computes the image, Scaler::onTaskFinish
-// runs on that thread (direct connection) and re-emits across a QUEUED hop to the
-// thread Scaler lives on. If the payload has no metatype, Qt drops the call with a
-// warning that scrolls past in the log and the viewer simply never gets a result —
-// silently, with no crash and every symbol still resolving.
-
-// The scale pipeline is: worker thread computes the image, Scaler::onTaskFinish
-// runs on that thread (direct connection) and re-emits across a QUEUED hop to the
-// thread Scaler lives on. If the payload has no metatype, Qt drops the call with a
-// warning that scrolls past in the log and the viewer simply never gets a result —
-// silently, with no crash and every symbol still resolving.
+// The scale pipeline is: worker thread computes the image, its finished signal
+// crosses into the Scaler's thread queued, and onTaskFinish delivers
+// scalingFinished from there. If the payload has no metatype, Qt drops the call
+// with a warning that scrolls past in the log and the viewer simply never gets
+// a result — silently, with no crash and every symbol still resolving.
 TEST_F(TestMachinery, scaledResultSurvivesTheQueuedHop) {
     resetFixture();
     const QSize orig(64, 64);
@@ -646,6 +640,35 @@ TEST_F(TestMachinery, scaledResultSurvivesTheQueuedHop) {
     scaler.requestScaled(ScalerRequest(image, QSize(32, 32), m_fixtureDir + "/real.png", QI_FILTER_BILINEAR, true));
     ASSERT_TRY_EQ_TIMEOUT(delivered, 1, 10000);
     EXPECT_EQ(result->size(), QSize(32, 32));
+}
+
+// The delivery is synchronous and lands at a settled point in the state
+// machine — running is false and the buffers are consumed by the time the
+// emit fires — so a consumer that re-requests from inside its own delivery
+// must land on the clean !running path. The queued self-hop this used to go
+// through deferred the delivery one loop turn as a shield for a re-entrancy
+// point that was already safe; this pin guards the assumption the removal
+// made.
+TEST_F(TestMachinery, aReentrantRequestFromTheDeliveryCallbackLands) {
+    resetFixture();
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/first.png", "png", QSize(64, 64)));
+    EXPECT_TRUE(writeBigImage(m_fixtureDir + "/second.png", "png", QSize(64, 64)));
+    auto first = *ImageFactory::createImage(m_fixtureDir + "/first.png", false, loadPolicy());
+    auto second = *ImageFactory::createImage(m_fixtureDir + "/second.png", false, loadPolicy());
+
+    Cache cache;
+    WorkerPool pool(2);
+    Scaler scaler(&cache, pool);
+    QSet<QString> delivered;
+    QObject::connect(&scaler, &Scaler::scalingFinished, &scaler, [&](std::shared_ptr<const QImage>, ScalerRequest req) {
+        delivered.insert(req.path);
+        if(req.path == m_fixtureDir + "/first.png")
+            scaler.requestScaled(
+                ScalerRequest(second, QSize(32, 32), m_fixtureDir + "/second.png", QI_FILTER_BILINEAR, true));
+    });
+    scaler.requestScaled(ScalerRequest(first, QSize(32, 32), m_fixtureDir + "/first.png", QI_FILTER_BILINEAR, true));
+    ASSERT_TRY_EQ_TIMEOUT(int(delivered.count()), 2, 10000);
+    EXPECT_TRUE(delivered.contains(m_fixtureDir + "/second.png"));
 }
 
 // The equality relation Scaler::startRequest guards its buffer with, pinned
