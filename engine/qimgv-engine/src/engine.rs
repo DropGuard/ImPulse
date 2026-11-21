@@ -63,9 +63,14 @@ pub enum WatchChangeKind {
 
 #[derive(Debug)]
 pub enum Event {
-    /// Directory listing replaced (also emitted after SetSort so the UI
-    /// repopulates; handles stay stable across re-sorts).
+    /// Directory listing replaced. Rows are new, gone or changed.
     DirListed { dir: PathBuf, epoch: u64 },
+    /// The rows are the same and their order is not. A sort, not a listing:
+    /// the mirror permutes what it already holds instead of rebuilding it,
+    /// and the view re-reads. Kept apart from DirListed because the two put
+    /// very different loads on a large folder, and because DirListed's epoch
+    /// is a session id that a sort has none of.
+    SortChanged { dir: PathBuf, epoch: u64 },
     OpenFailed {
         dir: PathBuf,
         error: Arc<EngineError>,
@@ -266,7 +271,7 @@ impl Engine {
                                         st.dir().map(|d| d.to_owned())
                                     };
                                     if let Some(dir) = dir {
-                                        let _ = ev_tx.send(Event::DirListed { dir, epoch: epoch_at() });
+                                        let _ = ev_tx.send(Event::SortChanged { dir, epoch: epoch_at() });
                                         fire_notify(&notify);
                                     }
                                 }

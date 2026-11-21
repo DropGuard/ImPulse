@@ -174,6 +174,7 @@ class DirectoryManager : public QObject {
 
   private slots:
     void onEngineDirListed(const QString &dirPath);
+    void onEngineSortChanged(const QString &dirPath);
     void onEngineOpenFailed(const QString &dirPath, int code);
     void onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
                          const QString &oldPath);

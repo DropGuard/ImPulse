@@ -357,6 +357,9 @@ void EngineBridge::drainEvents() {
         if(ev.kind == QIMGV_EVENT_DIR_LISTED) {
             m_listedDir = subject;
             emit dirListed(subject);
+        } else if(ev.kind == QIMGV_EVENT_SORT_CHANGED) {
+            m_listedDir = subject;
+            emit sortChanged(subject);
         } else if(ev.kind == QIMGV_EVENT_DIR_MUTATED) {
             emit dirMutated(mut.kind, subject, mut.is_dir != 0, mut.size, mut.mtime_ms, mut.index, oldPath);
         } else if(ev.kind == QIMGV_EVENT_OPEN_FAILED) {

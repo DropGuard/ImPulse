@@ -43,6 +43,8 @@ typedef struct qimgv_engine qimgv_engine;
 #define QIMGV_EVENT_DIR_LISTED  1
 #define QIMGV_EVENT_OPEN_FAILED 2
 #define QIMGV_EVENT_DIR_MUTATED 3
+/* The rows are the same, their order is not: permute, do not rebuild. */
+#define QIMGV_EVENT_SORT_CHANGED 4
 
 /* mutation kinds (qimgv_mutation.kind) */
 #define QIMGV_MUT_ADDED    1

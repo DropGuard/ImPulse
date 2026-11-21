@@ -54,6 +54,31 @@ TEST_F(TestListing, directoryManagerOpenIsAsynchronous) {
     EXPECT_EQ(failed.count(), 0);
 }
 
+// A sort is a permutation of rows the mirror already holds. It must not look
+// like a directory re-listing: no row arrives, none leaves, and the view is
+// told to re-read. This is the contract the engine's SetSort half was written
+// for, and it is what separates a 3-row fixture from a 100k-row folder where
+// rebuilding the vectors is the visible cost.
+TEST_F(TestListing, aSortIsAPermutationNotARelisting) {
+    resetFixture();
+    DirectoryManager dm{EngineBridge::instance()};
+    QSignalSpy added(&dm, &DirectoryManager::fileAdded);
+    QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
+    QSignalSpy resort(&dm, &DirectoryManager::sortingChanged);
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    ASSERT_TRY_EQ_TIMEOUT(dm.fileCount(), 3UL, 10000);
+    added.clear();
+    removed.clear();
+
+    dm.setSortingMode(SORT_NAME_DESC);
+    ASSERT_TRY_EQ_TIMEOUT(resort.count(), 1, 10000);
+
+    EXPECT_EQ(added.count(), 0) << "a sort reported rows arriving";
+    EXPECT_EQ(removed.count(), 0) << "a sort reported rows leaving";
+    EXPECT_EQ(dm.filePathAt(0), m_fixtureDir + "/img10.jpg");
+    EXPECT_EQ(dm.filePathAt(2), m_fixtureDir + "/img1.jpg");
+}
+
 TEST_F(TestListing, missingDirectoryFailsFast) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};

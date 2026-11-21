@@ -40,6 +40,7 @@ pub const QIMGV_EVENT_NONE: c_int = 0;
 pub const QIMGV_EVENT_DIR_LISTED: c_int = 1;
 pub const QIMGV_EVENT_OPEN_FAILED: c_int = 2;
 pub const QIMGV_EVENT_DIR_MUTATED: c_int = 3;
+pub const QIMGV_EVENT_SORT_CHANGED: c_int = 4;
 
 // --- mutation kinds (qimgv_mutation.kind) -----------------------------------
 pub const QIMGV_MUT_ADDED: c_int = 1;
@@ -844,6 +845,18 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_DIR_LISTED,
+                                code: QIMGV_OK,
+                                epoch: *epoch as u32,
+                                seq: 0,
+                            };
+                        }
+                        Ok(1)
+                    }
+                    Event::SortChanged { dir, epoch } => {
+                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        unsafe {
+                            *out = QimgvEvent {
+                                kind: QIMGV_EVENT_SORT_CHANGED,
                                 code: QIMGV_OK,
                                 epoch: *epoch as u32,
                                 seq: 0,

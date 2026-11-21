@@ -21,6 +21,7 @@ DirectoryManager::DirectoryManager(EngineBridge &bridge) : m_bridge(bridge), m_s
     connect(settings, &Settings::settingsChanged, this, &DirectoryManager::readSettings);
 
     connect(&m_bridge, &EngineBridge::dirListed, this, &DirectoryManager::onEngineDirListed);
+    connect(&m_bridge, &EngineBridge::sortChanged, this, &DirectoryManager::onEngineSortChanged);
     connect(&m_bridge, &EngineBridge::openFailed, this, &DirectoryManager::onEngineOpenFailed);
     connect(&m_bridge, &EngineBridge::dirMutated, this, &DirectoryManager::onEngineMutated);
     m_appliedSort = m_sortingMode;
@@ -259,6 +260,71 @@ bool DirectoryManager::containsDir(const QString &dirPath) const {
 
 // ##############################################################
 // ###################### PRIVATE METHODS #######################
+// The engine reordered its listing. The rows are the same objects the mirror
+// already holds, so this permutes the vectors instead of rebuilding them and
+// emits no arrival or departure: everything a resync would do here is work
+// whose answer is already known.
+//
+// The order itself is not re-derived on this side — that is the one-writer
+// law. The engine's export is the order, so it is read and walked, and each
+// row is taken from the mirror's own map by path.
+void DirectoryManager::onEngineSortChanged(const QString &dirPath) {
+    if(dirPath != m_engineDir || dirPath != m_mirroredDir)
+        return;
+
+    QByteArray listing;
+    quint32 fileCount = 0, dirCount = 0;
+    if(!m_bridge.exportListing(listing, fileCount, dirCount)) {
+        // the engine has no listing to hand over: make the next openDir the
+        // authority rather than guessing an order here
+        m_wantRescan = true;
+        return;
+    }
+    std::vector<EngineBridge::EngineEntry> files, dirs;
+    if(!EngineBridge::parseListing(listing, files, dirs)) {
+        m_wantRescan = true;
+        return;
+    }
+    if(files.size() != m_fileEntryVec.size() || dirs.size() != m_dirEntryVec.size()) {
+        // not a permutation: something arrived or left without the mirror
+        // hearing about it. A listing resync is the path that can say so.
+        m_wantRescan = true;
+        return;
+    }
+
+    QHash<QString, FSEntry> byPath;
+    byPath.reserve(int(m_fileEntryVec.size()) * 2);
+    for(FSEntry &e : m_fileEntryVec)
+        byPath.insert(e.path, std::move(e));
+    for(const FSEntry &e : m_dirEntryVec)
+        byPath.insert(e.path, e);
+
+    std::vector<FSEntry> reorderedFiles, reorderedDirs;
+    reorderedFiles.reserve(files.size());
+    reorderedDirs.reserve(dirs.size());
+    for(const auto &f : files) {
+        const auto it = byPath.constFind(f.path);
+        if(it == byPath.constEnd()) {
+            m_wantRescan = true; // a path the mirror never held
+            return;
+        }
+        reorderedFiles.push_back(*it);
+    }
+    for(const auto &d : dirs) {
+        const auto it = byPath.constFind(d.path);
+        if(it == byPath.constEnd()) {
+            m_wantRescan = true;
+            return;
+        }
+        reorderedDirs.push_back(*it);
+    }
+
+    m_fileEntryVec = std::move(reorderedFiles);
+    m_dirEntryVec = std::move(reorderedDirs);
+    m_appliedSort = m_sortingMode;
+    emit sortingChanged();
+}
+
 // ##############################################################
 void DirectoryManager::setSortingMode(SortingMode mode) {
     if(mode != m_sortingMode) {
