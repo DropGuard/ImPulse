@@ -332,7 +332,12 @@ def gcc_counts(srcs, versions, memo):
             m = DIAG.match(line)
             if m:
                 found[m.group(3)].add((m.group(1), m.group(2)))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as ex:
+    # LINT_JOBS caps the parallel gcc fan-out (the pass that runs one process
+    # per core by default). Unset means full cores; 0 or an empty value means
+    # the same, so "export LINT_JOBS=8" is the only way in.
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=int(os.environ.get("LINT_JOBS") or os.cpu_count())
+    ) as ex:
         results = list(ex.map(one, srcs))
     if not NOCACHE:
         cache_gc('gcc', {k for _, k in results if k}, '.out')
