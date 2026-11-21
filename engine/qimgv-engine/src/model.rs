@@ -243,15 +243,6 @@ impl DirectoryState {
         Some(idx as u32)
     }
 
-    /// Which order an entry belongs in, by its directory flag.
-    fn order_of(&self, e: &EntryData) -> &Vec<EntryData> {
-        if e.is_dir {
-            &self.dir_order
-        } else {
-            &self.file_order
-        }
-    }
-
     // --- bulk listing export ------------------------------------------------
 
     /// Serializes the whole listing into `buf` (little-endian, one read-lock pass):
