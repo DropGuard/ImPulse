@@ -52,20 +52,20 @@ use crossbeam_channel::Sender;
 /// thread: install the subscription, then enumerate the baseline. Two threads
 /// cannot promise that ordering to each other, which is why a change used to
 /// be able to fall into a gap where it was in neither the snapshot nor any
-/// event — not unnoticed, but undetectable. `session`/`dispatch` ride along so
+/// event — not unnoticed, but undetectable. `epoch`/`dispatch` ride along so
 /// the result can be attributed to the request it answers.
 pub(crate) enum WatchCmd {
-    Watch {
-        path: PathBuf,
-        session: u64,
-        dispatch: u64,
-    },
-    /// Re-enumerate a folder that is already watched (a declared loss: the
-    /// kernel queue overflowed, the folder vanished, or a caller asked).
+    /// Enumerate a folder — optionally (re)installing the subscription first.
+    /// An open asks with `install`, so the subscription and the baseline are
+    /// taken in one order on one thread; the engine's own rescans ask without,
+    /// the folder already being watched (a declared loss: the kernel queue
+    /// overflowed, the folder vanished, or a caller asked). The two were
+    /// separate arms that were structurally identical but for that flag.
     Enumerate {
         path: PathBuf,
-        session: u64,
+        epoch: u64,
         dispatch: u64,
+        install: bool,
     },
     /// Drop the current watch. Explicit, because the previous implementation
     /// of "stop watching" was to add a watch on an empty path and rely on it
@@ -142,7 +142,7 @@ fn dispatch(ev_tx: &Sender<RawWatchEvent>, out: Out, live_wd: Option<i32>) -> bo
 /// listing state.
 fn enumerate_and_report(
     path: &Path,
-    session: u64,
+    epoch: u64,
     dispatch: u64,
     res_tx: &Sender<crate::engine::ScanDone>,
     options: &crate::scan::ScanOptions,
@@ -158,7 +158,7 @@ fn enumerate_and_report(
         })
     });
     let _ = res_tx.send(crate::engine::ScanDone {
-        session,
+        epoch,
         dispatch,
         path: path.to_path_buf(),
         result,

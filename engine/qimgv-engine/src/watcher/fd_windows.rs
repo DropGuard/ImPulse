@@ -633,44 +633,41 @@ fn watcher_loop(
                     }
                     WatchCmd::Enumerate {
                         path,
-                        session,
+                        epoch,
                         dispatch,
+                        install,
                     } => {
-                        enumerate_and_report(&path, session, dispatch, res_tx, options);
-                    }
-                    WatchCmd::Unwatch => {
-                        retire_watch(watch.take(), &mut overlapped, armed);
-                        armed = false;
-                    }
-                    WatchCmd::Watch {
-                        path,
-                        session,
-                        dispatch,
-                    } => {
-                        retire_watch(watch.take(), &mut overlapped, armed);
-                        armed = false;
-                        match open_dir(&path) {
-                            Ok(dir) => {
-                                next_id += 1;
-                                let w = Watch {
-                                    dir,
-                                    path: path.clone(),
-                                    id: next_id,
-                                };
-                                if arm_read(w.dir, completion.raw(), &mut buffer, &mut overlapped) {
-                                    armed = true;
-                                    watch = Some(w);
-                                } else {
-                                    log::warn!(
-                                        "watcher: arm read on {:?}: {}",
-                                        path,
-                                        std::io::Error::last_os_error()
-                                    );
-                                    unsafe { CloseHandle(w.dir) };
+                        if install {
+                            retire_watch(watch.take(), &mut overlapped, armed);
+                            armed = false;
+                            match open_dir(&path) {
+                                Ok(dir) => {
+                                    next_id += 1;
+                                    let w = Watch {
+                                        dir,
+                                        path: path.clone(),
+                                        id: next_id,
+                                    };
+                                    if arm_read(
+                                        w.dir,
+                                        completion.raw(),
+                                        &mut buffer,
+                                        &mut overlapped,
+                                    ) {
+                                        armed = true;
+                                        watch = Some(w);
+                                    } else {
+                                        log::warn!(
+                                            "watcher: arm read on {:?}: {}",
+                                            path,
+                                            std::io::Error::last_os_error()
+                                        );
+                                        unsafe { CloseHandle(w.dir) };
+                                    }
                                 }
-                            }
-                            Err(e) => {
-                                log::warn!("watcher: open {:?}: {e}", path);
+                                Err(e) => {
+                                    log::warn!("watcher: open {:?}: {e}", path);
+                                }
                             }
                         }
                         // The baseline is taken here, by this thread, after
@@ -681,7 +678,11 @@ fn watcher_loop(
                         // land in a gap between the two acts: it is either in
                         // the snapshot or it arrives on the notification
                         // queue afterwards.
-                        enumerate_and_report(&path, session, dispatch, res_tx, options);
+                        enumerate_and_report(&path, epoch, dispatch, res_tx, options);
+                    }
+                    WatchCmd::Unwatch => {
+                        retire_watch(watch.take(), &mut overlapped, armed);
+                        armed = false;
                     }
                 }
             }

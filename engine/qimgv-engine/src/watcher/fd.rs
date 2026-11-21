@@ -214,43 +214,33 @@ fn watcher_loop(
                     WatchCmd::Stop => return,
                     WatchCmd::Enumerate {
                         path,
-                        session,
+                        epoch,
                         dispatch,
+                        install,
                     } => {
-                        enumerate_and_report(&path, session, dispatch, &res_tx, options);
-                    }
-                    WatchCmd::Unwatch => {
-                        if let Some(w) = watch.take() {
-                            let _ = inotify.watches().remove(w);
-                        }
-                        watch_dir = PathBuf::new();
-                    }
-                    WatchCmd::Watch {
-                        path,
-                        session,
-                        dispatch,
-                    } => {
-                        if let Some(w) = watch.take() {
-                            let _ = inotify.watches().remove(w);
-                        }
-                        match inotify.watches().add(
-                            &path,
-                            WatchMask::CREATE
-                                | WatchMask::MODIFY
-                                | WatchMask::DELETE
-                                | WatchMask::MOVED_FROM
-                                | WatchMask::MOVED_TO
-                                | WatchMask::DELETE_SELF
-                                | WatchMask::MOVE_SELF,
-                        ) {
-                            Ok(wd) => {
-                                watch = Some(wd);
-                                watch_dir = path.clone();
+                        if install {
+                            if let Some(w) = watch.take() {
+                                let _ = inotify.watches().remove(w);
                             }
-                            Err(e) => {
-                                log::warn!("watcher: add_watch {:?}: {e}", path);
-                                watch = None;
-                                watch_dir = PathBuf::new();
+                            match inotify.watches().add(
+                                &path,
+                                WatchMask::CREATE
+                                    | WatchMask::MODIFY
+                                    | WatchMask::DELETE
+                                    | WatchMask::MOVED_FROM
+                                    | WatchMask::MOVED_TO
+                                    | WatchMask::DELETE_SELF
+                                    | WatchMask::MOVE_SELF,
+                            ) {
+                                Ok(wd) => {
+                                    watch = Some(wd);
+                                    watch_dir = path.clone();
+                                }
+                                Err(e) => {
+                                    log::warn!("watcher: add_watch {:?}: {e}", path);
+                                    watch = None;
+                                    watch_dir = PathBuf::new();
+                                }
                             }
                         }
                         // The baseline is taken here, by this thread, after the
@@ -260,7 +250,13 @@ fn watcher_loop(
                         // thread can enumerate this folder, so a change cannot land
                         // in a gap between the two acts: it is either in the snapshot
                         // or it arrives on the event queue afterwards.
-                        enumerate_and_report(&path, session, dispatch, &res_tx, options);
+                        enumerate_and_report(&path, epoch, dispatch, &res_tx, options);
+                    }
+                    WatchCmd::Unwatch => {
+                        if let Some(w) = watch.take() {
+                            let _ = inotify.watches().remove(w);
+                        }
+                        watch_dir = PathBuf::new();
                     }
                 }
             }

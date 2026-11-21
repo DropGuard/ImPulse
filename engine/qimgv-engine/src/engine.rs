@@ -26,7 +26,7 @@ pub enum Command {
     /// Opens a directory. `sort` is applied atomically with the scan (one
     /// DirListed event) — passing it separately would emit a stale resort
     /// event for the *previous* directory's state. `epoch` identifies the
-    /// session (allocated by the caller via `next_epoch`).
+    /// request (allocated by the caller via `next_epoch`).
     OpenDir {
         path: PathBuf,
         sort: Option<SortMode>,
@@ -113,10 +113,10 @@ pub struct EngineConfig {
 }
 
 /// One enumeration the watcher thread owes back to the loop: which request it
-/// answers (`session`, `dispatch`) and which folder was read.
+/// answers (`epoch`, `dispatch`) and which folder was read.
 /// One directory-listing request, and the only place the loop decides whether a
 /// result is still wanted. It replaces three loose counters that each answered a
-/// piece of that question — `session` (whose answer the FFI filters on), a dispatch
+/// piece of that question — `epoch` (whose answer the FFI filters on), a dispatch
 /// number (newest scan writes the listing), and `watch_gen` (does this event belong
 /// to the folder on screen, now answered by the event's own directory) — and adds
 /// the two the counters could not express at all: whether a scan is in flight, and
@@ -127,18 +127,18 @@ pub struct EngineConfig {
 /// sets while their counts agreed.
 struct ListingRequest {
     dir: PathBuf,
-    session: u64,
+    epoch: u64,
     dispatch: u64,
 }
 
 impl ListingRequest {
-    /// Take the listing again, as the same session: a rescan answers the request
+    /// Take the listing again, as the same epoch: a rescan answers the request
     /// that already exists, it does not start one.
     fn rescan(&mut self, next: &mut u64) -> ScanJob {
         *next += 1;
         self.dispatch = *next;
         ScanJob {
-            session: self.session,
+            epoch: self.epoch,
             dispatch: self.dispatch,
             path: self.dir.clone(),
         }
@@ -146,12 +146,12 @@ impl ListingRequest {
 }
 
 pub(crate) struct ScanJob {
-    session: u64,
+    epoch: u64,
     dispatch: u64,
     path: PathBuf,
 }
 pub(crate) struct ScanDone {
-    pub(crate) session: u64,
+    pub(crate) epoch: u64,
     pub(crate) dispatch: u64,
     pub(crate) path: PathBuf,
     pub(crate) result: Result<ScanOutput, EngineError>,
@@ -245,17 +245,18 @@ impl Engine {
                                     }
                                     let mut req = ListingRequest {
                                         dir: path.clone(),
-                                        session: e,
+                                        epoch: e,
                                         dispatch: 0,
                                     };
                                     let job = req.rescan(&mut next_dispatch);
                                     listing = Some(req);
                                     #[cfg(any(target_os = "linux", windows))]
                                     if let Some(w) = &watcher {
-                                        w.send(watcher::WatchCmd::Watch {
+                                        w.send(watcher::WatchCmd::Enumerate {
                                             path: job.path,
-                                            session: job.session,
+                                            epoch: job.epoch,
                                             dispatch: job.dispatch,
+                                            install: true,
                                         });
                                     }
                                 }
@@ -272,8 +273,9 @@ impl Engine {
                                         if let Some(w) = &watcher {
                                             w.send(watcher::WatchCmd::Enumerate {
                                                 path: job.path,
-                                                session: job.session,
+                                                epoch: job.epoch,
                                                 dispatch: job.dispatch,
+                                                install: false,
                                             });
                                         }
                                     }
@@ -356,7 +358,7 @@ impl Engine {
                                     );
                                     let _ = ev_tx.send(Event::DirListed {
                                         dir,
-                                        epoch: done.session,
+                                        epoch: done.epoch,
                                         revision: applied_revision,
                                     });
                                     fire_notify(&notify);
@@ -365,7 +367,7 @@ impl Engine {
                                     let _ = ev_tx.send(Event::OpenFailed {
                                         dir: done.path,
                                         error: Arc::new(e),
-                                        epoch: done.session,
+                                        epoch: done.epoch,
                                     });
                                     fire_notify(&notify);
                                 }
@@ -389,7 +391,7 @@ impl Engine {
                                     });
                                     continue;
                                 }
-                                let req_session = listing.as_ref().map(|r| r.session).unwrap_or(0);
+                                let req_epoch = listing.as_ref().map(|r| r.epoch).unwrap_or(0);
                                 let action = {
                                     let mut st = state_write(&state);
                                     let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
@@ -442,7 +444,7 @@ impl Engine {
                                         };
                                         next_mutation += 1;
                                         crate::trace::line("emit", || format!(
-                                            "seq={next_mutation} {kind:?} {path} index={index} session={req_session}"));
+                                            "seq={next_mutation} {kind:?} {path} index={index} epoch={req_epoch}"));
                                         let _ = ev_tx.send(Event::Mutated {
                                             seq: next_mutation,
                                             revision: applied_revision,
@@ -452,7 +454,7 @@ impl Engine {
                                             size,
                                             mtime_ms,
                                             index,
-                                            epoch: req_session,
+                                            epoch: req_epoch,
                                         });
                                         fire_notify(&notify);
                                     }
@@ -508,13 +510,13 @@ impl Engine {
         (needed, files, dirs, st.revision())
     }
 
-    /// Current session epoch; bumped by every OpenDir/rescan.
+    /// Current epoch; bumped by every OpenDir/rescan.
     pub fn epoch(&self) -> u64 {
         self.epoch.load(Ordering::Relaxed)
     }
 
-    /// Allocates the session epoch for an OpenDir the caller is about to send.
-    /// Allocates the id of a NEW request. It is the only place a session id is
+    /// Allocates the epoch for an OpenDir the caller is about to send.
+    /// Allocates the id of a NEW request. It is the only place an epoch is
     /// born: the loop's own rescan (queue overflow, the watched folder deleted)
     /// re-answers the session that is already current and must not allocate here,
     /// because the stale-scan guard below asks "am I the newest" — so an internal
