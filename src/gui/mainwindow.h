@@ -27,7 +27,7 @@ class CropController;
 #include "components/actionmanager/actionmanager.h"
 #include "settings.h"
 #include "gui/viewers/documentwidget.h"
-#include "gui/folderview/folderviewproxy.h"
+#include "gui/folderview/folderview.h"
 #include "gui/panels/infobar/infobarproxy.h"
 
 #ifdef USE_KDE_BLUR
@@ -49,8 +49,8 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
     void showAnimation(const std::shared_ptr<QMovie> &movie) override;
     void showVideo(const QString &file) override;
 
-    FolderViewProxy *getFolderView();
-    ThumbnailStripProxy *getThumbnailPanel();
+    FolderView *getFolderView();
+    ThumbnailStrip *getThumbnailPanel();
 
     ViewMode currentViewMode();
     WindowShell *shell();
@@ -76,7 +76,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
 
     bool m_showInfoBarFullscreen, m_showInfoBarWindowed;
     DocumentWidget *m_docWidget = nullptr;
-    FolderViewProxy *m_folderView = nullptr;
+    FolderView *m_folderView = nullptr;
     CentralWidget *m_centralWidget = nullptr;
     SidePanel *m_sidePanel;
     FullscreenInfoOverlayProxy *m_infoBarFullscreen;
@@ -110,7 +110,7 @@ class MW : public FloatingWidgetContainer, public IUserInteractions, public ICor
         InfoBarProxy *infoBarWindowed;
         DocumentWidget *doc;
         DialogHost *dialog;
-        FolderViewProxy *folderView;
+        FolderView *folderView;
         CentralWidget *central;
         FullscreenInfoOverlayProxy *infoBarFullscreen;
         SidePanel *sidePanel;

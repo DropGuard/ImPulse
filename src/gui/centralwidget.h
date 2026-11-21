@@ -1,14 +1,14 @@
 #pragma once
 
 #include <QStackedWidget>
-#include "gui/folderview/folderviewproxy.h"
+#include "gui/folderview/folderview.h"
 #include "gui/viewers/documentwidget.h"
 #include "settings.h"
 
 class CentralWidget : public QStackedWidget {
     Q_OBJECT
   public:
-    explicit CentralWidget(DocumentWidget *_docWidget, FolderViewProxy *_folderView, QWidget *parent = nullptr);
+    explicit CentralWidget(DocumentWidget *_docWidget, FolderView *_folderView, QWidget *parent = nullptr);
 
     ViewMode currentViewMode();
   signals:
@@ -20,7 +20,7 @@ class CentralWidget : public QStackedWidget {
 
   private:
     DocumentWidget *m_documentView = nullptr;
-    FolderViewProxy *m_folderView = nullptr;
+    FolderView *m_folderView = nullptr;
     // MODE_FOLDER, not MODE_DOCUMENT: the ctor calls showDocumentView(),
     // which early-returns on MODE_DOCUMENT (the other value is MODE_FOLDERVIEW) — an uninitialized or
     // document-initialized mode would skip the first full setup (UBSan catch)

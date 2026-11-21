@@ -301,6 +301,7 @@ void FolderView::onRootBtn() {
 }
 
 void FolderView::setDirectoryPath(QString path) {
+    m_directoryPath = path;
 #ifdef __linux
     if(path.startsWith(QDir::homePath())) {
         if(m_dirModel->rootPath() != QDir::homePath()) {

@@ -317,16 +317,16 @@ void Core::connectWindowActions() {
     actionManager->connectAction("toggleMute", m_mw->viewer(), &ViewerWidget::toggleMute);
     actionManager->connectAction("volumeUp", m_mw->viewer(), &ViewerWidget::volumeUp);
     actionManager->connectAction("volumeDown", m_mw->viewer(), &ViewerWidget::volumeDown);
-    actionManager->connectAction("gridSelectNext", m_mw->getFolderView(), &FolderViewProxy::gridSelectNext);
-    actionManager->connectAction("gridSelectPrev", m_mw->getFolderView(), &FolderViewProxy::gridSelectPrev);
-    actionManager->connectAction("gridSelectAbove", m_mw->getFolderView(), &FolderViewProxy::gridSelectAbove);
-    actionManager->connectAction("gridSelectBelow", m_mw->getFolderView(), &FolderViewProxy::gridSelectBelow);
-    actionManager->connectAction("gridPageUp", m_mw->getFolderView(), &FolderViewProxy::gridPageUp);
-    actionManager->connectAction("gridPageDown", m_mw->getFolderView(), &FolderViewProxy::gridPageDown);
-    actionManager->connectAction("gridSelectFirst", m_mw->getFolderView(), &FolderViewProxy::gridSelectFirst);
-    actionManager->connectAction("gridSelectLast", m_mw->getFolderView(), &FolderViewProxy::gridSelectLast);
-    actionManager->connectAction("gridSelectAll", m_mw->getFolderView(), &FolderViewProxy::gridSelectAll);
-    actionManager->connectAction("gridOpen", m_mw->getFolderView(), &FolderViewProxy::activateCurrent);
+    actionManager->connectAction("gridSelectNext", m_mw->getFolderView(), &FolderView::gridSelectNext);
+    actionManager->connectAction("gridSelectPrev", m_mw->getFolderView(), &FolderView::gridSelectPrev);
+    actionManager->connectAction("gridSelectAbove", m_mw->getFolderView(), &FolderView::gridSelectAbove);
+    actionManager->connectAction("gridSelectBelow", m_mw->getFolderView(), &FolderView::gridSelectBelow);
+    actionManager->connectAction("gridPageUp", m_mw->getFolderView(), &FolderView::gridPageUp);
+    actionManager->connectAction("gridPageDown", m_mw->getFolderView(), &FolderView::gridPageDown);
+    actionManager->connectAction("gridSelectFirst", m_mw->getFolderView(), &FolderView::gridSelectFirst);
+    actionManager->connectAction("gridSelectLast", m_mw->getFolderView(), &FolderView::gridSelectLast);
+    actionManager->connectAction("gridSelectAll", m_mw->getFolderView(), &FolderView::gridSelectAll);
+    actionManager->connectAction("gridOpen", m_mw->getFolderView(), &FolderView::activateCurrent);
     // the folder view's Ctrl+V. Landed on Core, not the grid: the destination
     // is the model's directory and the work is interactiveCopy, both of which
     // the grid surface has no business owning.

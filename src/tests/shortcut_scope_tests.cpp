@@ -16,7 +16,7 @@
 #include "gui/dialogs/settingsdialog.h"
 #include "actions_table.h"
 #include "gui/folderview/folderview.h"
-#include "gui/folderview/folderviewproxy.h"
+#include "gui/folderview/folderview.h"
 #include "gui/customwidgets/iconbutton.h"
 
 class TestShortcutScope : public ::testing::Test {
@@ -347,7 +347,7 @@ TEST_F(TestShortcutScope, defaultKeymapProjectsOntoTheRegistry) {
 // NavigationController::loadPath. It did not — MainWindow created
 // DialogHost AFTER setupUi, so the connect inside setupUi bound a null
 // receiver and both the home and root buttons did nothing for the life of
-// the feature. Qt said so on every start ("connect(FolderViewProxy,
+// the feature. Qt said so on every start ("connect(FolderView,
 // Unknown): invalid nullptr parameter") into a log nobody read; this pin
 // is what says it in a suite.
 TEST_F(TestShortcutScope, theFolderViewsHomeButtonReachesTheNavigator) {
@@ -361,9 +361,7 @@ TEST_F(TestShortcutScope, theFolderViewsHomeButtonReachesTheNavigator) {
         10000));
 
     auto *proxy = core.mainWindow()->getFolderView();
-    proxy->init();
-    auto *folderView = proxy->findChild<FolderView *>();
-    EXPECT_TRUE(folderView) << "no FolderView under the proxy";
+    auto *folderView = proxy;
     auto *homeBtn = folderView->findChild<IconButton *>(QStringLiteral("homeButton"));
     EXPECT_TRUE(homeBtn) << "the folder view has no home button";
 
@@ -388,7 +386,6 @@ TEST_F(TestShortcutScope, gridFocusAnswersThroughTheGridsTable) {
         },
         10000));
     auto *proxy = core.mainWindow()->getFolderView();
-    proxy->init(); // materializes the real FolderView (and its grid)
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
 
@@ -424,7 +421,6 @@ TEST_F(TestShortcutScope, resolverAnswersTheLiveTableWithoutADeclaimPass) {
         },
         10000));
     auto *proxy = core.mainWindow()->getFolderView();
-    proxy->init();
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
     QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
@@ -469,7 +465,6 @@ TEST_F(TestShortcutScope, tokenWalkAnswersThroughTheSameTables) {
         },
         10000));
     auto *proxy = core.mainWindow()->getFolderView();
-    proxy->init();
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
 
@@ -606,7 +601,6 @@ TEST_F(TestShortcutScope, returnKeyMeansFolderViewInTheDocumentAndGridOpenInTheG
 
     // that very delivery switched to the folder view; the grid surfaces
     auto *proxy = mw->getFolderView();
-    proxy->init();
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
     EXPECT_TRUE(QTest::qWaitFor(
@@ -803,7 +797,6 @@ TEST_F(TestShortcutScope, viewSwitchKeepsBothScopesLiveWithoutRebuilding) {
     // switch to the folder view (the real observer path, not a direct call)
     EXPECT_TRUE(actionManager->invokeAction(QStringLiteral("folderView")));
     auto *proxy = mw->getFolderView();
-    proxy->init();
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
     grid->setFocus();

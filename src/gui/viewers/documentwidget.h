@@ -13,7 +13,7 @@ class DocumentWidget : public FloatingWidgetContainer {
   public:
     DocumentWidget(ViewerWidget *viewWidget, InfoBarProxy *infoBar, QWidget *parent = nullptr);
     ViewerWidget *viewWidget();
-    ThumbnailStripProxy *thumbPanel();
+    ThumbnailStrip *thumbPanel();
     void setFocus();
     void hideFloatingPanel();
     void hideFloatingPanel(bool animated);

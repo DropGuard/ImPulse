@@ -22,7 +22,7 @@ class DirectoryPresenter : public QObject {
     // pointer-to-member connect cannot be written against the interface (measured:
     // &IDirectoryView::itemActivated does not compile). It is written against the
     // concrete type instead, which every caller already has: MW hands out
-    // FolderViewProxy* and ThumbnailStripProxy*, and both declare these five
+    // FolderView* and ThumbnailStrip*, and both declare these five
     // signals itself. That makes the compiler check every signal/slot pair, and
     // it retires the SIGNAL()/SLOT() strings this used to be - strings that also
     // forced disconnectView to mirror all five signatures by hand.

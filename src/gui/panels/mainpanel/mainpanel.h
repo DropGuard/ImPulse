@@ -3,7 +3,7 @@
 #include <QVBoxLayout>
 #include "gui/customwidgets/slidepanel.h"
 #include "gui/customwidgets/actionbutton.h"
-#include "gui/panels/mainpanel/thumbnailstripproxy.h"
+#include "gui/panels/mainpanel/thumbnailstrip.h"
 
 class MainPanel : public SlidePanel {
     Q_OBJECT
@@ -11,7 +11,7 @@ class MainPanel : public SlidePanel {
     MainPanel(FloatingWidgetContainer *parent);
     void setPosition(PanelPosition);
     void setExitButtonEnabled(bool mode);
-    ThumbnailStripProxy *getThumbnailStrip();
+    ThumbnailStrip *getThumbnailStrip();
     void setupThumbnailStrip();
     QSize sizeHint() const override;
 
@@ -27,7 +27,7 @@ class MainPanel : public SlidePanel {
   private:
     QVBoxLayout *m_buttonsLayout = nullptr;
     QWidget m_buttonsWidget;
-    ThumbnailStripProxy *m_thumbnailStrip = nullptr;
+    ThumbnailStrip *m_thumbnailStrip = nullptr;
     ActionButton *m_openButton, *m_settingsButton, *m_exitButton, *m_folderViewButton, *m_pinButton;
 
   protected:

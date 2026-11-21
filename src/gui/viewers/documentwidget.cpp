@@ -76,7 +76,7 @@ bool DocumentWidget::panelPinned() {
     return m_panelPinned;
 }
 
-ThumbnailStripProxy *DocumentWidget::thumbPanel() {
+ThumbnailStrip *DocumentWidget::thumbPanel() {
     return m_mainPanel->getThumbnailStrip();
 }
 

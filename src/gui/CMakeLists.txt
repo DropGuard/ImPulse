@@ -62,7 +62,6 @@ target_sources(qimgv_gui PRIVATE
     crop/croppanel.cpp
     panels/mainpanel/mainpanel.cpp
     panels/mainpanel/thumbnailstrip.cpp
-    panels/mainpanel/thumbnailstripproxy.cpp
     panels/sidepanel/sidepanel.cpp
 
     panels/infobar/infobar.cpp
@@ -76,7 +75,6 @@ target_sources(qimgv_gui PRIVATE
 
     folderview/foldergridview.cpp
     folderview/folderview.cpp
-    folderview/folderviewproxy.cpp
     folderview/filesystemmodelcustom.cpp
     folderview/treeviewcustom.cpp
     folderview/fvoptionspopup.cpp

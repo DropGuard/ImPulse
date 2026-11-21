@@ -51,15 +51,15 @@ TEST_F(TestPresenter, presenterPopulatesTheViewWhenModelArrives) {
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy proxy;
+    ThumbnailStrip proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
 
     presenter.setView(&proxy);
     presenter.setModel(model);
-    proxy.show(); // the strip materializes on showEvent, not on populate
 
-    EXPECT_TRUE(proxy.isInitialized()) << "show never materialized the strip";
+    // the eager view populates straight from a listing in hand
+    EXPECT_EQ(proxy.itemCount(), 1);
 }
 
 TEST_F(TestPresenter, presenterSetViewTwiceKeepsTheFirstBinding) {
@@ -72,17 +72,16 @@ TEST_F(TestPresenter, presenterSetViewTwiceKeepsTheFirstBinding) {
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy first, second;
+    ThumbnailStrip first, second;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
 
     presenter.setView(&first);
-    first.show();
     presenter.setView(&second); // rejected: the binding is already live
     presenter.setModel(model);
 
-    EXPECT_TRUE(first.isInitialized());
-    EXPECT_TRUE(!second.isInitialized()) << "the second setView silently replaced the first";
+    EXPECT_EQ(first.itemCount(), 1);
+    EXPECT_EQ(second.itemCount(), 0) << "the second setView was rejected, not replaced";
 }
 
 TEST_F(TestPresenter, presenterForwardsActivationToTheFilePath) {
@@ -95,7 +94,7 @@ TEST_F(TestPresenter, presenterForwardsActivationToTheFilePath) {
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy proxy;
+    ThumbnailStrip proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&proxy);
@@ -120,7 +119,7 @@ TEST_F(TestPresenter, presenterDisconnectViewStopsForwardingAndAllowsRebinding) 
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy first, second;
+    ThumbnailStrip first, second;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&first);
@@ -135,9 +134,8 @@ TEST_F(TestPresenter, presenterDisconnectViewStopsForwardingAndAllowsRebinding) 
     EXPECT_EQ(activated.count(), 1); // the detached view no longer reaches us
 
     presenter.setView(&second); // rebinding was impossible before disconnectView
-    second.show();
     presenter.setModel(model);
-    EXPECT_TRUE(second.isInitialized()) << "rebinding after disconnectView does not populate";
+    EXPECT_EQ(second.itemCount(), 1) << "rebinding after disconnectView does not populate";
     QMetaObject::invokeMethod(&second, "itemActivated", Q_ARG(int, 0));
     EXPECT_EQ(activated.count(), 2);
     EXPECT_EQ(activated.at(1).at(0).toString(), QDir(m_alpha).filePath("a.png"));
@@ -153,7 +151,7 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy proxy;
+    ThumbnailStrip proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&proxy);
@@ -162,7 +160,7 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
 
     presenter.unsetModel(); // detaches the model, keeps the view on purpose
 
-    EXPECT_TRUE(proxy.isInitialized()); // the binding survived the model swap
+    EXPECT_EQ(proxy.itemCount(), 1); // the binding survived the model swap
     auto model2 = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
     EXPECT_TRUE(model2->setDirectory(m_beta));
     EXPECT_TRUE(QTest::qWaitFor(
@@ -172,7 +170,7 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
         10000));
     EXPECT_EQ(model2->listing().fileCount(), 1);
     presenter.setModel(model2);
-    EXPECT_TRUE(proxy.isInitialized()) << "re-setting a model on a live binding must repopulate";
+    EXPECT_EQ(proxy.itemCount(), 1) << "re-setting a model on a live binding must repopulate";
 }
 
 // The presenter's five view connections are compiled against the concrete
@@ -279,7 +277,7 @@ TEST_F(TestPresenter, presenterForwardsDragFromTheView) {
         },
         10000));
     EXPECT_EQ(model->listing().fileCount(), 1);
-    ThumbnailStripProxy proxy;
+    ThumbnailStrip proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&proxy);
@@ -396,7 +394,11 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     EXPECT_EQ(view.renamedTo, QList<QString>({QFileInfo(f1).fileName(), QFileInfo(d1).fileName()}));
 }
 
-TEST_F(TestPresenter, viewlessProxyRemapsItsBufferedSelectionOnRename) {
+TEST_F(TestPresenter, aRenameFollowsTheSelectionEvenInAnUnshownView) {
+    // The strip is real from construction now (the buffering proxy retired),
+    // but "shown" and "functional" are still different things: this view is
+    // never shown, and the rename that lands must still move the selection
+    // with the row — the same contract the buffer used to pin.
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
     const QString dir = uniqueDir("proxyrename");
@@ -411,7 +413,7 @@ TEST_F(TestPresenter, viewlessProxyRemapsItsBufferedSelectionOnRename) {
         10000));
     EXPECT_EQ(model->listing().fileCount(), 3);
 
-    coretest::CountingStripProxy view; // never shown: the buffer is all there is
+    coretest::CountingStripProxy view; // real, but never shown
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&view);
@@ -427,8 +429,7 @@ TEST_F(TestPresenter, viewlessProxyRemapsItsBufferedSelectionOnRename) {
         },
         10000));
     EXPECT_EQ(view.renamed.count(), 2);
-    // a.png was row 0 and z.png is the last row: the buffer moved with it,
-    // so a strip materialized later replays the highlight onto the renamed row
+    // a.png was row 0 and z.png is the last row: the selection moves with it
     EXPECT_EQ(view.renamed, QList<int>({0, 2}));
     EXPECT_EQ(view.selection(), QList<int>({2}));
 }
@@ -438,13 +439,13 @@ TEST_F(TestPresenter, disconnectViewAfterTheViewDiedIsSafe) {
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     {
-        auto *proxy = new ThumbnailStripProxy();
+        auto *proxy = new ThumbnailStrip();
         presenter.setView(proxy);
         delete proxy; // the view dies while the presenter lives
     }
     presenter.disconnectView(); // must not reach the freed sender
     // and rebinding to a fresh view still works afterwards
-    ThumbnailStripProxy second;
+    ThumbnailStrip second;
     presenter.setView(&second);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
     EXPECT_TRUE(model->setDirectory(m_alpha));

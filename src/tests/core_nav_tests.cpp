@@ -989,14 +989,8 @@ TEST_F(TestCoreNav, settingsBusWaitsOnlyForThePipelineItsSettingsActuallyFeed) {
 TEST_F(TestCoreNav, settingsBusReachesTheThumbnailStripThroughThePanelChain) {
     Core core;
     const int original = settings->panelPreviewsSize(); // singleton: snapshot and restore
-    auto *strip = core.mainWindow()->findChild<ThumbnailStripProxy *>();
-    ASSERT_TRUE(strip) << "no ThumbnailStripProxy under MW — the chain is not what this claims";
-    // init(), not show(): the proxy is a child here, and a child's show()
-    // fires no showEvent while its ancestors are hidden, which is what made
-    // the first version of this test fail 5 times out of 5 rather than
-    // sometimes. init() is the public entry showEvent itself calls.
-    strip->init();
-    EXPECT_TRUE(strip->isInitialized()) << "the strip did not materialize under init()";
+    auto *strip = core.mainWindow()->findChild<ThumbnailStrip *>();
+    ASSERT_TRUE(strip) << "no ThumbnailStrip under MW — the chain is not what this claims";
 
     settings->setPanelPreviewsSize(30);
     settings->sendChangeNotification();

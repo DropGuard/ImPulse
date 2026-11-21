@@ -1,6 +1,6 @@
 #include "centralwidget.h"
 
-CentralWidget::CentralWidget(DocumentWidget *_docWidget, FolderViewProxy *_folderView, QWidget *parent)
+CentralWidget::CentralWidget(DocumentWidget *_docWidget, FolderView *_folderView, QWidget *parent)
     : QStackedWidget(parent), m_documentView(_docWidget), m_folderView(_folderView) {
     setMouseTracking(true);
     if(!m_documentView || !m_folderView)

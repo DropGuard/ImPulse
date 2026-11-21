@@ -37,7 +37,7 @@ MainPanel::MainPanel(FloatingWidgetContainer *parent) : SlidePanel(parent) {
 
     layout()->addWidget(&m_buttonsWidget);
 
-    m_thumbnailStrip = new ThumbnailStripProxy(this);
+    m_thumbnailStrip = new ThumbnailStrip(this);
     setWidget(m_thumbnailStrip);
 
     readSettings();
@@ -92,19 +92,16 @@ void MainPanel::setExitButtonEnabled(bool mode) {
     m_exitButton->setHidden(!mode);
 }
 
-ThumbnailStripProxy *MainPanel::getThumbnailStrip() {
+ThumbnailStrip *MainPanel::getThumbnailStrip() {
     return m_thumbnailStrip;
 }
 
 void MainPanel::setupThumbnailStrip() {
-    m_thumbnailStrip->init();
     // adjust size & position
     readSettings();
 }
 
 QSize MainPanel::sizeHint() const {
-    if(!m_thumbnailStrip->isInitialized())
-        return QSize(0, 0);
     // item size + spacing + scrollbar + border
     switch(settings->panelPosition()) {
     case PANEL_TOP: return QSize(width(), m_thumbnailStrip->itemSize().height() + 16);

@@ -135,7 +135,7 @@ MW::Ui MW::createUi() {
     auto *uiInfoBarWindowed = new InfoBarProxy(this);
     auto *uiDoc = new DocumentWidget(uiViewer, uiInfoBarWindowed);
     auto *uiDialog = new DialogHost(this, uiDoc);
-    auto *uiFolderView = new FolderViewProxy(this);
+    auto *uiFolderView = new FolderView(this);
     auto *uiCentral = new CentralWidget(uiDoc, uiFolderView, this);
     auto *uiInfoBarFullscreen = new FullscreenInfoOverlayProxy(uiViewer);
     auto *uiSidePanel = new SidePanel(this);
@@ -143,11 +143,11 @@ MW::Ui MW::createUi() {
     // the wires that only need what this function built. The ones that
     // involve `this` as a signal's receiver and `uiDialog`/`uiViewer` as senders
     // live here too — they are part of the same graph.
-    connect(uiFolderView, &FolderViewProxy::sortingSelected, this, &MW::sortingSelected);
-    connect(uiFolderView, &FolderViewProxy::directorySelected, uiDialog, &DialogHost::opened);
-    connect(uiFolderView, &FolderViewProxy::copyUrlsRequested, this, &MW::copyUrlsRequested);
-    connect(uiFolderView, &FolderViewProxy::moveUrlsRequested, this, &MW::moveUrlsRequested);
-    connect(uiFolderView, &FolderViewProxy::showFoldersChanged, this, &MW::showFoldersChanged);
+    connect(uiFolderView, &FolderView::sortingSelected, this, &MW::sortingSelected);
+    connect(uiFolderView, &FolderView::directorySelected, uiDialog, &DialogHost::opened);
+    connect(uiFolderView, &FolderView::copyUrlsRequested, this, &MW::copyUrlsRequested);
+    connect(uiFolderView, &FolderView::moveUrlsRequested, this, &MW::moveUrlsRequested);
+    connect(uiFolderView, &FolderView::showFoldersChanged, this, &MW::showFoldersChanged);
     connect(uiViewer, &ViewerWidget::scalingRequested, this, &MW::scalingRequested);
     connect(uiViewer, &ViewerWidget::draggedOut, this, qOverload<>(&MW::draggedOut));
     connect(uiViewer, &ViewerWidget::playbackFinished, this, &MW::playbackFinished);
@@ -502,11 +502,11 @@ WindowShell *MW::shell() {
     return m_windowShell;
 }
 
-FolderViewProxy *MW::getFolderView() {
+FolderView *MW::getFolderView() {
     return m_folderView;
 }
 
-ThumbnailStripProxy *MW::getThumbnailPanel() {
+ThumbnailStrip *MW::getThumbnailPanel() {
     return m_docWidget->thumbPanel();
 }
 

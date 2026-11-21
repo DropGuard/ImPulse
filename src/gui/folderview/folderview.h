@@ -24,6 +24,11 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
   public:
     explicit FolderView(QWidget *parent = nullptr);
     ~FolderView() override;
+    // the directory this view was last pointed at — what setDirectoryPath set,
+    // regardless of what the tree widget has scrolled to
+    const QString &directoryPath() const {
+        return m_directoryPath;
+    }
 
   public slots:
     void show();
@@ -104,4 +109,5 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     FileSystemModelCustom *m_dirModel;
     FVOptionsPopup *m_optionsPopup;
     QElapsedTimer m_popupTimerClutch;
+    QString m_directoryPath;
 };

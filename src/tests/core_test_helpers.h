@@ -40,7 +40,7 @@
 #include "gui/icoreview.h"
 #include "gui/icropsurface.h"
 #include "gui/folderview/foldergridview.h"
-#include "gui/panels/mainpanel/thumbnailstripproxy.h"
+#include "gui/panels/mainpanel/thumbnailstrip.h"
 #include "shortcutbuilder.h"
 #include "utils/inputmap.h"
 #include <QPainter>
@@ -232,34 +232,34 @@ inline QString writeRectImage(const QString &path) {
     return path;
 }
 
-class CountingStripProxy : public ThumbnailStripProxy {
+class CountingStripProxy : public ThumbnailStrip {
   public:
-    using ThumbnailStripProxy::ThumbnailStripProxy;
+    using ThumbnailStrip::ThumbnailStrip;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override {
         ++thumbnailCalls;
         lastThumbnailPos = pos;
-        ThumbnailStripProxy::setThumbnail(pos, thumb);
+        ThumbnailStrip::setThumbnail(pos, thumb);
     }
     void setDragHover(int index) override {
         ++hoverCalls;
-        ThumbnailStripProxy::setDragHover(index);
+        ThumbnailStrip::setDragHover(index);
     }
     void removeItem(int index) override {
         removed << index;
-        ThumbnailStripProxy::removeItem(index);
+        ThumbnailStrip::removeItem(index);
     }
     void insertItem(int index) override {
         inserted << index;
-        ThumbnailStripProxy::insertItem(index);
+        ThumbnailStrip::insertItem(index);
     }
     void reloadItem(int index) override {
         reloaded << index;
-        ThumbnailStripProxy::reloadItem(index);
+        ThumbnailStrip::reloadItem(index);
     }
     void renameItem(int oldIndex, int newIndex, const QString &name) override {
         renamed << oldIndex << newIndex;
         renamedTo << name;
-        ThumbnailStripProxy::renameItem(oldIndex, newIndex, name);
+        ThumbnailStrip::renameItem(oldIndex, newIndex, name);
     }
     int thumbnailCalls = 0;
     int hoverCalls = 0;
