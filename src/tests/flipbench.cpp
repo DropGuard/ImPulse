@@ -116,8 +116,8 @@ int main(int argc, char **argv) {
                          // classified at DELIVERY time against the then-current
                          // file: report-time classification would call the whole
                          // flight "behind" by construction
-                         const int cur = core.directoryModel()->indexOfFile(core.currentFilePath());
-                         const int idx = core.directoryModel()->indexOfFile(path);
+                         const int cur = core.directoryModel()->listing().indexOfFile(core.currentFilePath());
+                         const int idx = core.directoryModel()->listing().indexOfFile(path);
                          if(idx < 0 || idx < cur)
                              behind++;
                          else if(idx > cur)
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
         core.loadPath(files.first());
         if(!spinUntil(
                [&] {
-                   return core.directoryModel()->fileCount() == fileCount &&
+                   return static_cast<int>(core.directoryModel()->listing().fileCount()) == fileCount &&
                           core.directoryModel()->isLoaded(files.first());
                },
                15000))

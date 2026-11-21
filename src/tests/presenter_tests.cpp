@@ -47,10 +47,10 @@ TEST_F(TestPresenter, presenterPopulatesTheViewWhenModelArrives) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -68,10 +68,10 @@ TEST_F(TestPresenter, presenterSetViewTwiceKeepsTheFirstBinding) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy first, second;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -91,10 +91,10 @@ TEST_F(TestPresenter, presenterForwardsActivationToTheFilePath) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -116,10 +116,10 @@ TEST_F(TestPresenter, presenterDisconnectViewStopsForwardingAndAllowsRebinding) 
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy first, second;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -149,10 +149,10 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -167,10 +167,10 @@ TEST_F(TestPresenter, presenterUnsetModelKeepsTheViewBinding) {
     EXPECT_TRUE(model2->setDirectory(m_beta));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model2->fileCount() == 1;
+            return model2->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model2->fileCount(), 1);
+    EXPECT_EQ(model2->listing().fileCount(), 1);
     presenter.setModel(model2);
     EXPECT_TRUE(proxy.isInitialized()) << "re-setting a model on a live binding must repopulate";
 }
@@ -194,10 +194,10 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     coretest::CountingStripProxy view;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -245,24 +245,24 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     presenter.reloadModel();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->dirCount() == 2;
+            return model->listing().dirCount() == 2;
         },
         10000));
-    EXPECT_EQ(model->dirCount(), 2);
+    EXPECT_EQ(model->listing().dirCount(), 2);
     // onDraggedOver has three guards (model, selection, dirs-visible) and
     // a hover index that must name a directory: each is asserted right
     // before the invoke so a lost delivery names the guard it hit instead
     // of reporting a bare zero.
     EXPECT_TRUE(presenter.showDirs()) << "precondition broken: the presenter is in files-only mode";
-    EXPECT_TRUE(model->dirCount() > 1) << qPrintable(
-        QStringLiteral("precondition broken: only %1 directories listed").arg(model->dirCount()));
+    EXPECT_TRUE(model->listing().dirCount() > 1) << qPrintable(
+        QStringLiteral("precondition broken: only %1 directories listed").arg(model->listing().dirCount()));
     EXPECT_TRUE(!view.selection().contains(1))
         << "precondition broken: index 1 is selected, onDraggedOver returns early";
 
     QMetaObject::invokeMethod(&view, "draggedOver", Q_ARG(int, 1));
     EXPECT_TRUE(view.hoverCalls == 1) << qPrintable(QStringLiteral("setDragHover never reached the view (dirCount=%1, "
                                                                    "showDirs=%2, selection=%3)")
-                                                        .arg(model->dirCount())
+                                                        .arg(model->listing().dirCount())
                                                         .arg(presenter.showDirs())
                                                         .arg(view.selection().isEmpty()
                                                                  ? QStringLiteral("empty")
@@ -275,10 +275,10 @@ TEST_F(TestPresenter, presenterForwardsDragFromTheView) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     ThumbnailStripProxy proxy;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
@@ -321,21 +321,21 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     EXPECT_TRUE(model->setDirectory(dir));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 2;
+            return model->listing().fileCount() == 2;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 2);
+    EXPECT_EQ(model->listing().fileCount(), 2);
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->dirCount() == 2;
+            return model->listing().dirCount() == 2;
         },
         10000));
-    EXPECT_EQ(model->dirCount(), 2);
-    const QString f0 = model->filePathAt(0);
-    const QString f1 = model->filePathAt(1);
-    const QString d0 = model->dirPathAt(0);
-    const QString d1 = model->dirPathAt(1);
-    const int dirCount = model->dirCount();
+    EXPECT_EQ(model->listing().dirCount(), 2);
+    const QString f0 = model->listing().filePathAt(0);
+    const QString f1 = model->listing().filePathAt(1);
+    const QString d0 = model->listing().dirPathAt(0);
+    const QString d1 = model->listing().dirPathAt(1);
+    const int dirCount = model->listing().dirCount();
     EXPECT_TRUE(dirCount > 0) << "precondition broken: no directories to offset by";
 
     coretest::CountingStripProxy view;
@@ -352,8 +352,8 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     EXPECT_EQ(view.inserted, QList<int>({1}));
     QMetaObject::invokeMethod(model.get(), "fileRemoved", Q_ARG(QString, f0), Q_ARG(int, 0));
     EXPECT_EQ(view.removed, QList<int>({0}));
-    QMetaObject::invokeMethod(model.get(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(model.get(), "dirAdded", Q_ARG(QString, d0));
+    QMetaObject::invokeMethod(&model->listing(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(&model->listing(), "dirAdded", Q_ARG(QString, d0));
     EXPECT_EQ(view.removed.count(), 1); // dirs are not in the grid: no splice
     EXPECT_EQ(view.inserted.count(), 1);
 
@@ -364,7 +364,7 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
     EXPECT_EQ(view.renamed, QList<int>({0, 1}));
     EXPECT_EQ(view.renamedTo, QList<QString>({QFileInfo(f1).fileName()}));
-    QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(&model->listing(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
     EXPECT_EQ(view.renamed.count(), 2);
 
     view.removed.clear();
@@ -381,8 +381,8 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     EXPECT_EQ(view.inserted, QList<int>({dirCount + 1}));
     QMetaObject::invokeMethod(model.get(), "fileRemoved", Q_ARG(QString, f0), Q_ARG(int, 0));
     EXPECT_EQ(view.removed, QList<int>({dirCount}));
-    QMetaObject::invokeMethod(model.get(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(model.get(), "dirAdded", Q_ARG(QString, d0));
+    QMetaObject::invokeMethod(&model->listing(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(&model->listing(), "dirAdded", Q_ARG(QString, d0));
     EXPECT_EQ(view.removed, QList<int>({dirCount, 0}));
     EXPECT_EQ(view.inserted, QList<int>({dirCount + 1, 0}));
 
@@ -391,7 +391,7 @@ TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
     view.renamed.clear();
     view.renamedTo.clear();
     QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(model.get(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(&model->listing(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
     EXPECT_EQ(view.renamed, QList<int>({dirCount, dirCount + 1, 0, 1}));
     EXPECT_EQ(view.renamedTo, QList<QString>({QFileInfo(f1).fileName(), QFileInfo(d1).fileName()}));
 }
@@ -406,10 +406,10 @@ TEST_F(TestPresenter, viewlessProxyRemapsItsBufferedSelectionOnRename) {
     EXPECT_TRUE(model->setDirectory(dir));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 3;
+            return model->listing().fileCount() == 3;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 3);
+    EXPECT_EQ(model->listing().fileCount(), 3);
 
     coretest::CountingStripProxy view; // never shown: the buffer is all there is
     Thumbnailer thumbnailer(pool);
@@ -417,7 +417,7 @@ TEST_F(TestPresenter, viewlessProxyRemapsItsBufferedSelectionOnRename) {
     presenter.setView(&view);
     presenter.setModel(model); // populate + select(0)
     EXPECT_EQ(view.selection(), QList<int>({0}));
-    EXPECT_EQ(model->fileNameAt(0), QStringLiteral("a.png"));
+    EXPECT_EQ(model->listing().fileNameAt(0), QStringLiteral("a.png"));
 
     EXPECT_TRUE(QFile::rename(QDir(dir).filePath("a.png"), QDir(dir).filePath("z.png")));
 
@@ -450,10 +450,10 @@ TEST_F(TestPresenter, disconnectViewAfterTheViewDiedIsSafe) {
     EXPECT_TRUE(model->setDirectory(m_alpha));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return model->fileCount() == 1;
+            return model->listing().fileCount() == 1;
         },
         10000));
-    EXPECT_EQ(model->fileCount(), 1);
+    EXPECT_EQ(model->listing().fileCount(), 1);
     presenter.setModel(model);
     QSignalSpy activated(&presenter, &DirectoryPresenter::fileActivated);
     EXPECT_TRUE(activated.isValid());

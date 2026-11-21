@@ -387,7 +387,7 @@ TEST_F(TestListing, modelFileOperationsRideTheEngineRoundTrip) {
     QSignalSpy removed(&model, &DirectoryModel::fileRemoved);
     QSignalSpy added(&model, &DirectoryModel::fileAdded);
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 3UL, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 3UL, 10000);
 
     FileOpResult result;
     model.removeFile(m_fixtureDir + "/img2.jpg", false, result);
@@ -396,18 +396,18 @@ TEST_F(TestListing, modelFileOperationsRideTheEngineRoundTrip) {
     // not synchronously from the operation
     ASSERT_TRY_EQ_TIMEOUT(removed.count(), 1, 10000);
     EXPECT_EQ(removed.at(0).at(0).toString(), m_fixtureDir + "/img2.jpg");
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 2UL, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 2UL, 10000);
 
     // rename in place surfaces as remove+add, exactly like an external one
     model.renameEntry(m_fixtureDir + "/img1.jpg", "renamed.jpg", false, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
-    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(m_fixtureDir + "/renamed.jpg"), 10000);
-    EXPECT_TRUE(!model.containsFile(m_fixtureDir + "/img1.jpg"));
+    ASSERT_TRY_TRUE_TIMEOUT(model.listing().containsFile(m_fixtureDir + "/renamed.jpg"), 10000);
+    EXPECT_TRUE(!model.listing().containsFile(m_fixtureDir + "/img1.jpg"));
 
     // copy into the watched directory — engine-driven from the start
     EXPECT_TRUE(QFile::copy(m_fixtureDir + "/renamed.jpg", m_fixtureDir + "/copy.jpg"));
-    ASSERT_TRY_TRUE_TIMEOUT(model.containsFile(m_fixtureDir + "/copy.jpg"), 10000);
-    EXPECT_EQ(model.fileCount(), 2UL + 1UL);
+    ASSERT_TRY_TRUE_TIMEOUT(model.listing().containsFile(m_fixtureDir + "/copy.jpg"), 10000);
+    EXPECT_EQ(model.listing().fileCount(), 2UL + 1UL);
 }
 
 // THE mirror contract: the engine decides content and order; the mirror is

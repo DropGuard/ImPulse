@@ -374,7 +374,7 @@ TEST_F(TestShortcutScope, theFolderViewsHomeButtonReachesTheNavigator) {
     emit homeBtn->clicked();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
-            return core.directoryModel()->directoryPath() == QDir::homePath();
+            return core.directoryModel()->listing().directoryPath() == QDir::homePath();
         },
         10000));
 }

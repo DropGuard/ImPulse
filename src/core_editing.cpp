@@ -39,7 +39,7 @@ void Core::rotateRight() {
 void Core::toggleCropPanel() {
     if(!m_crop)
         return; // headless without a crop fake: nothing to toggle
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     // the folder view cannot reach this (no binding, and the panel refuses it
     // silently anyway); a running clock can, and it would move the image out
@@ -53,7 +53,7 @@ void Core::toggleCropPanel() {
 }
 
 void Core::requestSavePath() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     const QString path = selectedPath();
     // an edited image earns a fresh target: Save As's quick path writes a
@@ -65,7 +65,7 @@ void Core::requestSavePath() {
 }
 
 void Core::showResizeDialog() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     // the gate is here as well as in resize(): the dialog is modal but exec()
     // blocks only input, never the slideshow clock — a tick would fire behind
@@ -94,7 +94,7 @@ template <typename... Args>
 void Core::edit_template(
     const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &editFunc,
     Args &&...as) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     // the edit contract is a property of the interaction state, not of this
     // call: a slideshow has no single image to edit — the clock moves on by
@@ -168,7 +168,7 @@ bool Core::saveFile(const QString &filePath, const QString &newPath) {
         return false;
     m_overlays->hideSaveOverlay();
     // switch to the new file
-    if(m_model->containsFile(newPath) && m_state.currentFilePath != newPath) {
+    if(m_model->listing().containsFile(newPath) && m_state.currentFilePath != newPath) {
         discardEdits();
         if(m_state.viewMode.value() == MODE_DOCUMENT)
             loadPath(newPath);
@@ -181,7 +181,7 @@ void Core::saveCurrentFile() {
 }
 
 void Core::saveCurrentFileAs(const QString &destPath) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     if(saveFile(selectedPath(), destPath)) {
         m_overlays->showMessageSuccess(tr("File saved"));
@@ -192,7 +192,7 @@ void Core::saveCurrentFileAs(const QString &destPath) {
 }
 
 void Core::discardEdits() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
 
     std::shared_ptr<Image> img = m_model->getImage(selectedPath());

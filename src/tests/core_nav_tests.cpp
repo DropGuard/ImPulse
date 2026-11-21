@@ -894,7 +894,7 @@ TEST_F(TestCoreNav, adjacentDirectoryNavigationMovesBetweenSiblingFolders) {
             10000);
         EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(core.directoryModel()->directoryPath(), dirB);
+    EXPECT_EQ(core.directoryModel()->listing().directoryPath(), dirB);
 
     core.prevDirectory(false);
     {
@@ -906,7 +906,7 @@ TEST_F(TestCoreNav, adjacentDirectoryNavigationMovesBetweenSiblingFolders) {
         EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_EQ(core.currentFilePath(), dirA + QStringLiteral("/one.png"));
-    EXPECT_EQ(core.directoryModel()->directoryPath(), dirA);
+    EXPECT_EQ(core.directoryModel()->listing().directoryPath(), dirA);
 
     core.nextDirectory();
     {

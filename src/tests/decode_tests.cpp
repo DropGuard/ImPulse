@@ -49,7 +49,7 @@ TEST_F(TestDecode, jpegTwoTierDecodesScaledThenUpgradesToFull) {
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(ready.isValid());
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 4, 10000);
 
     model.load(m_fixtureDir + "/big.jpg", true); // tier-1 by default
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
@@ -75,7 +75,7 @@ TEST_F(TestDecode, pngDecodesFullQualityInOneTier) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 4, 10000);
 
     model.load(m_fixtureDir + "/big.png", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
@@ -95,7 +95,7 @@ TEST_F(TestDecode, syncLoadIsAlwaysFullQuality) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 4, 10000);
 
     model.load(m_fixtureDir + "/big.jpg", false);
     // synchronous: the signal has fired by the time load() returned
@@ -113,7 +113,7 @@ TEST_F(TestDecode, cachedFullImageReflipsWithoutRedecoding) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 4, 10000);
 
     model.load(m_fixtureDir + "/big.jpg", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
@@ -139,7 +139,7 @@ TEST_F(TestDecode, upgradeToFullRefusesWhatWasNeverScaled) {
     DirectoryModel model(pool, EngineBridge::instance());
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 4, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 4, 10000);
 
     model.load(m_fixtureDir + "/big.png", true);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 1, 10000);
@@ -184,7 +184,7 @@ TEST_F(TestDecode, theFlipWindowPromotesTheStopPointAndDropsThePassedFiles) {
     QSignalSpy ready(&model, &DirectoryModel::imageReady);
     EXPECT_TRUE(ready.isValid());
     EXPECT_TRUE(model.setDirectory(m_fixtureDir));
-    ASSERT_TRY_EQ_TIMEOUT(model.fileCount(), 6, 10000);
+    ASSERT_TRY_EQ_TIMEOUT(model.listing().fileCount(), 6, 10000);
 
     // the flight: two flips forward, each queueing its direction
     // neighbor's preload — w2, then w3 — and with the worker gated both

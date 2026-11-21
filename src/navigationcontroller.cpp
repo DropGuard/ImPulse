@@ -77,7 +77,7 @@ void NavigationController::attachModel(DirectoryModel *m) {
     // the model reactions, owned by the controller that serves them: with
     // this attachment the controller is fully live — no coordinator-side
     // wiring is needed for anything navigation reacts to
-    connect(m_model, &DirectoryModel::loaded, this, &NavigationController::onModelLoaded);
+    connect(&m_model->listing(), &DirectoryManager::loaded, this, &NavigationController::onModelLoaded);
     connect(m_model, &DirectoryModel::imageReady, this, &NavigationController::onModelItemReady);
     connect(m_model, &DirectoryModel::imageUpdated, this, &NavigationController::onModelItemUpdated);
     connect(m_model, &DirectoryModel::sortingChanged, this, &NavigationController::onModelSortingChanged);
@@ -148,9 +148,9 @@ void NavigationController::onPlaybackFinished() {
 
 void NavigationController::syncRandomizer() {
     if(m_model) {
-        m_randomizer.setCount(m_model->fileCount());
+        m_randomizer.setCount(m_model->listing().fileCount());
         m_randomizer.shuffle();
-        m_randomizer.setCurrent(m_model->indexOfFile(m_state->currentFilePath));
+        m_randomizer.setCurrent(m_model->listing().indexOfFile(m_state->currentFilePath));
     }
 }
 
@@ -193,13 +193,13 @@ void NavigationController::enableDocumentView() {
     if(m_state->viewMode.value() == MODE_DOCUMENT)
         return;
     enterMode(MODE_DOCUMENT);
-    if(m_model && m_model->fileCount() && m_state->currentFilePath == "") {
+    if(m_model && m_model->listing().fileCount() && m_state->currentFilePath == "") {
         const QString selected = m_folderViewPresenter.selectedPaths().value(0);
         // if it is a directory - ignore and just open the first file
-        if(m_model->containsFile(selected))
+        if(m_model->listing().containsFile(selected))
             loadPath(selected);
         else
-            loadPath(m_model->firstFile());
+            loadPath(m_model->listing().firstFile());
     }
 }
 
@@ -211,7 +211,7 @@ void NavigationController::toggleFolderView() {
 }
 
 void NavigationController::sortBy(SortingMode mode) {
-    m_model->setSortingMode(mode);
+    m_model->listing().setSortingMode(mode);
 }
 
 void NavigationController::setFoldersDisplay(bool mode) {
@@ -221,7 +221,7 @@ void NavigationController::setFoldersDisplay(bool mode) {
 
 void NavigationController::onFileRemoved(const QString &filePath, int index) {
     // no files left
-    if(m_model->isEmpty()) {
+    if(m_model->listing().isEmpty()) {
         m_view->closeImage();
         m_state->hasActiveImage = false;
         m_state->currentFilePath = "";
@@ -243,7 +243,7 @@ void NavigationController::onFileAdded(const QString &filePath) {
     Q_UNUSED(filePath)
     // update file count
     m_host->updateInfoString();
-    if(m_model->fileCount() == 1 && m_state->currentFilePath == "")
+    if(m_model->listing().fileCount() == 1 && m_state->currentFilePath == "")
         loadFileIndex(0, false, settings->usePreloader());
 }
 
@@ -306,23 +306,23 @@ void NavigationController::refuseEdit() const {
 
 void NavigationController::sortByName() {
     auto mode = SortingMode::SORT_NAME;
-    if(m_model->sortingMode() == mode)
+    if(m_model->listing().sortingMode() == mode)
         mode = SortingMode::SORT_NAME_DESC;
-    m_model->setSortingMode(mode);
+    m_model->listing().setSortingMode(mode);
 }
 
 void NavigationController::sortByTime() {
     auto mode = SortingMode::SORT_TIME;
-    if(m_model->sortingMode() == mode)
+    if(m_model->listing().sortingMode() == mode)
         mode = SortingMode::SORT_TIME_DESC;
-    m_model->setSortingMode(mode);
+    m_model->listing().setSortingMode(mode);
 }
 
 void NavigationController::sortBySize() {
     auto mode = SortingMode::SORT_SIZE;
-    if(m_model->sortingMode() == mode)
+    if(m_model->listing().sortingMode() == mode)
         mode = SortingMode::SORT_SIZE_DESC;
-    m_model->setSortingMode(mode);
+    m_model->listing().setSortingMode(mode);
 }
 
 bool NavigationController::loadPath(const QString &path) {
@@ -353,7 +353,7 @@ bool NavigationController::loadPathInternal(const QString &path) {
         // delayModel now means exactly one thing: the GUI is still hidden and
         // the first ready item must raise it. It no longer defers the listing
         // — the open target below arms to the landing instead of racing it
-        m_state->delayModel = (m_model->directoryPath() != dir);
+        m_state->delayModel = (m_model->listing().directoryPath() != dir);
     } else {
         m_overlays->showError(tr("Could not open target: ") + target);
         qDebug() << "Could not open target: " << target;
@@ -369,7 +369,7 @@ bool NavigationController::loadPathInternal(const QString &path) {
         // local insert (forceInsert retired 2026-11 — the mirror has no
         // writers besides the apply target)
         enterMode(MODE_DOCUMENT);
-        int index = m_model->indexOfFile(fileInfo.absoluteFilePath());
+        int index = m_model->listing().indexOfFile(fileInfo.absoluteFilePath());
         if(index != -1)
             return loadFileIndex(index, false, settings->usePreloader());
         // cold open: this directory's listing has not landed yet (or has not
@@ -379,9 +379,9 @@ bool NavigationController::loadPathInternal(const QString &path) {
         // that exception is what hid the fact that the open target had no
         // landing-driven form at all.
         const QString filePath = fileInfo.absoluteFilePath();
-        m_state->pendingListedToken = m_model->whenListed(dir, [this, filePath] {
+        m_state->pendingListedToken = m_model->listing().whenListed(dir, [this, filePath] {
             m_state->pendingListedToken = 0;
-            int idx = m_model->indexOfFile(filePath);
+            int idx = m_model->listing().indexOfFile(filePath);
             if(idx != -1)
                 loadFileIndex(idx, false, settings->usePreloader());
             else
@@ -395,7 +395,7 @@ bool NavigationController::loadPathInternal(const QString &path) {
 }
 
 bool NavigationController::setDirectory(const QString &path) {
-    if(m_model->directoryPath() != path) {
+    if(m_model->listing().directoryPath() != path) {
         this->reset();
         if(!m_model->setDirectory(path)) {
             m_overlays->showError(tr("Could not load folder: ") + path);
@@ -417,14 +417,14 @@ bool NavigationController::loadFileIndex(int index, bool async, bool preload) {
         return false;
     // an explicit choice of file outranks the deferred folder-boundary load
     if(m_state->pendingListedToken) {
-        m_model->cancelListed(m_state->pendingListedToken);
+        m_model->listing().cancelListed(m_state->pendingListedToken);
         m_state->pendingListedToken = 0;
     }
-    auto entry = m_model->fileEntryAt(index);
+    auto entry = m_model->listing().fileEntryAt(index);
     if(entry.path.isEmpty())
         return false;
     // direction-aware preload: decode only the side of travel
-    int oldIndex = m_model->indexOfFile(m_state->currentFilePath);
+    int oldIndex = m_model->listing().indexOfFile(m_state->currentFilePath);
     bool movingForward = (oldIndex == -1) ? true : (index >= oldIndex);
     m_state->currentFilePath = entry.path;
     m_model->unloadExcept(entry.path, preload);
@@ -437,9 +437,9 @@ bool NavigationController::loadFileIndex(int index, bool async, bool preload) {
         m_model->load(entry.path, false);
         if(preload) {
             if(movingForward)
-                m_model->preload(m_model->nextOf(entry.path));
+                m_model->preload(m_model->listing().nextOfFile(entry.path));
             else
-                m_model->preload(m_model->prevOf(entry.path));
+                m_model->preload(m_model->listing().prevOfFile(entry.path));
         }
     }
     m_thumbPanelPresenter.selectAndFocus(entry.path);
@@ -451,10 +451,10 @@ bool NavigationController::loadFileIndex(int index, bool async, bool preload) {
 void NavigationController::loadParentDir() {
     if(navigationDenied())
         return;
-    if(m_model->directoryPath().isEmpty() || m_state->viewMode.value() != MODE_FOLDERVIEW)
+    if(m_model->listing().directoryPath().isEmpty() || m_state->viewMode.value() != MODE_FOLDERVIEW)
         return;
     stopSlideshow();
-    QFileInfo currentDir(m_model->directoryPath());
+    QFileInfo currentDir(m_model->listing().directoryPath());
     QFileInfo parentDir(currentDir.absolutePath());
     if(parentDir.exists() && parentDir.isReadable())
         loadPath(parentDir.absoluteFilePath());
@@ -464,10 +464,11 @@ void NavigationController::loadParentDir() {
 void NavigationController::nextDirectory() {
     if(navigationDenied())
         return;
-    if(m_model->directoryPath().isEmpty() || m_state->viewMode.value() != MODE_DOCUMENT)
+    if(m_model->listing().directoryPath().isEmpty() || m_state->viewMode.value() != MODE_DOCUMENT)
         return;
     stopSlideshow();
-    QString next = m_model->adjacentDirectory(m_model->directoryPath(), true);
+    QString next = m_model->listing().adjacentDirectory(m_model->listing().directoryPath(), true,
+                                                        m_model->listing().sortingMode());
     if(next.isEmpty()) {
         return;
     }
@@ -476,8 +477,8 @@ void NavigationController::nextDirectory() {
     m_overlays->showMessageDirectory(QFileInfo(next).baseName());
     // the new folder's listing is in flight; loading index 0 here would show a
     // file of the folder we just left — defer until it lands
-    m_state->pendingListedToken = m_model->whenListed(next, [this] {
-        if(m_model->fileCount())
+    m_state->pendingListedToken = m_model->listing().whenListed(next, [this] {
+        if(m_model->listing().fileCount())
             loadFileIndex(0, false, true);
     });
 }
@@ -485,18 +486,19 @@ void NavigationController::nextDirectory() {
 void NavigationController::prevDirectory(bool selectLast) {
     if(navigationDenied())
         return;
-    if(m_model->directoryPath().isEmpty() || m_state->viewMode.value() != MODE_DOCUMENT)
+    if(m_model->listing().directoryPath().isEmpty() || m_state->viewMode.value() != MODE_DOCUMENT)
         return;
-    QString prev = m_model->adjacentDirectory(m_model->directoryPath(), false);
+    QString prev = m_model->listing().adjacentDirectory(m_model->listing().directoryPath(), false,
+                                                        m_model->listing().sortingMode());
     if(prev.isEmpty()) {
         return;
     }
     if(!setDirectory(prev))
         return;
     m_overlays->showMessageDirectory(QFileInfo(prev).baseName());
-    m_state->pendingListedToken = m_model->whenListed(prev, [this, selectLast] {
-        if(m_model->fileCount())
-            loadFileIndex(selectLast ? static_cast<int>(m_model->fileCount()) - 1 : 0, false, true);
+    m_state->pendingListedToken = m_model->listing().whenListed(prev, [this, selectLast] {
+        if(m_model->listing().fileCount())
+            loadFileIndex(selectLast ? static_cast<int>(m_model->listing().fileCount()) - 1 : 0, false, true);
     });
 }
 
@@ -510,15 +512,15 @@ void NavigationController::nextImage() {
     if(navigationDenied())
         return;
     if(m_state->viewMode.value() == MODE_FOLDERVIEW ||
-       (m_model->isEmpty() && m_folderEndAction != FOLDER_END_GOTO_ADJACENT))
+       (m_model->listing().isEmpty() && m_folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
     if(m_state->shuffle) {
         loadFileIndex(m_randomizer.next(), true, false);
         return;
     }
-    int newIndex = m_model->indexOfFile(m_state->currentFilePath) + 1;
-    auto decision = FolderEnd::decide(m_folderEndAction, newIndex, m_model->fileCount());
+    int newIndex = m_model->listing().indexOfFile(m_state->currentFilePath) + 1;
+    auto decision = FolderEnd::decide(m_folderEndAction, newIndex, m_model->listing().fileCount());
     switch(decision.outcome) {
     case FolderEnd::Outcome::LoadIndex: loadFileIndex(decision.index, true, settings->usePreloader()); return;
     case FolderEnd::Outcome::EnterAdjacentFolder: nextDirectory(); return;
@@ -532,7 +534,7 @@ void NavigationController::prevImage() {
     if(navigationDenied())
         return;
     if(m_state->viewMode.value() == MODE_FOLDERVIEW ||
-       (m_model->isEmpty() && m_folderEndAction != FOLDER_END_GOTO_ADJACENT))
+       (m_model->listing().isEmpty() && m_folderEndAction != FOLDER_END_GOTO_ADJACENT))
         return;
     stopSlideshow();
     if(m_state->shuffle) {
@@ -540,8 +542,8 @@ void NavigationController::prevImage() {
         return;
     }
 
-    int newIndex = m_model->indexOfFile(m_state->currentFilePath) - 1;
-    auto decision = FolderEnd::decide(m_folderEndAction, newIndex, m_model->fileCount());
+    int newIndex = m_model->listing().indexOfFile(m_state->currentFilePath) - 1;
+    auto decision = FolderEnd::decide(m_folderEndAction, newIndex, m_model->listing().fileCount());
     switch(decision.outcome) {
     case FolderEnd::Outcome::LoadIndex: loadFileIndex(decision.index, true, settings->usePreloader()); return;
     case FolderEnd::Outcome::EnterAdjacentFolder: prevDirectory(true); return;
@@ -554,13 +556,13 @@ void NavigationController::prevImage() {
 void NavigationController::nextImageSlideshow() {
     if(m_overlays->hasPendingSurface())
         return; // the clock tick is not user intent — denied silently
-    if(m_model->isEmpty() || m_state->viewMode.value() == MODE_FOLDERVIEW)
+    if(m_model->listing().isEmpty() || m_state->viewMode.value() == MODE_FOLDERVIEW)
         return;
     if(m_state->shuffle) {
         loadFileIndex(m_randomizer.next(), false, false);
     } else {
-        int newIndex = m_model->indexOfFile(m_state->currentFilePath) + 1;
-        if(newIndex >= m_model->fileCount()) {
+        int newIndex = m_model->listing().indexOfFile(m_state->currentFilePath) + 1;
+        if(newIndex >= static_cast<int>(m_model->listing().fileCount())) {
             if(m_loopSlideshow) {
                 newIndex = 0;
             } else {
@@ -590,7 +592,7 @@ void NavigationController::startSlideshowTimer() {
 void NavigationController::jumpToFirst() {
     if(navigationDenied())
         return;
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     stopSlideshow();
     loadFileIndex(0, true, settings->usePreloader());
@@ -599,10 +601,10 @@ void NavigationController::jumpToFirst() {
 void NavigationController::jumpToLast() {
     if(navigationDenied())
         return;
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     stopSlideshow();
-    loadFileIndex(m_model->fileCount() - 1, true, settings->usePreloader());
+    loadFileIndex(m_model->listing().fileCount() - 1, true, settings->usePreloader());
 }
 
 void NavigationController::onLoadFailed(const QString &path) {
@@ -665,7 +667,7 @@ void NavigationController::reset() {
     m_state->hasActiveImage = false;
     m_state->currentFilePath = "";
     if(m_state->pendingListedToken) {
-        m_model->cancelListed(m_state->pendingListedToken);
+        m_model->listing().cancelListed(m_state->pendingListedToken);
         m_state->pendingListedToken = 0;
     }
     m_model->setDirectory("");

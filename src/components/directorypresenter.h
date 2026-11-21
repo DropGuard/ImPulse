@@ -32,7 +32,7 @@ class DirectoryPresenter : public QObject {
         m_view = newView;
         m_viewSender = newView; // a QPointer: it goes null with the widget
         if(m_model)
-            m_view->populate(m_showDirs ? m_model->totalCount() : m_model->fileCount());
+            m_view->populate(m_showDirs ? m_model->listing().totalCount() : m_model->listing().fileCount());
 
         connect(newView, &View::itemActivated, this, &DirectoryPresenter::onItemActivated);
         connect(newView, &View::thumbnailsRequested, this, &DirectoryPresenter::generateThumbnails);

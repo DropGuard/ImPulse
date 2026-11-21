@@ -418,7 +418,7 @@ QList<QString> Core::currentSelection() {
 //------------------------
 
 void Core::runScript(const QString &scriptName) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     scriptManager->runScript(scriptName, m_model->getImage(selectedPath()));
 }
@@ -437,7 +437,7 @@ QPair<QString, QStringList> Core::wallpaperCommand(const QString &session, const
 }
 
 void Core::setWallpaper() {
-    if(m_model->isEmpty() || selectedPath().isEmpty())
+    if(m_model->listing().isEmpty() || selectedPath().isEmpty())
         return;
     auto img = m_model->getImage(selectedPath());
     if(img->type() != DocumentType::STATIC) {
@@ -474,7 +474,7 @@ void Core::setWallpaper() {
 void Core::print() {
     if(!m_mw)
         return; // the print dialog parents to the window; headless has none
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     PrintDialog p(m_mw);
     auto img = m_model->getImage(selectedPath());
@@ -486,7 +486,7 @@ void Core::print() {
         m_overlays->showError(tr("Can only print static images"));
         return;
     }
-    QString pdfPath = m_model->directoryPath() + "/" + img->baseName() + ".pdf";
+    QString pdfPath = m_model->listing().directoryPath() + "/" + img->baseName() + ".pdf";
     p.setImage(img->getImage());
     p.setOutputPath(pdfPath);
     p.exec();
@@ -533,7 +533,7 @@ bool Core::firstFramePending() const {
 }
 
 bool Core::isSettled() const {
-    return m_model && m_model->listingSettled() && !m_model->loaderBusy();
+    return m_model && m_model->listing().isSettled() && !m_model->loaderBusy();
 }
 
 void Core::guiSetImage(std::shared_ptr<Image> img) {
@@ -561,11 +561,11 @@ void Core::guiSetImage(std::shared_ptr<Image> img) {
 
 void Core::updateInfoString() {
     CurrentInfo ci;
-    ci.index = m_model->indexOfFile(m_state.currentFilePath);
-    ci.fileCount = m_model->fileCount();
-    ci.fileName = m_model->fileNameAt(ci.index);
-    ci.filePath = m_model->filePathAt(ci.index);
-    ci.directoryPath = m_model->directoryPath();
+    ci.index = m_model->listing().indexOfFile(m_state.currentFilePath);
+    ci.fileCount = m_model->listing().fileCount();
+    ci.fileName = m_model->listing().fileNameAt(ci.index);
+    ci.filePath = m_model->listing().filePathAt(ci.index);
+    ci.directoryPath = m_model->listing().directoryPath();
     ci.directoryName = ci.directoryPath.split("/").last();
     if(m_model->isLoaded(m_state.currentFilePath)) {
         auto img = m_model->getImage(m_state.currentFilePath);

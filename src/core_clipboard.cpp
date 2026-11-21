@@ -30,7 +30,7 @@
 
 // TODO: also copy selection from folder view?
 void Core::copyFileClipboard() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
 
     QMimeData *mimeData = getMimeDataForImage(m_model->getImage(selectedPath()), TARGET_CLIPBOARD);
@@ -45,7 +45,7 @@ void Core::copyFileClipboard() {
 }
 
 void Core::copyPathClipboard() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     QApplication::clipboard()->setText(selectedPath());
     m_overlays->showMessage(tr("Path copied"));
@@ -68,7 +68,7 @@ void Core::copyPathClipboard() {
 //     overwrite prompt for an operation that can only produce an identical
 //     file.
 void Core::pasteFilesToCurrentDirectory() {
-    const QString destDir = m_model->directoryPath();
+    const QString destDir = m_model->listing().directoryPath();
     if(destDir.isEmpty())
         return; // no directory to paste into
     const QMimeData *mimeData = QApplication::clipboard()->mimeData();
@@ -113,7 +113,7 @@ void Core::openFromClipboard() {
         const QImage image = cb->image();
         if(image.isNull())
             return;
-        QString destPath = (!m_model->isEmpty() ? m_model->directoryPath() : QDir::homePath());
+        QString destPath = (!m_model->listing().isEmpty() ? m_model->listing().directoryPath() : QDir::homePath());
         destPath.append("/clipboard.png");
         destPath = m_dialogs->getSaveFileName(destPath);
         if(destPath.isEmpty())
@@ -151,7 +151,7 @@ void Core::onDraggedOut() {
 QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {
     QMimeData *mimeData;
     // single selection, image
-    if(paths.count() == 1 && m_model->containsFile(paths.first())) {
+    if(paths.count() == 1 && m_model->listing().containsFile(paths.first())) {
         mimeData = getMimeDataForImage(m_model->getImage(paths.last()), TARGET_DROP);
         // the Image object may simply not be in the cache — an entry in the
         // listing is a file whether or not its full-size image was loaded.

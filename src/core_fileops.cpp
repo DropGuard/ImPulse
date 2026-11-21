@@ -100,7 +100,7 @@ void Core::reloadImage() {
 }
 
 void Core::reloadImage(const QString &filePath) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     m_model->reload(filePath);
 }
@@ -110,7 +110,7 @@ void Core::renameCurrentSelection(const QString &newName) {
     // and Core::onFileRenamed follows it for the file on screen — an in-app
     // rename and an external one take the same path and get the same result.
     const QString oldPath = selectedPath();
-    if(!m_model->fileCount() || newName.isEmpty() || oldPath.isEmpty())
+    if(!m_model->listing().fileCount() || newName.isEmpty() || oldPath.isEmpty())
         return;
     FileOpResult result;
     m_model->renameEntry(oldPath, newName, false, result);
@@ -128,7 +128,7 @@ void Core::renameCurrentSelection(const QString &newName) {
 }
 
 FileOpResult Core::removeFile(const QString &filePath, bool trash) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return FileOpResult::NOTHING_TO_DO;
 
     bool reopen = false;
@@ -169,7 +169,7 @@ void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCou
 }
 
 void Core::showOpenDialog() {
-    m_dialogs->showOpenDialog(m_model->directoryPath());
+    m_dialogs->showOpenDialog(m_model->listing().directoryPath());
 }
 
 void Core::showInDirectory() {
@@ -186,7 +186,7 @@ void Core::showInDirectory() {
     // An empty selection reveals the directory itself (selected in its
     // parent); a session without the contract gets a message, not a list
     // of guessed binaries.
-    QString reveal = selectedPath().isEmpty() ? m_model->directoryPath() : selectedPath();
+    QString reveal = selectedPath().isEmpty() ? m_model->listing().directoryPath() : selectedPath();
     QDBusMessage msg = QDBusMessage::createMethodCall(
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("/org/freedesktop/FileManager1"),
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("ShowItems"));
@@ -208,7 +208,7 @@ void Core::showInDirectory() {
     args << "/select," << QDir::toNativeSeparators(selectedPath());
     QProcess::startDetached("explorer", args);
 #else
-    QDesktopServices::openUrl(QUrl::fromLocalFile(m_model->directoryPath()));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_model->listing().directoryPath()));
 #endif
 }
 
@@ -216,7 +216,7 @@ void Core::showInDirectory() {
 // keypress copies the current file into the configured folder — no dialog,
 // no clobbering. Unconfigured, it says so instead of guessing.
 void Core::quickCopyToFixedDirectory() {
-    if(!m_model || m_model->isEmpty() || selectedPath().isEmpty())
+    if(!m_model || m_model->listing().isEmpty() || selectedPath().isEmpty())
         return;
     QString destDir = settings->quickCopyDirectory();
     if(destDir.isEmpty()) {
@@ -455,7 +455,7 @@ void Core::movePathsTo(const QList<QString> &paths, const QString &destDirectory
 }
 
 void Core::moveCurrentFile(const QString &destDirectory) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     // pause updates to avoid flicker
     m_view->setUpdatesEnabled(false);
@@ -486,7 +486,7 @@ void Core::moveCurrentFile(const QString &destDirectory) {
 }
 
 void Core::copyCurrentFile(const QString &destDirectory) {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     FileOpResult result;
     m_model->copyFileTo(selectedPath(), destDirectory, false, result);
@@ -501,7 +501,7 @@ void Core::copyCurrentFile(const QString &destDirectory) {
 }
 
 void Core::showRenameDialog() {
-    if(m_model->isEmpty())
+    if(m_model->listing().isEmpty())
         return;
     QFileInfo fi(selectedPath());
     m_overlays->toggleRenameOverlay(fi.fileName());

@@ -512,7 +512,11 @@ def main():
     print(f'{len(srcs)} translation units, build dir {BUILD}, instrument {fp}')
     memo = {}
     gcc, gcc_crashes = gcc_counts(srcs, versions, memo)
-    gated = {k: v for k, v in gcc.items() if k in GATED}
+    # counts, not the raw (file, line) sets: show() converts for the
+    # report-only families, and the gated print and the baseline compare
+    # need the same shape — a gated family with findings formatted its set
+    # and took the whole gate down
+    gated = {k: len(v) for k, v in gcc.items() if k in GATED}
     report_only = {k: v for k, v in gcc.items() if k not in GATED}
     now = {}
     now.update({('gcc', k): v for k, v in show('gcc, report-only families', report_only).items()})

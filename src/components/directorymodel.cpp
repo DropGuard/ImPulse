@@ -6,16 +6,10 @@
 
 DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
     : QObject(parent), scaler(std::make_unique<Scaler>(&m_cache, pool)), m_dirManager(bridge), m_loader(pool) {
-
     connect(&m_dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
     connect(&m_dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
     connect(&m_dirManager, &DirectoryManager::fileModified, this, &DirectoryModel::onFileModified);
     connect(&m_dirManager, &DirectoryManager::fileRenamed, this, &DirectoryModel::onFileRenamed);
-    connect(&m_dirManager, &DirectoryManager::dirRemoved, this, &DirectoryModel::dirRemoved);
-    connect(&m_dirManager, &DirectoryManager::dirAdded, this, &DirectoryModel::dirAdded);
-    connect(&m_dirManager, &DirectoryManager::dirRenamed, this, &DirectoryModel::dirRenamed);
-
-    connect(&m_dirManager, &DirectoryManager::loaded, this, &DirectoryModel::loaded);
     connect(&m_dirManager, &DirectoryManager::sortingChanged, this, &DirectoryModel::onSortingChanged);
     connect(&m_loader, &Loader::loadFinished, this, &DirectoryModel::onImageReady);
     connect(&m_loader, &Loader::loadFailed, this, &DirectoryModel::loadFailed);
@@ -25,95 +19,7 @@ DirectoryModel::~DirectoryModel() {
     m_loader.clearTasks();
 }
 
-int DirectoryModel::totalCount() const {
-    return m_dirManager.totalCount();
-}
-
-int DirectoryModel::fileCount() const {
-    return m_dirManager.fileCount();
-}
-
-int DirectoryModel::dirCount() const {
-    return m_dirManager.dirCount();
-}
-
-int DirectoryModel::indexOfFile(const QString &filePath) const {
-    return m_dirManager.indexOfFile(filePath);
-}
-
-int DirectoryModel::indexOfDir(const QString &filePath) const {
-    return m_dirManager.indexOfDir(filePath);
-}
-
-SortingMode DirectoryModel::sortingMode() const {
-    return m_dirManager.sortingMode();
-}
-
-const FSEntry &DirectoryModel::fileEntryAt(int index) const {
-    return m_dirManager.fileEntryAt(index);
-}
-
-QString DirectoryModel::fileNameAt(int index) const {
-    return m_dirManager.fileNameAt(index);
-}
-
-QString DirectoryModel::filePathAt(int index) const {
-    return m_dirManager.filePathAt(index);
-}
-
-QString DirectoryModel::dirNameAt(int index) const {
-    return m_dirManager.dirNameAt(index);
-}
-
-QString DirectoryModel::dirPathAt(int index) const {
-    return m_dirManager.dirPathAt(index);
-}
-
-QString DirectoryModel::directoryPath() const {
-    return m_dirManager.directoryPath();
-}
-
-bool DirectoryModel::containsFile(const QString &filePath) const {
-    return m_dirManager.containsFile(filePath);
-}
-
-bool DirectoryModel::containsDir(const QString &dirPath) const {
-    return m_dirManager.containsDir(dirPath);
-}
-
-bool DirectoryModel::isEmpty() const {
-    return m_dirManager.isEmpty();
-}
-
-QString DirectoryModel::firstFile() const {
-    return m_dirManager.firstFile();
-}
-
-QString DirectoryModel::lastFile() const {
-    return m_dirManager.lastFile();
-}
-
-QString DirectoryModel::nextOf(const QString &filePath) const {
-    return m_dirManager.nextOfFile(filePath);
-}
-
-QString DirectoryModel::prevOf(const QString &filePath) const {
-    return m_dirManager.prevOfFile(filePath);
-}
-
-QDateTime DirectoryModel::lastModified(const QString &filePath) const {
-    return m_dirManager.lastModified(filePath);
-}
-
 // -----------------------------------------------------------------------------
-
-QString DirectoryModel::adjacentDirectory(const QString &dirPath, bool forward) {
-    return m_dirManager.adjacentDirectory(dirPath, forward, sortingMode());
-}
-
-void DirectoryModel::setSortingMode(SortingMode mode) {
-    m_dirManager.setSortingMode(mode);
-}
 
 void DirectoryModel::removeFile(const QString &filePath, bool trash, FileOpResult &result) {
     // no mirror write here: the engine's watch sees the change and the
@@ -156,16 +62,8 @@ bool DirectoryModel::setDirectory(const QString &path) {
     return m_dirManager.setDirectory(path);
 }
 
-qint64 DirectoryModel::whenListed(const QString &dirPath, std::function<void()> action) {
-    return m_dirManager.whenListed(dirPath, std::move(action));
-}
-
-bool DirectoryModel::cancelListed(qint64 token) {
-    return m_dirManager.cancelListed(token);
-}
-
 void DirectoryModel::unload(int index) {
-    QString filePath = this->filePathAt(index);
+    QString filePath = m_dirManager.filePathAt(index);
     m_cache.remove(filePath);
 }
 
@@ -177,18 +75,14 @@ void DirectoryModel::unloadExcept(const QString &filePath, bool keepNearby) {
     QList<QString> list;
     list << filePath;
     if(keepNearby) {
-        list << prevOf(filePath);
-        list << nextOf(filePath);
+        list << m_dirManager.prevOfFile(filePath);
+        list << m_dirManager.nextOfFile(filePath);
     }
     m_cache.trimTo(list);
 }
 
 bool DirectoryModel::loaderBusy() const {
     return m_loader.isBusy();
-}
-
-bool DirectoryModel::listingSettled() const {
-    return m_dirManager.isSettled();
 }
 
 void DirectoryModel::onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
@@ -210,7 +104,7 @@ bool DirectoryModel::saveFile(const QString &filePath) {
 }
 
 bool DirectoryModel::saveFile(const QString &filePath, const QString &destPath) {
-    if(!containsFile(filePath) || !m_cache.contains(filePath))
+    if(!m_dirManager.containsFile(filePath) || !m_cache.contains(filePath))
         return false;
     auto img = m_cache.get(filePath);
     if(img->save(destPath, settings->JPEGSaveQuality())) {
@@ -224,7 +118,7 @@ bool DirectoryModel::saveFile(const QString &filePath, const QString &destPath) 
 // dirManager events
 
 void DirectoryModel::onSortingChanged() {
-    emit sortingChanged(sortingMode());
+    emit sortingChanged(m_dirManager.sortingMode());
 }
 
 void DirectoryModel::onFileAdded(const QString &filePath) {
@@ -232,7 +126,7 @@ void DirectoryModel::onFileAdded(const QString &filePath) {
 }
 
 void DirectoryModel::onFileModified(const QString &filePath) {
-    QDateTime modTime = lastModified(filePath);
+    QDateTime modTime = m_dirManager.lastModified(filePath);
     if(!modTime.isValid())
         return;
     auto img = m_cache.get(filePath);
@@ -276,7 +170,7 @@ void DirectoryModel::onFileRenamed(const QString &filePath, const QString &newPa
 }
 
 bool DirectoryModel::isLoaded(int index) const {
-    return m_cache.contains(filePathAt(index));
+    return m_cache.contains(m_dirManager.filePathAt(index));
 }
 
 bool DirectoryModel::isLoaded(const QString &filePath) const {
@@ -284,7 +178,7 @@ bool DirectoryModel::isLoaded(const QString &filePath) const {
 }
 
 std::shared_ptr<Image> DirectoryModel::getImageAt(int index) {
-    return getImage(filePathAt(index));
+    return getImage(m_dirManager.filePathAt(index));
 }
 
 // returns cached image
@@ -302,7 +196,7 @@ std::shared_ptr<Image> DirectoryModel::getImage(const QString &filePath) {
 }
 
 void DirectoryModel::updateImage(const QString &filePath, std::shared_ptr<Image> img) {
-    if(containsFile(filePath)) {
+    if(m_dirManager.containsFile(filePath)) {
         const bool cached = m_cache.contains(filePath);
         m_cache.insert(img);
         if(cached)
@@ -315,7 +209,7 @@ void DirectoryModel::load(const QString &filePath, bool asyncHint) {
 }
 
 void DirectoryModel::load(const QString &filePath, bool asyncHint, bool scaled) {
-    if(!containsFile(filePath) || m_loader.isLoading(filePath))
+    if(!m_dirManager.containsFile(filePath) || m_loader.isLoading(filePath))
         return;
     if(!m_cache.contains(filePath)) {
         if(asyncHint) {
@@ -347,13 +241,13 @@ void DirectoryModel::reload(const QString &filePath) {
 }
 
 void DirectoryModel::loadFocused(const QString &filePath, bool forward, bool withPreload) {
-    if(!containsFile(filePath))
+    if(!m_dirManager.containsFile(filePath))
         return;
     QSet<QString> window;
     window.insert(filePath);
     QString neighbor;
     if(withPreload) {
-        neighbor = forward ? nextOf(filePath) : prevOf(filePath);
+        neighbor = forward ? m_dirManager.nextOfFile(filePath) : m_dirManager.prevOfFile(filePath);
         if(!neighbor.isEmpty())
             window.insert(neighbor);
     }
@@ -370,12 +264,12 @@ void DirectoryModel::loadFocused(const QString &filePath, bool forward, bool wit
 }
 
 void DirectoryModel::preload(const QString &filePath) {
-    if(containsFile(filePath) && !m_cache.contains(filePath))
+    if(m_dirManager.containsFile(filePath) && !m_cache.contains(filePath))
         m_loader.loadAsync(filePath, LoadPolicy::fromSettings()); // tier-1 scaled
 }
 
 // tier-2: full-res re-decode of a tier-1 cached image
 void DirectoryModel::upgradeToFull(const QString &filePath) {
-    if(containsFile(filePath) && !m_loader.isLoading(filePath) && m_scaledCache.contains(filePath))
+    if(m_dirManager.containsFile(filePath) && !m_loader.isLoading(filePath) && m_scaledCache.contains(filePath))
         m_loader.loadAsyncFull(filePath, LoadPolicy::fromSettings());
 }

@@ -487,17 +487,17 @@ TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
             10000);
         EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    const int before = core().directoryModel()->fileCount();
+    const int before = core().directoryModel()->listing().fileCount();
 
     core().removePermanent();
 
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core().directoryModel()->fileCount()) == (before - 1);
+                return static_cast<int>(core().directoryModel()->listing().fileCount()) == (before - 1);
             },
             10000);
-        EXPECT_EQ(core().directoryModel()->fileCount(), before - 1)
+        EXPECT_EQ(core().directoryModel()->listing().fileCount(), before - 1)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_TRUE(!QFileInfo::exists(QDir(m_alpha).filePath("a.png"))) << "the confirmed removal never reached the disk";
@@ -515,12 +515,12 @@ TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
             10000);
         EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    const int before = core().directoryModel()->fileCount();
+    const int before = core().directoryModel()->listing().fileCount();
 
     core().moveToTrash();
 
     EXPECT_EQ(m_ui.confirmCalls, 1);
-    EXPECT_EQ(core().directoryModel()->fileCount(), before);
+    EXPECT_EQ(core().directoryModel()->listing().fileCount(), before);
     EXPECT_TRUE(QFileInfo::exists(QDir(m_alpha).filePath("a.png")));
 }
 
@@ -641,13 +641,13 @@ TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNe
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core().directoryModel()->containsFile(from);
+                return core().directoryModel()->listing().containsFile(from);
             },
             10000);
-        EXPECT_TRUE(core().directoryModel()->containsFile(from))
+        EXPECT_TRUE(core().directoryModel()->listing().containsFile(from))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(core().directoryModel()->fileCount(), 2);
+    EXPECT_EQ(core().directoryModel()->listing().fileCount(), 2);
 
     core().renameCurrentSelection("renamed.png");
 
@@ -657,14 +657,14 @@ TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNe
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core().directoryModel()->containsFile(to);
+                return core().directoryModel()->listing().containsFile(to);
             },
             10000);
-        EXPECT_TRUE(core().directoryModel()->containsFile(to))
+        EXPECT_TRUE(core().directoryModel()->listing().containsFile(to))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(!core().directoryModel()->containsFile(from));
-    EXPECT_EQ(core().directoryModel()->fileCount(), 2); // lossless: nothing dropped
+    EXPECT_TRUE(!core().directoryModel()->listing().containsFile(from));
+    EXPECT_EQ(core().directoryModel()->listing().fileCount(), 2); // lossless: nothing dropped
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -696,10 +696,10 @@ TEST_F(TestCoreFileOps, externallyRenamingTheCurrentFileKeepsItTheCurrentFile) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core().directoryModel()->containsFile(from);
+                return core().directoryModel()->listing().containsFile(from);
             },
             10000);
-        EXPECT_TRUE(core().directoryModel()->containsFile(from))
+        EXPECT_TRUE(core().directoryModel()->listing().containsFile(from))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_EQ(core().currentFilePath(), from);
@@ -717,7 +717,7 @@ TEST_F(TestCoreFileOps, externallyRenamingTheCurrentFileKeepsItTheCurrentFile) {
     }
     EXPECT_TRUE(core().directoryModel()->isLoaded(to)); // on it, not merely pointing at it
     EXPECT_TRUE(!core().directoryModel()->isLoaded(from));
-    EXPECT_EQ(core().directoryModel()->fileCount(), 2); // lossless, as under an issued rename
+    EXPECT_EQ(core().directoryModel()->listing().fileCount(), 2); // lossless, as under an issued rename
 }
 
 // The watcher's contract for the image on screen: an external rewrite is
