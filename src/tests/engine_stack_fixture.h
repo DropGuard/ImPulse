@@ -238,8 +238,9 @@ class EngineStackFixture {
         // The export names the listing it came from. If the mirror has not
         // applied that version, its rows are a different snapshot and there is
         // nothing to compare — say "not settled yet" rather than inventing a
-        // mismatch the caller would report as a bug.
-        if(dm.appliedRevision() != revision) {
+        // mismatch the caller would report as a bug. Both sides compare in the
+        // wire's width: the mirror stores the low 32 bits.
+        if(dm.appliedRevision() != quint32(revision)) {
             diff = QStringLiteral("the mirror is at revision %1, the export at %2")
                        .arg(dm.appliedRevision())
                        .arg(revision);

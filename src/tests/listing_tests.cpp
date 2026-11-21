@@ -94,7 +94,8 @@ TEST_F(TestListing, theMirrorRevisionTracksTheEngineItApplied) {
         QByteArray arena;
         quint32 fc = 0, dc = 0;
         quint64 rev = 0;
-        return bridge.exportListing(arena, fc, dc, rev) ? rev : 0;
+        // the wire's own width: the mirror stores the low 32 bits
+        return bridge.exportListing(arena, fc, dc, rev) ? quint32(rev) : 0;
     };
 
     ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() != 0, 10000);
@@ -497,6 +498,10 @@ TEST_F(TestListing, mutationsOutsideTheMirroredDirectoryAreDropped) {
     EXPECT_EQ(added.count(), 0);
     EXPECT_EQ(dm.fileCount(), before);
 
+    // neither drop is drift: the engine never lists the other folder, so the
+    // current listing is already what it should be, and no repair is armed
+    EXPECT_TRUE(dm.isSettled());
+
     // the guard must not swallow the real case
     makeFile("legit.jpg");
     ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(m_fixtureDir + "/legit.jpg"), 10000);
@@ -515,6 +520,7 @@ TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
     ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
     const unsigned long before = dm.fileCount();
     EXPECT_TRUE(before > 0);
+    const quint64 beforeRevision = dm.appliedRevision();
     QSignalSpy renamed(&dm, &DirectoryManager::fileRenamed);
     QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
 
@@ -528,7 +534,73 @@ TEST_F(TestListing, renameFromOutsideTheMirroredDirectoryIsDropped) {
     // the row it would have moved is still the engine's own row
     assertMirrorMatchesEngineExport(dm);
 
+    // the drop arms its own repair; wait for its listing to land (applied
+    // moves — see the sort test for why this, not isSettled, names the
+    // moment) before the real rename, so the rename rides the repair's
+    // session instead of racing the rescan's open
+    ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() != beforeRevision, 10000);
+
     // and a real rename of the same destination still lands
     EXPECT_TRUE(QFile::rename(m_fixtureDir + "/img2.jpg", m_fixtureDir + "/moved.jpg"));
     ASSERT_TRY_EQ_TIMEOUT(renamed.count(), 1, 10000);
+}
+
+TEST_F(TestListing, aDroppedMutationResyncsTheMirror) {
+    // A duplicate arrival is dropped: the mirror already holds the row, and
+    // applying it would double it — but the engine inserted the path and its
+    // revision moved anyway, which is drift as far as this side knows. The
+    // drop arms its own repair instead of waiting for a DirListed that a
+    // quiet directory will never produce: the rescan re-lists, and the mirror
+    // converges with no further event and no row change.
+    resetFixture();
+    DirectoryManager dm{EngineBridge::instance()};
+    auto &bridge = EngineBridge::instance();
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+    const unsigned long before = dm.fileCount();
+    const QString heldRow = dm.filePathAt(0);
+    const quint64 applied = dm.appliedRevision();
+
+    QSignalSpy added(&dm, &DirectoryManager::fileAdded);
+    QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
+    emit bridge.dirMutated(QIMGV_MUT_ADDED, heldRow, false, 1, 0, 0, QString(), applied);
+    // the drop armed the repair: unsettled now, and the mirror follows the
+    // rescan's listing when it lands (applied moving is the outside-visible
+    // sign the repair landed — same reasoning as the sort test)
+    EXPECT_FALSE(dm.isSettled());
+    ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() != applied, 10000);
+    EXPECT_EQ(added.count(), 0);
+    EXPECT_EQ(removed.count(), 0);
+    EXPECT_EQ(dm.fileCount(), before);
+    EXPECT_TRUE(dm.containsFile(heldRow));
+    assertMirrorMatchesEngineExport(dm);
+}
+
+TEST_F(TestListing, aSortMismatchResyncsInsteadOfWaitingForTheNextListing) {
+    // The sort handler confirms the event's revision against the export's
+    // before trusting it. A mismatch used to only set m_wantRescan — a flag
+    // consumed by the next DirListed, which a quiet directory never produces,
+    // leaving the mirror unsettled forever. The mismatch now arms its own
+    // rescan, and the mirror converges to the engine's revision, not to the
+    // event's claim.
+    resetFixture();
+    DirectoryManager dm{EngineBridge::instance()};
+    auto &bridge = EngineBridge::instance();
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+    const quint64 applied = dm.appliedRevision();
+
+    emit bridge.sortChanged(m_fixtureDir, applied + 1);
+    EXPECT_FALSE(dm.isSettled());
+    // The repair is a same-directory openDir: the engine resorts silently (a
+    // revision bump no event carries) and re-lists, and the mirror follows
+    // when the DirListed lands. "applied moved" is what "the repair landed"
+    // looks like from outside — the listing content is unchanged, so nothing
+    // else names it. A bare equality assert cannot stand in here: the
+    // engine's loop thread moves the export concurrently, and the macro's
+    // wait-then-reassert can read the two sides on opposite sides of that
+    // move (seen once under the hook's full-suite load: applied 2, export 3,
+    // in a 196 ms test).
+    ASSERT_TRY_TRUE_TIMEOUT(dm.appliedRevision() != applied, 10000);
+    assertMirrorMatchesEngineExport(dm);
 }

@@ -272,6 +272,14 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     if(dirPath != m_engineDir || dirPath != m_mirroredDir)
         return;
 
+    // Every mismatch below means the rows this event would permute are not
+    // the rows the mirror holds, or the version it names is not the engine's.
+    // The repair is a rescan, armed HERE: this event may be the last one a
+    // quiet directory ever produces, and m_wantRescan is consumed only by the
+    // next DirListed — waiting for one would leave the mirror unsettled
+    // forever. (m_wantRescan stays the tool for flags raised while m_resyncing
+    // holds; there the direct schedule is dropped by its own guard.)
+    //
     // The event's revision is the one to apply; the export's is used only to
     // confirm the rows this permutes are still the engine's, below.
     QByteArray listing;
@@ -280,25 +288,27 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     if(!m_bridge.exportListing(listing, fileCount, dirCount, exportRevision)) {
         // the engine has no listing to hand over: make the next openDir the
         // authority rather than guessing an order here
-        m_wantRescan = true;
+        scheduleRescan();
         return;
     }
     std::vector<EngineBridge::EngineEntry> files, dirs;
     if(!EngineBridge::parseListing(listing, files, dirs)) {
-        m_wantRescan = true;
+        scheduleRescan();
         return;
     }
-    if(exportRevision != revision) {
+    if(quint32(exportRevision) != quint32(revision)) {
         // a mutation landed after the sort did: the order just read is newer
         // than the one this event announced, so permuting to it would claim a
-        // version the event does not own. The rescan path can say so.
-        m_wantRescan = true;
+        // version the event does not own. Both sides compare in the wire's own
+        // width — the low 32 bits of the engine's u64 counter, the only thing
+        // equality is ever asked to mean.
+        scheduleRescan();
         return;
     }
     if(files.size() != m_fileEntryVec.size() || dirs.size() != m_dirEntryVec.size()) {
         // not a permutation: something arrived or left without the mirror
         // hearing about it. A listing resync is the path that can say so.
-        m_wantRescan = true;
+        scheduleRescan();
         return;
     }
 
@@ -315,7 +325,7 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     for(const auto &f : files) {
         const auto it = byPath.constFind(f.path);
         if(it == byPath.constEnd()) {
-            m_wantRescan = true; // a path the mirror never held
+            scheduleRescan(); // a path the mirror never held
             return;
         }
         reorderedFiles.push_back(*it);
@@ -323,7 +333,7 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     for(const auto &d : dirs) {
         const auto it = byPath.constFind(d.path);
         if(it == byPath.constEnd()) {
-            m_wantRescan = true;
+            scheduleRescan(); // a path the mirror never held
             return;
         }
         reorderedDirs.push_back(*it);
@@ -591,8 +601,14 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
                                        int index, const QString &oldPath, quint64 revision) {
     const bool tracing = EngineBridge::traceEnabled();
     if(m_resyncing) {
+        // the listing being applied was exported before this event existed,
+        // and whether that export already contains it is not decidable here.
+        // The flag defers the question: it is consumed when the resync's own
+        // onEngineDirListed tail runs — the direct schedule would be dropped
+        // by its own guard while m_resyncing is held.
         if(tracing)
             qDebug() << "[mirror trace] drop (resync in progress)" << path;
+        m_wantRescan = true;
         return;
     }
     // A mutation edits the listing the vectors currently hold, so its path has
@@ -604,14 +620,23 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
     if(!m_mirroredDir.isEmpty() && !path.startsWith(m_mirroredDir + QLatin1Char('/'))) {
         qWarning() << "[DirectoryManager] mutation outside the mirrored directory:" << path
                    << "mirrored:" << m_mirroredDir;
+        // no repair armed here, deliberately: the engine filters other
+        // directories' mutations before they become events at all, so this
+        // drop cannot be drift — the current listing is what it should be.
         return;
     }
     switch(kind) {
     case QIMGV_MUT_ADDED: {
         if(containsFile(path) || containsDir(path)) {
+            // the engine inserted a path the mirror already holds — its
+            // revision moved, this side did not apply it. Presence may agree,
+            // meta may not: this drop is drift and repairs itself. A false
+            // alarm costs one debounced rescan; a silent one leaves a stale
+            // row on a quiet directory forever.
             if(tracing)
                 qDebug() << "[mirror trace] drop (already mirrored)" << path;
-            return; // already mirrored (racing duplicate)
+            scheduleRescan();
+            return;
         }
         FSEntry entry;
         entry.path = path;
@@ -637,6 +662,9 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
         if(!m_mirroredDir.isEmpty() && !oldPath.startsWith(m_mirroredDir + QLatin1Char('/'))) {
             qWarning() << "[DirectoryManager] rename source outside the mirrored directory:" << oldPath
                        << "mirrored:" << m_mirroredDir;
+            // the engine's revision moved for a rename this side cannot apply:
+            // drift, repaired like the rest
+            scheduleRescan();
             return;
         }
         applyEngineRename(oldPath, path, isDir, size, mtimeMs, index);
@@ -700,8 +728,9 @@ bool DirectoryManager::mirrorEngineListing(const QString &dirPath) {
     if(!applyArena(dirPath, listing, newFileCount, newDirCount))
         return false;
     // the version this mirror now reflects: the one the bytes came with, not
-    // one sampled afterwards (which could name a listing it never applied)
-    m_appliedRevision = revision;
+    // one sampled afterwards (which could name a listing it never applied).
+    // Low 32 bits — the width every writer of this number uses.
+    m_appliedRevision = quint32(revision);
     return true;
 }
 

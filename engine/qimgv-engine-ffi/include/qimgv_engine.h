@@ -96,8 +96,10 @@ typedef struct qimgv_event {
      * and SORT_CHANGED, the version after the change; for DIR_LISTED, the
      * version of the listing it announces. A mirror applies the event and
      * stores this, so `mirror.revision == export.revision` means the rows and
-     * that export came from the same listing. High 32 bits of the engine's
-     * u64 counter; 0 means "no listing". */
+     * that export came from the same listing. Low 32 bits of the engine's
+     * u64 counter (the Rust side truncates with `as u32`: a wrap moves both
+     * sides' numbers together, and equality is all that is ever asked);
+     * 0 means "no listing". */
     uint32_t revision;
 } qimgv_event;
 

@@ -76,9 +76,10 @@ class DirectoryManager : public QObject {
     // an assertion about content (sortingMode() could: it reports the requested
     // mode, which setSortingMode writes before it returns).
     bool isSettled() const;
-    // The engine listing version these rows reflect. A reader comparing them
-    // against an export needs the export's revision to match this one; equal
-    // means the rows are that export's rows.
+    // The engine listing version these rows reflect: the low 32 bits of the
+    // engine's u64 counter, zero-extended — the width the wire carries on
+    // events, and equality is the only question ever asked of it. Equal to an
+    // export's low 32 bits means the rows are that export's rows.
     quint64 appliedRevision() const {
         return m_appliedRevision;
     }

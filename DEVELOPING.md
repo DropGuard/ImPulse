@@ -115,8 +115,13 @@ half, and it moves only when an event was APPLIED — every guard that drops one
 returns without touching it, because a dropped event leaves the mirror behind
 the engine and the number is supposed to say so. A reader compares two
 integers instead of two exports, and "not settled yet" is a distinct answer
-from "these disagree". Still open: nothing acts on a mismatch — the revision
-detects a mirror left behind, and no resync consumes the detection yet.
+from "these disagree". A mismatch acts: the sort handler's revision check and
+every drop that can leave the mirror behind arm their own rescan instead of
+waiting for the next `DirListed` — which a quiet directory never produces.
+One behind-window stays by design: after a failed open, in-flight
+stale-session mutations can strand bumps in the listing the engine retains,
+with no corrective event until the next successful open repairs it — the
+mirror does not rescan a directory that just refused to open.
 
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
