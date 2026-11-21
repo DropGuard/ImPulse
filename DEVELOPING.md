@@ -30,15 +30,13 @@ each carry their own C/C++ runtime ABI; linking libraries from two of them
 produces link errors at best and silent breakage at worst. Every package comes
 from clang64.
 
-clang64 rather than ucrt64, which this section used to name. The reason given
-for ucrt64 was that exiv2 and libmpv were packaged only there; checked
-2026-11-21, both are in clang64 as well. clang64 wins because it is the only
-environment that also carries **clazy**, so the machine that builds the code
+clang64, not ucrt64: it is the only environment that carries every dependency
+(exiv2 and libmpv included) **and** clazy, so the machine that builds the code
 can also run the lint gate on it — and clang's warnings match what the Linux
 tree measures, where gcc's do not.
 
 The Rust side stays `x86_64-pc-windows-gnu`; its self-contained CRT objects
-link cleanly through the pure C ABI (measured, zero undefined symbols). The git
+link cleanly through the pure C ABI. The git
 gate is bash-shaped by design — run git from the msys2 shell, where bash, the
 coreutils and the hook's environment exist; from a bare cmd the hook's
 interpreter is not resolvable. Tools the machine does not have are skipped
@@ -51,9 +49,9 @@ Feature availability on this toolchain, measured rather than assumed:
 
 | Option | msys2 clang64 | note |
 | --- | --- | --- |
-| `EXIV2` | ON | mingw-w64-clang-x86_64-exiv2 0.28; its 0.28 API takes UTF-8 narrow paths on every platform (`QString::toStdString`, not the old wide-char helper) |
-| `VIDEO_SUPPORT` | ON | mingw-w64-clang-x86_64-mpv 0.42; the plugin builds as `build/plugins/player_mpv/player_mpv.dll` |
-| `OPENCV_SUPPORT` | ON | mingw-w64-clang-x86_64-opencv 5.0 |
+| `EXIV2` | ON | package `mingw-w64-clang-x86_64-exiv2`; its 0.28 API takes UTF-8 narrow paths on every platform (`QString::toStdString`, not the old wide-char helper) |
+| `VIDEO_SUPPORT` | ON | package `mingw-w64-clang-x86_64-mpv`; the plugin builds as `build/plugins/player_mpv/player_mpv.dll` |
+| `OPENCV_SUPPORT` | ON | package `mingw-w64-clang-x86_64-opencv` |
 
 Windows file-system facts the code is written against (each pinned by a test):
 
@@ -268,13 +266,11 @@ green suite is only evidence if the test you think ran actually ran.
 ## AppImage
 
 The self-contained bundle is built by the `appimage` job in
-`.github/workflows/ci.yml`, inside a ubuntu:22.04 container (the glibc floor
-the bundle inherits: 2.35 — it covers Debian 12+ and Ubuntu 22.04+).
-Everything rides inside: Qt 6.9, OpenCV, exiv2, libmpv and the engine. The job
-runs on `v*` tag pushes, `workflow_dispatch` and the nightly schedule; the
-pipeline itself was validated locally through `act` (build, pack and the
-headless smoke green there), but the release step needs the real GitHub API
-and is only proven on a runner.
+`.github/workflows/ci.yml` — the workflow file, not this section, is the truth
+about the container, the Qt it rides and the triggers. The glibc floor the
+bundle inherits is 2.35 — it covers Debian 12+ and Ubuntu 22.04+ — and
+everything rides inside: the engine, OpenCV, exiv2 and libmpv. The release
+step needs the real GitHub API and is only proven on a runner.
 
 A tag push lands a **draft** release with `ImPulse-<version>-x86_64.AppImage`
 and its sha256; the tag must match the version in `src/appversion.cpp`.
