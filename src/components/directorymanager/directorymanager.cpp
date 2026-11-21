@@ -467,13 +467,21 @@ void DirectoryManager::onEngineDirListed(const QString &dirPath) {
     if(!applied) {
         // A rejected arena is not a listing: the actions armed for it must keep
         // waiting for one that arrives, rather than fire against a mirror that was
-        // never updated. Bounded so a permanently broken engine cannot make the
-        // 150ms rescan timer spin forever.
+        // never updated.
+        //
+        // This is drift, not a transient: parseListing rejects only when the
+        // arena's header disagrees with its own bytes or it does not consume
+        // exactly. Nothing here can heal that, so the counter does not bound
+        // anything — it decides whether the repeated failure is a warning or a
+        // critical. What actually stops a spin is applyArena's own m_wantRescan,
+        // consumed by the branch above, plus scheduleRescan's m_resyncing guard;
+        // both keep one retry in flight at a time rather than ending the loop.
+        // Ending it deliberately is the caller's call, and no caller does.
         if(++m_rejectedListings <= 3)
             qWarning() << "[DirectoryManager] listing rejected" << m_rejectedListings << "times for" << dirPath;
         else
-            qCritical() << "[DirectoryManager] giving up on mirroring" << dirPath
-                        << ": the engine keeps rejecting its own listing";
+            qCritical() << "[DirectoryManager] the engine keeps rejecting its own listing for" << dirPath
+                        << "— retrying, but no retry can heal this";
         return;
     }
     m_rejectedListings = 0;
