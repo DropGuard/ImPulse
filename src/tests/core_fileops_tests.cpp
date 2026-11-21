@@ -83,6 +83,31 @@ class TestCoreFileOps : public ::testing::Test, protected EngineStackFixture {
         EXPECT_TRUE(QDir().mkpath(m_alpha));
         writeImage(QDir(m_alpha).filePath("a.png"));
     }
+
+    // A headless Core over the three fakes, built on first use. Most of this
+    // suite's tests opened with the same eight lines building exactly this —
+    // the fixture is what a gtest suite is for — but a few drive a component
+    // directly and have no Core at all, so constructing it eagerly would make
+    // them pay for a window-less Core they never touch.
+    Core &core() {
+        if(!m_core)
+            m_core = std::make_unique<Core>(headlessDeps());
+        return *m_core;
+    }
+
+    Core::Deps headlessDeps() {
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &m_ui;
+        deps.overlays = &m_overlays;
+        deps.view = &m_view;
+        return deps;
+    }
+
+    coretest::FakeInteractions m_ui;
+    coretest::FakeOverlayHost m_overlays;
+    coretest::RecordingView m_view;
+    std::unique_ptr<Core> m_core;
 };
 
 TEST_F(TestCoreFileOps, quickCopyLandsInTheConfiguredFolder) {
@@ -90,25 +115,16 @@ TEST_F(TestCoreFileOps, quickCopyLandsInTheConfiguredFolder) {
     settings->setQuickCopyDirectory(dest);
     EXPECT_TRUE(QDir().mkpath(dest));
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     QString img = QDir(m_base).filePath("qc.png");
     writeImage(img);
-    EXPECT_TRUE(core.loadPath(img));
+    EXPECT_TRUE(core().loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (img);
+                return (core().currentFilePath()) == (img);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), img)
+        EXPECT_EQ(core().currentFilePath(), img)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
@@ -135,26 +151,17 @@ TEST_F(TestCoreFileOps, moveCurrentFileRelandsOnDiskAndCopyKeepsTheOriginal) {
     const QString file = src + QStringLiteral("/moving.png");
     writeImage(file);
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps); // must be installed: see below
-    EXPECT_TRUE(core.loadPath(file));
+    EXPECT_TRUE(core().loadPath(file));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core.copyCurrentFile(copyDst);
+    core().copyCurrentFile(copyDst);
     EXPECT_TRUE(QFileInfo::exists(copyDst + QStringLiteral("/moving.png")))
         << "copy did not produce the file at the destination";
     EXPECT_TRUE(QFileInfo::exists(file)) << "copy consumed the original";
@@ -165,7 +172,7 @@ TEST_F(TestCoreFileOps, moveCurrentFileRelandsOnDiskAndCopyKeepsTheOriginal) {
     // overwrite decision, and the production provider (the main window)
     // blocks on a real modal dialog — the test does not fail, it hangs
     // until the QTest watchdog kills the process at 300 s.
-    core.moveCurrentFile(moveDst);
+    core().moveCurrentFile(moveDst);
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -176,7 +183,7 @@ TEST_F(TestCoreFileOps, moveCurrentFileRelandsOnDiskAndCopyKeepsTheOriginal) {
                                               << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_TRUE(QFileInfo::exists(moveDst + QStringLiteral("/moving.png")));
-    EXPECT_EQ(fake.confirmCalls, 0); // no collision on this path
+    EXPECT_EQ(m_ui.confirmCalls, 0); // no collision on this path
 }
 
 TEST_F(TestCoreFileOps, declinedCollisionLeavesBothFilesWhereTheyWere) {
@@ -188,56 +195,38 @@ TEST_F(TestCoreFileOps, declinedCollisionLeavesBothFilesWhereTheyWere) {
     writeImage(clash);
     const QByteArray clashBytes = coretest::contentOf(clash);
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    fake.confirmAnswer = false; // the overwrite question is answered NO
-    EXPECT_TRUE(core.loadPath(file));
+    m_ui.confirmAnswer = false; // the overwrite question is answered NO
+    EXPECT_TRUE(core().loadPath(file));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core.moveCurrentFile(dst);
+    core().moveCurrentFile(dst);
 
-    EXPECT_EQ(fake.confirmCalls, 1);
+    EXPECT_EQ(m_ui.confirmCalls, 1);
     EXPECT_TRUE(QFileInfo::exists(file)) << "a declined overwrite still moved the file";
     EXPECT_TRUE(QFileInfo::exists(clash));
 
-    core.copyCurrentFile(dst);
-    EXPECT_EQ(fake.confirmCalls, 2);
+    core().copyCurrentFile(dst);
+    EXPECT_EQ(m_ui.confirmCalls, 2);
     // the destination kept its own bytes: the declined copy never wrote
     EXPECT_EQ(coretest::contentOf(clash), clashBytes);
     EXPECT_TRUE(QFileInfo::exists(file));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyPlacesFileWithoutDialogs) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString src = makeTxt(m_base, "f1.txt", "one");
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core.interactiveCopy({src}, destDir);
+    core().interactiveCopy({src}, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 0); // no collision, nothing to ask
+    EXPECT_EQ(m_ui.replaceCalls, 0); // no collision, nothing to ask
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("f1.txt")), QByteArray("one"));
     EXPECT_TRUE(QFileInfo::exists(src)); // a copy leaves the source alone
 }
@@ -247,15 +236,6 @@ TEST_F(TestCoreFileOps, interactiveCopyPlacesFileWithoutDialogs) {
 // recursive copy treated it as a real subdirectory and copied the target's
 // contents — and a link back up the tree would recurse without end.
 TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
 
     const QString srcDir = QDir(m_base).filePath("srcdir");
     const QString realDir = QDir(srcDir).filePath("real");
@@ -268,7 +248,7 @@ TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
     const QString destDir = QDir(m_base).filePath("linkdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core.interactiveCopy({srcDir}, destDir);
+    core().interactiveCopy({srcDir}, destDir);
 
     // the real directory and its file arrive; the links arrive as links (or
     // are skipped), and nothing recurses through them
@@ -283,38 +263,20 @@ TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyOverwritesWhenScriptedYes) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString src = makeTxt(m_base, "f1.txt", "new");
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "f1.txt", "old");
-    fake.replaceAnswers << DialogResult{true, false, false};
+    m_ui.replaceAnswers << DialogResult{true, false, false};
 
-    core.interactiveCopy({src}, destDir);
+    core().interactiveCopy({src}, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1);
-    EXPECT_EQ(fake.replaceArgs.at(0).first, src); // asked about THIS file
+    EXPECT_EQ(m_ui.replaceCalls, 1);
+    EXPECT_EQ(m_ui.replaceArgs.at(0).first, src); // asked about THIS file
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("f1.txt")), QByteArray("new"));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyYesToAllSticksAcrossTheBatch) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
@@ -322,25 +284,16 @@ TEST_F(TestCoreFileOps, interactiveCopyYesToAllSticksAcrossTheBatch) {
         sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
-    fake.replaceAnswers << DialogResult{true, true, false}; // one answer, whole batch
+    m_ui.replaceAnswers << DialogResult{true, true, false}; // one answer, whole batch
 
-    core.interactiveCopy(sources, destDir);
+    core().interactiveCopy(sources, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1); // the sticky answer suppresses the rest
+    EXPECT_EQ(m_ui.replaceCalls, 1); // the sticky answer suppresses the rest
     for(const char *n : {"f1", "f2", "f3"})
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray(n));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyNoToAllSkipsTheRestWithoutAsking) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
@@ -348,25 +301,16 @@ TEST_F(TestCoreFileOps, interactiveCopyNoToAllSkipsTheRestWithoutAsking) {
         sources << makeTxt(m_base, QString(n) + ".txt", "new");
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
-    fake.replaceAnswers << DialogResult{false, true, false}; // no + apply to all
+    m_ui.replaceAnswers << DialogResult{false, true, false}; // no + apply to all
 
-    core.interactiveCopy(sources, destDir);
+    core().interactiveCopy(sources, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1); // asked once for the first collision only
+    EXPECT_EQ(m_ui.replaceCalls, 1); // asked once for the first collision only
     for(const char *n : {"f1", "f2", "f3"})
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray("old"));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyPlainYesAsksAgainForEachCollision) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
@@ -375,25 +319,16 @@ TEST_F(TestCoreFileOps, interactiveCopyPlainYesAsksAgainForEachCollision) {
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
     for(int i = 0; i < 3; ++i)
-        fake.replaceAnswers << DialogResult{true, false, false}; // plain yes, no all
+        m_ui.replaceAnswers << DialogResult{true, false, false}; // plain yes, no all
 
-    core.interactiveCopy(sources, destDir);
+    core().interactiveCopy(sources, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 3); // the yes resets: one question per file
+    EXPECT_EQ(m_ui.replaceCalls, 3); // the yes resets: one question per file
     for(const char *n : {"f1", "f2", "f3"})
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray(n));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyCancelStopsTheBatch) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     QList<QString> sources;
@@ -401,60 +336,42 @@ TEST_F(TestCoreFileOps, interactiveCopyCancelStopsTheBatch) {
         sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
-    fake.replaceAnswers << DialogResult{false, false, true}; // cancel
+    m_ui.replaceAnswers << DialogResult{false, false, true}; // cancel
 
-    core.interactiveCopy(sources, destDir);
+    core().interactiveCopy(sources, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1); // the batch unwound at the first collision
+    EXPECT_EQ(m_ui.replaceCalls, 1); // the batch unwound at the first collision
     for(const char *n : {"f1", "f2", "f3"})
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray("old"));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyOverwritesADirectoryCollisionWhenScriptedYes) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");                    // a FILE where the directory lands
-    fake.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
+    m_ui.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
 
-    core.interactiveCopy({srcDir}, destDir);
+    core().interactiveCopy({srcDir}, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1);
+    EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir/inner.txt")), QByteArray("inner"));
 }
 
 TEST_F(TestCoreFileOps, interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");
-    fake.replaceAnswers << DialogResult{false, false, false}; // no
+    m_ui.replaceAnswers << DialogResult{false, false, false}; // no
 
-    core.interactiveCopy({srcDir}, destDir);
+    core().interactiveCopy({srcDir}, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1);
+    EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir")), QByteArray("old file")); // intact
     EXPECT_TRUE(!QFileInfo::exists(QDir(destDir).filePath("sdir/inner.txt")));
 }
@@ -462,15 +379,6 @@ TEST_F(TestCoreFileOps, interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile) {
 // The same guard on the move side: a directory holding a symlink to another
 // directory must move the link, not walk into the target.
 TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
 
     const QString srcDir = QDir(m_base).filePath("mvsrcdir");
     const QString realDir = QDir(srcDir).filePath("real");
@@ -482,7 +390,7 @@ TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
     const QString destDir = QDir(m_base).filePath("mvdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core.interactiveMove({srcDir}, destDir);
+    core().interactiveMove({srcDir}, destDir);
 
     EXPECT_TRUE(QFileInfo::exists(QDir(destDir).filePath("mvsrcdir/real/inside.txt")));
     // The links moved as links, so nothing recursed. The source directory
@@ -493,48 +401,29 @@ TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
 }
 
 TEST_F(TestCoreFileOps, interactiveMoveOverwritesADirectoryCollisionWhenScriptedYes) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
     const QString srcDir = QDir(m_base).filePath("sdir");
     EXPECT_TRUE(QDir().mkpath(srcDir));
     makeTxt(srcDir, "inner.txt", "inner");
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
     makeTxt(destDir, "sdir", "old file");
-    fake.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
+    m_ui.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
 
-    core.movePathsTo({srcDir}, destDir);
+    core().movePathsTo({srcDir}, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1);
+    EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir/inner.txt")), QByteArray("inner"));
     EXPECT_TRUE(!QFileInfo::exists(QDir(m_base).filePath("sdir/inner.txt")))
         << "a move that overwrote a file with a directory left the source behind";
 }
 
 TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
-    // Constructed through Deps rather than the no-argument form: this test
-    // moves files and answers a dialog, so it needs neither the process-wide
-    // engine nor a MainWindow's overlay surface. Supplying its own bridge is
-    // the domain this suite owns -- the global one keeps its inotify watch
-    // state for the life of the process, and two tests sharing it would be
-    // sharing a watch.
+    // Its own bridge, so it cannot use the fixture's Core: the global one
+    // keeps its inotify watch state for the life of the process, and two tests
+    // sharing it would be sharing a watch.
     EngineBridge bridge;
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
+    Core::Deps deps = headlessDeps();
     deps.bridge = &bridge;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
     Core core(deps);
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
@@ -543,11 +432,11 @@ TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
         sources << makeTxt(m_base, QString(n) + ".txt", n);
         makeTxt(destDir, QString(n) + ".txt", "old");
     }
-    fake.replaceAnswers << DialogResult{true, true, false};
+    m_ui.replaceAnswers << DialogResult{true, true, false};
 
     core.movePathsTo(sources, destDir);
 
-    EXPECT_EQ(fake.replaceCalls, 1);
+    EXPECT_EQ(m_ui.replaceCalls, 1);
     for(const char *n : {"m1", "m2", "m3"}) {
         EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath(QString(n) + ".txt")), QByteArray(n));
         EXPECT_TRUE(!QFileInfo::exists(QDir(m_base).filePath(QString(n) + ".txt")))
@@ -568,16 +457,7 @@ TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
     makeTxt(root, "thetop/Another normal name/6. This is a file with a prefix and extension.png", "x");
     EXPECT_TRUE(QDir().mkpath(root + "/otherdir"));
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    core.interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
+    core().interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
 
     // dotted directory names survive the move whole
     EXPECT_TRUE(QDir(root + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
@@ -588,7 +468,7 @@ TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
     EXPECT_TRUE(!QFileInfo::exists(root + "/thetop"));        // moved, not copied
 
     // a directory dropped into its own subtree is refused flat
-    core.interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
+    core().interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
     EXPECT_TRUE(QDir(root + "/otherdir/thetop/1. What/3. This is weird").exists());
     EXPECT_TRUE(!QDir(root + "/otherdir/thetop/1. What/thetop").exists());
     EXPECT_TRUE(!QDir(root + "/otherdir/thetop/1. What/1").exists());
@@ -598,67 +478,49 @@ TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
 // viewing used to surface "Load failed" over the image on screen. Only
 // the on-screen file may announce its own failure.
 TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
+    EXPECT_TRUE(core().loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    const int before = core.directoryModel()->fileCount();
+    const int before = core().directoryModel()->fileCount();
 
-    core.removePermanent();
+    core().removePermanent();
 
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.directoryModel()->fileCount()) == (before - 1);
+                return (core().directoryModel()->fileCount()) == (before - 1);
             },
             10000);
-        EXPECT_EQ(core.directoryModel()->fileCount(), before - 1)
+        EXPECT_EQ(core().directoryModel()->fileCount(), before - 1)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     EXPECT_TRUE(!QFileInfo::exists(QDir(m_alpha).filePath("a.png"))) << "the confirmed removal never reached the disk";
-    EXPECT_EQ(fake.confirmCalls, 1);
+    EXPECT_EQ(m_ui.confirmCalls, 1);
 }
 
 TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    fake.confirmAnswer = false;
-    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
+    m_ui.confirmAnswer = false;
+    EXPECT_TRUE(core().loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    const int before = core.directoryModel()->fileCount();
+    const int before = core().directoryModel()->fileCount();
 
-    core.moveToTrash();
+    core().moveToTrash();
 
-    EXPECT_EQ(fake.confirmCalls, 1);
-    EXPECT_EQ(core.directoryModel()->fileCount(), before);
+    EXPECT_EQ(m_ui.confirmCalls, 1);
+    EXPECT_EQ(core().directoryModel()->fileCount(), before);
     EXPECT_TRUE(QFileInfo::exists(QDir(m_alpha).filePath("a.png")));
 }
 
@@ -667,36 +529,27 @@ TEST_F(TestCoreFileOps, saveRequestTravelingTheInjectedHostWritesTheEdit) {
     const QString img = QDir(dir).filePath("a.png");
     writeImage(img);
 
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    coretest::FakeInteractions fake;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(img));
+    EXPECT_TRUE(core().loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
     // an in-memory crop: the disk still carries the full-size file (a
     // uniform-color fixture would make flipH byte-identical, so the edit
     // must be one a file diff can see)
-    core.crop(QRect(0, 0, 6, 8));
+    core().crop(QRect(0, 0, 6, 8));
     EXPECT_EQ(QImage(img).size(), QSize(8, 8));
     // the edit itself lit the prompt (the edited-state nudge); the leg
     // under test is measured from a clean slate
-    overlayFake.saveOverlayShows = 0;
-    overlayFake.saveOverlayHides = 0;
+    m_overlays.saveOverlayShows = 0;
+    m_overlays.saveOverlayHides = 0;
 
-    emit overlayFake.saveRequested();
+    emit m_overlays.saveRequested();
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -706,80 +559,61 @@ TEST_F(TestCoreFileOps, saveRequestTravelingTheInjectedHostWritesTheEdit) {
         EXPECT_EQ(QImage(img).size(), QSize(6, 8))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(overlayFake.saveOverlayShows, 0); // the request leg saves; it never opens the prompt
+    EXPECT_EQ(m_overlays.saveOverlayShows, 0); // the request leg saves; it never opens the prompt
 }
 
 TEST_F(TestCoreFileOps, headlessCoreConstructsWithoutAnyWidget) {
     const int widgetsBefore = QApplication::allWidgets().size();
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-
     EXPECT_EQ(QApplication::allWidgets().size(), widgetsBefore);
-    EXPECT_TRUE(core.mainWindow() == nullptr) << "a headless Core still built a window";
+    EXPECT_TRUE(core().mainWindow() == nullptr) << "a headless Core still built a window";
 
     // the operations run, the display sink records, the messages land in
     // the overlay fake — the full file-ops contract without a single widget
     const QString img = QDir(m_alpha).filePath("a.png");
-    EXPECT_TRUE(core.loadPath(img));
+    EXPECT_TRUE(core().loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (img);
+                return (core().currentFilePath()) == (img);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), img)
+        EXPECT_EQ(core().currentFilePath(), img)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (view.showImageCalls) == (1);
+                return (m_view.showImageCalls) == (1);
             },
             10000);
-        EXPECT_EQ(view.showImageCalls, 1) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_EQ(m_view.showImageCalls, 1) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(view.lastImageSize, QSize(8, 8));
+    EXPECT_EQ(m_view.lastImageSize, QSize(8, 8));
 
-    core.copyCurrentFile(QStringLiteral("/nonexistent-dir-xyz/nowhere"));
-    EXPECT_TRUE(overlayFake.errorCalls > 0) << "the failed copy never reached the injected host";
+    core().copyCurrentFile(QStringLiteral("/nonexistent-dir-xyz/nowhere"));
+    EXPECT_TRUE(m_overlays.errorCalls > 0) << "the failed copy never reached the injected host";
 
-    core.enableFolderView();
-    EXPECT_EQ(core.viewState().viewMode.value(), MODE_FOLDERVIEW); // the state is the truth
+    core().enableFolderView();
+    EXPECT_EQ(core().viewState().viewMode.value(), MODE_FOLDERVIEW); // the state is the truth
 }
 
 TEST_F(TestCoreFileOps, renameCurrentSelectionForcesAfterScriptedConfirmation) {
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
+    EXPECT_TRUE(core().loadPath(QDir(m_alpha).filePath("a.png")));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.isSettled();
+                return core().isSettled();
             },
             10000);
-        EXPECT_TRUE(core.isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     // the collision the rename will hit: renamed.png already exists
     const QString colliding = QDir(m_alpha).filePath("renamed.png");
     writeImage(colliding);
     const QByteArray original = coretest::contentOf(QDir(m_alpha).filePath("a.png"));
 
-    core.renameCurrentSelection("renamed.png");
+    core().renameCurrentSelection("renamed.png");
 
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -794,7 +628,7 @@ TEST_F(TestCoreFileOps, renameCurrentSelectionForcesAfterScriptedConfirmation) {
     // a forced rename moves the bytes, so the colliding name now holds
     // exactly what the old name held
     EXPECT_EQ(coretest::contentOf(colliding), original);
-    EXPECT_EQ(fake.confirmCalls, 1); // the overwrite question was asked and scripted yes
+    EXPECT_EQ(m_ui.confirmCalls, 1); // the overwrite question was asked and scripted yes
 }
 
 TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNewName) {
@@ -803,28 +637,19 @@ TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNe
     const QString to = QDir(dir).filePath("renamed.png");
     writeImage(from);
     writeImage(QDir(dir).filePath("zzz.png"));
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(from));
+    EXPECT_TRUE(core().loadPath(from));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.directoryModel()->containsFile(from);
+                return core().directoryModel()->containsFile(from);
             },
             10000);
-        EXPECT_TRUE(core.directoryModel()->containsFile(from))
+        EXPECT_TRUE(core().directoryModel()->containsFile(from))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(core.directoryModel()->fileCount(), 2);
+    EXPECT_EQ(core().directoryModel()->fileCount(), 2);
 
-    core.renameCurrentSelection("renamed.png");
+    core().renameCurrentSelection("renamed.png");
 
     // isSettled() cannot wait for this: it asks about pending model work,
     // not about whether the watch events arrived, and it is already true
@@ -832,25 +657,25 @@ TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNe
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.directoryModel()->containsFile(to);
+                return core().directoryModel()->containsFile(to);
             },
             10000);
-        EXPECT_TRUE(core.directoryModel()->containsFile(to))
+        EXPECT_TRUE(core().directoryModel()->containsFile(to))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(!core.directoryModel()->containsFile(from));
-    EXPECT_EQ(core.directoryModel()->fileCount(), 2); // lossless: nothing dropped
+    EXPECT_TRUE(!core().directoryModel()->containsFile(from));
+    EXPECT_EQ(core().directoryModel()->fileCount(), 2); // lossless: nothing dropped
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.currentFilePath() == to;
+                return core().currentFilePath() == to;
             },
             10000);
-        EXPECT_TRUE(core.currentFilePath() == to)
+        EXPECT_TRUE(core().currentFilePath() == to)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(core.directoryModel()->isLoaded(to));    // landed on it, not merely listed
-    EXPECT_TRUE(!core.directoryModel()->isLoaded(from)); // and the old name is gone from memory
+    EXPECT_TRUE(core().directoryModel()->isLoaded(to));    // landed on it, not merely listed
+    EXPECT_TRUE(!core().directoryModel()->isLoaded(from)); // and the old name is gone from memory
 }
 
 // The other half of 跟手: a rename this process never issued, done by another
@@ -867,41 +692,32 @@ TEST_F(TestCoreFileOps, externallyRenamingTheCurrentFileKeepsItTheCurrentFile) {
     const QString to = QDir(dir).filePath("zebra.png");
     writeImage(from);
     writeImage(QDir(dir).filePath("zzz.png"));
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    deps.ui = &fake;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(from));
+    EXPECT_TRUE(core().loadPath(from));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.directoryModel()->containsFile(from);
+                return core().directoryModel()->containsFile(from);
             },
             10000);
-        EXPECT_TRUE(core.directoryModel()->containsFile(from))
+        EXPECT_TRUE(core().directoryModel()->containsFile(from))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_EQ(core.currentFilePath(), from);
+    EXPECT_EQ(core().currentFilePath(), from);
 
     EXPECT_TRUE(std::rename(from.toLocal8Bit().constData(), to.toLocal8Bit().constData()) == 0);
 
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.currentFilePath() == to;
+                return core().currentFilePath() == to;
             },
             10000);
-        EXPECT_TRUE(core.currentFilePath() == to)
+        EXPECT_TRUE(core().currentFilePath() == to)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(core.directoryModel()->isLoaded(to)); // on it, not merely pointing at it
-    EXPECT_TRUE(!core.directoryModel()->isLoaded(from));
-    EXPECT_EQ(core.directoryModel()->fileCount(), 2); // lossless, as under an issued rename
+    EXPECT_TRUE(core().directoryModel()->isLoaded(to)); // on it, not merely pointing at it
+    EXPECT_TRUE(!core().directoryModel()->isLoaded(from));
+    EXPECT_EQ(core().directoryModel()->fileCount(), 2); // lossless, as under an issued rename
 }
 
 // The watcher's contract for the image on screen: an external rewrite is
@@ -914,27 +730,19 @@ TEST_F(TestCoreFileOps, externalModificationFollowsTheDiskButNeverClobbersEdits)
     const QString dir = uniqueDir("watchmod");
     const QString file = QDir(dir).filePath("watched.png");
     writeImage(file);
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    // the ctor's first-run message is this fork's own baseline noise
-    const int messageBaseline = overlayFake.messageCalls;
-    EXPECT_TRUE(core.loadPath(file));
+    EXPECT_TRUE(core().loadPath(file));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (file);
+                return (core().currentFilePath()) == (file);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), file)
+        EXPECT_EQ(core().currentFilePath(), file)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
+    // the ctor's first-run message and anything loadPath says are the baseline
+    // noise; what the test asserts is that the watcher path below adds nothing
+    const int messageBaseline = m_overlays.messageCalls;
 
     // (a) unedited, through the real watcher: an external rewrite is
     // followed down to a repaint. The watcher leg gets a wide window —
@@ -947,48 +755,50 @@ TEST_F(TestCoreFileOps, externalModificationFollowsTheDiskButNeverClobbersEdits)
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.directoryModel()->getImage(file)->size()) == (QSize(20, 10));
+                return (core().directoryModel()->getImage(file)->size()) == (QSize(20, 10));
             },
             30000);
-        EXPECT_EQ(core.directoryModel()->getImage(file)->size(), QSize(20, 10))
+        EXPECT_EQ(core().directoryModel()->getImage(file)->size(), QSize(20, 10))
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return view.showImageCalls >= 2;
+                return m_view.showImageCalls >= 2;
             },
             30000);
-        EXPECT_TRUE(view.showImageCalls >= 2) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_TRUE(m_view.showImageCalls >= 2)
+            << (qt_test_held ? "" : "the condition did not hold before the deadline");
     } // the repaint rode itemUpdated, same event
     // (and the flip below must not race it)
-    EXPECT_EQ(overlayFake.messageCalls, messageBaseline); // silent: nothing held
+    EXPECT_EQ(m_overlays.messageCalls, messageBaseline); // silent: nothing held
 
     // (b) edited, driven at the model slot itself (invoked by name): flip
     // first, rewrite the disk, then hand the mirror event straight to the
     // edge detector. This pins the whole contract — announce the
     // divergence once, keep the edit, land no repaint — without betting
     // on watcher latency.
-    core.flipH();
-    EXPECT_TRUE(core.directoryModel()->getImage(file)->isEdited());
-    const int showCallsBefore = view.showImageCalls;
+    core().flipH();
+    EXPECT_TRUE(core().directoryModel()->getImage(file)->isEdited());
+    const int showCallsBefore = m_view.showImageCalls;
     QImage other(4, 4, QImage::Format_RGB32);
     other.fill(Qt::green);
     // separate the two stamps: a coarse-jiffy filesystem stamps same-tick
     // saves identically, and the mtime IS the change signal here
     QTest::qWait(150);
     EXPECT_TRUE(other.save(file, "png"));
-    EXPECT_TRUE(QMetaObject::invokeMethod(core.directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
+    EXPECT_TRUE(QMetaObject::invokeMethod(core().directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
 
-    EXPECT_EQ(overlayFake.messageCalls, messageBaseline + 1);
-    EXPECT_TRUE(core.directoryModel()->getImage(file)->isEdited());
-    EXPECT_EQ(core.directoryModel()->getImage(file)->size(), QSize(20, 10)); // the edited geometry, not the disk's 4x4
-    EXPECT_EQ(view.showImageCalls, showCallsBefore);                         // no clobber repaint
+    EXPECT_EQ(m_overlays.messageCalls, messageBaseline + 1);
+    EXPECT_TRUE(core().directoryModel()->getImage(file)->isEdited());
+    EXPECT_EQ(core().directoryModel()->getImage(file)->size(),
+              QSize(20, 10));                          // the edited geometry, not the disk's 4x4
+    EXPECT_EQ(m_view.showImageCalls, showCallsBefore); // no clobber repaint
 
     // one external save surfaces as several wire/mirror cycles: the same
     // divergence must not re-announce (the model dedups per path+mtime)
-    EXPECT_TRUE(QMetaObject::invokeMethod(core.directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
-    EXPECT_EQ(overlayFake.messageCalls, messageBaseline + 1);
+    EXPECT_TRUE(QMetaObject::invokeMethod(core().directoryModel().get(), "onFileModified", Q_ARG(QString, file)));
+    EXPECT_EQ(m_overlays.messageCalls, messageBaseline + 1);
 }
 
 // The pending-work lock: while any registered surface holds unfinished
@@ -1002,73 +812,69 @@ TEST_F(TestCoreFileOps, pendingSurfacesLockFolderEntryAndNavigation) {
     writeImage(a);
     writeImage(b);
 
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    const int messageBaseline = overlayFake.messageCalls;
-    EXPECT_TRUE(core.loadPath(a));
+    EXPECT_TRUE(core().loadPath(a));
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (a);
+                return (core().currentFilePath()) == (a);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), a) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_EQ(core().currentFilePath(), a)
+            << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
+    // after the Core exists and the load is done: the denials below are what
+    // the count is about
+    const int messageBaseline = m_overlays.messageCalls;
 
-    overlayFake.pendingSurfaces = true;
+    m_overlays.pendingSurfaces = true;
 
-    EXPECT_TRUE(!core.loadPath(b)); // denied, target untouched
-    EXPECT_EQ(core.currentFilePath(), a);
-    core.enableFolderView(); // denied: folder stays out of reach
-    EXPECT_EQ(core.viewState().viewMode.value(), MODE_DOCUMENT);
-    core.nextImage(); // denied
-    EXPECT_EQ(core.currentFilePath(), a);
-    EXPECT_EQ(overlayFake.messageCalls, messageBaseline + 3); // one message per denial
+    EXPECT_TRUE(!core().loadPath(b)); // denied, target untouched
+    EXPECT_EQ(core().currentFilePath(), a);
+    core().enableFolderView(); // denied: folder stays out of reach
+    EXPECT_EQ(core().viewState().viewMode.value(), MODE_DOCUMENT);
+    core().nextImage(); // denied
+    EXPECT_EQ(core().currentFilePath(), a);
+    EXPECT_EQ(m_overlays.messageCalls, messageBaseline + 3); // one message per denial
 
-    overlayFake.pendingSurfaces = false;
-    EXPECT_TRUE(core.loadPath(b)); // resolved: the walk is open again
+    m_overlays.pendingSurfaces = false;
+    EXPECT_TRUE(core().loadPath(b)); // resolved: the walk is open again
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (b);
+                return (core().currentFilePath()) == (b);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), b) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+        EXPECT_EQ(core().currentFilePath(), b)
+            << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
     // the STATE-held leg: an uncommitted edit locks navigation even with
     // no visible surface (the save prompt may be settings-off — the work
     // exists regardless of its rendering). discard resolves it.
-    EXPECT_TRUE(core.loadPath(b)); // settle on b
+    EXPECT_TRUE(core().loadPath(b)); // settle on b
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return (core.currentFilePath()) == (b);
+                return (core().currentFilePath()) == (b);
             },
             10000);
-        EXPECT_EQ(core.currentFilePath(), b) << (qt_test_held ? "" : "the condition did not hold before the deadline");
-    }
-    core.flipH();
-    {
-        const bool qt_test_held = QTest::qWaitFor(
-            [&] {
-                return core.directoryModel()->getImage(b)->isEdited();
-            },
-            10000);
-        EXPECT_TRUE(core.directoryModel()->getImage(b)->isEdited())
+        EXPECT_EQ(core().currentFilePath(), b)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    EXPECT_TRUE(!core.loadPath(b)); // the walk away is denied: the edit is uncommitted
-    EXPECT_EQ(core.currentFilePath(), b);
-    core.discardEdits();
-    EXPECT_TRUE(core.loadPath(b)); // resolved by discard
+    core().flipH();
+    {
+        const bool qt_test_held = QTest::qWaitFor(
+            [&] {
+                return core().directoryModel()->getImage(b)->isEdited();
+            },
+            10000);
+        EXPECT_TRUE(core().directoryModel()->getImage(b)->isEdited())
+            << (qt_test_held ? "" : "the condition did not hold before the deadline");
+    }
+    EXPECT_TRUE(!core().loadPath(b)); // the walk away is denied: the edit is uncommitted
+    EXPECT_EQ(core().currentFilePath(), b);
+    core().discardEdits();
+    EXPECT_TRUE(core().loadPath(b)); // resolved by discard
 }
 
 // The NavigationController pilot's payoff pin: the controller constructs,
@@ -1086,11 +892,9 @@ TEST_F(TestCoreFileOps, navigationControllerConstructsAndWalksStandalone) {
     DirectoryPresenter folderPresenter(thumbnailer);
 
     State state;
-    coretest::RecordingView view;
-    coretest::FakeOverlayHost overlays;
     RecordingNavHost host;
 
-    NavigationController nav(&state, &host, &view, &overlays, thumbPresenter, folderPresenter);
+    NavigationController nav(&state, &host, &m_view, &m_overlays, thumbPresenter, folderPresenter);
     DirectoryModel model(pool, bridge);
     nav.attachModel(&model);
 
@@ -1153,23 +957,20 @@ TEST_F(TestCoreFileOps, scalingResultsAreDeliveredForTheCurrentPathOnly) {
     const QString dir = uniqueDir("scaling");
     const QString img = QDir(dir).filePath("target.png");
     writeImage(img);
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    ::testing::StrictMock<coretest::MockCoreView> view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
+    // A mock view instead of the fixture's recording one: this test is about
+    // the CALLS, so it builds its own Core around the mock.
+    ::testing::StrictMock<coretest::MockCoreView> mockView;
+    Core::Deps deps = headlessDeps();
+    deps.view = &mockView;
     Core core(deps);
     // the calls Core makes while loading are not this test's subject; the
     // scaling hand-off is. Stated here so an unmentioned call still fails.
-    EXPECT_CALL(view, showImage).Times(::testing::AnyNumber());
-    EXPECT_CALL(view, repaintView).Times(::testing::AnyNumber());
-    EXPECT_CALL(view, setUpdatesEnabled).Times(::testing::AnyNumber());
-    EXPECT_CALL(view, closeImage).Times(::testing::AnyNumber());
-    EXPECT_CALL(view, onSortingChanged).Times(::testing::AnyNumber());
-    EXPECT_CALL(view, showWindowDefault).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, showImage).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, repaintView).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, setUpdatesEnabled).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, closeImage).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, onSortingChanged).Times(::testing::AnyNumber());
+    EXPECT_CALL(mockView, showWindowDefault).Times(::testing::AnyNumber());
     EXPECT_TRUE(core.loadPath(img));
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -1192,8 +993,8 @@ TEST_F(TestCoreFileOps, scalingResultsAreDeliveredForTheCurrentPathOnly) {
     // and after; here the expectation IS the assertion.
     {
         ::testing::InSequence seq;
-        EXPECT_CALL(view, onScalingFinished).Times(1); // delivered: the path on screen
-        EXPECT_CALL(view, onScalingFinished).Times(0); // dropped: a path nobody is looking at
+        EXPECT_CALL(mockView, onScalingFinished).Times(1); // delivered: the path on screen
+        EXPECT_CALL(mockView, onScalingFinished).Times(0); // dropped: a path nobody is looking at
     }
     emit core.directoryModel()->scaler->scalingFinished(result, req);
     const ScalerRequest stale(req.image, req.size, dir + "/elsewhere.png", req.filter, req.smoothUpscaling);

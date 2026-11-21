@@ -28,6 +28,27 @@ class TestSlideshow : public ::testing::Test {
         return dir;
     }
 
+    // A headless Core over the three fakes, built on first use.
+    Core &core() {
+        if(!m_core)
+            m_core = std::make_unique<Core>(headlessDeps());
+        return *m_core;
+    }
+
+    Core::Deps headlessDeps() {
+        Core::Deps deps;
+        deps.headless = true;
+        deps.ui = &m_ui;
+        deps.overlays = &m_overlays;
+        deps.view = &m_view;
+        return deps;
+    }
+
+    coretest::FakeInteractions m_ui;
+    coretest::FakeOverlayHost m_overlays;
+    coretest::RecordingView m_view;
+    std::unique_ptr<Core> m_core;
+
     void SetUp() override {
         EXPECT_TRUE(m_home.path() != nullptr);
         m_base = QDir(m_home.path()).filePath("slideshow");
@@ -56,10 +77,10 @@ class TestSlideshow : public ::testing::Test {
     // holds or the deadline expires. QTRY_VERIFY_WITH_TIMEOUT wraps QVERIFY,
     // whose failure path is a bare return that reports nothing outside a
     // QTest::qExec run — measured in this very conversion.
-    static bool waitSettled(Core &core) {
+    static bool waitSettled(Core &c) {
         return QTest::qWaitFor(
-            [&core] {
-                return core.isSettled();
+            [&c] {
+                return c.isSettled();
             },
             10000);
     }
@@ -67,153 +88,109 @@ class TestSlideshow : public ::testing::Test {
 
 TEST_F(TestSlideshow, slideshowLifecycleRequestsLoopPlaybackOffThenOn) {
     const QStringList files = slideshowFiles("show1");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
     // the loop request lands on the view seam; RecordingView keeps every value
 
-    core.startSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow);
-    EXPECT_EQ(view.loopPlaybackRequests, 1);
-    EXPECT_EQ(view.loopPlaybackValues.at(0), false);
+    core().startSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow);
+    EXPECT_EQ(m_view.loopPlaybackRequests, 1);
+    EXPECT_EQ(m_view.loopPlaybackValues.at(0), false);
 
     // a second start with the flag already set is the no-op it must be:
     // re-arming would emit a second request and re-enter enableDocumentView
-    core.startSlideshow();
-    EXPECT_EQ(view.loopPlaybackRequests, 1);
+    core().startSlideshow();
+    EXPECT_EQ(m_view.loopPlaybackRequests, 1);
 
-    core.stopSlideshow();
-    EXPECT_TRUE(!core.viewState().slideshow);
-    EXPECT_EQ(view.loopPlaybackRequests, 2);
-    EXPECT_EQ(view.loopPlaybackValues.at(1), true);
+    core().stopSlideshow();
+    EXPECT_TRUE(!core().viewState().slideshow);
+    EXPECT_EQ(m_view.loopPlaybackRequests, 2);
+    EXPECT_EQ(m_view.loopPlaybackValues.at(1), true);
 
-    core.stopSlideshow();
-    EXPECT_EQ(view.loopPlaybackRequests, 2);
+    core().stopSlideshow();
+    EXPECT_EQ(m_view.loopPlaybackRequests, 2);
 }
 
 TEST_F(TestSlideshow, slideshowAdvanceIsSequentialAndArmsTheTimer) {
     const QStringList files = slideshowFiles("show2");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
 
-    core.startSlideshow();
+    core().startSlideshow();
     // startSlideshow arms the timer itself, through startSlideshowTimer,
     // for a static image — measured, this assertion's first draft claimed
     // the opposite and failed
-    EXPECT_TRUE(core.slideshowClock().isActive());
+    EXPECT_TRUE(core().slideshowClock().isActive());
 
-    core.nextImageSlideshow();
-    EXPECT_EQ(core.currentFilePath(), files.at(1));
-    EXPECT_TRUE(core.slideshowClock().isActive()) << "a static image under slideshow must keep the timer armed";
+    core().nextImageSlideshow();
+    EXPECT_EQ(core().currentFilePath(), files.at(1));
+    EXPECT_TRUE(core().slideshowClock().isActive()) << "a static image under slideshow must keep the timer armed";
 
-    core.nextImageSlideshow();
-    EXPECT_EQ(core.currentFilePath(), files.at(2));
+    core().nextImageSlideshow();
+    EXPECT_EQ(core().currentFilePath(), files.at(2));
 }
 
 TEST_F(TestSlideshow, nonLoopingSlideshowStopsAtTheEndOfTheListing) {
     const QStringList files = slideshowFiles("show3");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
-    EXPECT_TRUE(!core.slideshowLoops());
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
+    EXPECT_TRUE(!core().slideshowLoops());
 
-    core.jumpToLast();
-    EXPECT_EQ(core.currentFilePath(), files.at(3));
+    core().jumpToLast();
+    EXPECT_EQ(core().currentFilePath(), files.at(3));
     // jumpToLast stops the show, so the state below is a fresh arm
-    EXPECT_TRUE(!core.viewState().slideshow);
+    EXPECT_TRUE(!core().viewState().slideshow);
 
-    core.jumpToFirst();
-    EXPECT_EQ(core.currentFilePath(), files.at(0));
+    core().jumpToFirst();
+    EXPECT_EQ(core().currentFilePath(), files.at(0));
 
-    core.startSlideshow();
-    core.jumpToLast();
-    core.startSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow);
-    const QString atEnd = core.currentFilePath();
+    core().startSlideshow();
+    core().jumpToLast();
+    core().startSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow);
+    const QString atEnd = core().currentFilePath();
 
-    core.nextImageSlideshow();
-    EXPECT_EQ(core.currentFilePath(), atEnd);
-    EXPECT_TRUE(!core.viewState().slideshow) << "a non-looping slideshow must stop itself at the end of the directory";
-    EXPECT_TRUE(!core.slideshowClock().isActive());
+    core().nextImageSlideshow();
+    EXPECT_EQ(core().currentFilePath(), atEnd);
+    EXPECT_TRUE(!core().viewState().slideshow)
+        << "a non-looping slideshow must stop itself at the end of the directory";
+    EXPECT_TRUE(!core().slideshowClock().isActive());
 }
 
 TEST_F(TestSlideshow, shuffleKeepsTheSlideshowCyclingPastTheEnd) {
     const QStringList files = slideshowFiles("show4");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
-    EXPECT_TRUE(!core.viewState().shuffle);
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
+    EXPECT_TRUE(!core().viewState().shuffle);
 
-    core.toggleShuffle();
-    EXPECT_TRUE(core.viewState().shuffle); // this is what syncRandomizer sized for
+    core().toggleShuffle();
+    EXPECT_TRUE(core().viewState().shuffle); // this is what syncRandomizer sized for
 
-    core.startSlideshow();
-    core.jumpToLast();
-    core.startSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow);
+    core().startSlideshow();
+    core().jumpToLast();
+    core().startSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow);
 
     // the sequential branch would have stopped here (pinned above with the
     // same setup); the randomizer branch starts a new cycle instead
-    core.nextImageSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow) << "shuffle mode stopped at the end of the listing";
-    EXPECT_TRUE(files.contains(core.currentFilePath()));
+    core().nextImageSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow) << "shuffle mode stopped at the end of the listing";
+    EXPECT_TRUE(files.contains(core().currentFilePath()));
 }
 
 TEST_F(TestSlideshow, toggleSlideshowStartsThenStops) {
     const QStringList files = slideshowFiles("show5");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
-    EXPECT_TRUE(!core.viewState().slideshow);
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
+    EXPECT_TRUE(!core().viewState().slideshow);
 
-    core.toggleSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow);
-    EXPECT_TRUE(core.slideshowClock().isActive());
+    core().toggleSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow);
+    EXPECT_TRUE(core().slideshowClock().isActive());
 
-    core.toggleSlideshow();
-    EXPECT_TRUE(!core.viewState().slideshow) << "the second toggle did not stop the slideshow";
-    EXPECT_TRUE(!core.slideshowClock().isActive());
+    core().toggleSlideshow();
+    EXPECT_TRUE(!core().viewState().slideshow) << "the second toggle did not stop the slideshow";
+    EXPECT_TRUE(!core().slideshowClock().isActive());
 }
 
 // The slideshow and editing are mutually exclusive states. startSlideshow
@@ -223,42 +200,33 @@ TEST_F(TestSlideshow, toggleSlideshowStartsThenStops) {
 // speaks: the clock's owner is the party that would destroy the work.
 TEST_F(TestSlideshow, editingIsRefusedWhileTheSlideshowRuns) {
     const QStringList files = slideshowFiles("show6");
-    coretest::FakeInteractions fake;
-    coretest::FakeOverlayHost overlayFake;
-    coretest::RecordingView view;
-    Core::Deps deps;
-    deps.headless = true;
-    deps.ui = &fake;
-    deps.overlays = &overlayFake;
-    deps.view = &view;
-    Core core(deps);
-    EXPECT_TRUE(core.loadPath(files.at(0)));
-    EXPECT_TRUE(waitSettled(core));
-    auto img = core.directoryModel()->getImage(core.currentFilePath());
+    EXPECT_TRUE(core().loadPath(files.at(0)));
+    EXPECT_TRUE(waitSettled(core()));
+    auto img = core().directoryModel()->getImage(core().currentFilePath());
     ASSERT_TRUE(img); // every observation below dereferences the image
     EXPECT_TRUE(!img->isEdited());
 
-    core.startSlideshow();
-    EXPECT_TRUE(core.viewState().slideshow);
-    const int messagesBefore = overlayFake.messageCalls;
+    core().startSlideshow();
+    EXPECT_TRUE(core().viewState().slideshow);
+    const int messagesBefore = m_overlays.messageCalls;
 
-    core.flipH();
+    core().flipH();
     EXPECT_TRUE(!img->isEdited()) << "the edit landed while the slideshow was running";
-    EXPECT_EQ(overlayFake.messageCalls, messagesBefore + 1);
-    EXPECT_TRUE(overlayFake.lastMessage.contains(QStringLiteral("Stop the slideshow")))
-        << qPrintable(QStringLiteral("unexpected refusal text: ") + overlayFake.lastMessage);
-    EXPECT_TRUE(core.viewState().slideshow);        // the clock is untouched
-    EXPECT_EQ(core.currentFilePath(), files.at(0)); // and nothing moved
+    EXPECT_EQ(m_overlays.messageCalls, messagesBefore + 1);
+    EXPECT_TRUE(m_overlays.lastMessage.contains(QStringLiteral("Stop the slideshow")))
+        << qPrintable(QStringLiteral("unexpected refusal text: ") + m_overlays.lastMessage);
+    EXPECT_TRUE(core().viewState().slideshow);        // the clock is untouched
+    EXPECT_EQ(core().currentFilePath(), files.at(0)); // and nothing moved
 
     // the refusal is the state's, not flipH's: another edit verb goes
     // through the same gate
-    core.rotateRight();
-    EXPECT_EQ(overlayFake.messageCalls, messagesBefore + 2);
+    core().rotateRight();
+    EXPECT_EQ(m_overlays.messageCalls, messagesBefore + 2);
     EXPECT_TRUE(!img->isEdited());
 
     // stopping the slideshow is the whole resolution — nothing else
-    core.stopSlideshow();
-    core.flipH();
+    core().stopSlideshow();
+    core().flipH();
     EXPECT_TRUE(img->isEdited()) << "the edit stayed refused after the clock stopped";
 }
 
