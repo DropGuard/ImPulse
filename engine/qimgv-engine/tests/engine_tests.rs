@@ -68,7 +68,7 @@ fn open_dir_lists_filtered_files() {
     assert_eq!(st.dir(), Some(dir.path()));
     assert_eq!(st.file_count(), 1);
     assert_eq!(st.dir_count(), 1);
-    assert_eq!(st.file_at(0).unwrap().data.name, "a.jpg");
+    assert_eq!(st.file_at(0).unwrap().name, "a.jpg");
 }
 
 #[test]
@@ -246,7 +246,6 @@ fn st_names(engine: &Engine, i: usize) -> String {
         .unwrap()
         .file_at(i)
         .unwrap()
-        .data
         .name
         .clone()
 }
@@ -306,5 +305,5 @@ fn mutated_event_carries_the_engine_position() {
         }
     }
     let st = engine.state.read().unwrap();
-    assert_eq!(st.file_at(1).unwrap().data.name, "b.jpg");
+    assert_eq!(st.file_at(1).unwrap().name, "b.jpg");
 }

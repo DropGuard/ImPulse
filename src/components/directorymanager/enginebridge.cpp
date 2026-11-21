@@ -201,10 +201,10 @@ bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &d
 
 // Decodes the arena written by DirectoryState::write_listing (model.rs).
 // Little-endian: u32 file_count, u32 dir_count, then file_count + dir_count
-// records of u64 handle, u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
-// name bytes, path bytes (no NUL) — files first. The handle is skipped: the
-// mirror keys on path. A record that does not fit ends the parse early, so a
-// truncated arena yields a short listing rather than a crash.
+// records of u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
+// name bytes, path bytes (no NUL) — files first. A record that does not fit
+// ends the parse early, so a truncated arena yields a short listing rather
+// than a crash.
 //
 // Returns false unless the arena held exactly file_count file records plus
 // dir_count dir records and was consumed to the last byte. Both checks matter:
@@ -233,13 +233,12 @@ bool EngineBridge::parseListing(const QByteArray &arena, std::vector<EngineEntry
     dirs.clear();
     // cap the reservation by the byte budget: a header that disagrees with the
     // arena must not drive a huge allocation
-    const size_t maxRecords = size_t(arena.size()) / 32;
+    const size_t maxRecords = size_t(arena.size()) / 24;
     files.reserve(std::min<size_t>(fc, maxRecords));
     dirs.reserve(std::min<size_t>(dc, maxRecords));
 
     auto readRun = [&](quint32 count, bool isDir) {
-        for(quint32 i = 0; i < count && p + 32 <= end; ++i) {
-            p += 8; // handle
+        for(quint32 i = 0; i < count && p + 24 <= end; ++i) {
             const quint64 size = rd64();
             const qint64 mtimeMs = static_cast<qint64>(rd64());
             const quint32 nlen = rd32();

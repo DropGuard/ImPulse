@@ -458,7 +458,7 @@ fn a_rename_moves_the_row_the_name_sort_says_to() {
         other => panic!("unexpected: {other:?}"),
     }
     let got: Vec<String> = (0..st.file_count())
-        .map(|i| st.file_at(i).unwrap().data.name.clone())
+        .map(|i| st.file_at(i).unwrap().name.clone())
         .collect();
     assert_eq!(
         got,
@@ -506,7 +506,7 @@ fn a_rename_onto_a_listed_name_overwrites_instead_of_leaving_two_rows() {
         other => panic!("unexpected: {other:?}"),
     }
     assert_eq!(st.file_count(), 1);
-    assert_eq!(st.file_at(0).unwrap().data.size, 4);
+    assert_eq!(st.file_at(0).unwrap().size, 4);
 }
 
 #[test]
@@ -983,7 +983,7 @@ fn operations_on_a_settled_folder_all_land_in_the_listing() {
         let v: Vec<String> = {
             let st = engine.state.read().unwrap();
             (0..st.file_count())
-                .filter_map(|i| st.file_at(i).map(|r| r.data.name.clone()))
+                .filter_map(|i| st.file_at(i).map(|r| r.name.clone()))
                 .collect()
         };
         let mut sorted = v;

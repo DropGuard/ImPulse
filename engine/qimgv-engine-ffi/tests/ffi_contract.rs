@@ -161,7 +161,6 @@ fn argument_validation_and_last_error() {
 
         // no directory opened yet → any index is out of range
         let mut meta = QimgvEntryMeta {
-            handle: 0,
             size: 0,
             mtime_ms: 0,
             is_dir: 0,
@@ -178,18 +177,6 @@ fn argument_validation_and_last_error() {
                 path.as_mut_ptr(),
                 path.len()
             ),
-            QIMGV_ERR_EMPTY
-        );
-
-        // all-zero handle is the documented null handle
-        let mut out = 0u64;
-        assert_eq!(
-            qimgv_engine_next_file(engine, 0, &mut out),
-            QIMGV_ERR_INVALID
-        );
-        // non-zero garbage handle decodes, then fails lookup
-        assert_eq!(
-            qimgv_engine_next_file(engine, 0xdead_beef, &mut out),
             QIMGV_ERR_EMPTY
         );
 
@@ -251,7 +238,6 @@ fn open_dir_event_queries_and_truncation() {
         assert_eq!(qimgv_engine_dir_count(engine), 0);
 
         let mut meta = QimgvEntryMeta {
-            handle: 0,
             size: 0,
             mtime_ms: 0,
             is_dir: 0,
@@ -271,29 +257,6 @@ fn open_dir_event_queries_and_truncation() {
             QIMGV_OK
         );
         assert_eq!(CStr::from_ptr(name.as_ptr()).to_str().unwrap(), "a.jpg");
-        let h0 = meta.handle;
-
-        assert_eq!(
-            qimgv_engine_file_entry_at(
-                engine,
-                1,
-                &mut meta,
-                name.as_mut_ptr(),
-                name.len(),
-                path.as_mut_ptr(),
-                path.len()
-            ),
-            QIMGV_OK
-        );
-        let h1 = meta.handle;
-
-        let mut out = 0u64;
-        assert_eq!(qimgv_engine_next_file(engine, h0, &mut out), QIMGV_OK);
-        assert_eq!(out, h1, "next_file must follow natural sort order");
-        assert_eq!(
-            qimgv_engine_prev_file(engine, h0, &mut out),
-            QIMGV_ERR_EMPTY
-        );
 
         // name buffer too small for "a.jpg\0" (6 bytes needed, 2 given)
         assert_eq!(
@@ -456,7 +419,6 @@ fn file_names(engine: *mut QimgvEngine, count: usize) -> Vec<String> {
     (0..count)
         .map(|i| {
             let mut meta = QimgvEntryMeta {
-                handle: 0,
                 size: 0,
                 mtime_ms: 0,
                 is_dir: 0,

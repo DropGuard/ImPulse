@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 912cb6a481e1ada7a29df14d540daf826752785979a0c6d82b1eab5cf5c859fa # shrinks to specs_in = [Spec { name: "00.", size: 0, secs: 1000000000 }, Spec { name: "01.", size: 0, secs: 1000000000 }, Spec { name: "020", size: 0, secs: 1000000000 }, Spec { name: "03.", size: 0, secs: 1000000000 }], ops = [Insert(1, false), Insert(2, true), Insert(4, false)], mode = Time
+cc a2eeeb61ade4b63875849a3ac61215140aa3c4db8177385da89db06e23d5dec2 # shrinks to fs = [Spec { name: "00.", size: 0, secs: 1000000000 }], ds = [Spec { name: "00.", size: 0, secs: 1000000000 }], mode = Name

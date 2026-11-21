@@ -367,7 +367,7 @@ fn admit(
         size,
         mtime,
     };
-    if let Some((_key, index)) = state.insert_entry(entry) {
+    if let Some(index) = state.insert_entry(entry) {
         WatchAction::Changed {
             kind: Applied::Added,
             path: path_str,
@@ -391,7 +391,7 @@ fn remove_listed(state: &mut DirectoryState, dir: &Path, ev: &RawWatchEvent) -> 
 }
 
 fn remove_or_ignore(state: &mut DirectoryState, path: String, is_dir: bool) -> WatchAction {
-    if let Some((_key, index)) = state.remove_entry_by_path(&path) {
+    if let Some(index) = state.remove_entry_by_path(&path) {
         WatchAction::Changed {
             kind: Applied::Removed,
             path,

@@ -18,5 +18,5 @@ pub use engine::{Command, Engine, EngineConfig, Event, Notify, WatchChangeKind};
 pub use error::EngineError;
 pub use filter::NameFilter;
 pub use meta::{ImageFormat, MetaInfo};
-pub use model::{DirectoryState, EntryData, EntryKey, EntryRef, key_from_ffi, key_to_ffi};
+pub use model::{DirectoryState, EntryData};
 pub use sort::{SortMode, natural};

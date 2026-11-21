@@ -87,7 +87,6 @@ fn set_last_error_by_code(code: c_int) {
 
 #[repr(C)]
 pub struct QimgvEntryMeta {
-    pub handle: u64,
     pub size: u64,
     pub mtime_ms: i64,
     pub is_dir: c_int,
@@ -147,11 +146,10 @@ pub struct QimgvMutation {
 // reads arguments from the wrong bytes.
 const _: () = {
     use std::mem::{offset_of, size_of};
-    assert!(size_of::<QimgvEntryMeta>() == 32);
-    assert!(offset_of!(QimgvEntryMeta, handle) == 0);
-    assert!(offset_of!(QimgvEntryMeta, size) == 8);
-    assert!(offset_of!(QimgvEntryMeta, mtime_ms) == 16);
-    assert!(offset_of!(QimgvEntryMeta, is_dir) == 24);
+    assert!(size_of::<QimgvEntryMeta>() == 24);
+    assert!(offset_of!(QimgvEntryMeta, size) == 0);
+    assert!(offset_of!(QimgvEntryMeta, mtime_ms) == 8);
+    assert!(offset_of!(QimgvEntryMeta, is_dir) == 16);
     assert!(size_of::<QimgvEvent>() == 20);
     assert!(offset_of!(QimgvEvent, kind) == 0);
     assert!(offset_of!(QimgvEvent, code) == 4);
@@ -505,13 +503,12 @@ fn entry_at(
             let Some(entry) = entry else {
                 return Err(QIMGV_ERR_EMPTY);
             };
-            write_str(name_buf, name_cap, &entry.data.name)?;
-            write_str(path_buf, path_cap, &entry.data.path)?;
+            write_str(name_buf, name_cap, &entry.name)?;
+            write_str(path_buf, path_cap, &entry.path)?;
             unsafe {
                 *out = QimgvEntryMeta {
-                    handle: qimgv_engine::key_to_ffi(entry.handle),
-                    size: entry.data.size,
-                    mtime_ms: mtime_ms(&entry.data.mtime),
+                    size: entry.size,
+                    mtime_ms: mtime_ms(&entry.mtime),
                     is_dir: if dirs { 1 } else { 0 },
                 };
             }
@@ -565,82 +562,6 @@ pub unsafe extern "C" fn qimgv_engine_dir_entry_at(
     entry_at(
         engine, index, true, out, name_buf, name_cap, path_buf, path_cap,
     )
-}
-
-fn neighbor(engine: *mut QimgvEngine, handle: u64, dirs: bool, next: bool, out: *mut u64) -> c_int {
-    if engine.is_null() || out.is_null() {
-        set_last_error("invalid argument");
-        return QIMGV_ERR_INVALID;
-    }
-    let Some(key) = qimgv_engine::key_from_ffi(handle) else {
-        set_last_error("null handle");
-        return QIMGV_ERR_INVALID;
-    };
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        with_engine(engine, |e| {
-            let st = e.state.read().unwrap_or_else(|p| p.into_inner());
-            let n = match (dirs, next) {
-                (false, true) => st.next_file(key),
-                (false, false) => st.prev_file(key),
-                (true, true) => st.next_dir(key),
-                (true, false) => st.prev_dir(key),
-            };
-            let Some(n) = n else {
-                return Err(QIMGV_ERR_EMPTY);
-            };
-            unsafe { *out = qimgv_engine::key_to_ffi(n) };
-            Ok(QIMGV_OK)
-        })
-    }));
-    match r {
-        Ok(Ok(code)) => code,
-        Ok(Err(code)) => {
-            set_last_error_by_code(code);
-            code
-        }
-        Err(_) => {
-            set_last_error("engine panic");
-            QIMGV_ERR_PANIC
-        }
-    }
-}
-
-/// The next file after `handle`: writes the neighbor handle to `out`. At either
-/// /// end = QIMGV_ERR_EMPTY; an unknown handle = QIMGV_ERR_INVALID.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_next_file(
-    engine: *mut QimgvEngine,
-    handle: u64,
-    out: *mut u64,
-) -> c_int {
-    neighbor(engine, handle, false, true, out)
-}
-/// The previous file before `handle`; same contract as qimgv_engine_next_file.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_prev_file(
-    engine: *mut QimgvEngine,
-    handle: u64,
-    out: *mut u64,
-) -> c_int {
-    neighbor(engine, handle, false, false, out)
-}
-/// The next directory after `handle`; same contract as qimgv_engine_next_file.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_next_dir(
-    engine: *mut QimgvEngine,
-    handle: u64,
-    out: *mut u64,
-) -> c_int {
-    neighbor(engine, handle, true, true, out)
-}
-/// The previous directory before `handle`; same contract as qimgv_engine_next_file.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn qimgv_engine_prev_dir(
-    engine: *mut QimgvEngine,
-    handle: u64,
-    out: *mut u64,
-) -> c_int {
-    neighbor(engine, handle, true, false, out)
 }
 
 // --- bulk listing export ------------------------------------------------------

@@ -74,7 +74,6 @@ typedef struct qimgv_engine qimgv_engine;
 #define QIMGV_SORT_SIZE_DESC  5
 
 typedef struct qimgv_entry_meta {
-    uint64_t handle;   /* opaque; valid until the next DirListed event */
     uint64_t size;
     int64_t mtime_ms;  /* ms since Unix epoch */
     int is_dir;
@@ -142,12 +141,11 @@ typedef void (*qimgv_notify_fn)(void *user);
 #  define QIMGV_PIN(what, cond) /* no compile-time assert available */
 #endif
 
-/* (u64,u64,i64,int) */
-QIMGV_PIN("qimgv_entry_meta", sizeof(qimgv_entry_meta) == 32);
-QIMGV_PIN("qimgv_entry_meta.handle", offsetof(qimgv_entry_meta, handle) == 0);
-QIMGV_PIN("qimgv_entry_meta.size", offsetof(qimgv_entry_meta, size) == 8);
-QIMGV_PIN("qimgv_entry_meta.mtime_ms", offsetof(qimgv_entry_meta, mtime_ms) == 16);
-QIMGV_PIN("qimgv_entry_meta.is_dir", offsetof(qimgv_entry_meta, is_dir) == 24);
+/* (u64,i64,int) */
+QIMGV_PIN("qimgv_entry_meta", sizeof(qimgv_entry_meta) == 24);
+QIMGV_PIN("qimgv_entry_meta.size", offsetof(qimgv_entry_meta, size) == 0);
+QIMGV_PIN("qimgv_entry_meta.mtime_ms", offsetof(qimgv_entry_meta, mtime_ms) == 8);
+QIMGV_PIN("qimgv_entry_meta.is_dir", offsetof(qimgv_entry_meta, is_dir) == 16);
 
 /* (int,int,u32,u32) */
 QIMGV_PIN("qimgv_event", sizeof(qimgv_event) == 20);
@@ -217,14 +215,6 @@ int qimgv_engine_dir_entry_at(qimgv_engine *engine, int index,
                               qimgv_entry_meta *out,
                               char *name_buf, size_t name_cap,
                               char *path_buf, size_t path_cap);
-/* Handle navigation: QIMGV_OK on success, QIMGV_ERR_EMPTY at either end. */
-int qimgv_engine_next_file(qimgv_engine *engine, uint64_t handle, uint64_t *out);
-/* The file before handle: writes it to out; at an end = QIMGV_ERR_EMPTY, unknown handle = QIMGV_ERR_INVALID. */
-int qimgv_engine_prev_file(qimgv_engine *engine, uint64_t handle, uint64_t *out);
-/* The directory after handle; same contract as qimgv_engine_prev_file. */
-int qimgv_engine_next_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
-/* The directory before handle; same contract as qimgv_engine_prev_file. */
-int qimgv_engine_prev_dir(qimgv_engine *engine, uint64_t handle, uint64_t *out);
 
 /* Returns 1 if an event was written, 0 if none pending, otherwise a POSITIVE
  * QIMGV_ERR_* code — so a caller must compare against 1, not against 0: any
@@ -267,7 +257,7 @@ int qimgv_engine_take_event(qimgv_engine *engine, qimgv_event *out,
 
 /* Bulk listing export: serializes the current listing in ONE lock pass
  * (little-endian: u32 file_count, u32 dir_count, then per entry
- * u64 handle, u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
+ * u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
  * name bytes, path bytes — files first, then dirs). Call with cap=0 to
  * query `needed_out`; returns QIMGV_ERR_TRUNCATED when cap is too small.
  *

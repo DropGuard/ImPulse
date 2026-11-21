@@ -16,7 +16,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use proptest::prelude::*;
 
-use qimgv_engine::{DirectoryState, EntryData, NameFilter, SortMode, key_from_ffi, key_to_ffi};
+use qimgv_engine::{DirectoryState, EntryData, NameFilter, SortMode};
 
 #[derive(Debug, Clone)]
 struct Spec {
@@ -42,7 +42,7 @@ impl Spec {
 }
 
 /// Unique names, guaranteed by the index prefix, so no property has to reason
-/// about the slotmap's dedup behaviour by accident.
+/// about the model's dedup behaviour by accident.
 ///
 /// The seconds range is epoch-sized on purpose: mtime crosses the wire in
 /// milliseconds, and a field that small is always the true value squeezed into
@@ -104,14 +104,14 @@ proptest! {
     }
 
     #[test]
-    fn listing_is_sorted_and_indexed_consistently(fs in specs(0..10), ds in specs(0..6), mode in any_mode()) {
+    fn listing_is_sorted_and_unique_consistently(fs in specs(0..10), ds in specs(0..6), mode in any_mode()) {
         let mut st = DirectoryState::new(SortMode::Name);
         st.replace_all(PathBuf::from("/root"),
                        fs.iter().map(|s| s.entry(false)).collect(),
                        ds.iter().map(|s| s.entry(true)).collect());
         st.resort(mode);
 
-        let got: Vec<&String> = (0..st.file_count()).map(|i| &st.file_at(i).unwrap().data.name).collect();
+        let got: Vec<&String> = (0..st.file_count()).map(|i| &st.file_at(i).unwrap().name).collect();
         let mut want: Vec<&Spec> = fs.iter().collect();
         want.sort_by(|p, q| mode.compare(&p.entry(false), &q.entry(false)));
         prop_assert_eq!(got, want.iter().map(|s| &s.name).collect::<Vec<_>>());
@@ -119,69 +119,34 @@ proptest! {
         let mut seen = HashSet::new();
         for i in 0..st.file_count() {
             let r = st.file_at(i).unwrap();
-            prop_assert_eq!(st.index_of_file(r.handle), Some(i as u32));
-            prop_assert!(seen.insert(key_to_ffi(r.handle)), "duplicate handle in the listing");
+            prop_assert!(seen.insert(r.path.clone()), "duplicate path in the listing");
         }
-        prop_assert_eq!(seen.len(), st.file_count());
 
-        // directories travel in their own order and their own index map, so both
-        // need the same guarantee the files got above
+        // directories travel in their own order, so they need the same
+        // guarantees the files got above. A cross-order path assert would be
+        // wrong here: the generator can hand the same name to a file and a
+        // directory, which no real filesystem produces but this strategy can.
         let got_dirs: Vec<&String> =
-            (0..st.dir_count()).map(|i| &st.dir_at(i).unwrap().data.name).collect();
+            (0..st.dir_count()).map(|i| &st.dir_at(i).unwrap().name).collect();
         let mut want_dirs: Vec<&Spec> = ds.iter().collect();
         want_dirs.sort_by(|p, q| mode.compare(&p.entry(true), &q.entry(true)));
         prop_assert_eq!(got_dirs, want_dirs.iter().map(|s| &s.name).collect::<Vec<_>>());
-        for i in 0..st.dir_count() {
-            let r = st.dir_at(i).unwrap();
-            prop_assert_eq!(st.index_of_dir(r.handle), Some(i as u32));
-        }
-    }
-
-    // next/prev must be a total traversal and exact inverses: the C++ navigation
-    // walks these, so a cycle or a lost entry is user-visible.
-    #[test]
-    fn next_prev_walk_covers_every_entry_once(fs in specs(1..10)) {
-        let mut st = DirectoryState::new(SortMode::Name);
-        st.replace_all(PathBuf::from("/root"), fs.iter().map(|s| s.entry(false)).collect(), vec![]);
-
-        let first = st.file_at(0).unwrap().handle;
-        let mut walked = vec![first];
-        while let Some(n) = st.next_file(*walked.last().unwrap()) {
-            walked.push(n);
-            prop_assert!(walked.len() <= fs.len(), "next_file never terminates");
-        }
-        prop_assert_eq!(walked.len(), fs.len());
-        let positions: Vec<u32> = walked.iter().map(|h| st.index_of_file(*h).unwrap()).collect();
-        prop_assert_eq!(positions, (0..fs.len() as u32).collect::<Vec<_>>());
-        for pair in walked.windows(2) {
-            prop_assert_eq!(st.prev_file(pair[1]), Some(pair[0]));
-            prop_assert_eq!(st.next_file(pair[0]), Some(pair[1]));
-        }
-        prop_assert_eq!(st.prev_file(first), None);
     }
 
     #[test]
-    fn resort_keeps_handles_and_replace_all_invalidates_them(fs in specs(2..8), extra in specs(1..2)) {
+    fn replace_all_leaves_no_entry_behind(fs in specs(2..8), extra in specs(1..2)) {
         let mut st = DirectoryState::new(SortMode::Name);
         st.replace_all(PathBuf::from("/root"), fs.iter().map(|s| s.entry(false)).collect(), vec![]);
-        let old: Vec<_> = (0..st.file_count()).map(|i| st.file_at(i).unwrap().handle).collect();
 
         st.resort(SortMode::SizeDesc);
-        for h in &old {
-            prop_assert!(st.index_of_file(*h).is_some(), "handle lost across a resort");
-        }
 
         // a wholly different path set, so an entry left behind by the first
         // listing cannot be mistaken for one the second listing re-inserted
         let mut merged: Vec<EntryData> = fs.iter().map(|s| s.entry_in("/other", false)).collect();
         merged.extend(extra.iter().map(|s| s.entry_in("/other", false)));
         st.replace_all(PathBuf::from("/other"), merged.clone(), vec![]);
-        for h in &old {
-            prop_assert_eq!(st.index_of_file(*h), None, "stale handle still resolves after replace_all");
-        }
-        // the position map gets rebuilt either way, so it proves nothing about the
-        // entry table. A leftover entry from the previous directory keeps its path
-        // in the table, and insert_entry refuses a new file whose path is already
+        // a leftover entry from the previous directory keeps its path in the
+        // listing, and insert_entry refuses a new file whose path is already
         // there — which is how a directory switch could swallow a creation.
         for e in &fs {
             prop_assert!(st.entry_meta(&e.entry(false).path).is_none(),
@@ -202,39 +167,26 @@ proptest! {
         st.replace_all(PathBuf::from("/root"), files.clone(), dirs.clone());
 
         let needed = 8 + files.iter().chain(&dirs)
-            .map(|e| 32 + e.name.len() + e.path.len()).sum::<usize>();
+            .map(|e| 24 + e.name.len() + e.path.len()).sum::<usize>();
         let mut buf = vec![0u8; needed + slack];
         let (n, fc, dc) = st.write_listing(&mut buf);
         prop_assert_eq!((n, fc, dc), (needed, files.len(), dirs.len()));
 
         let (got_files, got_dirs) = read_arena(&buf[..needed]);
         prop_assert_eq!(got_files.len(), files.len());
-        // the handle is what C++ navigates by, and the arena position is what it
-        // reads back as an index — both have to agree with the live state, or the
-        // far side of the FFI is holding a reference to something else
+        // each row is checked against the state's row at the same index, not
+        // against the order it happened to be inserted in
         for (i, g) in got_files.iter().enumerate() {
-            let k = key_from_ffi(g.handle);
-            prop_assert!(k.is_some(), "arena handle does not decode");
-            prop_assert_eq!(st.index_of_file(k.unwrap()), Some(i as u32),
-                            "arena position is not the model index");
-            // each row is checked against the state's row at the same index, not
-            // against the order it happened to be inserted in
             let row = st.file_at(i).unwrap();
-            prop_assert_eq!(row.handle, k.unwrap(), "handle/row mismatch");
-            // names travel as UTF-8 bytes; a char-count disagreement shows up here
-            prop_assert_eq!(&g.name, &row.data.name);
-            prop_assert_eq!(&g.path, &row.data.path);
-            prop_assert_eq!(g.size, row.data.size);
-            prop_assert_eq!(g.mtime_ms, row.data.mtime.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64);
+            prop_assert_eq!(&g.name, &row.name);
+            prop_assert_eq!(&g.path, &row.path);
+            prop_assert_eq!(g.size, row.size);
+            prop_assert_eq!(g.mtime_ms, row.mtime.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64);
             prop_assert!(!g.is_dir);
         }
         prop_assert_eq!(got_dirs.len(), dirs.len());
         for (i, g) in got_dirs.iter().enumerate() {
-            let k = key_from_ffi(g.handle);
-            prop_assert!(k.is_some(), "arena handle does not decode");
-            prop_assert_eq!(st.index_of_dir(k.unwrap()), Some(i as u32),
-                            "arena position is not the model index");
-            prop_assert_eq!(&g.name, &st.dir_at(i).unwrap().data.name);
+            prop_assert_eq!(&g.name, &st.dir_at(i).unwrap().name);
             prop_assert!(g.is_dir);
         }
 
@@ -288,7 +240,6 @@ proptest! {
 /// comment in model.rs rather than from the serializer itself.
 #[derive(Debug)]
 struct Rec {
-    handle: u64,
     name: String,
     path: String,
     size: u64,
@@ -310,17 +261,15 @@ fn read_arena(buf: &[u8]) -> (Vec<Rec>, Vec<Rec>) {
     let mut dirs = Vec::new();
     for (count, is_dir) in [(fc, false), (dc, true)] {
         for _ in 0..count {
-            let handle = u64le(buf, off);
-            let size = u64le(buf, off + 8);
-            let mtime_ms = i64::from_le_bytes(buf[off + 16..off + 24].try_into().unwrap());
-            let nlen = u32le(buf, off + 24) as usize;
-            let plen = u32le(buf, off + 28) as usize;
-            let name = String::from_utf8(buf[off + 32..off + 32 + nlen].to_vec()).unwrap();
+            let size = u64le(buf, off);
+            let mtime_ms = i64::from_le_bytes(buf[off + 8..off + 16].try_into().unwrap());
+            let nlen = u32le(buf, off + 16) as usize;
+            let plen = u32le(buf, off + 20) as usize;
+            let name = String::from_utf8(buf[off + 24..off + 24 + nlen].to_vec()).unwrap();
             let path =
-                String::from_utf8(buf[off + 32 + nlen..off + 32 + nlen + plen].to_vec()).unwrap();
-            off += 32 + nlen + plen;
+                String::from_utf8(buf[off + 24 + nlen..off + 24 + nlen + plen].to_vec()).unwrap();
+            off += 24 + nlen + plen;
             (if is_dir { &mut dirs } else { &mut files }).push(Rec {
-                handle,
                 name,
                 path,
                 size,
@@ -335,9 +284,9 @@ fn read_arena(buf: &[u8]) -> (Vec<Rec>, Vec<Rec>) {
 // --- the self-consistency contract -------------------------------------------
 //
 // After ANY mutation sequence in ANY sort mode, the order vectors must be
-// sorted by the comparator and the position maps must tell the truth about
-// them. update_entry_meta used to skip the re-seating, so a size change under
-// SIZE sort silently unsorted the model — and every export after it.
+// sorted by the comparator. update_entry_meta used to skip the re-seating, so
+// a size change under SIZE sort silently unsorted the model — and every export
+// after it.
 
 #[derive(Debug, Clone)]
 enum Op {
@@ -359,30 +308,23 @@ fn assert_well_ordered(st: &DirectoryState) {
     let mode = st.sort();
     for i in 0..st.file_count() {
         let e = st.file_at(i).unwrap();
-        assert_eq!(
-            st.index_of_file(e.handle),
-            Some(i as u32),
-            "position map lies about {}",
-            e.data.name
-        );
         if i > 0 {
             let prev = st.file_at(i - 1).unwrap();
             assert_ne!(
-                mode.compare(prev.data, e.data),
+                mode.compare(prev, e),
                 Ordering::Greater,
                 "file order unsorted at {i}: {} vs {}",
-                prev.data.name,
-                e.data.name
+                prev.name,
+                e.name
             );
         }
     }
     for i in 0..st.dir_count() {
         let e = st.dir_at(i).unwrap();
-        assert_eq!(st.index_of_dir(e.handle), Some(i as u32));
         if i > 0 {
             let prev = st.dir_at(i - 1).unwrap();
             assert_ne!(
-                mode.compare(prev.data, e.data),
+                mode.compare(prev, e),
                 Ordering::Greater,
                 "dir order unsorted at {i}"
             );

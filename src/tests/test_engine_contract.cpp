@@ -98,12 +98,6 @@ int main() {
     char name[64], path[512];
     CHECK(qimgv_engine_file_entry_at(engine, 0, &meta, name, sizeof(name), path, sizeof(path)) == QIMGV_OK);
     CHECK(std::strcmp(name, "a.jpg") == 0);
-    uint64_t h0 = meta.handle;
-    CHECK(qimgv_engine_file_entry_at(engine, 1, &meta, name, sizeof(name), path, sizeof(path)) == QIMGV_OK);
-    uint64_t h1 = meta.handle;
-    uint64_t next = 0;
-    CHECK(qimgv_engine_next_file(engine, h0, &next) == QIMGV_OK);
-    CHECK(next == h1);
 
     // undersized name buffer ("a.jpg\0" needs 6 bytes, 1 given)
     CHECK(qimgv_engine_file_entry_at(engine, 0, &meta, name, 1, path, sizeof(path)) == QIMGV_ERR_TRUNCATED);
@@ -116,8 +110,6 @@ int main() {
     qimgv_entry_meta dmeta{};
     CHECK(qimgv_engine_dir_entry_at(engine, 0, &dmeta, name, sizeof(name), path, sizeof(path)) == QIMGV_OK);
     CHECK(std::strcmp(name, "subdir") == 0);
-    CHECK(qimgv_engine_next_dir(engine, dmeta.handle, &next) == QIMGV_ERR_EMPTY);
-    CHECK(qimgv_engine_prev_dir(engine, dmeta.handle, &next) == QIMGV_ERR_EMPTY);
 
     CHECK(qimgv_engine_set_show_hidden(engine, 1) == QIMGV_OK);
     CHECK(qimgv_engine_set_show_hidden(engine, 0) == QIMGV_OK);
