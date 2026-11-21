@@ -208,7 +208,27 @@ TEST_F(TestThumbnailer, tearingDownAThumbnailerWaitsForARunningSweep) {
 
 TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
     resetFixture();
+    // Both workers held, so the three requests below are still QUEUED when the
+    // third is made. With a free worker the first can finish and leave the
+    // pool's records before the duplicate arrives — the dedup then answers
+    // "nothing running" correctly and the third becomes a new request. That is
+    // the queue's semantics, not a bug, and a fixture that claims to test
+    // dedup has to hold the pool still: measured 2/20 standalone, 1/20 under
+    // -j4, before this. Two threads, not one — the pool stays the shape
+    // production runs.
+    std::atomic_bool gate{false};
+    std::atomic_int starts{0};
     WorkerPool pool(2);
+    for(int i = 0; i < 2; ++i)
+        pool.submit(PoolOwner::Thumbnailer, 0, std::make_unique<ThumbnailGateJob>(&gate, &starts));
+    struct Release {
+        std::atomic_bool &gate;
+        ~Release() {
+            gate.store(true);
+        }
+    } release{gate};
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 2, 10000);
+
     Thumbnailer thumb(pool);
     QSignalSpy ready(&thumb, &Thumbnailer::thumbnailReady);
     EXPECT_TRUE(ready.isValid());
@@ -217,8 +237,10 @@ TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
     // schedules thumbnails
     thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 32, false, false);
     thumb.getThumbnailAsync(m_fixtureDir + "/img2.jpg", 32, false, false);
-    // a duplicate collapses instead of double-dispatching
+    // a duplicate collapses instead of double-dispatching — decidable here
+    // because the gate keeps all three queued
     thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 32, false, false);
+    gate.store(true); // let the two distinct requests run
     ASSERT_TRY_EQ_TIMEOUT(ready.count(), 2, 10000);
     coretest::drainEvents();
     EXPECT_EQ(ready.count(), 2);
