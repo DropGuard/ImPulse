@@ -1,5 +1,7 @@
 #include "thumbnailstripproxy.h"
 
+#include "gui/customwidgets/selectionremap.h"
+
 ThumbnailStripProxy::ThumbnailStripProxy(QWidget *parent) : QWidget(parent) {
     m_layout.setContentsMargins(0, 0, 0, 0);
 }
@@ -121,15 +123,8 @@ void ThumbnailStripProxy::reloadItem(int index) {
 void ThumbnailStripProxy::renameItem(int oldIndex, int newIndex, const QString &name) {
     if(m_thumbnailStrip) {
         m_thumbnailStrip->renameItem(oldIndex, newIndex, name);
-    } else if(oldIndex != newIndex) {
-        for(int i = 0; i < m_stateBuf.selection.count(); i++) {
-            if(m_stateBuf.selection[i] == oldIndex)
-                m_stateBuf.selection[i] = newIndex;
-            else if(oldIndex < newIndex && m_stateBuf.selection[i] > oldIndex && m_stateBuf.selection[i] <= newIndex)
-                m_stateBuf.selection[i]--;
-            else if(newIndex < oldIndex && m_stateBuf.selection[i] >= newIndex && m_stateBuf.selection[i] < oldIndex)
-                m_stateBuf.selection[i]++;
-        }
+    } else {
+        remapSelectionForRename(m_stateBuf.selection, oldIndex, newIndex);
     }
 }
 

@@ -1,4 +1,5 @@
 #include "thumbnailview.h"
+#include "gui/customwidgets/selectionremap.h"
 #include <utility>
 
 ThumbnailView::ThumbnailView(Qt::Orientation _orientation, QWidget *parent)
@@ -352,16 +353,11 @@ void ThumbnailView::renameItem(int oldIndex, int newIndex, const QString &name) 
     addItemToLayout(widget, newIndex);
     updateLayout();
 
-    // the same permutation the rows went through, applied to the selection
+    // the same permutation the rows went through, applied to the selection —
+    // the shared rule lives in remapSelectionForRename, one copy for this view
+    // and the viewless proxy
     auto newSelection = m_selection;
-    for(int i = 0; i < newSelection.count(); i++) {
-        if(newSelection[i] == oldIndex)
-            newSelection[i] = newIndex;
-        else if(oldIndex < newIndex && newSelection[i] > oldIndex && newSelection[i] <= newIndex)
-            newSelection[i]--;
-        else if(newIndex < oldIndex && newSelection[i] >= newIndex && newSelection[i] < oldIndex)
-            newSelection[i]++;
-    }
+    remapSelectionForRename(newSelection, oldIndex, newIndex);
     select(newSelection);
 }
 
