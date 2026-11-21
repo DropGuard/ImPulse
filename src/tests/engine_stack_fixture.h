@@ -221,16 +221,23 @@ class EngineStackFixture {
     // agree and, when they do not, names the disagreement, because a count that
     // differs says "the mirror is wrong", which is not actionable, while the two
     // lists say which entry the mirror never heard about.
+    // Two snapshots, not one. The export is taken before the mirror is read,
+    // so a resync landing between the two makes them disagree about a tree
+    // that was never inconsistent — the engine is at T2 and the export at T1.
+    // Taking the export again afterwards and requiring the two to be identical
+    // means the mirror was read while the engine stood still. Without this the
+    // caller's retry loop can spin: each attempt re-reads in the same order and
+    // misses the same window.
     static bool mirrorMatchesEngineExport(DirectoryManager &dm, QString &diff) {
-        QByteArray arena;
-        quint32 fileCount = 0, dirCount = 0;
-        if(!EngineBridge::instance().exportListing(arena, fileCount, dirCount)) {
+        QByteArray before;
+        quint32 bc = 0, bd = 0;
+        if(!EngineBridge::instance().exportListing(before, bc, bd)) {
             diff = QStringLiteral("exportListing failed");
             return false;
         }
         std::vector<EngineBridge::EngineEntry> files, dirs;
-        if(!EngineBridge::parseListing(arena, files, dirs)) {
-            diff = QStringLiteral("parseListing rejected a %1-byte arena").arg(arena.size());
+        if(!EngineBridge::parseListing(before, files, dirs)) {
+            diff = QStringLiteral("parseListing rejected a %1-byte arena").arg(before.size());
             return false;
         }
         auto joinNames = [](const std::vector<EngineBridge::EngineEntry> &entries) {
@@ -265,6 +272,13 @@ class EngineStackFixture {
         for(size_t i = 0; i < dirs.size(); ++i) {
             if(dm.dirPathAt(static_cast<int>(i)) != dirs[i].path)
                 return fail(QStringLiteral("dir row %1").arg(int(i)));
+        }
+        // the engine must not have moved under the read
+        QByteArray after;
+        quint32 ac = 0, ad = 0;
+        if(!EngineBridge::instance().exportListing(after, ac, ad) || after != before) {
+            diff = QStringLiteral("the engine listing changed while it was being compared");
+            return false;
         }
         return true;
     }
