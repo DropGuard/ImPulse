@@ -43,7 +43,14 @@ CTEST_CMD="$(dirname "$CMAKE_CMD")/ctest"
 [ -x "$CTEST_CMD" ] || CTEST_CMD=ctest
 PYTHON_CMD=$(cache_value Python3_EXECUTABLE | cut -d';' -f1)
 [ -n "$PYTHON_CMD" ] || PYTHON_CMD=python3
-if have nproc; then JOBS=$(nproc); else JOBS=4; fi
+# The build fan-out. LINT_JOBS caps it together with the lint gate's own
+# workers (the knob lint.py reads) — one variable, one cap, for the machine
+# that must stay responsive while commits run. Unset, empty or 0 means full
+# cores.
+JOBS=$(nproc 2>/dev/null || echo 4)
+if [ -n "$LINT_JOBS" ] && [ "$LINT_JOBS" -gt 0 ] 2>/dev/null; then
+    JOBS=$LINT_JOBS
+fi
 
 # format gate on staged C++ files (working-tree contents, same scan surface as
 # the lint gate): the tree's style is .clang-format, and an unformatted file
