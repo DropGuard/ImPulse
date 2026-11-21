@@ -40,6 +40,12 @@ pub struct DirectoryState {
     file_pos: HashMap<EntryKey, u32>,
     dir_pos: HashMap<EntryKey, u32>,
     sort: SortMode,
+    /// Bumped whenever the listing's contents OR its order change. A reader
+    /// that wants a snapshot it can trust reads this before and after: the
+    /// same number means the listing did not move under it. Without it the
+    /// only way to notice a change is to compare the data, which is a guess
+    /// about how long the comparison takes.
+    revision: u64,
 }
 
 impl DirectoryState {
@@ -52,7 +58,13 @@ impl DirectoryState {
             file_pos: HashMap::new(),
             dir_pos: HashMap::new(),
             sort,
+            revision: 0,
         }
+    }
+
+    /// The listing's version. Every mutation bumps it; nothing else does.
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn dir(&self) -> Option<&Path> {
@@ -79,6 +91,9 @@ impl DirectoryState {
     }
 
     fn reorder(&mut self) {
+        // the one place an order is decided, so the one place the version
+        // moves for an order change
+        self.revision = self.revision.wrapping_add(1);
         let mode = self.sort;
         {
             let (file_order, dir_order, entries) =
@@ -186,6 +201,7 @@ impl DirectoryState {
             order.insert(idx, key);
             idx as u32
         };
+        self.revision = self.revision.wrapping_add(1);
         if is_dir {
             // the splice shifts every later entry right; the position maps
             // must follow, or next/prev navigation and the mutation wire
@@ -235,6 +251,7 @@ impl DirectoryState {
             }
         }
         self.entries.remove(key);
+        self.revision = self.revision.wrapping_add(1);
         Some((key, index.unwrap_or(0)))
     }
 
@@ -265,6 +282,9 @@ impl DirectoryState {
         }
         // a name sort keys on the name, which a metadata change never moves
         if matches!(self.sort, SortMode::Name | SortMode::NameDesc) {
+            // size/mtime changed, so the listing changed even though no row
+            // moved — a reader's snapshot is stale either way
+            self.revision = self.revision.wrapping_add(1);
             let (order, _) = self.order_of(key);
             return order.iter().position(|&k| k == key).map(|i| i as u32);
         }

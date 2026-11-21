@@ -109,6 +109,12 @@ pub struct QimgvEvent {
     /// that reason: at 4 billion mutations it wraps, and a wrap changes which
     /// number is printed, never which event follows which.
     pub seq: u32,
+    /// The listing version this event leaves the engine at. A mirror applies
+    /// the event and stores it, so `mirror.revision == export.revision` means
+    /// the rows and that export came from the same listing. Truncated from the
+    /// engine's u64; a wrap moves both sides' numbers together, and equality
+    /// is all that is ever asked.
+    pub revision: u32,
 }
 
 #[repr(C)]
@@ -146,11 +152,12 @@ const _: () = {
     assert!(offset_of!(QimgvEntryMeta, size) == 8);
     assert!(offset_of!(QimgvEntryMeta, mtime_ms) == 16);
     assert!(offset_of!(QimgvEntryMeta, is_dir) == 24);
-    assert!(size_of::<QimgvEvent>() == 16);
+    assert!(size_of::<QimgvEvent>() == 20);
     assert!(offset_of!(QimgvEvent, kind) == 0);
     assert!(offset_of!(QimgvEvent, code) == 4);
     assert!(offset_of!(QimgvEvent, epoch) == 8);
     assert!(offset_of!(QimgvEvent, seq) == 12);
+    assert!(offset_of!(QimgvEvent, revision) == 16);
     assert!(size_of::<QimgvMutation>() == 32);
     assert!(offset_of!(QimgvMutation, kind) == 0);
     assert!(offset_of!(QimgvMutation, is_dir) == 4);
@@ -651,12 +658,14 @@ pub unsafe extern "C" fn qimgv_engine_export_listing(
     needed_out: *mut u32,
     file_count_out: *mut u32,
     dir_count_out: *mut u32,
+    revision_out: *mut u64,
 ) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         if engine.is_null()
             || needed_out.is_null()
             || file_count_out.is_null()
             || dir_count_out.is_null()
+            || revision_out.is_null()
         {
             return Err(QIMGV_ERR_INVALID);
         }
@@ -669,11 +678,12 @@ pub unsafe extern "C" fn qimgv_engine_export_listing(
             } else {
                 unsafe { std::slice::from_raw_parts_mut(buf, cap) }
             };
-            let (needed, fc, dc) = e.export_listing(slice);
+            let (needed, fc, dc, revision) = e.export_listing(slice);
             unsafe {
                 *needed_out = needed as u32;
                 *file_count_out = fc as u32;
                 *dir_count_out = dc as u32;
+                *revision_out = revision;
             }
             if slice.len() < needed {
                 Err(QIMGV_ERR_TRUNCATED)
@@ -840,7 +850,11 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
             match pending.as_ref() {
                 None => Ok(0),
                 Some(ev) => match ev {
-                    Event::DirListed { dir, epoch } => {
+                    Event::DirListed {
+                        dir,
+                        epoch,
+                        revision,
+                    } => {
                         write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
                         unsafe {
                             *out = QimgvEvent {
@@ -848,11 +862,16 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 code: QIMGV_OK,
                                 epoch: *epoch as u32,
                                 seq: 0,
+                                revision: *revision as u32,
                             };
                         }
                         Ok(1)
                     }
-                    Event::SortChanged { dir, epoch } => {
+                    Event::SortChanged {
+                        dir,
+                        epoch,
+                        revision,
+                    } => {
                         write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
                         unsafe {
                             *out = QimgvEvent {
@@ -860,6 +879,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 code: QIMGV_OK,
                                 epoch: *epoch as u32,
                                 seq: 0,
+                                revision: *revision as u32,
                             };
                         }
                         Ok(1)
@@ -874,12 +894,14 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 code,
                                 epoch: *epoch as u32,
                                 seq: 0,
+                                revision: 0,
                             };
                         }
                         Ok(1)
                     }
                     Event::Mutated {
                         seq,
+                        revision,
                         kind,
                         path,
                         name: _,
@@ -927,6 +949,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 code: QIMGV_OK,
                                 epoch: *epoch as u32,
                                 seq: *seq as u32,
+                                revision: *revision as u32,
                             };
                         }
                         Ok(1)

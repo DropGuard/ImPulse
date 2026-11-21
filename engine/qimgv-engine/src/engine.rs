@@ -64,14 +64,22 @@ pub enum WatchChangeKind {
 #[derive(Debug)]
 pub enum Event {
     /// Directory listing replaced. Rows are new, gone or changed.
-    DirListed { dir: PathBuf, epoch: u64 },
+    DirListed {
+        dir: PathBuf,
+        epoch: u64,
+        revision: u64,
+    },
     /// The rows are the same and their order is not. A sort, not a listing:
     /// the mirror permutes what it already holds instead of rebuilding it,
     /// and the view re-reads. Kept apart from DirListed because on a large
     /// folder the two are very different loads — rebuilding the model to move
     /// pointers is work whose answer is already known. The epoch is the
     /// current session's: a sort belongs to it, but allocates none.
-    SortChanged { dir: PathBuf, epoch: u64 },
+    SortChanged {
+        dir: PathBuf,
+        epoch: u64,
+        revision: u64,
+    },
     OpenFailed {
         dir: PathBuf,
         error: Arc<EngineError>,
@@ -84,6 +92,9 @@ pub enum Event {
         /// This engine's own count of the mutations it has emitted, starting at
         /// 1. Crosses the ABI as `qimgv_event.seq`.
         seq: u64,
+        /// The listing version after this change. Crosses the ABI as
+        /// `qimgv_event.revision`.
+        revision: u64,
         kind: WatchChangeKind,
         path: String,
         name: String,
@@ -266,18 +277,22 @@ impl Engine {
                                     }
                                 }
                                 Ok(Command::SetSort(mode)) => {
-                                    let dir = {
+                                    // the revision is read with the state that
+                                    // produced it, so the event names the
+                                    // listing a consumer will hold after
+                                    // applying it
+                                    let applied = {
                                         let mut st = state_write(&state);
                                         st.resort(mode);
-                                        st.dir().map(|d| d.to_owned())
+                                        st.dir().map(|d| (d.to_owned(), st.revision()))
                                     };
-                                    if let Some(dir) = dir {
-                                        let _ = ev_tx.send(Event::SortChanged { dir, epoch: epoch_at() });
+                                    if let Some((dir, revision)) = applied {
+                                        let _ = ev_tx.send(Event::SortChanged { dir, epoch: epoch_at(), revision });
                                         fire_notify(&notify);
                                     }
                                 }
                                 Ok(Command::IncludePath(p)) => {
-                                    let dir = {
+                                    let applied = {
                                         let meta = std::fs::metadata(&p);
                                         let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
                                         ov.insert(p.clone());
@@ -291,10 +306,10 @@ impl Engine {
                                                 mtime: m.modified().unwrap_or(std::time::UNIX_EPOCH),
                                             });
                                         }
-                                        st.dir().map(|d| d.to_owned())
+                                        st.dir().map(|d| (d.to_owned(), st.revision()))
                                     };
-                                    if let Some(dir) = dir {
-                                        let _ = ev_tx.send(Event::DirListed { dir, epoch: epoch_at() });
+                                    if let Some((dir, revision)) = applied {
+                                        let _ = ev_tx.send(Event::DirListed { dir, epoch: epoch_at(), revision });
                                         fire_notify(&notify);
                                     }
                                 }
@@ -326,17 +341,22 @@ impl Engine {
                                     let dir = done.path.clone();
                                     let entry_count = out.files.len();
                                     let apply_start = Instant::now();
-                                    {
+                                    let applied_revision = {
                                         let mut st = state_write(&state);
                                         st.replace_all(dir.clone(), out.files, out.dirs);
-                                    }
+                                        st.revision()
+                                    };
                                     eprintln!(
                                         "[engine] scan {} ms + insert/sort {} ms ({} entries, off UI thread)",
                                         done.scan_ms,
                                         apply_start.elapsed().as_millis(),
                                         entry_count
                                     );
-                                    let _ = ev_tx.send(Event::DirListed { dir, epoch: done.session });
+                                    let _ = ev_tx.send(Event::DirListed {
+                                        dir,
+                                        epoch: done.session,
+                                        revision: applied_revision,
+                                    });
                                     fire_notify(&notify);
                                 }
                                 Err(e) => {
@@ -389,6 +409,13 @@ impl Engine {
                                         watcher::WatchAction::Ignored(watcher::IgnoreReason::Panicked)
                                     })
                                 };
+                                // read after the change, still inside the same
+                                // iteration: this is the version the event leaves
+                                // the engine at
+                                let applied_revision = state
+                                    .read()
+                                    .unwrap_or_else(|p| p.into_inner())
+                                    .revision();
                                 crate::trace::line("apply", || format!("{raw:?} -> {action:?}"));
                                 match action {
                                     watcher::WatchAction::Changed { kind, path, name, is_dir, size, mtime_ms, index } => {
@@ -414,7 +441,18 @@ impl Engine {
                                         next_mutation += 1;
                                         crate::trace::line("emit", || format!(
                                             "seq={next_mutation} {kind:?} {path} index={index} session={req_session}"));
-                                        let _ = ev_tx.send(Event::Mutated { seq: next_mutation, kind, path, name, is_dir, size, mtime_ms, index, epoch: req_session });
+                                        let _ = ev_tx.send(Event::Mutated {
+                                            seq: next_mutation,
+                                            revision: applied_revision,
+                                            kind,
+                                            path,
+                                            name,
+                                            is_dir,
+                                            size,
+                                            mtime_ms,
+                                            index,
+                                            epoch: req_session,
+                                        });
                                         fire_notify(&notify);
                                     }
                                     watcher::WatchAction::Reconcile { dir } => {
@@ -457,10 +495,16 @@ impl Engine {
 
     /// Serializes the whole current listing in ONE read-lock pass
     /// (see DirectoryState::write_listing for the wire format).
-    /// Returns (needed_bytes, file_count, dir_count).
-    pub fn export_listing(&self, buf: &mut [u8]) -> (usize, usize, usize) {
+    /// Returns (needed_bytes, file_count, dir_count, revision).
+    ///
+    /// The revision is read under the same lock as the bytes, so it names the
+    /// listing this copy came from: a reader that compares two rows never has
+    /// to wonder whether something moved between them. Sampling it separately
+    /// would leave exactly that window, which is the bug this closes.
+    pub fn export_listing(&self, buf: &mut [u8]) -> (usize, usize, usize, u64) {
         let st = self.state.read().unwrap_or_else(|p| p.into_inner());
-        st.write_listing(buf)
+        let (needed, files, dirs) = st.write_listing(buf);
+        (needed, files, dirs, st.revision())
     }
 
     /// Current session epoch; bumped by every OpenDir/rescan.
