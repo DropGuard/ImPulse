@@ -63,8 +63,15 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     // pass's. It moves when a listing lands (mirrorEngineListing), which is
     // the same moment m_mirroredDir does.
     markListingInSync();
-    // a newer open supersedes everything armed for the previous session
-    m_pendingOnListed.clear();
+    // a newer open supersedes everything armed for the PREVIOUS session — but
+    // an action armed for the directory being reopened survives it: the open
+    // IS the listing that action is waiting for, and wiping it here killed the
+    // natural arm-then-open ordering on nothing but convention
+    m_pendingOnListed.erase(std::remove_if(m_pendingOnListed.begin(), m_pendingOnListed.end(),
+                                           [&dirPath](const PendingListed &p) {
+                                               return p.dir != dirPath;
+                                           }),
+                            m_pendingOnListed.end());
     return true;
 }
 

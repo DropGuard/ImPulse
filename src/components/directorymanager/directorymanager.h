@@ -41,7 +41,10 @@ class DirectoryManager : public QObject {
     // reports that as the design's fault. Production passes
     // EngineBridge::instance() at the construction site, where it is visible.
     explicit DirectoryManager(EngineBridge &bridge);
-    // ignored if the same dir is already opened
+    // Re-opens unconditionally — even the directory already open: the previous
+    // session's listing answer is superseded, and armed whenListed actions for
+    // OTHER directories are dropped. Actions armed for the directory being
+    // reopened survive: the open IS the listing they are waiting for.
     bool setDirectory(const QString &);
     // The folder a folder-boundary transition should enter: this folder's place in
     // its parent's order, resolved synchronously because a folder-boundary keypress

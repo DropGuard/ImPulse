@@ -334,6 +334,29 @@ TEST_F(TestListing, whenListedIsSupersededByANewerOpen) {
     EXPECT_TRUE(!staleFired);
 }
 
+TEST_F(TestListing, whenListedSurvivesAReopenOfTheSameDirectory) {
+    // The arm-then-open ordering is the natural way to write it: the action is
+    // armed, then the directory opened. The unconditional wipe made that a
+    // silent kill on a same-directory reopen — the open IS the listing the
+    // action is waiting for, so superseding it there served nobody. Only
+    // actions for OTHER directories are superseded by a newer open.
+    resetFixture();
+    DirectoryManager dm{EngineBridge::instance()};
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+
+    bool fired = false;
+    dm.whenListed(m_fixtureDir, [&fired] {
+        fired = true;
+    });
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    // isSettled cannot stand in here: a same-directory reopen reads as settled
+    // the instant the call returns (the old listing already satisfies every
+    // POSITION and OWED WORK term), while the new listing is still in flight.
+    // The action firing is the thing being pinned — wait on it directly.
+    ASSERT_TRY_TRUE_TIMEOUT(fired, 10000);
+}
+
 TEST_F(TestListing, whenListedCanBeCancelled) {
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
