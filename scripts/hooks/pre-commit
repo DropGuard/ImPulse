@@ -95,25 +95,6 @@ elif ! "$PYTHON_CMD" scripts/lint.py build --gate > /tmp/qimgv-hook-lint.log 2>&
     exit 1
 fi
 
-# Refresh mtimes on files whose inode changed without their mtime following.
-# `cp -p`, `mv` and `tar -x` restore the old mtime, ninja sees a source older
-# than the object built from it and prints nothing — the run then tests a
-# binary that is not the code (AGENTS.md rule 7, which cost a break-probe and
-# its own revert in one session). ctime is the field no userland copy puts
-# back, so mtime < ctime means "replaced after it was last written".
-refresh_replaced_mtimes() {
-    [ -d src ] || return 0
-    find src plugins engine -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.rs' \) \
-        -not -path '*/3rdparty/*' -not -path '*/target/*' -print0 2>/dev/null |
-        while IFS= read -r -d '' f; do
-            m=$(stat -c %Y "$f" 2>/dev/null) || continue
-            c=$(stat -c %Z "$f" 2>/dev/null) || continue
-            if [ "$m" -lt "$c" ]; then
-                touch -c "$f"
-            fi
-        done
-}
-refresh_replaced_mtimes
 
 "$CMAKE_CMD" --build build -j"$JOBS" > /tmp/qimgv-hook-build.log 2>&1 || {
     echo "pre-commit: build failed:" >&2
