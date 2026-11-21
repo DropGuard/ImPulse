@@ -97,7 +97,6 @@ pub enum Event {
         revision: u64,
         kind: WatchChangeKind,
         path: String,
-        name: String,
         is_dir: bool,
         size: u64,
         mtime_ms: i64,
@@ -108,7 +107,6 @@ pub enum Event {
 
 #[derive(Clone)]
 pub struct EngineConfig {
-    pub scan_threads: usize,
     pub show_hidden: Arc<AtomicBool>,
     pub filter: NameFilter,
     pub initial_sort: SortMode,
@@ -181,8 +179,9 @@ fn fire_notify(notify: &Notify) {
 }
 
 impl Engine {
-    /// Starts the engine loop thread, the scan worker pool and the platform
-    /// watcher thread (inotify on Linux, ReadDirectoryChangesW on Windows).
+    /// Starts the engine loop thread and the platform watcher thread (inotify
+    /// on Linux, ReadDirectoryChangesW on Windows). Enumeration runs on the
+    /// watcher thread itself; there is no scan worker pool.
     /// Dropping the returned handle shuts everything
     /// down (command channel closes → loop breaks → job channel closes →
     /// workers exit; watcher is joined explicitly).
@@ -418,7 +417,7 @@ impl Engine {
                                     .revision();
                                 crate::trace::line("apply", || format!("{raw:?} -> {action:?}"));
                                 match action {
-                                    watcher::WatchAction::Changed { kind, path, name, is_dir, size, mtime_ms, index } => {
+                                    watcher::WatchAction::Changed { kind, path, is_dir, size, mtime_ms, index } => {
                                         let kind = match kind {
                                             watcher::Applied::Added => WatchChangeKind::Added,
                                             watcher::Applied::Modified => WatchChangeKind::Modified,
@@ -446,7 +445,6 @@ impl Engine {
                                             revision: applied_revision,
                                             kind,
                                             path,
-                                            name,
                                             is_dir,
                                             size,
                                             mtime_ms,

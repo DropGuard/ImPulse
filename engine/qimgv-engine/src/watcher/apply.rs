@@ -178,7 +178,6 @@ pub enum WatchAction {
     Changed {
         kind: Applied,
         path: String,
-        name: String,
         is_dir: bool,
         size: u64,
         mtime_ms: i64,
@@ -372,7 +371,6 @@ fn admit(
         WatchAction::Changed {
             kind: Applied::Added,
             path: path_str,
-            name: name.to_owned(),
             is_dir,
             size,
             mtime_ms: if is_dir { 0 } else { mtime_ms(mtime) },
@@ -397,7 +395,6 @@ fn remove_or_ignore(state: &mut DirectoryState, path: String, is_dir: bool) -> W
         WatchAction::Changed {
             kind: Applied::Removed,
             path,
-            name: String::new(),
             is_dir,
             size: 0,
             mtime_ms: 0,
@@ -439,7 +436,6 @@ fn restat(state: &mut DirectoryState, path: String) -> WatchAction {
     WatchAction::Changed {
         kind: Applied::Modified,
         path,
-        name: String::new(),
         is_dir: false,
         size,
         mtime_ms: mtime_ms(mtime),
@@ -508,7 +504,6 @@ fn rename(
             WatchAction::Changed {
                 kind: Applied::Renamed { from: from_path },
                 path: to_str,
-                name: name.clone(),
                 is_dir: ev.is_dir,
                 size,
                 mtime_ms: if ev.is_dir { 0 } else { mtime_ms(mtime) },

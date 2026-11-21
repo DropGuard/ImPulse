@@ -397,7 +397,6 @@ fn a_paired_rename_is_one_event_about_one_entry() {
         WatchAction::Changed {
             kind: Applied::Renamed { from },
             path,
-            name,
             size,
             mtime_ms,
             index,
@@ -405,7 +404,6 @@ fn a_paired_rename_is_one_event_about_one_entry() {
         } => {
             assert_eq!(from, s(&p), "the event names the path the entry had");
             assert_eq!(path, s(&dir.path().join("z.jpg")));
-            assert_eq!(name, "z.jpg");
             assert_eq!(
                 size, 1,
                 "the destination's own stat, not the listing's memory"
@@ -667,7 +665,6 @@ fn a_renamed_directory_stays_canonical() {
 #[cfg_attr(miri, allow(dead_code))]
 fn config() -> EngineConfig {
     EngineConfig {
-        scan_threads: 2,
         show_hidden: Arc::new(AtomicBool::new(false)),
         filter: NameFilter::from_extensions(["jpg"]),
         initial_sort: SortMode::Name,

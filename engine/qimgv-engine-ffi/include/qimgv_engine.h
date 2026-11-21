@@ -180,7 +180,6 @@ const char *qimgv_last_error(void);
 /* `formats_extensions_utf8`: '\n'-joined extension whitelist ("jpg\npng") or
  * NULL to accept everything. Sourced from Settings::supportedFormats(). */
 qimgv_engine *qimgv_engine_new(qimgv_notify_fn notify, void *user,
-                               int scan_threads,
                                const char *formats_extensions_utf8);
 /* Destroys the engine; NULL tolerated. Panics are contained (see qimgv_last_error). */
 void qimgv_engine_free(qimgv_engine *engine);

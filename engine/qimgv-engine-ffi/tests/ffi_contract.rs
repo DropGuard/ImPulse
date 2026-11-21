@@ -84,7 +84,6 @@ fn new_engine(extensions: Option<&str>, notify: bool, flag: &AtomicBool) -> *mut
         qimgv_engine_new(
             if notify { Some(set_flag) } else { None },
             flag as *const AtomicBool as *mut c_void,
-            2,
             exts.as_ref().map_or(std::ptr::null(), |c| c.as_ptr()),
         )
     }
@@ -592,7 +591,7 @@ fn free_waits_for_a_notify_callback_that_is_already_running() {
     let path_c = CString::new(dir.path().to_str().unwrap()).unwrap();
 
     let engine =
-        unsafe { qimgv_engine_new(Some(slow_notify), std::ptr::null_mut(), 1, c"jpg".as_ptr()) };
+        unsafe { qimgv_engine_new(Some(slow_notify), std::ptr::null_mut(), c"jpg".as_ptr()) };
     assert!(!engine.is_null());
     assert_eq!(
         unsafe { qimgv_engine_open_dir(engine, path_c.as_ptr(), 0, std::ptr::null_mut()) },

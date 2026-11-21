@@ -6,7 +6,6 @@ use qimgv_engine::{Command, Engine, EngineConfig, Event, NameFilter, SortMode};
 
 fn config(extensions: &[&str]) -> EngineConfig {
     EngineConfig {
-        scan_threads: 2,
         show_hidden: Arc::new(AtomicBool::new(false)),
         filter: NameFilter::from_extensions(extensions.to_vec()),
         initial_sort: SortMode::Name,

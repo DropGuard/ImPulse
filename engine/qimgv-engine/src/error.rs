@@ -8,8 +8,6 @@ pub enum EngineError {
         #[source]
         source: std::io::Error,
     },
-    #[error("not a directory: {}", .0.display())]
-    NotADirectory(PathBuf),
     #[error("engine command channel closed")]
     EngineGone,
     #[error("unknown sort mode: {0}")]

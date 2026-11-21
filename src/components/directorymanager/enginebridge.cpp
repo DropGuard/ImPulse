@@ -53,7 +53,7 @@ EngineBridge &EngineBridge::instance() {
 
 EngineBridge::EngineBridge(QObject *parent) : QObject(parent) {
     const QByteArray exts = settings ? extensionListFor(settings->supportedFormats()) : QByteArray();
-    m_engine.adopt(qimgv_engine_new(&EngineBridge::notifyCb, this, 2, exts.isEmpty() ? nullptr : exts.constData()));
+    m_engine.adopt(qimgv_engine_new(&EngineBridge::notifyCb, this, exts.isEmpty() ? nullptr : exts.constData()));
     if(!m_engine) {
         const char *err = qimgv_last_error();
         qWarning() << "[EngineBridge] engine init failed:" << (err ? err : "unknown");

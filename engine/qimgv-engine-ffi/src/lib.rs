@@ -199,7 +199,7 @@ pub struct QimgvEngine {
 
 fn map_engine_error(e: &EngineError) -> c_int {
     match e {
-        EngineError::Io { .. } | EngineError::NotADirectory(_) => QIMGV_ERR_IO,
+        EngineError::Io { .. } => QIMGV_ERR_IO,
         EngineError::EngineGone => QIMGV_ERR_ENGINE_GONE,
         EngineError::BadSortMode(_) => QIMGV_ERR_BAD_SORT,
     }
@@ -266,7 +266,6 @@ fn mtime_ms(t: &SystemTime) -> i64 {
 pub unsafe extern "C" fn qimgv_engine_new(
     notify: Option<NotifyCb>,
     user: *mut c_void,
-    scan_threads: c_int,
     formats_extensions_utf8: *const c_char,
 ) -> *mut QimgvEngine {
     let attempt = || -> Result<QimgvEngine, String> {
@@ -288,7 +287,6 @@ pub unsafe extern "C" fn qimgv_engine_new(
         };
         let engine = Engine::spawn(
             EngineConfig {
-                scan_threads: scan_threads.max(1) as usize,
                 show_hidden: Arc::new(AtomicBool::new(false)),
                 filter,
                 initial_sort: SortMode::Name,
@@ -904,7 +902,6 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         revision,
                         kind,
                         path,
-                        name: _,
                         is_dir,
                         size,
                         mtime_ms,

@@ -55,7 +55,7 @@ int main() {
     CHECK(qimgv_engine_version() != nullptr);
     CHECK(std::strlen(qimgv_engine_version()) > 0);
 
-    qimgv_engine *engine = qimgv_engine_new(nullptr, nullptr, 1, "jpg");
+    qimgv_engine *engine = qimgv_engine_new(nullptr, nullptr, "jpg");
     CHECK(engine != nullptr);
     if(!engine)
         return 1;
