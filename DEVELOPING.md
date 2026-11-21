@@ -96,6 +96,30 @@ The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
 carry engine-side indices and watcher-statted data, and C++ only splices. The
 monopoly is enforced by a test, not by convention.
 
+**A sort is a permutation, and says so.** `SetSort` used to emit `DirListed`,
+so a reorder walked the full resync path — vectors rebuilt, every row compared
+for arrival and departure — for a change that only moved rows. `SortChanged`
+is its own event now, and the mirror permutes what it already holds by walking
+the engine's export order (that order is still the engine's decision; this
+side only rearranges). No arrival or departure is emitted, because none
+happened.
+
+`IncludePath` still emits `DirListed`: it can change what the listing
+contains, so it is a listing event in fact.
+
+**The listing carries a revision, so "same instant" is a question with an
+answer.** Every mutation bumps the version in `DirectoryState` — reorder,
+insert, remove, metadata update — and it travels two ways: the export returns
+it with the bytes, read under the same lock, so it names the listing that copy
+came from; and `qimgv_event` carries it, so a mirror applying an event knows
+which version it now holds. `DirectoryManager::appliedRevision()` is the other
+half, and it moves only when an event was APPLIED — every guard that drops one
+returns without touching it, because a dropped event leaves the mirror behind
+the engine and the number is supposed to say so. A reader compares two
+integers instead of two exports, and "not settled yet" is a distinct answer
+from "these disagree". Still open: nothing acts on a mismatch — the revision
+detects a mirror left behind, and no resync consumes the detection yet.
+
 **A rename is one event, end to end.** The engine pairs the kernel's inotify
 cookie, the wire carries both subjects, and the mirror moves a row instead of
 killing one and growing another — so the thumbnail survives, the selection stays
