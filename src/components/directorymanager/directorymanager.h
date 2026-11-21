@@ -136,14 +136,23 @@ class DirectoryManager : public QObject {
     SortingMode m_appliedSort;
     quint64 m_appliedRevision = 0;
 
-    // OWED WORK: how the mirror catches up when position says it is behind.
-    // None of these is a fact about the mirror's contents; each is a step in
-    // flight or a step remembered.
-    QTimer *m_rescanTimer = nullptr;
-    bool m_openInFlight = false; // an accepted open awaits its DirListed/OpenFailed
-    bool m_resyncing = false;    // a listing is being applied right now
-    bool m_wantRescan = false;   // markBehind() ran while m_resyncing held
-    int m_rejectedListings = 0;  // consecutive refusals, for the log level
+    // OWED WORK — one machine, not a pile of flags: the phases an open and
+    // its repairs pass through, in order. Settled means nothing is owed;
+    // Scheduled is the debounced repair timer armed; OpenInFlight is an
+    // accepted open awaiting its DirListed/OpenFailed; Applying is the answer
+    // being consumed. m_repairOwedAfterPass is the one orthogonal bit:
+    // markBehind() ran while Applying held, and the pass's tail owes another
+    // round before Settled.
+    enum class CatchUpPhase {
+        Settled,
+        Scheduled,
+        OpenInFlight,
+        Applying
+    };
+    CatchUpPhase m_catchUp = CatchUpPhase::Settled;
+    bool m_repairOwedAfterPass = false;
+    QTimer *m_rescanTimer = nullptr; // the mechanism behind Scheduled, not state
+    int m_rejectedListings = 0;      // consecutive refusals, for the log level
     struct PendingListed {
         qint64 token;
         QString dir;

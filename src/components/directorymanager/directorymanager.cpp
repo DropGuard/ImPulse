@@ -39,7 +39,7 @@ void DirectoryManager::readSettings() {
 bool DirectoryManager::setDirectory(const QString &dirPath) {
     if(dirPath.isEmpty()) {
         m_engineDir.clear();
-        m_openInFlight = false;
+        m_catchUp = CatchUpPhase::Settled;
         if(m_rescanTimer)
             m_rescanTimer->stop();
         m_bridge.stopWatch();
@@ -60,7 +60,7 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     m_engineDir = dirPath;
     // an open was accepted: something this instance asked for is now in
     // flight, and isSettled owes the caller a false until its answer arrives
-    m_openInFlight = true;
+    m_catchUp = CatchUpPhase::OpenInFlight;
     // NOT m_appliedSort: the sort is not applied yet — the listing that will
     // carry it has not arrived. Assigning it here made isSettled() true the
     // instant a directory was reopened while its rows were still the previous
@@ -290,9 +290,9 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revis
     // Every mismatch below means the rows this event would permute are not
     // the rows the mirror holds, or the version it names is not the engine's.
     // The repair is a rescan, armed HERE: this event may be the last one a
-    // quiet directory ever produces, and m_wantRescan is consumed only by the
+    // quiet directory ever produces, and m_repairOwedAfterPass is consumed only by the
     // next DirListed — waiting for one would leave the mirror unsettled
-    // forever. (m_wantRescan stays the tool for flags raised while m_resyncing
+    // forever. (m_repairOwedAfterPass stays the tool for flags raised while Applying
     // holds; there the direct schedule is dropped by its own guard.)
     //
     // The event's revision is the one to apply; the export's is used only to
@@ -396,7 +396,7 @@ bool DirectoryManager::isSettled() const {
     //     scheduled)? These say nothing about where the mirror is; they say
     //     the mirror is not done moving.
     const bool positionMatches = m_mirroredDir == m_engineDir && m_appliedSort == m_sortingMode;
-    const bool workOwed = m_openInFlight || m_resyncing || m_wantRescan || (m_rescanTimer && m_rescanTimer->isActive());
+    const bool workOwed = m_catchUp != CatchUpPhase::Settled;
     return positionMatches && !workOwed;
 }
 
@@ -462,27 +462,27 @@ std::filesystem::file_time_type DirectoryManager::fileTimeFromMs(qint64 ms) {
 // agreement anymore, so there is nothing to bound. What remains is the agreement
 // mark a landed listing makes.
 void DirectoryManager::markListingInSync() {
-    m_wantRescan = false;
+    m_repairOwedAfterPass = false;
 }
 
 // The one way to say "the mirror is behind the engine". Called from every
 // branch that discovers a disagreement — the nine sites that used to choose
-// between scheduleRescan() and setting m_wantRescan themselves. The choice is
+// between scheduling and deferring themselves. The choice is
 // not theirs to make: a rescan already in flight was exported before this
 // disagreement existed, so the retry has to wait for it, and that is a fact
 // about the state machine rather than about the branch that noticed.
 void DirectoryManager::markBehind() {
-    if(m_resyncing) {
+    if(m_catchUp == CatchUpPhase::Applying) {
         // consumed by the DirListed tail of the rescan in progress; scheduling
         // here would be dropped by scheduleRescan's own guard
-        m_wantRescan = true;
+        m_repairOwedAfterPass = true;
         return;
     }
     scheduleRescan();
 }
 
 void DirectoryManager::scheduleRescan() {
-    if(m_resyncing)
+    if(m_catchUp == CatchUpPhase::Applying)
         return;
     if(m_directoryPath.isEmpty())
         return;
@@ -491,31 +491,35 @@ void DirectoryManager::scheduleRescan() {
         m_rescanTimer->setSingleShot(true);
         m_rescanTimer->setInterval(150);
         connect(m_rescanTimer, &QTimer::timeout, this, [this]() {
-            if(!m_resyncing && !m_directoryPath.isEmpty()) {
+            if(m_catchUp != CatchUpPhase::Applying && !m_directoryPath.isEmpty()) {
                 // the repair's own open is work in flight, exactly like a
-                // navigation open: same flag, same answer
-                m_openInFlight = true;
+                // navigation open: same phase, same answer
+                m_catchUp = CatchUpPhase::OpenInFlight;
                 m_bridge.openDir(m_directoryPath, engineSortMode(m_sortingMode), m_showHiddenFiles);
             }
         });
     }
     m_rescanTimer->start();
+    // armed IS the Scheduled phase: in the flag pile this state lived in the
+    // timer's isActive(), and forgetting to name it here made isSettled flip
+    // back to true the instant the caller returned
+    m_catchUp = CatchUpPhase::Scheduled;
 }
 
 void DirectoryManager::onEngineDirListed(const QString &dirPath) {
-    if(m_resyncing || dirPath != m_engineDir)
+    if(m_catchUp == CatchUpPhase::Applying || dirPath != m_engineDir)
         return;
     if(m_directoryPath != dirPath)
         return;
     // this listing is the answer to the open in flight; the mirror terms
     // below keep isSettled honest about the rest
-    m_openInFlight = false;
-    m_resyncing = true;
+    m_catchUp = CatchUpPhase::Applying;
     const bool applied = mirrorEngineListing(dirPath);
-    m_resyncing = false;
-    if(m_wantRescan) {
-        m_wantRescan = false;
-        scheduleRescan();
+    if(m_repairOwedAfterPass) {
+        m_repairOwedAfterPass = false;
+        scheduleRescan(); // the tail owes another round; phase -> Scheduled
+    } else {
+        m_catchUp = CatchUpPhase::Settled;
     }
     if(!applied) {
         // A rejected arena is not a listing: the actions armed for it must keep
@@ -526,8 +530,9 @@ void DirectoryManager::onEngineDirListed(const QString &dirPath) {
         // arena's header disagrees with its own bytes or it does not consume
         // exactly. Nothing here can heal that, so the counter does not bound
         // anything — it decides whether the repeated failure is a warning or a
-        // critical. What actually stops a spin is applyArena's own m_wantRescan,
-        // consumed by the branch above, plus scheduleRescan's m_resyncing guard;
+        // critical. What actually stops a spin is applyArena's own
+        // m_repairOwedAfterPass,
+        // consumed by the branch above, plus scheduleRescan's Applying guard;
         // both keep one retry in flight at a time rather than ending the loop.
         // Ending it deliberately is the caller's call, and no caller does.
         if(++m_rejectedListings <= 3)
@@ -661,12 +666,12 @@ void DirectoryManager::applyEngineRename(const QString &from, const QString &to,
 void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs,
                                        int index, const QString &oldPath, quint64 revision) {
     const bool tracing = EngineBridge::traceEnabled();
-    if(m_resyncing) {
+    if(m_catchUp == CatchUpPhase::Applying) {
         // the listing being applied was exported before this event existed,
         // and whether that export already contains it is not decidable here.
         // The flag defers the question: it is consumed when the resync's own
         // onEngineDirListed tail runs — the direct schedule would be dropped
-        // by its own guard while m_resyncing is held.
+        // by its own guard while Applying is held.
         if(tracing)
             qDebug() << "[mirror trace] drop (resync in progress)" << path;
         markBehind();
@@ -772,7 +777,7 @@ void DirectoryManager::onEngineOpenFailed(const QString &dirPath, int code) {
     qWarning() << "[DirectoryManager] engine open failed:" << dirPath << "code" << code;
     // the open in flight got its answer, and the answer is "no": nothing else
     // will arrive for it, so isSettled's debt is paid
-    m_openInFlight = false;
+    m_catchUp = CatchUpPhase::Settled;
     // an open that failed will never produce the listing its actions wait for
     m_pendingOnListed.erase(std::remove_if(m_pendingOnListed.begin(), m_pendingOnListed.end(),
                                            [&](const PendingListed &p) {
