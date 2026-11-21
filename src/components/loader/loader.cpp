@@ -8,32 +8,32 @@ Loader::Loader(WorkerPool &_pool) : m_pool(_pool) {
 Loader::~Loader() {
     // submitted jobs are the pool's to destroy: the unstarted ones come back
     // from drain() and die here, running ones the pool destroys on the worker
-    // thread when run() returns. The task table is bookkeeping — an entry for
-    // a finished-but-undelivered job points at memory the pool already freed.
+    // thread when run() returns
     m_pool.drain(PoolOwner::Loader); // the queued jobs die with the returned vector
     m_pool.cancel(PoolOwner::Loader);
     m_pool.waitForOwner(PoolOwner::Loader);
-    m_tasks.clear();
 }
 
 void Loader::clearTasks() {
     clearPool();
     // A decode that already started cannot be taken back, but it can still be
     // told to stop at its entry checkpoint — and a job that stops there reports
-    // nothing, so the entries it was tracked by are dropped here instead of by
-    // the onLoadFinished that will not arrive. The wait is what makes this safe:
-    // after it, no Loader job is left that could still be holding an entry.
+    // nothing. The wait is what makes this safe: after it, no Loader job is
+    // left that could still be in flight.
     m_pool.cancel(PoolOwner::Loader);
     m_pool.waitForOwner(PoolOwner::Loader);
-    m_tasks.clear();
 }
 
 bool Loader::isBusy() const {
-    return (m_tasks.count() != 0);
+    return m_pool.hasQueuedOrRunning<LoaderRunnable>(PoolOwner::Loader, [](const LoaderRunnable &) {
+        return true;
+    });
 }
 
-bool Loader::isLoading(const QString &path) {
-    return m_tasks.contains(path);
+bool Loader::isLoading(const QString &path) const {
+    return m_pool.hasQueuedOrRunning<LoaderRunnable>(PoolOwner::Loader, [&path](const LoaderRunnable &job) {
+        return job.loadPath() == path;
+    });
 }
 
 std::optional<std::shared_ptr<Image>> Loader::load(const QString &path, const LoadPolicy &policy) {
@@ -61,7 +61,6 @@ void Loader::loadWindow(const QString &target, const QSet<QString> &window, cons
     std::vector<std::unique_ptr<LoaderRunnable>> kept;
     for(auto &job : dropped) {
         auto *runnable = static_cast<LoaderRunnable *>(job.get());
-        m_tasks.remove(runnable->loadPath());
         if(runnable->loadPath() == target)
             promote.reset(static_cast<LoaderRunnable *>(job.release()));
         else if(window.contains(runnable->loadPath()))
@@ -79,16 +78,14 @@ void Loader::loadWindow(const QString &target, const QSet<QString> &window, cons
 }
 
 void Loader::resubmit(std::unique_ptr<LoaderRunnable> job, int priority) {
-    const QString path = job->loadPath();
-    if(m_tasks.contains(path))
+    if(isLoading(job->loadPath()))
         return;
-    m_tasks.insert(path, job.get());
     connect(job.get(), &LoaderRunnable::finished, this, &Loader::onLoadFinished, Qt::UniqueConnection);
     m_pool.submit(PoolOwner::Loader, priority, std::move(job));
 }
 
 void Loader::doLoadAsync(const QString &path, int priority, bool scaled, const LoadPolicy &policy) {
-    if(m_tasks.contains(path)) {
+    if(isLoading(path)) {
         return;
     }
 
@@ -97,9 +94,6 @@ void Loader::doLoadAsync(const QString &path, int priority, bool scaled, const L
 }
 
 void Loader::onLoadFinished(std::optional<std::shared_ptr<Image>> image, const QString &path, bool scaled) {
-    // the pool destroyed the job on its worker thread once run() returned;
-    // dropping the entry is bookkeeping, not ownership
-    m_tasks.take(path);
     // this is where absence stops travelling: loadFinished() only ever fires
     // with an image, and the caller that cannot show one gets loadFailed()
     if(!image)
@@ -112,8 +106,5 @@ void Loader::clearPool() {
     // drain() is tryTake() for the whole owner: everything still queued comes
     // back and dies with the vector; a job already inside run() stays out
     // there and reports through the queued onLoadFinished like any other
-    auto dropped = m_pool.drain(PoolOwner::Loader);
-    // every job this pool ever received from Loader is a LoaderRunnable
-    for(auto &job : dropped)
-        m_tasks.remove(static_cast<LoaderRunnable *>(job.get())->loadPath());
+    m_pool.drain(PoolOwner::Loader);
 }

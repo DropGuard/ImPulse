@@ -27,23 +27,22 @@ class Loader : public QObject {
     // re-submitted as they were (tier included), and everything else queued
     // dies — a queued job has not started, so dropping it costs nothing that
     // was decoded. Jobs already inside run() are not drained and keep their
-    // entries: a decode has no seam past its entry checkpoint, and the one
-    // running for `target` is the wanted tier anyway.
+    // place in the pool's records: a decode has no seam past its entry
+    // checkpoint, and the one running for `target` is the wanted tier anyway.
     void loadWindow(const QString &target, const QSet<QString> &window, const LoadPolicy &policy);
 
     void clearTasks();
     bool isBusy() const;
-    bool isLoading(const QString &path);
+    bool isLoading(const QString &path) const;
 
   private:
-    // bookkeeping only: submitted jobs belong to the pool, which destroys them
-    // on the worker thread once run() returns
-    QHash<QString, LoaderRunnable *> m_tasks;
     WorkerPool &m_pool;
     void clearPool();
-    // the one submission seam: dedup by task entry, connect, submit. Both the
-    // fresh path (a new job) and the window path (a drained job kept alive)
-    // go through it, so the two cannot grow different bookkeeping.
+    // the one submission seam: dedup against the pool's own records (queued
+    // and running — the pool tracks what a side index could only chase),
+    // connect, submit. Both the fresh path (a new job) and the window path (a
+    // drained job kept alive) go through it, so the two cannot grow different
+    // bookkeeping.
     void resubmit(std::unique_ptr<LoaderRunnable> job, int priority);
     void doLoadAsync(const QString &path, int priority, bool scaled, const LoadPolicy &policy);
 
