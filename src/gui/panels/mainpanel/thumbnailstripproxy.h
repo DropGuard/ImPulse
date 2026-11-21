@@ -38,11 +38,11 @@ class ThumbnailStripProxy : public QWidget, public IDirectoryView {
     void showEvent(QShowEvent *event) override;
 
   signals:
-    void itemActivated(int) override;
-    void thumbnailsRequested(QList<int>, int, bool, bool) override;
-    void draggedOut() override;
-    void droppedInto(const QMimeData *, QObject *, int) override;
-    void draggedOver(int) override;
+    void itemActivated(int);
+    void thumbnailsRequested(QList<int>, int, bool, bool);
+    void draggedOut();
+    void droppedInto(const QMimeData *, QObject *, int);
+    void draggedOver(int);
 
   private:
     ThumbnailStrip *m_thumbnailStrip = nullptr;

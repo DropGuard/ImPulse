@@ -51,10 +51,12 @@ void DirectoryPresenter::populateView() {
 void DirectoryPresenter::disconnectView() {
     if(!m_view)
         return;
-    // the pairs come from setView's own list, so this cannot drift from it
-    if(m_viewTeardown)
-        m_viewTeardown();
-    m_viewTeardown = nullptr;
+    // the QPointer is the liveness test: a destroyed widget has already had
+    // Qt drop its connections, and a null sender passed to disconnect()
+    // would mean "every sender to this receiver" — the model wiring included
+    // — so the severing happens only while the widget is alive.
+    if(m_viewSender)
+        QObject::disconnect(m_viewSender, nullptr, this, nullptr);
     m_viewSender = nullptr;
     m_view = nullptr;
 }

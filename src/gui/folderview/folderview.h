@@ -68,16 +68,16 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     void onZoomSliderValueChanged(int value);
 
   signals:
-    void itemActivated(int) override;
-    void thumbnailsRequested(QList<int>, int, bool, bool) override;
-    void draggedOut() override;
+    void itemActivated(int);
+    void thumbnailsRequested(QList<int>, int, bool, bool);
+    void draggedOut();
     void sortingSelected(SortingMode);
     void directorySelected(QString path);
     void showFoldersChanged(bool mode);
     void copyUrlsRequested(QList<QString>, QString path);
     void moveUrlsRequested(QList<QString>, QString path);
-    void droppedInto(const QMimeData *, QObject *, int) override;
-    void draggedOver(int) override;
+    void droppedInto(const QMimeData *, QObject *, int);
+    void draggedOver(int);
 
   private slots:
     void onSortingSelected(int);

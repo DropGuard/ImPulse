@@ -39,22 +39,9 @@ class DirectoryPresenter : public QObject {
         connect(newView, &View::draggedOut, this, &DirectoryPresenter::onDraggedOut);
         connect(newView, &View::draggedOver, this, &DirectoryPresenter::onDraggedOver);
         connect(newView, &View::droppedInto, this, &DirectoryPresenter::onDroppedInto);
-
-        // The teardown names the same five member pointers the connects above
-        // used, so there is no second list of signatures that can drift out of
-        // agreement with the first. The QPointer test keeps a dead view from
-        // being handed to disconnect() at all: Qt has already dropped the
-        // connections by then, so this is the contract made explicit rather
-        // than a crash observed (ASan flagged nothing without it).
-        m_viewTeardown = [this, newView]() {
-            if(!m_viewSender)
-                return;
-            disconnect(newView, &View::itemActivated, this, &DirectoryPresenter::onItemActivated);
-            disconnect(newView, &View::thumbnailsRequested, this, &DirectoryPresenter::generateThumbnails);
-            disconnect(newView, &View::draggedOut, this, &DirectoryPresenter::onDraggedOut);
-            disconnect(newView, &View::draggedOver, this, &DirectoryPresenter::onDraggedOver);
-            disconnect(newView, &View::droppedInto, this, &DirectoryPresenter::onDroppedInto);
-        };
+        // these five connects are the only view -> presenter wiring there is,
+        // so disconnectView can sever them all by sender+receiver without a
+        // second list of signatures to keep in agreement
     }
     void setModel(std::shared_ptr<DirectoryModel> newModel);
     void unsetModel();
@@ -99,10 +86,9 @@ class DirectoryPresenter : public QObject {
   private:
     // observes; the Qt parent tree owns the view widget
     IDirectoryView *m_view = nullptr;
-    // the same widget, seen as the QObject it also is: the teardown needs to
+    // the same widget, seen as the QObject it also is: the disconnect needs to
     // ask whether it is still there, and QPointer answers that truthfully
     QPointer<QObject> m_viewSender;
-    std::function<void()> m_viewTeardown;
     std::shared_ptr<DirectoryModel> m_model = nullptr;
     // shared with every other presenter, owned by Core (architecture rule R9):
     // one executor per engine event. Two presenters each holding their own
