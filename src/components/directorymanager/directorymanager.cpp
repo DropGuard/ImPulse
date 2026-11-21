@@ -39,6 +39,7 @@ void DirectoryManager::readSettings() {
 bool DirectoryManager::setDirectory(const QString &dirPath) {
     if(dirPath.isEmpty()) {
         m_engineDir.clear();
+        m_openInFlight = false;
         if(m_rescanTimer)
             m_rescanTimer->stop();
         m_bridge.stopWatch();
@@ -57,6 +58,9 @@ bool DirectoryManager::setDirectory(const QString &dirPath) {
     }
     m_directoryPath = dirPath;
     m_engineDir = dirPath;
+    // an open was accepted: something this instance asked for is now in
+    // flight, and isSettled owes the caller a false until its answer arrives
+    m_openInFlight = true;
     // NOT m_appliedSort: the sort is not applied yet — the listing that will
     // carry it has not arrived. Assigning it here made isSettled() true the
     // instant a directory was reopened while its rows were still the previous
@@ -392,7 +396,7 @@ bool DirectoryManager::isSettled() const {
     //     scheduled)? These say nothing about where the mirror is; they say
     //     the mirror is not done moving.
     const bool positionMatches = m_mirroredDir == m_engineDir && m_appliedSort == m_sortingMode;
-    const bool workOwed = m_resyncing || m_wantRescan || (m_rescanTimer && m_rescanTimer->isActive());
+    const bool workOwed = m_openInFlight || m_resyncing || m_wantRescan || (m_rescanTimer && m_rescanTimer->isActive());
     return positionMatches && !workOwed;
 }
 
@@ -487,8 +491,12 @@ void DirectoryManager::scheduleRescan() {
         m_rescanTimer->setSingleShot(true);
         m_rescanTimer->setInterval(150);
         connect(m_rescanTimer, &QTimer::timeout, this, [this]() {
-            if(!m_resyncing && !m_directoryPath.isEmpty())
+            if(!m_resyncing && !m_directoryPath.isEmpty()) {
+                // the repair's own open is work in flight, exactly like a
+                // navigation open: same flag, same answer
+                m_openInFlight = true;
                 m_bridge.openDir(m_directoryPath, engineSortMode(m_sortingMode), m_showHiddenFiles);
+            }
         });
     }
     m_rescanTimer->start();
@@ -499,6 +507,9 @@ void DirectoryManager::onEngineDirListed(const QString &dirPath) {
         return;
     if(m_directoryPath != dirPath)
         return;
+    // this listing is the answer to the open in flight; the mirror terms
+    // below keep isSettled honest about the rest
+    m_openInFlight = false;
     m_resyncing = true;
     const bool applied = mirrorEngineListing(dirPath);
     m_resyncing = false;
@@ -759,6 +770,9 @@ void DirectoryManager::onEngineOpenFailed(const QString &dirPath, int code) {
     if(dirPath != m_engineDir)
         return;
     qWarning() << "[DirectoryManager] engine open failed:" << dirPath << "code" << code;
+    // the open in flight got its answer, and the answer is "no": nothing else
+    // will arrive for it, so isSettled's debt is paid
+    m_openInFlight = false;
     // an open that failed will never produce the listing its actions wait for
     m_pendingOnListed.erase(std::remove_if(m_pendingOnListed.begin(), m_pendingOnListed.end(),
                                            [&](const PendingListed &p) {

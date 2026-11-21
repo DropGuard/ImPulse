@@ -334,6 +334,24 @@ TEST_F(TestListing, whenListedIsSupersededByANewerOpen) {
     EXPECT_TRUE(!staleFired);
 }
 
+TEST_F(TestListing, aReopenOfTheSameDirectoryIsNotSettledUntilItsListingLands) {
+    // The contract isSettled() documents: true when nothing ASKED for is still
+    // in flight. A same-directory reopen asks for an open, and for a while the
+    // predicate answered true anyway — every POSITION term already held on the
+    // old listing, and nothing tracked the open. The flag that tracks it is
+    // set synchronously by setDirectory, so the false is deterministic no
+    // matter how fast the engine answers; it flips back once the reopen's own
+    // listing is applied.
+    resetFixture();
+    DirectoryManager dm{EngineBridge::instance()};
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+
+    EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
+    EXPECT_FALSE(dm.isSettled());
+    ASSERT_TRY_TRUE_TIMEOUT(dm.isSettled(), 10000);
+}
+
 TEST_F(TestListing, whenListedSurvivesAReopenOfTheSameDirectory) {
     // The arm-then-open ordering is the natural way to write it: the action is
     // armed, then the directory opened. The unconditional wipe made that a

@@ -140,9 +140,10 @@ class DirectoryManager : public QObject {
     // None of these is a fact about the mirror's contents; each is a step in
     // flight or a step remembered.
     QTimer *m_rescanTimer = nullptr;
-    bool m_resyncing = false;   // a listing is being applied right now
-    bool m_wantRescan = false;  // markBehind() ran while m_resyncing held
-    int m_rejectedListings = 0; // consecutive refusals, for the log level
+    bool m_openInFlight = false; // an accepted open awaits its DirListed/OpenFailed
+    bool m_resyncing = false;    // a listing is being applied right now
+    bool m_wantRescan = false;   // markBehind() ran while m_resyncing held
+    int m_rejectedListings = 0;  // consecutive refusals, for the log level
     struct PendingListed {
         qint64 token;
         QString dir;
