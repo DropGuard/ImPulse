@@ -268,13 +268,16 @@ bool DirectoryManager::containsDir(const QString &dirPath) const {
 // The order itself is not re-derived on this side — that is the one-writer
 // law. The engine's export is the order, so it is read and walked, and each
 // row is taken from the mirror's own map by path.
-void DirectoryManager::onEngineSortChanged(const QString &dirPath) {
+void DirectoryManager::onEngineSortChanged(const QString &dirPath, quint64 revision) {
     if(dirPath != m_engineDir || dirPath != m_mirroredDir)
         return;
 
+    // The event's revision is the one to apply; the export's is used only to
+    // confirm the rows this permutes are still the engine's, below.
     QByteArray listing;
     quint32 fileCount = 0, dirCount = 0;
-    if(!m_bridge.exportListing(listing, fileCount, dirCount)) {
+    quint64 exportRevision = 0;
+    if(!m_bridge.exportListing(listing, fileCount, dirCount, exportRevision)) {
         // the engine has no listing to hand over: make the next openDir the
         // authority rather than guessing an order here
         m_wantRescan = true;
@@ -282,6 +285,13 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath) {
     }
     std::vector<EngineBridge::EngineEntry> files, dirs;
     if(!EngineBridge::parseListing(listing, files, dirs)) {
+        m_wantRescan = true;
+        return;
+    }
+    if(exportRevision != revision) {
+        // a mutation landed after the sort did: the order just read is newer
+        // than the one this event announced, so permuting to it would claim a
+        // version the event does not own. The rescan path can say so.
         m_wantRescan = true;
         return;
     }
@@ -322,6 +332,7 @@ void DirectoryManager::onEngineSortChanged(const QString &dirPath) {
     m_fileEntryVec = std::move(reorderedFiles);
     m_dirEntryVec = std::move(reorderedDirs);
     m_appliedSort = m_sortingMode;
+    m_appliedRevision = revision;
     emit sortingChanged();
 }
 
@@ -577,7 +588,7 @@ void DirectoryManager::applyEngineRename(const QString &from, const QString &to,
 }
 
 void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs,
-                                       int index, const QString &oldPath) {
+                                       int index, const QString &oldPath, quint64 revision) {
     const bool tracing = EngineBridge::traceEnabled();
     if(m_resyncing) {
         if(tracing)
@@ -637,6 +648,11 @@ void DirectoryManager::onEngineMutated(int kind, const QString &path, bool isDir
         break;
     default: break;
     }
+    // Reached only when the mutation was applied: every guard above returns
+    // without moving this, because a dropped event leaves the mirror behind the
+    // engine and the revision is supposed to say so. That is what makes it a
+    // usable answer to "are these rows current".
+    m_appliedRevision = revision;
     if(tracing) {
         // the counts, not just the kind: the failure this trace exists to name is
         // a mutation that lands and still leaves the mirror one entry short
@@ -678,9 +694,15 @@ bool DirectoryManager::mirrorEngineListing(const QString &dirPath) {
     // bulk pull: the whole listing crosses in one engine lock pass
     QByteArray listing;
     quint32 newFileCount = 0, newDirCount = 0;
-    if(!m_bridge.exportListing(listing, newFileCount, newDirCount))
+    quint64 revision = 0;
+    if(!m_bridge.exportListing(listing, newFileCount, newDirCount, revision))
         return false;
-    return applyArena(dirPath, listing, newFileCount, newDirCount);
+    if(!applyArena(dirPath, listing, newFileCount, newDirCount))
+        return false;
+    // the version this mirror now reflects: the one the bytes came with, not
+    // one sampled afterwards (which could name a listing it never applied)
+    m_appliedRevision = revision;
+    return true;
 }
 
 bool DirectoryManager::applyArena(const QString &dirPath, const QByteArray &listing, quint32 newFileCount,

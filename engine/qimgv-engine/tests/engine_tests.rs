@@ -161,7 +161,7 @@ fn rapid_open_dir_keeps_only_latest() {
     // one-entry directory usually does. What is pinned: the current session's
     // event names dir_b, and a stale one can only name dir_a.
     while let Some(ev) = engine.try_event() {
-        if let Event::DirListed { dir, epoch } = ev {
+        if let Event::DirListed { dir, epoch, .. } = ev {
             if epoch == engine.epoch() {
                 assert_eq!(dir, dir_b.path());
             } else {

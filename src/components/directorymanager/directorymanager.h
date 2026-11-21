@@ -76,6 +76,12 @@ class DirectoryManager : public QObject {
     // an assertion about content (sortingMode() could: it reports the requested
     // mode, which setSortingMode writes before it returns).
     bool isSettled() const;
+    // The engine listing version these rows reflect. A reader comparing them
+    // against an export needs the export's revision to match this one; equal
+    // means the rows are that export's rows.
+    quint64 appliedRevision() const {
+        return m_appliedRevision;
+    }
     // The half of mirroring that applies a listing, split out so a test can hand
     // the mirror one the engine does not currently hold. Nothing in production
     // calls it directly: mirrorEngineListing pulls the arena and forwards. This
@@ -120,6 +126,7 @@ class DirectoryManager : public QObject {
     SortingMode m_appliedSort;
     QTimer *m_rescanTimer = nullptr;
     bool m_resyncing = false;
+    quint64 m_appliedRevision = 0;
     // requested from inside the mirror and consumed after m_resyncing clears: a
     // scheduleRescan() call made during mirroring is dropped by its own guard,
     // which is how the engine-behind rescan never used to happen.
@@ -174,10 +181,10 @@ class DirectoryManager : public QObject {
 
   private slots:
     void onEngineDirListed(const QString &dirPath);
-    void onEngineSortChanged(const QString &dirPath);
+    void onEngineSortChanged(const QString &dirPath, quint64 revision);
     void onEngineOpenFailed(const QString &dirPath, int code);
     void onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
-                         const QString &oldPath);
+                         const QString &oldPath, quint64 revision);
 
   signals:
     // The mutation vocabulary of the engine is Added | Modified | Removed |
