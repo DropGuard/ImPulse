@@ -157,13 +157,7 @@ baselines). What remains here is the part needing judgment.
    x86_64-pc-windows-gnu` + `cargo check --target ...` for the Rust half
    (it compiles here, so run it, and the port's CI job for the C++ half) —
    and when a fixture leans on a platform fact, make the fact explicit in
-   DEVELOPING.md and pin it on both sides. For the C++ half there is no local
-   substitute: `clang++ -D_WIN32 -fms-extensions -fsyntax-only` does parse the
-   `#ifdef` bodies, but it also flips Qt's own platform headers, so 155 of 175
-   TUs die on missing Windows declarations before reaching ours — and the ones
-   that survive are the ones with no platform code. Tried; it does not work.
-   The m_ sweep left six stale member names in Windows-only branches, and the
-   Windows compiler found every one of them.
+   DEVELOPING.md and pin it on both sides.
 5. **State locks never span waits.** Guards live to block end, not semicolon;
    sleeping under a read lock starves the engine writer (std RwLock has no
    writer preference). Reference pattern: `wait_for` in the same file.
