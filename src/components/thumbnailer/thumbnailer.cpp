@@ -67,10 +67,6 @@ Thumbnailer::~Thumbnailer() {
     delete m_cache;
 }
 
-void Thumbnailer::waitForDone() {
-    m_pool.waitForOwner(PoolOwner::Thumbnailer);
-}
-
 void Thumbnailer::clearTasks() {
     // Invalidate the batch: queued jobs are drained (destroyed without ever
     // running) and running ones are marked — those past their pop decode to

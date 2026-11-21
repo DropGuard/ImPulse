@@ -16,7 +16,6 @@ class Thumbnailer : public QObject {
     explicit Thumbnailer(WorkerPool &_pool);
     ~Thumbnailer() override;
     void clearTasks();
-    void waitForDone();
 
   public slots:
     void getThumbnailAsync(const QString &path, int size, bool crop, bool force);

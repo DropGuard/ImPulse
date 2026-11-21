@@ -177,7 +177,7 @@ TEST_F(TestThumbnailer, theStoreSweepRunsOnAWorkerNotOnTheCallingThread) {
 
     std::atomic<Qt::HANDLE> ranOn{nullptr};
     thumb.scheduleSweep(15, ThumbnailCache::cacheMaxBytes, &ranOn);
-    // waitForOwner, not waitForDone: the latter is Thumbnailer's own owner
+    // the Maintenance owner, not the Thumbnailer owner the other tests wait on
     pool.waitForOwner(PoolOwner::Maintenance);
 
     EXPECT_TRUE(ranOn.load() != nullptr) << "the sweep never ran";
@@ -256,7 +256,7 @@ TEST_F(TestThumbnailer, thumbnailerAccountingSurvivesAClearMidFlight) {
     // so assert a lower bound, not an exact count)
     thumb.getThumbnailAsync(m_fixtureDir + "/img1.jpg", 64, false, false);
     ASSERT_TRY_TRUE_TIMEOUT(ready.count() >= 3, 10000);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
 }
 
 // The presenter-level shape of the shared instance, pinned at the unit the
@@ -311,7 +311,7 @@ TEST_F(TestThumbnailer, aJobMarkedBeforeItStartsForgetsItsRequest) {
     // view, not even an empty one
     gate.store(true);
     pool.waitForOwner(PoolOwner::Maintenance);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
     coretest::drainEvents();
     EXPECT_EQ(arrived.size(), 0);
 
@@ -319,7 +319,7 @@ TEST_F(TestThumbnailer, aJobMarkedBeforeItStartsForgetsItsRequest) {
     // later request for this file for the life of the process
     thumb.getThumbnailAsync(path, 128, false, false);
     ASSERT_TRY_EQ_TIMEOUT(arrived.size(), 1, 15000);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
 }
 
 TEST_F(TestThumbnailer, aClearedBatchIsRecoveredByTheNextWave) {
@@ -346,7 +346,7 @@ TEST_F(TestThumbnailer, aClearedBatchIsRecoveredByTheNextWave) {
     for(const QString &path : batch)
         thumb.getThumbnailAsync(path, 32, false, false);
     ASSERT_TRY_EQ_TIMEOUT(ready.count(), batch.count(), 10000);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
 }
 
 // The strand the counted set exists to prevent, injected deterministically:
@@ -400,7 +400,7 @@ TEST_F(TestThumbnailer, aStaleReportCannotFreeTheNextWavesSlot) {
     // run A1 (it returns silently at its entry checkpoint — no report, the
     // pool's record is the only accounting) and let the worker reach gate2.
     gate1.store(true);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
     EXPECT_EQ(ThumbnailerRunnable::constructionCount().load() - before, 1); // only A1
     ASSERT_TRY_EQ_TIMEOUT(holds2.load(), 1, 10000);
 
@@ -416,7 +416,7 @@ TEST_F(TestThumbnailer, aStaleReportCannotFreeTheNextWavesSlot) {
     EXPECT_EQ(ThumbnailerRunnable::constructionCount().load() - before, 2);
 
     gate2.store(true);
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
 }
 
 TEST_F(TestThumbnailer, aMarkedRunningJobDoesNotSwallowTheReRequest) {
@@ -448,5 +448,5 @@ TEST_F(TestThumbnailer, aMarkedRunningJobDoesNotSwallowTheReRequest) {
     // pool's record, so nothing here can be stranded by that collapse.
     ASSERT_TRY_EQ_TIMEOUT(delivered, 1, 15000);
     gate.store(true); // release the gate worker so the pool can be joined
-    thumb.waitForDone();
+    pool.waitForOwner(PoolOwner::Thumbnailer);
 }
