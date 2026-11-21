@@ -392,12 +392,18 @@ impl Engine {
                                     continue;
                                 }
                                 let req_epoch = listing.as_ref().map(|r| r.epoch).unwrap_or(0);
+                                // the event's stats are taken BEFORE the write
+                                // lock: state locks never span waits (rule 5),
+                                // and a slow mount's fs::metadata would stall a
+                                // UI-side export for the length of the stat
+                                let stats = watcher::Prestat::of_event(&raw);
                                 let action = {
                                     let mut st = state_write(&state);
                                     let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
                                     catch_unwind(AssertUnwindSafe(|| {
-                                        watcher::apply_event(&mut st, &filter, &mut ov,
-                                                             show_hidden.load(Ordering::Relaxed), &raw)
+                                        watcher::apply_event_with_stats(&mut st, &filter, &mut ov,
+                                                                        show_hidden.load(Ordering::Relaxed),
+                                                                        &raw, &stats)
                                     }))
                                     .unwrap_or_else(|payload| {
                                         // The guard exists so one bad event cannot

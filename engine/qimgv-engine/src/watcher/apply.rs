@@ -1,14 +1,50 @@
 //! Event semantics: parse one inotify record's mask, then apply the parsed
 //! event to the listing state. Nothing here touches libc, channels or threads —
-//! the only I/O is `fs::metadata` on the subject path, which is exactly the
-//! behavior the property tests pin. This file is the surface Miri can run.
+//! the only I/O is `fs::metadata` on the subject path, taken from a
+//! [`Prestat`] the caller supplies (the engine takes it before the state's
+//! write lock; standalone callers stat inline). This file is the surface Miri
+//! can run.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::filter::NameFilter;
 use crate::model::DirectoryState;
+
+/// The filesystem facts one event's application will need, taken before the
+/// state's write lock. The engine pre-statss the event's subject path — for a
+/// rename that IS the destination, the pairing resolved the name — so no
+/// filesystem I/O runs under the lock, and a UI-side export never waits on a
+/// stat. A path the prestat did not predict is statted live at the point of
+/// use, keeping the application total over any event.
+#[derive(Debug, Default)]
+pub struct Prestat {
+    entries: HashMap<PathBuf, std::io::Result<fs::Metadata>>,
+}
+
+impl Prestat {
+    pub fn of_event(ev: &RawWatchEvent) -> Self {
+        let mut entries = HashMap::new();
+        if let Some(name) = &ev.name {
+            let p = PathBuf::from(subject_path(&ev.dir, name));
+            entries.insert(p.clone(), fs::metadata(&p));
+        }
+        Prestat { entries }
+    }
+
+    /// The stat for `path`: the pre-taken one when the plan predicted it, a
+    /// live one otherwise. An Err means the path is gone.
+    pub fn stat(&self, path: impl AsRef<Path>) -> std::io::Result<fs::Metadata> {
+        let key = path.as_ref();
+        match self.entries.get(key) {
+            Some(Ok(m)) => Ok(m.clone()),
+            Some(Err(e)) => Err(std::io::Error::new(e.kind(), e.to_string())),
+            None => fs::metadata(key),
+        }
+    }
+}
 
 /// One parsed inotify event, before it touches the engine state.
 ///
@@ -206,6 +242,24 @@ pub fn apply_event(
     show_hidden: bool,
     ev: &RawWatchEvent,
 ) -> WatchAction {
+    // standalone callers (the suites) stat inline: same facts, taken at the
+    // caller's own timing instead of the engine's pre-lock pass
+    let stats = Prestat::of_event(ev);
+    apply_event_with_stats(state, filter, overrides, show_hidden, ev, &stats)
+}
+
+/// The engine's entry: identical semantics to [`apply_event`], with the
+/// event's filesystem facts supplied from outside the state's write lock —
+/// the discipline-5 rule (state locks never span waits) applied to the one
+/// syscall this path performs.
+pub fn apply_event_with_stats(
+    state: &mut DirectoryState,
+    filter: &NameFilter,
+    overrides: &mut std::collections::HashSet<PathBuf>,
+    show_hidden: bool,
+    ev: &RawWatchEvent,
+    stats: &Prestat,
+) -> WatchAction {
     use RawWatchKind as K;
     let dir = ev.dir.as_path();
     // The event's subject has to be the directory this state describes. A delete
@@ -231,6 +285,7 @@ pub fn apply_event(
             dir,
             ev,
             Arrival::Created,
+            stats,
         ),
         K::MovedTo => arrive(
             state,
@@ -240,6 +295,7 @@ pub fn apply_event(
             dir,
             ev,
             Arrival::Moved,
+            stats,
         ),
         K::Deleted | K::MovedFrom => remove_listed(state, dir, ev),
         K::Modified => {
@@ -249,9 +305,13 @@ pub fn apply_event(
             if ev.is_dir {
                 return WatchAction::Ignored(IgnoreReason::DirIsCanonical);
             }
-            restat(state, subject_path(dir, ev.name.as_deref().unwrap_or("")))
+            restat(
+                state,
+                subject_path(dir, ev.name.as_deref().unwrap_or("")),
+                &stats,
+            )
         }
-        K::Renamed { from } => rename(state, filter, overrides, show_hidden, dir, ev, from),
+        K::Renamed { from } => rename(state, filter, overrides, show_hidden, dir, ev, from, stats),
     }
 }
 
@@ -299,6 +359,7 @@ fn arrive(
     dir: &Path,
     ev: &RawWatchEvent,
     arrival: Arrival,
+    stats: &Prestat,
 ) -> WatchAction {
     match &ev.name {
         Some(name) => admit(
@@ -310,6 +371,7 @@ fn arrive(
             name,
             ev.is_dir,
             arrival,
+            stats,
         ),
         None => WatchAction::Ignored(IgnoreReason::NoName),
     }
@@ -326,6 +388,7 @@ fn admit(
     name: &str,
     is_dir: bool,
     arrival: Arrival,
+    stats: &Prestat,
 ) -> WatchAction {
     let path_str = subject_path(dir, name);
     let path = Path::new(&path_str);
@@ -340,12 +403,12 @@ fn admit(
         // and the thumbnail cache, which validates by mtime, kept serving the
         // picture that used to be there.
         return if arrival == Arrival::Moved {
-            restat(state, path_str)
+            restat(state, path_str, stats)
         } else {
             WatchAction::Ignored(IgnoreReason::AlreadyListed)
         };
     }
-    let meta = match fs::metadata(&path) {
+    let meta = match stats.stat(&path) {
         Ok(m) => m,
         // vanished already
         Err(_) => return WatchAction::Ignored(IgnoreReason::StatFailed),
@@ -410,11 +473,11 @@ fn remove_or_ignore(state: &mut DirectoryState, path: String, is_dir: bool) -> W
 /// now puts it. Shared by IN_MODIFY, by a move that overwrote a listed name and
 /// by the destination of a rename — all three say "this row's file changed", and
 /// none of them may be answered by re-deriving an order here.
-fn restat(state: &mut DirectoryState, path: String) -> WatchAction {
+fn restat(state: &mut DirectoryState, path: String, stats: &Prestat) -> WatchAction {
     let Some((old_size, old_mtime)) = state.entry_meta(&path) else {
         return WatchAction::Ignored(IgnoreReason::NotListed);
     };
-    let meta = match fs::metadata(&path) {
+    let meta = match stats.stat(&path) {
         Ok(m) => m,
         Err(_) => return WatchAction::Ignored(IgnoreReason::StatFailed),
     };
@@ -457,6 +520,7 @@ fn rename(
     dir: &Path,
     ev: &RawWatchEvent,
     from: &str,
+    stats: &Prestat,
 ) -> WatchAction {
     let Some(name) = &ev.name else {
         return WatchAction::Ignored(IgnoreReason::NoName);
@@ -486,7 +550,7 @@ fn rename(
             if state.contains_path(&to_str) {
                 state.remove_entry_by_path(&to_str);
             }
-            let meta = match fs::metadata(&to_path) {
+            let meta = match stats.stat(&to_path) {
                 Ok(m) => m,
                 // Gone already: the only fact left is that the source is not
                 // here any more, which is what an unpaired MOVED_FROM said.
@@ -526,6 +590,7 @@ fn rename(
             name,
             ev.is_dir,
             Arrival::Moved,
+            stats,
         ),
         (false, Some(reason)) => WatchAction::Ignored(reason),
     }
