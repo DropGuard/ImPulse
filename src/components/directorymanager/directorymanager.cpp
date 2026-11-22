@@ -85,9 +85,20 @@ QString DirectoryManager::adjacentDirectory(const QString &dirPath, bool forward
 
     QStringList paths;
     for(const auto &entry : fs::directory_iterator(toStdString(parent))) {
+        // Follows a symlink to a directory, like scan.rs does (it re-stats a
+        // symlink and keeps it when the target is a directory); a broken link
+        // answers is_directory()==false on both sides and is skipped.
         if(!entry.is_directory())
             continue;
         QString name = QString::fromStdString(entry.path().filename().generic_string());
+        // The dotfile half of the engine's hidden rule. NOT the whole rule:
+        // scan.rs also drops a Windows file-system-hidden attribute when
+        // showHidden is false, and this scan does not — a hidden-attribute,
+        // non-dot directory would then sit in the sibling order but not in the
+        // listing. Unix has no such attribute (scan.rs's half is a no-op there),
+        // so the two agree everywhere but that Windows corner; folding it in
+        // needs the engine's own membership decision, which this synchronous
+        // on-the-UI-thread scan exists to avoid.
         if(!m_showHiddenFiles && name.startsWith(QLatin1Char('.')))
             continue;
         paths.append(QString::fromStdString(entry.path().generic_string()));

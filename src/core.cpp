@@ -131,13 +131,18 @@ void Core::readSettings() {
     // reaches an executor is folderViewMode, whose setShowDirs() repopulates
     // the view and makes it request thumbnails again. So the wait is scoped to
     // the Thumbnailer: Loader and Scaler jobs carry their own policy inside
-    // them (LoadPolicy, ScalerRequest — the rule R4 exists to enforce), so
-    // none of these five settings could change what an in-flight decode or
-    // scale produces, and waiting for them was pure UI-thread cost bounded by
-    // the whole queue. Queued thumbnail work is not even awaited in the steady
-    // path: the regenerated batch starts with Thumbnailer::clearTasks(), which
-    // drains it. What remains here is the running job, so a thumbnail callback
-    // cannot land mid-repopulation.
+    // them (LoadPolicy, ScalerRequest — the rule R4 exists to enforce), so none
+    // of these five settings could change what an in-flight decode or scale
+    // produces, and waiting for them was pure UI-thread cost.
+    //
+    // waitForOwner() blocks until the owner has nothing RUNNING and nothing
+    // QUEUED, so on a deep thumbnail queue this waits the whole queue out. That
+    // is conservative, not wrong: the repopulate below opens with
+    // Thumbnailer::clearTasks(), which would drain the queue anyway, and this
+    // path runs only when the user saves the settings dialog — never on a hot
+    // loop — so the occasional wait is not a stutter anyone sees. The point the
+    // wait buys is the one that matters: no thumbnail callback can land on the
+    // view while it is being repopulated under a different index order.
     m_pool.waitForOwner(PoolOwner::Thumbnailer);
     m_nav->applySlideshowSettings(settings->slideshowInterval(), settings->loopSlideshow());
     m_nav->setFolderEndAction(settings->folderEndAction());
