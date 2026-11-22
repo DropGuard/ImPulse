@@ -19,4 +19,4 @@ pub use error::EngineError;
 pub use filter::NameFilter;
 pub use meta::{ImageFormat, MetaInfo};
 pub use model::{DirectoryState, EntryData};
-pub use sort::{SortMode, natural};
+pub use sort::{SortMode, natural, sort_key};

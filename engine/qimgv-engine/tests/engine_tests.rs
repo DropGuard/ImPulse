@@ -206,6 +206,71 @@ fn natural_orders_classes_like_the_desktop_and_runs_digits_by_value() {
     );
 }
 
+// The model sorts by cached keys (sort_key), never by calling natural() per
+// comparison — so the two orderings must decide identically for every pair,
+// or the cached sort quietly rewrites the contract the tests above pin. The
+// corpus mixes the classes, digit runs, zero padding and CJK the live
+// directories actually carry; the fuzz adds deterministic-random pairs on
+// top.
+#[test]
+fn sort_keys_decide_identically_to_natural() {
+    let corpus = [
+        "a",
+        "a1",
+        "a01",
+        "a001b",
+        "A2",
+        "b10",
+        "b9",
+        "01",
+        "1",
+        "0",
+        "00",
+        "IMG.png",
+        "img.png",
+        "[Album] VOL.003",
+        "0gallery (2)",
+        "（3447）Arona",
+        "【萝莉】101-200期",
+        "为萝莉而战_101期_01.jpeg",
+        "为萝莉而战_395期_68.jpeg",
+        "",
+        "x",
+        "X",
+    ];
+    for a in corpus {
+        for b in corpus {
+            assert_eq!(
+                qimgv_engine::natural(a, b),
+                qimgv_engine::sort_key(a).cmp(&qimgv_engine::sort_key(b)),
+                "key order diverged from natural: {a:?} vs {b:?}"
+            );
+        }
+    }
+
+    let mut seed = 0x2545_F491_4F6C_DD1Du64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let alphabet = ['a', 'B', '0', '9', '（', '【', '萝', '1', '.', '-'];
+    for _ in 0..3000 {
+        let name_a: String = (0..1 + next() % 12)
+            .map(|_| alphabet[(next() % alphabet.len() as u64) as usize])
+            .collect();
+        let name_b: String = (0..1 + next() % 12)
+            .map(|_| alphabet[(next() % alphabet.len() as u64) as usize])
+            .collect();
+        assert_eq!(
+            qimgv_engine::natural(&name_a, &name_b),
+            qimgv_engine::sort_key(&name_a).cmp(&qimgv_engine::sort_key(&name_b)),
+            "key order diverged from natural: {name_a:?} vs {name_b:?}"
+        );
+    }
+}
+
 // Revived 2026-11-15 (Windows port audit): this test had lost its #[test]
 // attribute — the suite stayed green while it silently never ran, the exact
 // shape AGENTS.md rule 7 pins. It runs by name on every platform now.
