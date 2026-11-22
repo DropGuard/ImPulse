@@ -4,6 +4,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -70,6 +71,32 @@ void FileOperations::removeDir(const QString &dirPath, bool recursive, FileOpRes
         return;
     }
     QDir dir(dirPath);
+    // A directory symlink INSIDE the tree is the one case removeRecursively()
+    // cannot take: its iterator hands the link to QFile::remove, and on
+    // Windows DeleteFileW answers ERROR_ACCESS_DENIED on a directory reparse
+    // point (measured, error 5), so the whole recursive removal answers false
+    // and the link survives. File symlinks are fine (DeleteFileW takes the
+    // link), which is why the file case hides the gap. The sweep clears the
+    // directory symlinks through removeSymlink before the recursion runs; on
+    // Unix removeRecursively already removes them and the sweep is redundant,
+    // not harmful. No FollowSymlinks: the walk visits real subdirectories and
+    // lists directory symlinks as plain entries, so a link is never descended
+    // into and a cycle is structurally impossible.
+    //
+    // Recursive mode only: recursive=false answers DIRECTORY_NOT_EMPTY for a
+    // directory that holds anything, and a directory symlink is anything —
+    // sweeping one out of a non-recursive remove would turn that refusal into
+    // a success.
+    if(recursive) {
+        QDirIterator it(dirPath, QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+                        QDirIterator::Subdirectories);
+        while(it.hasNext()) {
+            it.next();
+            const QFileInfo fi = it.fileInfo();
+            if(fi.isSymLink() && fi.isDir())
+                removeSymlink(fi.filePath());
+        }
+    }
     if(recursive ? dir.removeRecursively() : dir.rmdir(dirPath))
         result = FileOpResult::SUCCESS;
     else if(!recursive && !dir.isEmpty())

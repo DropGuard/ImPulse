@@ -357,6 +357,39 @@ TEST_F(TestFileOps, aSymlinkIsRemovedAsALinkNeverFollowingIt) {
     EXPECT_TRUE(QFileInfo::exists(real + "/keep.txt"));
 }
 
+// The sibling case of aSymlinkIsRemovedAsALinkNeverFollowingIt: the directory
+// symlink sits INSIDE the removed tree, not at its root. removeRecursively
+// alone cannot take it — its iterator hands the link to QFile::remove, and on
+// Windows DeleteFileW answers ERROR_ACCESS_DENIED on a directory reparse point
+// (measured, error 5) — so the whole removal answers false and the link
+// survives. The recursive sweep clears the inner directory symlinks through
+// removeSymlink first; the target sits OUTSIDE the tree, so a followed link
+// would be visible as a lost keep.txt. Non-recursive keeps its contract: a
+// tree that holds a link is not empty, and the refusal removes nothing.
+TEST_F(TestFileOps, recursiveRemoveTakesADirectorySymlinkInsideTheTreeAndNeverItsTarget) {
+    resetFixture();
+    const QString tree = m_fixtureDir + "/tree";
+    const QString target = m_fixtureDir + "/outside-target";
+    ASSERT_TRUE(QDir().mkpath(tree + "/real"));
+    ASSERT_TRUE(QDir().mkpath(target));
+    makeFile(tree + "/real/inner.txt", "x");
+    makeFile(target + "/keep.txt", "x");
+    if(!FileOperations::createSymlink(target, tree + "/dirlink") ||
+       !FileOperations::createSymlink(target + "/keep.txt", tree + "/filelink"))
+        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+
+    FileOpResult result = OTHER_ERROR;
+    FileOperations::removeDir(tree, false, result);
+    EXPECT_EQ(result, DIRECTORY_NOT_EMPTY) << "non-recursive must refuse a tree that holds a link";
+    EXPECT_TRUE(QFileInfo::exists(tree + "/dirlink")) << "the refusal removed the link anyway";
+
+    FileOperations::removeDir(tree, true, result);
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_FALSE(QFileInfo::exists(tree)) << "the tree itself survived the recursive remove";
+    EXPECT_TRUE(QFileInfo::exists(target + "/keep.txt"))
+        << "the recursive delete followed the directory symlink - the target is gone";
+}
+
 TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
     // QFile::moveToTrash selects the trash on the SOURCE's filesystem
     // (top-level .Trash-<uid>, freedesktop spec). A fixture under /tmp cannot
