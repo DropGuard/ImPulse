@@ -14,10 +14,10 @@
 
 struct ListingFileChanges {
     struct Displacement {
-        quint64 id;
+        quint64 id = 0;
         QString oldPath;
         QString newPath;
-        int oldIndex;
+        int oldIndex = 0;
     };
     QList<Displacement> displaced;
     QStringList contentChanged;

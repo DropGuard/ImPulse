@@ -85,9 +85,9 @@ class DirectoryPresenter : public QObject {
     // writers one frame file
     Thumbnailer &m_thumbnailer;
     struct ViewEntry {
-        quint64 id;
+        quint64 id = 0;
         QString name, path;
-        quint64 contentRevision;
+        quint64 contentRevision = 0;
     };
     QList<ViewEntry> m_rows;
     bool m_showDirs;

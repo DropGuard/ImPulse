@@ -207,13 +207,17 @@ int main() {
 
     // little-endian readers for the arena header (qimgv_engine.h: u32
     // file_count, u32 dir_count, u64 session, u64 revision, i32 applied_sort,
-    // u32 directory_len, then directory bytes, then the rows)
+    // u32 directory_len, then directory bytes, then the rows). The shift
+    // counts carry u too: an unsuffixed literal is an int, and LLVM 23's
+    // bugprone-signed-bitwise names the expression on it even when the other
+    // operand is unsigned — the reads stay unsigned end to end, on both
+    // toolchains.
     auto rd32 = [&arena](size_t off) {
-        return uint32_t(arena[off]) | uint32_t(arena[off + 1]) << 8 | uint32_t(arena[off + 2]) << 16 |
-               uint32_t(arena[off + 3]) << 24;
+        return uint32_t(arena[off]) | uint32_t(arena[off + 1]) << 8u | uint32_t(arena[off + 2]) << 16u |
+               uint32_t(arena[off + 3]) << 24u;
     };
     auto rd64 = [&rd32](size_t off) {
-        return uint64_t(rd32(off)) | uint64_t(rd32(off + 4)) << 32;
+        return uint64_t(rd32(off)) | uint64_t(rd32(off + 4)) << 32u;
     };
     CHECK(rd32(0) == 2); // file_count
     CHECK(rd32(4) == 1); // dir_count
