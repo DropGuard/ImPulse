@@ -121,16 +121,15 @@ TEST_F(TestListing, siblingNavigationUsesTheEnginesNameOrder) {
     // Two siblings whose names differ only in case pin the exact collator
     // divergence — but that pair cannot exist on a case-insensitive file
     // system (DEVELOPING.md: `IMG2.jpg` and `img2.jpg` are one name), so the
-    // Windows branch uses a non-colliding pair. Both branches still assert the
-    // contract that survives either way: the sibling walk follows the engine's
-    // order, not a re-derived one.
-#ifdef Q_OS_WIN
+    // second mkdir is a probe: where the filesystem refuses the twin, a
+    // non-colliding name stages a second sibling instead. Either way the
+    // contract asserted below is the same one — the sibling walk follows the
+    // engine's order, not a re-derived one.
     EXPECT_TRUE(QDir(m_fixtureDir).mkdir("CaseDir"));
-    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("ALPHADir")); // non-colliding: no case twin
-#else
-    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("CaseDir"));
-    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("casedir"));
-#endif
+    const bool caseTwinExists = QDir(m_fixtureDir).mkdir("casedir");
+    if(!caseTwinExists) {
+        EXPECT_TRUE(QDir(m_fixtureDir).mkdir("ALPHADir")); // non-colliding: no case twin
+    }
 
     DirectoryManager dm{EngineBridge::instance()};
     EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
@@ -149,12 +148,11 @@ TEST_F(TestListing, siblingNavigationUsesTheEnginesNameOrder) {
     }
     EXPECT_EQ(walked, rows) << "the sibling walk and the rows disagreed";
     EXPECT_TRUE(rows.contains(QStringLiteral("CaseDir")));
-#ifndef Q_OS_WIN
     // the case pair is the part a collator gets wrong: both are present, and
     // their relative order is the engine's, not ICU's — only meaningful where
-    // the two are distinct entries
-    EXPECT_TRUE(rows.contains(QStringLiteral("casedir")));
-#endif
+    // the two are distinct entries, which is exactly what the mkdir probe
+    // measured
+    EXPECT_EQ(rows.contains(QStringLiteral("casedir")), caseTwinExists);
 }
 
 TEST_F(TestListing, missingDirectoryFailsFast) {
@@ -441,15 +439,14 @@ TEST_F(TestListing, mirrorStaysAFaithfulProjectionOfTheEngineListing) {
 
     // tricky names — exactly where the two producers used to disagree —
     // plus a removal and a modification, all through the watcher.
-    // IMG2/img2 are one name on a case-insensitive filesystem: creating
-    // "IMG2.jpg" there would reopen the img2.jpg that is already listed
-    // and the add never happens, so the Windows variant stresses the same
-    // collation with IMG3 instead.
-#ifdef Q_OS_WIN
-    makeFile("IMG3.jpg");
-#else
-    makeFile("IMG2.jpg");
-#endif
+    // IMG2/img2 are one name on a case-insensitive filesystem: "IMG2.jpg"
+    // would reopen the img2.jpg that is already listed and the add never
+    // happens. The twin name is a probe — where the filesystem refuses it
+    // (NewOnly), IMG3 stresses the same collation instead; three new files
+    // land either way, so the count below is 5 on both hosts.
+    QFile twin(m_fixtureDir + "/IMG2.jpg");
+    if(!twin.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+        makeFile("IMG3.jpg");
     makeFile("img 10.jpg");
     makeFile("10.jpg");
     EXPECT_TRUE(QFile::remove(m_fixtureDir + "/img1.jpg"));

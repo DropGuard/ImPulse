@@ -1101,24 +1101,31 @@ TEST_F(TestCoreNav, gridActionsDriveTheGridThroughTheFullChain) {
 // exact split is a property of the trash topology (a mount with no trash
 // at all fails every member), so the pin is the format, not the counts.
 TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
-#ifdef Q_OS_WIN
-    // the 254-char fixture cannot even be written here: the path crosses
-    // MAX_PATH before the name exhausts any NAME_MAX, writeImage fails
-    // silently, and exists() answers false for a file that never existed.
-    // The refusable subject on this platform is a file held open with no
-    // sharing — the shell's recycle cannot take it while the handle
-    // lives, and it stays a visible, existing refusal.
-    const QString longFile = QDir(m_alpha).filePath(QStringLiteral("locked.png"));
-    writeImage(longFile);
-    HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
-                              0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    EXPECT_TRUE(held != INVALID_HANDLE_VALUE) << "the lock fixture failed to open the refusable subject";
-#else
-    // 250 'l' + ".png" fits the source directory (254 <= NAME_MAX) but
-    // cannot fit any real trash: even HOME=/ gives a 26-char files/ prefix.
+    // The refusable subject: a file moveToTrash will refuse. The long name
+    // (250 'l' + ".png" — fits the source directory at 254 <= NAME_MAX but
+    // cannot fit any real trash: even HOME=/ gives a 26-char files/ prefix)
+    // is tried FIRST on every host — it stays a name, not an API. Where the
+    // path limit refuses to stage it at all (the path crosses MAX_PATH
+    // before any NAME_MAX: writeImage fails silently and exists() answers
+    // false for a file that never existed), the fallback subject is a file
+    // held open with no sharing — the shell's recycle cannot take it while
+    // the handle lives, and it stays a visible, existing refusal. That
+    // fallback needs CreateFileW, a genuine compile-time fact, so it alone
+    // stays behind the platform macro.
     const QString longName = QString(250, QLatin1Char('l')) + QStringLiteral(".png");
-    const QString longFile = QDir(m_alpha).filePath(longName);
+    QString longFile = QDir(m_alpha).filePath(longName);
     writeImage(longFile);
+#ifdef Q_OS_WIN
+    HANDLE held = INVALID_HANDLE_VALUE; // the compile-time fact: the lock mechanism
+    if(!QFileInfo::exists(longFile)) {
+        longFile = QDir(m_alpha).filePath(QStringLiteral("locked.png"));
+        writeImage(longFile);
+        held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
+                           0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        EXPECT_TRUE(held != INVALID_HANDLE_VALUE) << "the lock fixture failed to open the refusable subject";
+    }
+#else
+    EXPECT_TRUE(QFileInfo::exists(longFile)) << "the refusable subject failed to stage on a POSIX host";
 #endif
 
     coretest::FakeOverlayHost overlayFake;
@@ -1159,7 +1166,8 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     EXPECT_TRUE(bothHalves.match(overlayFake.lastError).hasMatch())
         << qPrintable(QStringLiteral("batch report lost a half: \"") + overlayFake.lastError + "\"");
 #ifdef Q_OS_WIN
-    EXPECT_TRUE(CloseHandle(held));
+    if(held != INVALID_HANDLE_VALUE)
+        EXPECT_TRUE(CloseHandle(held));
 #endif
 }
 
