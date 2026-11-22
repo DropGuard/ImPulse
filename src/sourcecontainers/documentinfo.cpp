@@ -158,7 +158,7 @@ bool DocumentInfo::detectAnimatedWebP() {
             in.skipRawData(4);
             char flags;
             in.readRawData(&flags, 1);
-            if(flags & (1 << 1)) {
+            if((unsigned(flags) & 0x02u) != 0) {
                 result = true;
             }
         }

@@ -32,12 +32,13 @@ TEST_F(TestImageOps, monoBitmapPaletteColorsSurviveTheLoad) {
     // fixture is raw bytes — the way machinery_tests writes its EXIF jpeg.
     QByteArray bmp;
     auto u32le = [&bmp](quint32 v) {
-        for(int i = 0; i < 4; ++i)
-            bmp.append(char((v >> (8 * i)) & 0xFF));
+        for(unsigned i = 0; i < 4; ++i)
+            bmp.append(char((v >> (8 * i)) & 0xFFu));
     };
     auto u16le = [&bmp](quint16 v) {
-        bmp.append(char(v & 0xFF));
-        bmp.append(char((v >> 8) & 0xFF));
+        const unsigned u = v; // a shifted quint16 promotes to signed int
+        bmp.append(char(u & 0xFFu));
+        bmp.append(char((u >> 8u) & 0xFFu));
     };
     bmp.append("BM");
     u32le(14 + 40 + 8 + 32); // file size: headers + palette + rows
@@ -359,7 +360,7 @@ TEST_F(TestImageOps, imageStaticSaveRoundTripAndQuality) {
     for(int y = 0; y < 64; ++y)
         for(int x = 0; x < 64; ++x) {
             seed = seed * 1103515245u + 12345u;
-            img.setPixel(x, y, QColor((seed >> 16) & 0xff, (seed >> 8) & 0xff, seed & 0xff).rgb());
+            img.setPixel(x, y, QColor(int((seed >> 16u) & 0xffu), int((seed >> 8u) & 0xffu), int(seed & 0xffu)).rgb());
         }
     QString saveDir = m_fixtureDir + "/savedir";
     EXPECT_TRUE(QDir().mkpath(saveDir));

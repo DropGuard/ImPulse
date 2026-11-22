@@ -287,10 +287,11 @@ void ThumbnailWidget::drawSingleLineText(QPainter *painter, QRect rect, QString 
     QFontMetrics fm(m_font);
     bool fits = !(fm.horizontalAdvance(text) > rect.width());
     // filename
-    int flags;
+    Qt::TextInteractionFlags flags;
     painter->setFont(m_font);
     if(fits) {
-        flags = Qt::TextSingleLine | Qt::AlignVCenter | Qt::AlignHCenter;
+        flags = Qt::TextInteractionFlags(Qt::TextSingleLine) | Qt::TextInteractionFlags(Qt::AlignVCenter) |
+                Qt::TextInteractionFlags(Qt::AlignHCenter);
         painter->setPen(color);
         painter->drawText(rect, flags, text);
     } else {
@@ -301,7 +302,7 @@ void ThumbnailWidget::drawSingleLineText(QPainter *painter, QRect rect, QString 
         QPainter textPainter(&textLayer);
         textPainter.setFont(m_font);
         // paint text onto tmp layer
-        flags = Qt::TextSingleLine | Qt::AlignVCenter;
+        flags = Qt::TextInteractionFlags(Qt::TextSingleLine) | Qt::TextInteractionFlags(Qt::AlignVCenter);
         textPainter.setPen(color);
         QRect textRect = QRect(0, 0, rect.width(), rect.height());
         textPainter.drawText(textRect, flags, text);

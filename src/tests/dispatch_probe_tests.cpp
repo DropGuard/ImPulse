@@ -53,7 +53,7 @@ class ProbeSurface : public QWidget {
     }
     void keyPressEvent(QKeyEvent *e) override {
         ++pressSeen;
-        lastPressed = QKeySequence(e->key() | e->modifiers());
+        lastPressed = QKeySequence(Qt::Key(e->key()) | e->modifiers());
         e->accept();
     }
 };

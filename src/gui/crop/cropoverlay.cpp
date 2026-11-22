@@ -573,7 +573,7 @@ void CropOverlay::onSelectionOutsideChange(QRect selection) {
 bool CropOverlay::event(QEvent *event) {
     if(event->type() == QEvent::ShortcutOverride) {
         auto *ke = static_cast<QKeyEvent *>(event);
-        const QKeySequence pressed(ke->key() | ke->modifiers());
+        const QKeySequence pressed(Qt::Key(ke->key()) | ke->modifiers());
         bool saveChord = false;
         for(const QString &token : actionManager->shortcutsForAction(QStringLiteral("save"))) {
             // the projection's own token->sequence expansion: "Enter" claims

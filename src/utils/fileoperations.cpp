@@ -494,17 +494,16 @@ bool FileOperations::createSymlink(const QString &target, const QString &linkPat
 #ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
 #define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
 #endif
-    const DWORD flags =
-        (QFileInfo(target).isDir() ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0) | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+    const DWORD dirFlag = QFileInfo(target).isDir() ? DWORD{SYMBOLIC_LINK_FLAG_DIRECTORY} : DWORD{0};
+    const DWORD unprivFlag = DWORD{SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE};
     const QString linkName = QDir::toNativeSeparators(linkPath);
     const QString targetName = QDir::toNativeSeparators(target);
     if(::CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(linkName.utf16()), reinterpret_cast<LPCWSTR>(targetName.utf16()),
-                             flags))
+                             dirFlag | unprivFlag))
         return true;
     if(::GetLastError() == ERROR_INVALID_PARAMETER)
         return ::CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(linkName.utf16()),
-                                     reinterpret_cast<LPCWSTR>(targetName.utf16()),
-                                     flags & ~SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != 0;
+                                     reinterpret_cast<LPCWSTR>(targetName.utf16()), dirFlag) != 0;
     return false;
 #endif
 }

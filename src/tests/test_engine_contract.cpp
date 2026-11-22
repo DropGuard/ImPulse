@@ -289,8 +289,8 @@ int main() {
     // CRC-free PNG is fine — the header parsers don't validate chunk CRCs
     auto chunk = [](const char tag[4], const unsigned char *data, uint32_t len) {
         std::string c;
-        for(int i = 3; i >= 0; --i)
-            c.push_back(char((len >> (8 * i)) & 0xff));
+        for(unsigned i = 4; i-- > 0;)
+            c.push_back(char((len >> (8 * i)) & 0xffu));
         c.append(tag, 4);
         c.append(reinterpret_cast<const char *>(data), len);
         return c;

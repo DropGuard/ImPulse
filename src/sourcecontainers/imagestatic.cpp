@@ -53,7 +53,8 @@ void ImageStatic::loadGeneric() {
     // never rewrites them. Rotating transformations (EXIF 6/8 arrive as the
     // Rotate90 flag) swap what the header calls width and height
     m_originalSize = r.size();
-    if(m_originalSize.isValid() && (m_docInfo->exifOrientation() & QImageIOHandler::TransformationRotate90))
+    if(m_originalSize.isValid() &&
+       (unsigned(m_docInfo->exifOrientation()) & unsigned(QImageIOHandler::TransformationRotate90)) != 0)
         m_originalSize.transpose();
     if(m_scaledRequest && m_docInfo->format() == "jpg") {
         // tier-1: decode at screen resolution via libjpeg DCT scaling

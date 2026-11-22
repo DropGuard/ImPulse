@@ -773,7 +773,7 @@ QString ActionManager::actionForToken(const QString &token) const {
 }
 
 bool ActionManager::keyNamesSubjectChangingAction(const QKeyEvent *overrideEvent) const {
-    const QKeySequence seq(overrideEvent->key() | overrideEvent->modifiers());
+    const QKeySequence seq(Qt::Key(overrideEvent->key()) | overrideEvent->modifiers());
     if(seq.count() == 0)
         return false;
     return isSubjectChangingAction(actionForKeySequence(seq));

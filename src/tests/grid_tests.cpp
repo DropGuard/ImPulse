@@ -146,13 +146,14 @@ TEST_F(TestGrid, dragEnterAcceptsUnconditionally) {
 
     auto mime = std::make_unique<QMimeData>();
     mime->setUrls({QUrl::fromLocalFile("/tmp/whatever.png")});
-    QDragEnterEvent enter(QPoint(10, 10), Qt::CopyAction, mime.get(), Qt::LeftButton, Qt::NoModifier);
+    auto enter = coretest::dragEnterEventAt(QPoint(10, 10), Qt::CopyAction, mime.get(), Qt::LeftButton, Qt::NoModifier);
     grid.dragEnterEvent(&enter);
     EXPECT_TRUE(enter.isAccepted()) << "dragEnter rejected a drop the grid is built to accept";
 
     QMimeData plain;
     plain.setText("just text");
-    QDragEnterEvent plainEnter(QPoint(10, 10), Qt::CopyAction, &plain, Qt::LeftButton, Qt::NoModifier);
+    auto plainEnter =
+        coretest::dragEnterEventAt(QPoint(10, 10), Qt::CopyAction, &plain, Qt::LeftButton, Qt::NoModifier);
     grid.dragEnterEvent(&plainEnter);
     EXPECT_TRUE(plainEnter.isAccepted())
         << "the grid accepts without inspecting the mime — reporting is the drop's job";
@@ -170,15 +171,15 @@ TEST_F(TestGrid, dragMoveReportsTheHoveredThumbnailIndex) {
     const QPoint pos1 = coretest::dropPosOverThumbnail(grid, 1);
     EXPECT_TRUE(pos0 != pos1) << "the two thumbnails share a position — layout never ran";
 
-    QDragMoveEvent move0(QPoint(pos0), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
+    auto move0 = coretest::dragMoveEventAt(pos0, Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
     grid.dragMoveEvent(&move0);
     EXPECT_EQ(spy.last().at(0).toInt(), 0);
 
-    QDragMoveEvent move1(QPoint(pos1), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
+    auto move1 = coretest::dragMoveEventAt(pos1, Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
     grid.dragMoveEvent(&move1);
     EXPECT_EQ(spy.last().at(0).toInt(), 1);
 
-    QDragMoveEvent moveEmpty(QPoint(1, 1), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
+    auto moveEmpty = coretest::dragMoveEventAt(QPoint(1, 1), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
     grid.dragMoveEvent(&moveEmpty);
     EXPECT_EQ(spy.last().at(0).toInt(), -1); // off-grid: the consumer learns "no target"
 }
@@ -192,7 +193,7 @@ TEST_F(TestGrid, dragReportingSurvivesALeave) {
     ASSERT_TRUE(spy.isValid()); // the spy is read below; a bad signal would crash it
 
     const QPoint pos0 = coretest::dropPosOverThumbnail(grid, 0);
-    QDragMoveEvent move0(QPoint(pos0), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
+    auto move0 = coretest::dragMoveEventAt(pos0, Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
     grid.dragMoveEvent(&move0);
     EXPECT_EQ(spy.last().at(0).toInt(), 0);
 
@@ -201,7 +202,7 @@ TEST_F(TestGrid, dragReportingSurvivesALeave) {
     EXPECT_TRUE(leave.isAccepted());
 
     // a new drag sequence after the leave reports from a clean slate
-    QDragMoveEvent move0again(QPoint(pos0), Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
+    auto move0again = coretest::dragMoveEventAt(pos0, Qt::CopyAction, nullptr, Qt::LeftButton, Qt::NoModifier);
     grid.dragMoveEvent(&move0again);
     EXPECT_EQ(spy.last().at(0).toInt(), 0);
 }

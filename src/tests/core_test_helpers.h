@@ -23,6 +23,7 @@
 #include <gmock/gmock.h>
 #include <QApplication>
 #include <QByteArray>
+#include <QDragMoveEvent>
 #include <QFile>
 #include <QKeyEvent>
 #include <QMap>
@@ -271,6 +272,32 @@ inline QPoint dropPosOverThumbnail(FolderGridView &grid, int index) {
     }
     const QPointF center = widgets.at(index)->mapToScene(widgets.at(index)->boundingRect().center());
     return grid.mapFromScene(center);
+}
+
+// The synthesized drag events for drop tests. QDragMoveEvent/QDragEnterEvent
+// grew QPointF constructors and deprecated the QPoint ones (marker:
+// QT_DEPRECATED_SINCE(6, 16) — visible from any Qt that ships the header),
+// while the apt Qt on ubuntu-26.04 predates the QPointF overload entirely.
+// The two real toolchains this tree builds on, msys2 clang64's Qt 6.12 and
+// ubuntu-26.04's apt Qt, sit on either side of that line, and each branch
+// here compiles and runs on one of them. The cutoff is the oldest version
+// measured to carry the QPointF overload: this tree's own 6.12.
+inline QDragMoveEvent dragMoveEventAt(const QPoint &pos, Qt::DropActions actions, const QMimeData *data,
+                                      Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)
+    return QDragMoveEvent(QPointF(pos), actions, data, buttons, modifiers);
+#else
+    return QDragMoveEvent(pos, actions, data, buttons, modifiers);
+#endif
+}
+
+inline QDragEnterEvent dragEnterEventAt(const QPoint &pos, Qt::DropActions actions, const QMimeData *data,
+                                        Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)
+    return QDragEnterEvent(QPointF(pos), actions, data, buttons, modifiers);
+#else
+    return QDragEnterEvent(pos, actions, data, buttons, modifiers);
+#endif
 }
 
 // A recording ICoreView for headless Core tests: counts the display sink

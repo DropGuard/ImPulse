@@ -47,7 +47,7 @@ void ChangelogWindow::wheelEvent(QWheelEvent *event) {
 bool ChangelogWindow::eventFilter(QObject *watched, QEvent *event) {
     if(event->type() == QEvent::ShortcutOverride) {
         auto *ke = static_cast<QKeyEvent *>(event);
-        if(QKeySequence(ke->key() | ke->modifiers()) == QKeySequence(QStringLiteral("Esc")))
+        if(QKeySequence(Qt::Key(ke->key()) | ke->modifiers()) == QKeySequence(QStringLiteral("Esc")))
             event->accept();
     }
     return OverlayWidget::eventFilter(watched, event);

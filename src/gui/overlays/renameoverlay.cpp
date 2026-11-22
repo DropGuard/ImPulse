@@ -92,7 +92,7 @@ void RenameOverlay::onCancel() {
 bool RenameOverlay::eventFilter(QObject *watched, QEvent *event) {
     if(event->type() == QEvent::ShortcutOverride) {
         auto *ke = static_cast<QKeyEvent *>(event);
-        if(!m_keyFilterSequences.contains(QKeySequence(ke->key() | ke->modifiers())))
+        if(!m_keyFilterSequences.contains(QKeySequence(Qt::Key(ke->key()) | ke->modifiers())))
             event->accept();
     }
     return OverlayWidget::eventFilter(watched, event);
