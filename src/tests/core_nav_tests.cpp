@@ -1128,6 +1128,14 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     if(QFileInfo::exists(twin))
         FileOperations::moveToTrash(twin, twinResult);
     if(!QFileInfo::exists(longFile) || twinResult == FileOpResult::SUCCESS) {
+        // the staged long name is not a refusal here, and it must not join
+        // the listing this test navigates — the folder view is selected by
+        // position, so exactly two subjects: a.png and the refusable one
+        if(QFileInfo::exists(longFile)) {
+            FileOpResult cleanup = FileOpResult::OTHER_ERROR;
+            FileOperations::removeFile(longFile, cleanup);
+            EXPECT_EQ(cleanup, FileOpResult::SUCCESS);
+        }
         longFile = QDir(m_alpha).filePath(QStringLiteral("locked.png"));
         writeImage(longFile);
         held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
