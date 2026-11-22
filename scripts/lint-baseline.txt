@@ -57,12 +57,24 @@
 # moved: compile_commands.json regenerates as CMake flag/entry state evolves, and a
 # fresh-configure scan of the SAME content reads 13-14. The four sites were an
 # artifact of the older flag set, recorded here twice-verified gone.
+# The ledger is grouped per instrument: an "instrument <sha>" line starts a
+# group and every row after it belongs to that group until the next such line.
+# The fingerprint hashes each machine's absolute paths and tool versions, so
+# two dev boxes can never share one group — a single shared table made the
+# second box's first recorded row break the first box's gate on INSTRUMENT
+# mismatch alone. Each instrument is judged only by its own group. An
+# instrument with no group runs unprotected while every group is empty (every
+# finding fails as NEW on its own, so a moved TU set is not a gate event);
+# once any group carries rows, an ungrouped instrument fails until it records
+# one deliberately — a single line, not a re-baseline.
 instrument c6395492fe177ecd
-# The fingerprint protects COUNTS. With the table empty there is nothing to
-# protect — every finding fails as NEW/GONE on its own — so a moved instrument
-# (typically a new TU entering the scanned set) is not a gate event, and the
-# fingerprint is updated without ceremony. It still gets recorded, for the day
-# a row returns. lint.py enforces the mismatch only while the table has rows.
+# 2026-11-07's group, now historical: it held the pre-rewrite counts
+# (range-loop-detach 14, qcolor-from-literal 50, cppcheck 10/1/1), all swept
+# to zero, so the group is empty rows today. The fingerprint protects COUNTS;
+# with a group empty there is nothing to protect — every finding fails as
+# NEW/GONE on its own — so a moved instrument (typically a new TU entering
+# the scanned set) is recorded without ceremony. It still gets recorded, for
+# the day a row returns.
 
 # The fingerprint is the scanned (file, command) set from compile_commands.json
 # PLUS the --version output of every tool that judged it (the compilers named in

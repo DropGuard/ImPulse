@@ -634,17 +634,26 @@ def main():
         print(f'  {gated.get(check, 0):6d}  {check}')
         now[('gcc-gated', check)] = gated.get(check, 0)
 
-    base = {}
-    base_fp = None
+    # The ledger is grouped by instrument: an "instrument <sha>" line starts a
+    # group and every row after it belongs to that group until the next such
+    # line. The fingerprint hashes the machines' absolute paths and tool
+    # versions, so two dev boxes can never share one group — and a single
+    # shared table made the second box's first recorded row break the first
+    # box's gate on INSTRUMENT mismatch alone. Each instrument is judged only
+    # by its own group; the others' rows are not this run's business.
+    groups = {}
+    current = None
     if os.path.exists(BASELINE):
         for line in open(BASELINE, encoding='utf-8'):
             if line.strip() and not line.startswith('#'):
                 parts = line.split()
                 if parts[0] == 'instrument':
-                    base_fp = parts[1]
+                    current = parts[1]
+                    groups.setdefault(current, {})
                     continue
-                tool, check, count = line.split()
-                base[(tool, check)] = int(count)
+                tool, check, count = parts[0], parts[1], int(parts[2])
+                groups.setdefault(current, {})[(tool, check)] = count
+    base = groups.get(fp, {})
 
     problems = []
     # A crashed tool produced no verdicts for that TU, so its counts are a
@@ -695,18 +704,27 @@ def main():
     if not GATE:
         print('\n(report only; --gate compares against scripts/lint-baseline.txt)')
         return
-    if base_fp is None:
+    if not groups:
         problems.append('the baseline records no instrument fingerprint — measure once and '
                         'add "instrument <sha>" deliberately, so count drift can never ride in '
                         'silently on an unnamed instrument change')
-    elif base_fp != fp and base:
-        # the fingerprint protects COUNTS; with an empty table there is nothing
-        # to protect — every finding fails as NEW/GONE on its own, so a moved
-        # instrument (typically a new TU in the scanned set) is not a gate event.
-        # It is still recorded, deliberately, for the day a row returns.
-        problems.append(f'INSTRUMENT changed since the baseline was recorded ({base_fp} -> {fp}) — '
-                        're-verify the counts against the new instrument and update the '
-                        'fingerprint deliberately')
+    elif None in groups:
+        # Rows above the first "instrument" line belong to no instrument and
+        # so to no judge — the old single-table format allowed that; the group
+        # ledger does not.
+        problems.append('baseline rows sit above any "instrument" line, outside every group '
+                        f'— re-verify them and pin them under "instrument {fp}"')
+    elif fp not in groups and any(groups.values()):
+        # An instrument whose group is absent runs unprotected when every
+        # group is empty (every finding fails as NEW on its own, and a moved
+        # TU set is not a gate event) — but with rows elsewhere, "no ledger
+        # for me" is itself a gate event: the rows in this file were measured
+        # by another instrument, so this run has never been verified against
+        # anything. Recording a group is one deliberate line, not a
+        # re-baseline.
+        problems.append(f'this instrument ({fp}) has no group in the baseline while other '
+                        'instruments carry rows — measure once and add "instrument ' + fp +
+                        '" deliberately, so an unjudged instrument can never pass by default')
     if problems:
         print('\nbaseline differs:')
         for p in problems:
