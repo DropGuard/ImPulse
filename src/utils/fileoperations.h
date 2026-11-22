@@ -54,6 +54,20 @@ class FileOperations {
     // keeps QFile::link, whose contract there is the symlink itself.
     static bool createSymlink(const QString &target, const QString &linkPath);
 
+    // Remove the LINK at linkPath — the link itself, never what it points at.
+    // QFile::remove is the primary path and does exactly that on every platform
+    // this builds on (verified on Linux: it unlinks the symlink and leaves the
+    // target's contents intact). On Windows a DIRECTORY symlink is a reparse
+    // point and QFile::remove can answer ACCESS_DENIED, so the fallback is
+    // RemoveDirectoryW, whose documented contract is precisely "remove the
+    // specified link regardless of whether the target directory is empty or
+    // not" and "the target directory itself is not affected". The two APIs a
+    // reader might reach for instead are both wrong here, measured on Linux:
+    // QDir().rmdir refuses a symlink outright (returns false, link survives),
+    // and QDir(link).removeRecursively FOLLOWS the link and empties the target
+    // before failing — a data-loss bug wrapped in a plausible name.
+    static bool removeSymlink(const QString &linkPath);
+
     static QString decodeResult(const FileOpResult &result);
 
     // The desktop's "file (1).jpg" pattern, owned here: the first

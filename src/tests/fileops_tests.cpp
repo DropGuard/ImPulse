@@ -316,6 +316,47 @@ TEST_F(TestFileOps, removeFileAndRemoveDirReportExactResults) {
     EXPECT_EQ(result, SOURCE_DOES_NOT_EXIST);
 }
 
+// A symlink is removed as a LINK, never followed. The trap is real and was
+// measured: QDir(link).removeRecursively() dereferences the point, empties the
+// TARGET and then fails, so a "delete this shortcut folder" that trusted it
+// would destroy the data behind the link. removeSymlink and removeDir both
+// take the link and leave the target whole.
+TEST_F(TestFileOps, aSymlinkIsRemovedAsALinkNeverFollowingIt) {
+    resetFixture();
+    const QString real = m_fixtureDir + "/realdir";
+    ASSERT_TRUE(QDir().mkpath(real));
+    makeFile(real + "/keep.txt", "precious");
+    const QString link = m_fixtureDir + "/linkdir";
+    if(!FileOperations::createSymlink(real, link))
+        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+    ASSERT_TRUE(QFileInfo(link).isSymLink());
+
+    // removeSymlink: the link goes, the target and its contents stay
+    EXPECT_TRUE(FileOperations::removeSymlink(link));
+    EXPECT_FALSE(QFileInfo::exists(link));
+    EXPECT_TRUE(QFileInfo(real).isDir());
+    EXPECT_TRUE(QFileInfo::exists(real + "/keep.txt"));
+
+    // removeDir over a link: same result through the user-facing delete path,
+    // and the target is untouched even though isDir() reported true on the link
+    ASSERT_TRUE(FileOperations::createSymlink(real, link));
+    FileOpResult result = OTHER_ERROR;
+    FileOperations::removeDir(link, true, result);
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_FALSE(QFileInfo::exists(link));
+    EXPECT_TRUE(QFileInfo::exists(real + "/keep.txt"));
+
+    // and the link's removal did not touch a target that happens to be empty-
+    // checked: a non-recursive removeDir on a link is still a link removal,
+    // not a DIRECTORY_NOT_EMPTY refusal
+    ASSERT_TRUE(FileOperations::createSymlink(real, link));
+    result = OTHER_ERROR;
+    FileOperations::removeDir(link, false, result);
+    EXPECT_EQ(result, SUCCESS);
+    EXPECT_FALSE(QFileInfo::exists(link));
+    EXPECT_TRUE(QFileInfo::exists(real + "/keep.txt"));
+}
+
 TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
     // QFile::moveToTrash selects the trash on the SOURCE's filesystem
     // (top-level .Trash-<uid>, freedesktop spec). A fixture under /tmp cannot

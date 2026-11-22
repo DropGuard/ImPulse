@@ -444,13 +444,12 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
             const QString linkDest = dstDir.absolutePath() + "/" + entry;
             QFile::remove(linkDest);
             if(FileOperations::createSymlink(linkTarget, linkDest)) {
-                // The link goes with the move. QFile::remove cannot delete a
-                // directory symlink on Windows (DeleteFileW answers
-                // ACCESS_DENIED on a directory reparse point), so a failed
-                // unlink falls back to the directory removal, which deletes
-                // the link itself and never the target.
-                if(!QFile::remove(entryPath))
-                    QDir().rmdir(entryPath);
+                // The link goes with the move, and only the link: removeSymlink
+                // unlinks the reparse point itself and never the target. The two
+                // alternatives a reader might reach for both fail — QDir::rmdir
+                // refuses a symlink outright, and removeRecursively follows it
+                // and empties the target first (both measured on Linux).
+                FileOperations::removeSymlink(entryPath);
             }
             continue;
         }

@@ -3,9 +3,15 @@
 #include "utils/stuff.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QSaveFile>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #ifdef USE_EXIV2
 #include <exiv2/exiv2.hpp>
@@ -49,22 +55,27 @@ void FileOperations::removeFile(const QString &filePath, FileOpResult &result) {
 }
 
 // recursive=false answers DIRECTORY_NOT_EMPTY for a directory that holds
-// anything; recursive=true removes the tree. The link question does not arise
-// here: QDir::removeRecursively deletes a symlink itself rather than the tree
-// it points at (Qt documents it), unlike the entry-by-entry recursion Core's
-// copy and move do.
+// anything; recursive=true removes the tree. A symlink is removed AS A LINK,
+// never followed: QDir(link).removeRecursively() dereferences the reparse
+// point, empties the TARGET and then fails (measured on Linux) — deleting a
+// shortcut folder must not delete what it points at.
 void FileOperations::removeDir(const QString &dirPath, bool recursive, FileOpResult &result) {
-    QDir dir(dirPath);
-    if(!dir.exists()) {
+    const QFileInfo info(dirPath);
+    if(!info.exists() && !info.isSymLink()) {
         result = FileOpResult::SOURCE_DOES_NOT_EXIST;
-    } else {
-        if(recursive ? dir.removeRecursively() : dir.rmdir(dirPath))
-            result = FileOpResult::SUCCESS;
-        else if(!recursive && !dir.isEmpty())
-            result = FileOpResult::DIRECTORY_NOT_EMPTY;
-        else
-            result = FileOpResult::OTHER_ERROR;
+        return;
     }
+    if(info.isSymLink()) {
+        result = removeSymlink(dirPath) ? FileOpResult::SUCCESS : FileOpResult::OTHER_ERROR;
+        return;
+    }
+    QDir dir(dirPath);
+    if(recursive ? dir.removeRecursively() : dir.rmdir(dirPath))
+        result = FileOpResult::SUCCESS;
+    else if(!recursive && !dir.isEmpty())
+        result = FileOpResult::DIRECTORY_NOT_EMPTY;
+    else
+        result = FileOpResult::OTHER_ERROR;
     return;
 }
 
@@ -494,6 +505,22 @@ bool FileOperations::createSymlink(const QString &target, const QString &linkPat
         return ::CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(linkName.utf16()),
                                      reinterpret_cast<LPCWSTR>(targetName.utf16()),
                                      flags & ~SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != 0;
+    return false;
+#endif
+}
+
+bool FileOperations::removeSymlink(const QString &linkPath) {
+    // QFile::remove unlinks the symlink itself on every platform (verified on
+    // Linux: the target's contents survive). It is the whole answer there.
+    if(QFile::remove(linkPath))
+        return true;
+#ifdef _WIN32
+    // A DIRECTORY symlink is a reparse point, and QFile::remove can answer
+    // ACCESS_DENIED on one. RemoveDirectoryW's documented contract is exactly
+    // what a link removal needs: it removes the specified link regardless of
+    // whether the target is empty, and never touches the target.
+    return ::RemoveDirectoryW(reinterpret_cast<LPCWSTR>(QDir::toNativeSeparators(linkPath).utf16())) != 0;
+#else
     return false;
 #endif
 }
