@@ -1,0 +1,12 @@
+# Line endings are policy, not per-clone state. The blobs in this repo are
+# LF; text=auto converts CRLF checkins to LF and never touches files detected
+# as binary. Without this, a Windows clone's CRLF working tree stages an
+# ending storm — 260 files of pure line-ending noise showed as modified after
+# one checkout, waiting to ride into history inside a real commit.
+* text=auto
+*.png binary
+*.jpg binary
+*.ico binary
+# Windows-native scripts, where the platform itself insists on CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
