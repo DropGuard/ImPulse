@@ -87,6 +87,19 @@ jobs:
           key: ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-
+      # the lint gate's per-TU verdict cache (build/.lint-cache): LINT alone
+      # was 378s of the suites step on this runner. Same pattern as ccache —
+      # the key carries the commit, restore-keys falls back to the newest
+      # cache from this workflow. lint.py hashes the TU and its depfile
+      # headers into the key, so a stale restore can never answer for a file
+      # that moved.
+      - name: lint cache
+        uses: actions/cache@v4
+        with:
+          path: build/.lint-cache
+          key: lint-cache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-${{ github.sha }}
+          restore-keys: |
+            lint-cache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-
       - name: configure
         run: |
           ccache --set-config=max_size=2G
@@ -104,4 +117,4 @@ jobs:
       - name: the suites and the gates
         run: |
           cd build
-          QT_QPA_PLATFORM=offscreen ctest --output-on-failure
+          QT_QPA_PLATFORM=offscreen ctest -j"$(nproc)" --output-on-failure

@@ -65,6 +65,20 @@ jobs:
           key: ccache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-
+      # the lint gate's per-TU verdict cache (build/.lint-cache): the cold scan
+      # is minutes per tool over 155 TUs, and CI was paying it on every push.
+      # Same pattern as ccache — the key carries the commit, restore-keys
+      # falls back to the newest cache from this workflow, so an unchanged
+      # TU's verdict survives and a changed one rescans. lint.py hashes the
+      # TU and its depfile headers into the key, so a stale restore can never
+      # answer for a file that moved.
+      - name: lint cache
+        uses: actions/cache@v4
+        with:
+          path: build/.lint-cache
+          key: lint-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ github.sha }}
+          restore-keys: |
+            lint-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}-
       # LINT_TESTS=ON puts the static-analysis gate into ctest, so this job
       # runs the same four gates the pre-commit hook runs — which is the point
       # of a clean machine: the hook can be skipped with --no-verify, and it
@@ -77,7 +91,10 @@ jobs:
       - name: build (warnings are contractual — the fatal families are -Werror)
         run: cmake --build build -j$(nproc)
       - name: the suites (includes FORMAT_RULES, ARCH_RULES, LINT)
-        run: cd build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
+        # -j like the hook runs them: the binaries are independent processes
+        # and safe by construction (pid-scoped fixtures, per-pid settings) —
+        # serial ctest was paying that wall time for nothing.
+        run: cd build && QT_QPA_PLATFORM=offscreen ctest -j$(nproc) --output-on-failure
       - name: rust suite
         run: cargo test --manifest-path engine/qimgv-engine/Cargo.toml
 
