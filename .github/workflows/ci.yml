@@ -121,7 +121,13 @@ jobs:
         run: |
           cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=address,undefined
           cmake --build build-asan -j$(nproc)
-          cd build-asan && QT_QPA_PLATFORM=offscreen ASAN_OPTIONS=detect_leaks=1 ctest --output-on-failure
+          cd build-asan && QT_QPA_PLATFORM=offscreen ASAN_OPTIONS=detect_leaks=1 ctest -j$(nproc) --output-on-failure
+      - name: tsan tree (thread sanitizer — the same option with `thread`; the noise
+          baseline is src/tests/tsan-noise.supp and rides the tests via TEST_ENV)
+        run: |
+          cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQIMGV_SANITIZERS=thread
+          cmake --build build-tsan -j$(nproc)
+          cd build-tsan && QT_QPA_PLATFORM=offscreen ctest -j$(nproc) --output-on-failure
       - name: miri over the pure layer (the armed race test must fail to pass)
         run: sh scripts/miri.sh
 
