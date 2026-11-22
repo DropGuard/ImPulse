@@ -271,7 +271,11 @@ void ThumbnailView::applyRows(const QList<DirectoryViewRow> &rows) {
             m_invalidated.insert(index);
 
     // rekey the materialized widgets: a widget follows its row, whatever the
-    // window does
+    // window does. A new index claimed by two rows (a presenter diff that
+    // named one previousIndex twice) is a malformed plan: the loser is
+    // destroyed, because QHash::insert would otherwise overwrite the
+    // key and leak a still-in-scene widget as a ghost the window never
+    // tracks again.
     QHash<int, ThumbnailWidget *> rekeyed;
     for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw) {
         const int newIndex = itw.key() < newIndices.size() ? newIndices[itw.key()] : -1;
@@ -282,6 +286,8 @@ void ThumbnailView::applyRows(const QList<DirectoryViewRow> &rows) {
         ThumbnailWidget *widget = itw.value();
         widget->setRowIndex(newIndex);
         placeWidget(widget, newIndex);
+        if(auto *previous = rekeyed.value(newIndex, nullptr))
+            delete previous;
         rekeyed.insert(newIndex, widget);
     }
     m_visible = std::move(rekeyed);
