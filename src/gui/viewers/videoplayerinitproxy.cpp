@@ -13,16 +13,18 @@ VideoPlayerInitProxy::VideoPlayerInitProxy(QWidget *parent) : VideoPlayer(parent
     setLayout(&m_layout);
     connect(settings, &Settings::settingsChanged, this, &VideoPlayerInitProxy::onSettingsChanged);
     m_libFile = QIMGV_PLAYER_PLUGIN;
-#ifdef _WIN32
+    // The app-relative plugins dir serves both platforms: the AppImage packs
+    // the player at usr/bin/plugins, and the Windows install tree uses the
+    // same layout next to the exe. The search then fans out to the Linux
+    // install layouts — the plugin layout follows the app's name; the
+    // lib/qimgv variants stay as fallbacks so installs that predate the
+    // rename keep playing video. The Unix-ish entries are dead weight on
+    // Windows and cost one failed stat each.
     m_libDirs << QApplication::applicationDirPath() + "/plugins";
-#else
-    // the plugin layout follows the app's name; the lib/qimgv variants stay
-    // as fallbacks so installs that predate the rename keep playing video
     QDir impulseLib(QApplication::applicationDirPath() + "/../lib/impulse");
     QDir legacyLib(QApplication::applicationDirPath() + "/../lib/qimgv");
     m_libDirs << (impulseLib.makeAbsolute() ? impulseLib.path() : ".") << "/usr/lib/impulse" << "/usr/lib64/impulse"
               << (legacyLib.makeAbsolute() ? legacyLib.path() : ".") << "/usr/lib/qimgv" << "/usr/lib64/qimgv";
-#endif
 }
 
 VideoPlayerInitProxy::~VideoPlayerInitProxy() {
