@@ -244,11 +244,11 @@ TEST_F(TestWorkerPool, waitForOwnerWaitsOnlyForItsOwner) {
     pool.waitForAll();
 }
 
-// The settings bus drains the whole pool: Core::readSettings() opens with
-// waitForAll(), so the price of pressing Save is bounded by every owner's
-// queue, not by the pipeline the changed setting actually feeds. The
-// narrow form already has a test above; this pins the width of the wide
-// one, because that width is the part that runs on the UI thread.
+// waitForAll (kept as the pool's whole-drain primitive; no product caller uses
+// it now, the settings bus moved to the narrow forms) must wait out EVERY owner,
+// not just the one whose pipeline the caller cares about. This pins the width,
+// because that width is what a caller reaching for the global drain would pay on
+// the UI thread.
 TEST_F(TestWorkerPool, waitForAllWaitsForEveryOwner) {
     std::atomic_bool gate{false};
     std::atomic_int loaderStarts{0}, thumbRuns{0}, deaths{0};
