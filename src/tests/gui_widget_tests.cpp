@@ -11,7 +11,6 @@
 // purpose: a test that needs a directory makes its own. Sharing one tree across
 // a file is how a test that forgets to clean up poisons its neighbours.
 #include "gtest_qt.h"
-#include "gui/flowlayout.h"
 #include <QtTest/QSignalSpy>
 #include <QtTest/qtestcase.h>
 #include <QApplication>
@@ -502,54 +501,6 @@ TEST_F(TestGuiWidgets, wallpaperCommandDispatchesBySession) {
 TEST_F(TestGuiWidgets, wallpaperMenuIconIsCompiledIntoResources) {
     EXPECT_TRUE(QFile::exists(":/res/icons/common/menuitem/wallpaper16.png"));
     EXPECT_TRUE(QFile::exists(":/res/icons/common/menuitem/wallpaper16@2x.png"));
-}
-
-// FlowLayout is the folder grid's placement engine and had no test at all:
-// 278 lines deciding where every thumbnail goes, and which one the arrow keys
-// land on. The navigation helpers are pure arithmetic over m_columns, so they
-// are pinned here without a scene.
-TEST_F(TestGuiWidgets, flowLayoutNavigationFollowsItsColumnCount) {
-    // QGraphicsLayoutItem is abstract; the layout only ever asks an item for
-    // its geometry, so a fixed-size stub is the whole contract it needs.
-    struct StubItem : QGraphicsLayoutItem {
-        void setGeometry(const QRectF &) override {
-        }
-        QSizeF sizeHint(Qt::SizeHint, const QSizeF &) const override {
-            return QSizeF(10, 10);
-        }
-    };
-    FlowLayout layout;
-    QList<QGraphicsLayoutItem *> items;
-    for(int i = 0; i < 10; ++i) {
-        auto *item = new StubItem();
-        layout.insertItem(i, item);
-        items << item;
-    }
-    EXPECT_EQ(layout.count(), 10);
-    // lay out into a width that fits four 10px items plus spacing
-    layout.setSpacing(Qt::Horizontal, 0);
-    layout.setGeometry(QRectF(0, 0, 40, 1000));
-    ASSERT_TRUE(layout.columns() > 0);
-    const int cols = layout.columns();
-
-    // the first item has nothing above it and stays put
-    EXPECT_EQ(layout.itemAbove(0), 0);
-    // and the one a column below is exactly one column away
-    EXPECT_EQ(layout.itemBelow(0), std::min(cols, 9));
-    // columnOf is index mod columns
-    for(int i = 0; i < 10; ++i)
-        EXPECT_EQ(layout.columnOf(i), i % cols);
-    // sameRow agrees with columnOf's quotient
-    EXPECT_TRUE(layout.sameRow(0, cols - 1));
-    EXPECT_TRUE(!layout.sameRow(0, cols));
-    // out-of-range answers -1 rather than reading past the list
-    EXPECT_EQ(layout.itemAbove(-1), -1);
-    EXPECT_EQ(layout.itemAbove(10), -1);
-    EXPECT_EQ(layout.columnOf(10), -1);
-
-    layout.clear();
-    EXPECT_EQ(layout.count(), 0);
-    qDeleteAll(items);
 }
 
 int main(int argc, char **argv) {

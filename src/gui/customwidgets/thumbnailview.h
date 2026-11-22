@@ -1,11 +1,15 @@
 #pragma once
 
-/* This class manages QGraphicsScene, ThumbnailWidget list,
- * scrolling, requesting and setting thumbnails.
- * It doesn't do actual positioning of thumbnails within the scene.
- * (But maybe it should?)
+/* This class manages the QGraphicsScene, the listing's row model, the
+ * materialized widget window, scrolling, and thumbnail request/set. Rows are
+ * a light model (a count plus an invalidated set): ThumbnailWidgets exist
+ * only for the viewport plus the preload band, created and destroyed as the
+ * view scrolls — widget-level virtualization, the counterpart to the pixmap
+ * laziness loadVisibleThumbnails already had. Positioning within the scene
+ * belongs to subclasses (arithmetic: a row's cell rect is computable without
+ * a widget).
  *
- * Usage: subclass, implement layout-related stuff
+ * Usage: subclass, implement the geometry contract below.
  */
 
 #include <QGraphicsView>
@@ -17,6 +21,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QScreen>
+#include <QSet>
 
 #include "gui/customwidgets/thumbnailwidget.h"
 #include "gui/idirectoryview.h"
@@ -37,6 +42,12 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     Q_INTERFACES(IDirectoryView)
   public:
     ThumbnailView(Qt::Orientation orient, QWidget *parent = nullptr);
+    // disconnects the scrollbar/timer feeds before the member scene dies:
+    // QGraphicsScene's destructor calls setScene(nullptr), whose
+    // recalculateContentSize can fire valueChanged into this class's own
+    // lambdas — loadVisibleThumbnails would then re-enter with the subclass
+    // half-destroyed and call pure virtuals through materializeWindow
+    ~ThumbnailView() override;
     void setDirectoryPath(QString path) override;
     void select(QList<int>) override;
     void select(int) override;
@@ -81,7 +92,6 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     int m_lastScrollFrameTime;
     QList<int> m_selection;
     QPoint m_dragStartPos;
-    ThumbnailWidget *m_dragTarget;
 
     void createScrollTimeLine();
     QElapsedTimer m_scrollFrameTimer;
@@ -91,7 +101,15 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
 
   protected:
     QGraphicsScene m_scene;
-    QList<ThumbnailWidget *> m_thumbnails;
+    // the row model: a count and the set of rows whose content changed since
+    // their thumbnail was last delivered (the widget-level
+    // m_needsFreshThumbnail, lifted out so it survives widget destruction)
+    int m_rowCount = 0;
+    QSet<int> m_invalidated;
+    // the materialized window: widgets for rows near the viewport only
+    QHash<int, ThumbnailWidget *> m_visible;
+    int m_dragHoverIndex = -1;
+
     QScrollBar *m_scrollBar;
     QTimeLine *m_scrollTimeLine;
     QPointF m_viewportCenter;
@@ -118,14 +136,22 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
 
     bool checkRange(int pos);
 
-    virtual ThumbnailWidget *createThumbnailWidget() = 0;
+    // the geometry contract: subclasses compute a row's scene rect, the
+    // window to keep materialized, and place widgets — all without touching
+    // widgets for other rows
+    virtual QRectF cellSceneRect(int index) const = 0;
+    virtual int materializeFirst() const = 0;
+    virtual int materializeLast() const = 0;
+    virtual void placeWidget(ThumbnailWidget *widget, int index) = 0;
+    virtual void updateSceneExtent() = 0;
+    virtual void configureWidget(ThumbnailWidget *widget) const = 0;
+
+    virtual ThumbnailWidget *createThumbnailWidget();
     virtual void syncThumbnailLayout() = 0;
-    virtual void updateLayout();
-    virtual void fitSceneToContents();
     virtual void updateScrollbarIndicator() = 0;
 
     void setOrientation(Qt::Orientation _orientation);
-    Qt::Orientation orientation();
+    Qt::Orientation orientation() const;
 
     void setCropThumbnails(bool);
     void setDrawScrollbarIndicator(bool mode);
@@ -152,4 +178,9 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     void hideEvent(QHideEvent *event) override;
+
+    void materializeWindow();
+    void destroyVisible(int index);
+
+    static int previousSizeFor(const QList<DirectoryViewRow> &rows);
 };

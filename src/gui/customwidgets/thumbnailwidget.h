@@ -39,6 +39,15 @@ class ThumbnailWidget : public QGraphicsWidget {
     void setThumbnail(std::shared_ptr<Thumbnail> _thumbnail);
     void renameThumbnail(const QString &newName);
 
+    // the listing row this widget currently renders; the view's O(1) reverse
+    // lookup replacing the old O(N) m_thumbnails.indexOf
+    void setRowIndex(int index) {
+        m_rowIndex = index;
+    }
+    int rowIndex() const {
+        return m_rowIndex;
+    }
+
     void setHighlighted(bool mode);
     bool isHighlighted();
 
@@ -90,6 +99,7 @@ class ThumbnailWidget : public QGraphicsWidget {
     // assignment, here on the GUI thread — the worker only ever makes QImage
     QPixmap m_displayPixmap;
     bool m_highlighted, m_hovered, m_dropHovered;
+    int m_rowIndex = -1;
     int m_thumbnailSize, m_padding, m_marginX, m_marginY, m_labelSpacing, m_textHeight;
     QRectF m_bgRect, m_boundingRect;
     QFont m_font, m_fontInfo;

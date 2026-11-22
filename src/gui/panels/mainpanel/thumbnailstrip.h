@@ -25,10 +25,8 @@ class ThumbnailStrip : public ThumbnailView {
   private:
     const int m_thumbPadding = 9;
     int m_thumbMarginX = 2, m_thumbMarginY = 4;
-    void updateThumbnailPositions(int start, int end);
-    void updateThumbnailPositions();
-    void setupLayout();
     ThumbnailStyle m_currentStyle;
+    void rebuildWindow();
 
   public slots:
     void focusOn(int index) override;
@@ -38,5 +36,11 @@ class ThumbnailStrip : public ThumbnailView {
     void resizeEvent(QResizeEvent *event) override;
     void updateScrollbarIndicator() override;
     void syncThumbnailLayout() override;
+    void configureWidget(ThumbnailWidget *widget) const override;
     ThumbnailWidget *createThumbnailWidget() override;
+    QRectF cellSceneRect(int index) const override;
+    int materializeFirst() const override;
+    int materializeLast() const override;
+    void placeWidget(ThumbnailWidget *widget, int index) override;
+    void updateSceneExtent() override;
 };

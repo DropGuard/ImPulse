@@ -3,7 +3,6 @@
 target_sources(qimgv_gui PRIVATE
     centralwidget.cpp
     contextmenu.cpp
-    flowlayout.cpp
     idirectoryview.cpp
     ioverlayhost.cpp
     ioverlayhost.h

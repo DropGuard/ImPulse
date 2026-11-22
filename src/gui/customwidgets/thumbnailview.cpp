@@ -47,7 +47,16 @@ ThumbnailView::ThumbnailView(Qt::Orientation _orientation, QWidget *parent)
         m_wayland = true;
 }
 
-Qt::Orientation ThumbnailView::orientation() {
+ThumbnailView::~ThumbnailView() {
+    m_rowCount = 0; // the gate, for any re-entry the disconnects miss
+    m_loadTimer.disconnect();
+    disconnect(horizontalScrollBar(), nullptr, this, nullptr);
+    disconnect(verticalScrollBar(), nullptr, this, nullptr);
+    if(m_scrollTimeLine)
+        m_scrollTimeLine->disconnect();
+}
+
+Qt::Orientation ThumbnailView::orientation() const {
     return m_orientation;
 }
 
@@ -68,7 +77,6 @@ void ThumbnailView::setOrientation(Qt::Orientation _orientation) {
             QGraphicsView::centerOn(m_viewportCenter.x(), value + 1);
         };
     }
-    // todo: layout
 }
 
 void ThumbnailView::hideEvent(QHideEvent *event) {
@@ -125,20 +133,22 @@ void ThumbnailView::setDirectoryPath(QString path) {
     Q_UNUSED(path)
 }
 
+// Highlight is pushed to whichever widgets are materialized; off-window rows
+// carry the selection in m_selection alone and get their highlight when their
+// widget is (re)created by materializeWindow().
 void ThumbnailView::select(QList<int> indices) {
-    for(auto i : std::as_const(m_selection))
-        m_thumbnails.at(i)->setHighlighted(false);
     QList<int>::iterator it = indices.begin();
     while(it != indices.end()) {
         // sanity check
         if(*it < 0 || *it >= itemCount()) {
             it = indices.erase(it);
         } else {
-            m_thumbnails.at(*it)->setHighlighted(true);
             ++it;
         }
     }
     m_selection = indices;
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+        itw.value()->setHighlighted(m_selection.contains(itw.key()));
     updateScrollbarIndicator();
 }
 
@@ -154,7 +164,8 @@ void ThumbnailView::deselect(int index) {
         return;
     if(m_selection.count() > 1) {
         m_selection.removeAll(index);
-        m_thumbnails.at(index)->setHighlighted(false);
+        if(auto *widget = m_visible.value(index))
+            widget->setHighlighted(false);
     }
 }
 
@@ -183,9 +194,9 @@ QList<int> ThumbnailView::selection() {
 }
 
 void ThumbnailView::clearSelection() {
-    for(auto i : std::as_const(m_selection))
-        m_thumbnails.at(i)->setHighlighted(false);
     m_selection.clear();
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+        itw.value()->setHighlighted(false);
 }
 
 int ThumbnailView::lastSelected() {
@@ -195,8 +206,11 @@ int ThumbnailView::lastSelected() {
         return selection().constLast();
 }
 
+// the row count, not the widget count: off-window rows exist in the model
+// without widgets, and everything that used to read m_thumbnails.count() as
+// "last row" reads this instead
 int ThumbnailView::itemCount() {
-    return m_thumbnails.count();
+    return m_rowCount;
 }
 
 void ThumbnailView::show() {
@@ -209,6 +223,7 @@ void ThumbnailView::showEvent(QShowEvent *event) {
     QGraphicsView::showEvent(event);
     // ensure we are properly resized
     qApp->processEvents();
+    updateSceneExtent();
     updateScrollbarIndicator();
     loadVisibleThumbnails();
 }
@@ -222,64 +237,135 @@ void ThumbnailView::populate(int newCount) {
     loadVisibleThumbnails();
 }
 
+// The listing diff, index-based. Widgets that follow their row (via
+// previousIndex) keep identity and loaded pixmaps; rows leaving the window or
+// the listing are destroyed immediately (the reuse pin holds a QPointer);
+// rows entering it are materialized with their full state — highlight,
+// invalidation, drag hover — re-applied from the index-based model.
 void ThumbnailView::applyRows(const QList<DirectoryViewRow> &rows) {
-    auto previous = std::exchange(m_thumbnails, {});
-    QList<int> newIndices(previous.size(), -1);
-    bool layoutChanged = previous.size() != rows.size();
-    bool contentChanged = false;
-    m_thumbnails.reserve(rows.size());
+    QList<int> newIndices(previousSizeFor(rows), -1);
+    for(int index = 0; index < rows.size(); ++index)
+        if(rows[index].previousIndex >= 0 && rows[index].previousIndex < m_rowCount)
+            newIndices[rows[index].previousIndex] = index;
+
+    // selection remap, unchanged semantics
+    QList<int> mappedSelection;
+    for(int index : std::as_const(m_selection)) {
+        const int target = index < newIndices.size() ? newIndices[index] : -1;
+        if(target >= 0)
+            mappedSelection.append(target);
+    }
+    QList<int> mappedRange;
+    for(int index : std::as_const(m_rangeSelectionSnapshot)) {
+        const int target = index < newIndices.size() ? newIndices[index] : -1;
+        if(target >= 0)
+            mappedRange.append(target);
+    }
+    m_selection = mappedSelection;
+    m_rangeSelectionSnapshot = mappedRange;
+    m_rowCount = rows.size();
+
+    // content changes lift into the index-based invalidated set
+    for(int index = 0; index < rows.size(); ++index)
+        if(rows[index].contentChanged)
+            m_invalidated.insert(index);
+
+    // rekey the materialized widgets: a widget follows its row, whatever the
+    // window does
+    QHash<int, ThumbnailWidget *> rekeyed;
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw) {
+        const int newIndex = itw.key() < newIndices.size() ? newIndices[itw.key()] : -1;
+        if(newIndex < 0 || newIndex >= m_rowCount) {
+            delete itw.value();
+            continue;
+        }
+        ThumbnailWidget *widget = itw.value();
+        widget->setRowIndex(newIndex);
+        placeWidget(widget, newIndex);
+        rekeyed.insert(newIndex, widget);
+    }
+    m_visible = std::move(rekeyed);
+
+    // per-row state over the materialized window: renames and invalidation
     for(int index = 0; index < rows.size(); ++index) {
-        const auto &row = rows[index];
-        ThumbnailWidget *widget = nullptr;
-        if(row.previousIndex >= 0 && row.previousIndex < previous.size()) {
-            widget = std::exchange(previous[row.previousIndex], nullptr);
-            if(widget)
-                newIndices[row.previousIndex] = index;
-        }
-        if(!widget) {
-            widget = createThumbnailWidget();
-            widget->setThumbnailSize(m_thumbnailSize);
-            m_scene.addItem(widget);
-            layoutChanged = true;
-        }
-        if(!row.newName.isNull())
-            widget->renameThumbnail(row.newName);
-        if(row.contentChanged) {
+        ThumbnailWidget *widget = m_visible.value(index);
+        if(!widget)
+            continue;
+        if(!rows[index].newName.isNull() && widget->isLoaded)
+            widget->renameThumbnail(rows[index].newName);
+        if(m_invalidated.contains(index))
             widget->invalidateThumbnail();
-            contentChanged = true;
-        }
-        m_thumbnails.append(widget);
-        layoutChanged |= row.previousIndex != index;
     }
 
-    const auto remap = [&newIndices](const QList<int> &selection) {
-        QList<int> mapped;
-        for(int index : selection) {
-            const int target = newIndices.value(index, -1);
-            if(target >= 0)
-                mapped.append(target);
-        }
-        return mapped;
-    };
-    const int previousFocus = lastSelected();
-    m_selection = remap(m_selection);
-    m_rangeSelectionSnapshot = remap(m_rangeSelectionSnapshot);
-    if(layoutChanged)
-        syncThumbnailLayout();
-    qDeleteAll(previous);
-    if(layoutChanged) {
-        updateLayout();
-        fitSceneToContents();
-        updateScrollbarIndicator();
+    materializeWindow();
+    updateSceneExtent();
+    updateScrollbarIndicator();
+}
+
+int ThumbnailView::previousSizeFor(const QList<DirectoryViewRow> &rows) {
+    // the largest referenced previous index + 1 bounds the old listing size
+    int largest = -1;
+    for(const auto &row : rows)
+        largest = qMax(largest, row.previousIndex);
+    return largest + 1;
+}
+
+void ThumbnailView::materializeWindow() {
+    if(m_rowCount == 0) {
+        for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+            delete itw.value();
+        m_visible.clear();
+        return;
     }
-    if(lastSelected() >= 0 && lastSelected() != previousFocus)
-        focusOnSelection();
-    else if(layoutChanged || contentChanged)
-        loadVisibleThumbnails();
+    const int first = qBound(0, materializeFirst(), m_rowCount - 1);
+    const int last = qBound(first, materializeLast(), m_rowCount - 1);
+    // destroy out-of-window widgets
+    for(auto itw = m_visible.begin(); itw != m_visible.end();) {
+        if(itw.key() < first || itw.key() > last) {
+            delete itw.value();
+            itw = m_visible.erase(itw);
+        } else {
+            ++itw;
+        }
+    }
+    // create in-window widgets with their full state
+    for(int index = first; index <= last; ++index) {
+        if(m_visible.contains(index))
+            continue;
+        ThumbnailWidget *widget = createThumbnailWidget();
+        widget->setRowIndex(index);
+        m_scene.addItem(widget);
+        placeWidget(widget, index);
+        widget->setHighlighted(m_selection.contains(index));
+        if(m_dragHoverIndex == index)
+            widget->setDropHovered(true);
+        if(m_invalidated.contains(index))
+            widget->invalidateThumbnail();
+        m_visible.insert(index, widget);
+    }
+}
+
+void ThumbnailView::destroyVisible(int index) {
+    if(auto *widget = m_visible.take(index))
+        delete widget;
+}
+
+ThumbnailWidget *ThumbnailView::createThumbnailWidget() {
+    auto *widget = new ThumbnailWidget();
+    configureWidget(widget);
+    return widget;
 }
 
 void ThumbnailView::setDragHover(int index) {
-    Q_UNUSED(index)
+    if(index == m_dragHoverIndex)
+        return;
+    if(m_dragHoverIndex >= 0)
+        if(auto *widget = m_visible.value(m_dragHoverIndex))
+            widget->setDropHovered(false);
+    m_dragHoverIndex = index;
+    if(index >= 0)
+        if(auto *widget = m_visible.value(index))
+            widget->setDropHovered(true);
 }
 
 void ThumbnailView::setCropThumbnails(bool mode) {
@@ -295,61 +381,47 @@ void ThumbnailView::setDrawScrollbarIndicator(bool mode) {
 }
 
 void ThumbnailView::setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) {
-    if(thumb && thumb->size() == floor(m_thumbnailSize * qApp->devicePixelRatio()) && checkRange(pos)) {
-        m_thumbnails.at(pos)->setThumbnail(thumb);
-    }
+    if(!thumb || thumb->size() != floor(m_thumbnailSize * qApp->devicePixelRatio()) || !checkRange(pos))
+        return;
+    m_invalidated.remove(pos);
+    if(auto *widget = m_visible.value(pos))
+        widget->setThumbnail(thumb);
+    // an off-window delivery is dropped: the row has no widget, and when it
+    // scrolls in, loadVisibleThumbnails re-requests it (cache hit)
 }
 
 void ThumbnailView::unloadAllThumbnails() {
-    for(int i = 0; i < m_thumbnails.count(); i++) {
-        m_thumbnails.at(i)->unsetThumbnail();
-    }
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+        itw.value()->unsetThumbnail();
 }
 
+// The materialize window doubles as the load window: the same viewport +
+// preload band arithmetic names both the widgets that must exist and the
+// rows whose thumbnails must be requested.
 void ThumbnailView::loadVisibleThumbnails() {
     m_loadTimer.stop();
-    if(isVisible() && !m_blockThumbnailLoading) {
-        QRectF visRect = mapToScene(viewport()->geometry()).boundingRect();
-        QRectF offRectBack;
-        QRectF offRectFront;
-        if(m_orientation == Qt::Horizontal) {
-            offRectBack = QRectF(visRect.left() - m_offscreenPreloadArea, visRect.top(), m_offscreenPreloadArea,
-                                 visRect.height());
-            offRectFront = QRectF(visRect.right(), visRect.top(), m_offscreenPreloadArea, visRect.height());
-        } else {
-            offRectBack =
-                QRectF(visRect.left(), visRect.top() - m_offscreenPreloadArea, visRect.width(), m_offscreenPreloadArea);
-            offRectFront = QRectF(visRect.left(), visRect.bottom(), visRect.width(), m_offscreenPreloadArea);
+    if(!isVisible() || m_blockThumbnailLoading || m_rowCount == 0)
+        return;
+    materializeWindow();
+    const int first = qBound(0, materializeFirst(), m_rowCount - 1);
+    const int last = qBound(first, materializeLast(), m_rowCount - 1);
+    QList<int> loadList;
+    bool force = false;
+    for(int index = first; index <= last; ++index) {
+        ThumbnailWidget *widget = m_visible.value(index);
+        if(widget && !widget->isLoaded) {
+            force |= widget->needsFreshThumbnail() || m_invalidated.contains(index);
+            loadList.append(index);
         }
-        QList<QGraphicsItem *> visibleItems;
-        if(m_lastScrollDirection == SCROLL_FORWARDS)
-            visibleItems = m_scene.items(visRect, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder);
-        else
-            visibleItems = m_scene.items(visRect, Qt::IntersectsItemBoundingRect, Qt::DescendingOrder);
-        visibleItems.append(m_scene.items(offRectBack, Qt::IntersectsItemBoundingRect, Qt::DescendingOrder));
-        visibleItems.append(m_scene.items(offRectFront, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder));
-        // select
-        QList<int> loadList;
-        bool force = false;
-        for(int i = 0; i < visibleItems.count(); i++) {
-            ThumbnailWidget *widget = qgraphicsitem_cast<ThumbnailWidget *>(visibleItems.at(i));
-            if(widget && !widget->isLoaded) {
-                force |= widget->needsFreshThumbnail();
-                int idx = m_thumbnails.indexOf(widget);
-                if(!loadList.contains(idx))
-                    loadList.append(idx);
-            }
-        }
-        // load
-        if(loadList.count())
-            emit thumbnailsRequested(loadList, static_cast<int>(qApp->devicePixelRatio() * m_thumbnailSize),
-                                     m_cropThumbnails, force);
-        // unload offscreen
-        if(settings->unloadThumbs()) {
-            for(int i = 0; i < m_thumbnails.count(); i++)
-                if(!visibleItems.contains(m_thumbnails.at(i)))
-                    m_thumbnails.at(i)->unsetThumbnail();
-        }
+    }
+    if(loadList.count())
+        emit thumbnailsRequested(loadList, static_cast<int>(qApp->devicePixelRatio() * m_thumbnailSize),
+                                 m_cropThumbnails, force);
+    // unload pixmaps off-window: widgets stay, pixels go
+    if(settings->unloadThumbs()) {
+        for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+            if(itw.key() < first || itw.key() > last)
+                itw.value()->unsetThumbnail();
     }
 }
 
@@ -391,26 +463,7 @@ bool ThumbnailView::atSceneEnd() {
 }
 
 bool ThumbnailView::checkRange(int pos) {
-    return pos >= 0 && pos < m_thumbnails.count();
-}
-
-void ThumbnailView::updateLayout() {
-}
-
-// fit scene to it's contents size
-void ThumbnailView::fitSceneToContents() {
-    QPointF center;
-    if(this->m_orientation == Qt::Vertical) {
-        int height = qMax(static_cast<int>(m_scene.itemsBoundingRect().height()), this->height());
-        m_scene.setSceneRect(QRectF(0, 0, this->width(), height));
-        center = mapToScene(viewport()->rect().center());
-        QGraphicsView::centerOn(0, center.y() + 1);
-    } else {
-        int width = qMax(static_cast<int>(m_scene.itemsBoundingRect().width()), this->width());
-        m_scene.setSceneRect(QRectF(0, 0, width, this->height()));
-        center = mapToScene(viewport()->rect().center());
-        QGraphicsView::centerOn(center.x() + 1, 0);
-    }
+    return pos >= 0 && pos < m_rowCount;
 }
 
 //################### scrolling ######################
@@ -427,7 +480,6 @@ void ThumbnailView::wheelEvent(QWheelEvent *event) {
             isWheel =
                 angleDelta && (abs(angleDelta) >= 120 && !(angleDelta % 60)) && m_lastTouchpadScroll.elapsed() > 250;
     }
-    //qDebug() << "isWheel:" << isWheel << " angle / pixel delta:" << angleDelta << pixelDelta << lastTouchpadScroll.elapsed() << event->phase() << " wayland:" << wayland;
 
     if(isWheel) {
         angleDelta *= settings->mouseScrollingSpeed();
@@ -469,6 +521,7 @@ void ThumbnailView::scrollPrecise(int delta) {
         m_centerOn(static_cast<int>(m_viewportCenter.x() - delta));
     else
         m_centerOn(static_cast<int>(m_viewportCenter.y() - delta));
+    loadVisibleThumbnails();
 }
 
 // windows explorer-like behavior
@@ -476,35 +529,34 @@ void ThumbnailView::scrollPrecise(int delta) {
 void ThumbnailView::scrollByItem(int delta) {
     // do not scroll less than a certain value in px, to avoid feeling unresponsive
     int minScroll = qMin(thumbnailSize() / 2, 100);
-    // grab fully visible thumbs
     QRectF visRect =
         mapToScene(viewport()->geometry()).boundingRect().adjusted(-minScroll, -minScroll, minScroll, minScroll);
-    QList<QGraphicsItem *> visibleItems;
-    visibleItems = m_scene.items(visRect, Qt::ContainsItemBoundingRect, Qt::AscendingOrder);
-    if(m_thumbnails.isEmpty() || visibleItems.isEmpty())
+    if(m_rowCount == 0 || m_visible.isEmpty())
+        return;
+    int firstVisible = m_rowCount, lastVisible = -1;
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw) {
+        if(cellSceneRect(itw.key()).intersects(visRect)) {
+            firstVisible = qMin(firstVisible, itw.key());
+            lastVisible = qMax(lastVisible, itw.key());
+        }
+    }
+    if(lastVisible < 0)
         return;
     int target = 0;
-    // select scroll target
-    if(delta > 0) { // up / left
-        ThumbnailWidget *widget = qgraphicsitem_cast<ThumbnailWidget *>(visibleItems.first());
-        if(!widget)
-            return;
-        target = m_thumbnails.indexOf(widget) - 1;
-    } else { // down / right
-        ThumbnailWidget *widget = qgraphicsitem_cast<ThumbnailWidget *>(visibleItems.last());
-        if(!widget)
-            return;
-        target = m_thumbnails.indexOf(widget) + 1;
-    }
+    if(delta > 0) // up / left
+        target = firstVisible - 1;
+    else // down / right
+        target = lastVisible + 1;
     scrollToItem(target);
 }
 
+// the scroll target's geometry is arithmetic: a row without a widget is
+// still a rect in the scene
 void ThumbnailView::scrollToItem(int index) {
     if(!checkRange(index))
         return;
-    ThumbnailWidget *item = m_thumbnails.at(index);
     QRectF sceneRect = mapToScene(viewport()->rect()).boundingRect();
-    QRectF itemRect = item->mapRectToScene(item->rect());
+    QRectF itemRect = cellSceneRect(index);
     bool visible = sceneRect.contains(itemRect);
     if(!visible) {
         int delta = 0;
@@ -582,9 +634,9 @@ void ThumbnailView::scrollSmooth(int angleDelta) {
 void ThumbnailView::mousePressEvent(QMouseEvent *event) {
     m_mouseReleaseSelect = false;
     m_dragStartPos = QPoint(0, 0);
-    ThumbnailWidget *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
+    auto *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
     if(item) {
-        int index = m_thumbnails.indexOf(item);
+        int index = item->rowIndex();
         if(event->button() == Qt::LeftButton) {
             if(event->modifiers() & Qt::ControlModifier) {
                 if(!selection().contains(index))
@@ -618,7 +670,7 @@ void ThumbnailView::mouseMoveEvent(QMouseEvent *event) {
         return;
     if(QLineF(m_dragStartPos, event->pos()).length() >= 40) {
         auto *item = dynamic_cast<ThumbnailWidget *>(itemAt(m_dragStartPos));
-        if(item && selection().contains(m_thumbnails.indexOf(item))) {
+        if(item && selection().contains(item->rowIndex())) {
             emit draggedOut();
         }
     }
@@ -627,19 +679,18 @@ void ThumbnailView::mouseMoveEvent(QMouseEvent *event) {
 void ThumbnailView::mouseReleaseEvent(QMouseEvent *event) {
     QGraphicsView::mouseReleaseEvent(event);
     if(m_mouseReleaseSelect && QLineF(m_dragStartPos, event->pos()).length() < 40) {
-        ThumbnailWidget *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
+        auto *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
         if(item) {
-            int index = m_thumbnails.indexOf(item);
-            select(index);
+            select(item->rowIndex());
         }
     }
 }
 
 void ThumbnailView::mouseDoubleClickEvent(QMouseEvent *event) {
     if(event->button() == Qt::LeftButton) {
-        ThumbnailWidget *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
+        auto *item = dynamic_cast<ThumbnailWidget *>(itemAt(event->pos()));
         if(item) {
-            emit itemActivated(m_thumbnails.indexOf(item));
+            emit itemActivated(item->rowIndex());
             return;
         }
     }

@@ -280,3 +280,64 @@ int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+// The view is widget-virtualized: rows near the viewport carry widgets, the
+// rest are a count. These pins keep the materialized window bounded and the
+// index-based state (selection, focus geometry) working across it.
+TEST_F(TestGrid, coldPopulateMaterializesOnlyTheViewportWindow) {
+    coretest::TestableFolderGridView grid;
+    grid.resize(500, 600);
+    const int big = 15413;
+    grid.populate(big);
+    grid.show();
+    // the viewport (~4 rows x 3 cols) plus the 2300px preload band, twice for
+    // band symmetry — anything at or beyond the full listing is a regression
+    // to eager materialization
+    const int materialized = grid.scene()->items().count();
+    EXPECT_LT(materialized, 500) << "materialized widgets for the whole listing";
+    EXPECT_EQ(grid.itemCount(), big) << "the row count is the model, not the widget count";
+}
+
+TEST_F(TestGrid, selectingAndFocusingAnOffWindowRowSurvivesVirtualization) {
+    coretest::TestableFolderGridView grid;
+    grid.resize(500, 600);
+    grid.populate(15413);
+    grid.show();
+    // far beyond any materialized window
+    const int far = 15000;
+    grid.select(far);
+    EXPECT_EQ(grid.selection(), (QList<int>{far}));
+    // the arithmetic geometry scrolls to a row that has no widget
+    grid.focusOn(far);
+    EXPECT_FALSE(grid.verticalScrollBar()->value() == 0) << "focusOn an off-window row did not scroll";
+    // after the scroll, the row's widget is materialized and carries the
+    // highlight the selection promised
+    QTest::qWait(50);
+    bool found = false;
+    const QList<ThumbnailWidget *> highlighted = coretest::orderedThumbnails(grid);
+    for(auto *widget : highlighted)
+        if(widget->rowIndex() == far && widget->isHighlighted())
+            found = true;
+    EXPECT_TRUE(found) << "the selected off-window row did not surface highlighted";
+}
+
+TEST_F(TestGrid, thumbnailDeliveryToAnOffWindowRowIsDroppedAndReRequestedOnScroll) {
+    coretest::TestableFolderGridView grid;
+    grid.resize(500, 600);
+    grid.populate(15413);
+    grid.show();
+    const int far = 15000;
+    auto thumb = std::make_shared<Thumbnail>(QStringLiteral("far.png"), QString(), 120,
+                                             std::make_shared<QImage>(16, 16, QImage::Format_RGB32));
+    // no widget at that index: the delivery is dropped, not crashed into
+    grid.setThumbnail(far, thumb);
+    // scrolling there materializes the row and re-requests its thumbnail
+    grid.focusOn(far);
+    QTest::qWait(50);
+    bool found = false;
+    const QList<ThumbnailWidget *> materialized = coretest::orderedThumbnails(grid);
+    for(auto *widget : materialized)
+        if(widget->rowIndex() == far)
+            found = true;
+    EXPECT_TRUE(found) << "the scrolled-to row did not materialize";
+}

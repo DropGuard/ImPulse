@@ -4,7 +4,6 @@
 
 #include "gui/customwidgets/thumbnailview.h"
 #include "gui/customwidgets/thumbnailwidget.h"
-#include "gui/flowlayout.h"
 #include "utils/stuff.h"
 #include "components/actionmanager/actionmanager.h"
 
@@ -41,14 +40,19 @@ class FolderGridView : public ThumbnailView {
     void setShowLabels(bool mode);
     void focusOn(int index) override;
     void focusOnSelection() override;
-    void setDragHover(int index) override;
 
   private:
-    FlowLayout *m_flowLayout;
-    QGraphicsWidget m_holderWidget;
     int m_shiftedCol;
     void scrollToCurrent();
-    int m_lastDragTarget = -1;
+
+    // the arithmetic layout that replaced FlowLayout: uniform cells wrapped
+    // at perRow columns, centered per row — one prototype widget supplies
+    // the cell size, everything else is derived
+    mutable QSizeF m_cellSize;
+    void refreshCellSize() const;
+    qreal holderWidth() const;
+    int perRow() const;
+    int gridRows() const;
 
   private slots:
     void onitemSelected();
@@ -57,10 +61,19 @@ class FolderGridView : public ThumbnailView {
     void resizeEvent(QResizeEvent *event) override;
     void updateScrollbarIndicator() override;
     void syncThumbnailLayout() override;
-    void setupLayout();
-    ThumbnailWidget *createThumbnailWidget() override;
-    void updateLayout() override;
-    void fitSceneToContents() override;
+    void configureWidget(ThumbnailWidget *widget) const override;
+    void updateSceneExtent() override;
+
+    QRectF cellSceneRect(int index) const override;
+    int materializeFirst() const override;
+    int materializeLast() const override;
+    void placeWidget(ThumbnailWidget *widget, int index) override;
+
+    // the FlowLayout navigation helpers, as pure index arithmetic over perRow
+    int itemAbove(int index) const;
+    int itemBelow(int index) const;
+    int columnOf(int index) const;
+    bool sameRow(int one, int two) const;
 
     void keyPressEvent(QKeyEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
