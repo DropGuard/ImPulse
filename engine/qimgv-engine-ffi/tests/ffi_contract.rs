@@ -682,3 +682,136 @@ fn a_truncated_take_event_still_owes_the_same_event() {
 
     unsafe { qimgv_engine_free(engine) };
 }
+
+#[test]
+fn compare_names_is_the_engines_order_exposed_purely() {
+    // qimgv_engine_compare_names is the engine's own comparator behind an
+    // extern "C" boundary, so a caller that sorts outside the mirror (sibling
+    // navigation) agrees with the view instead of approximating it with a
+    // collator. It touches no engine instance, so this test owns the pure
+    // semantics: sign convention, numeric digit runs, the ascending/descending
+    // mirror, and the null-input answer.
+    let a = CString::new("a").unwrap();
+    let b = CString::new("b").unwrap();
+    let ab = |x: &CString, y: &CString, mode| unsafe {
+        qimgv_engine_compare_names(x.as_ptr(), y.as_ptr(), mode)
+    };
+    // strcmp sign convention: the argument order decides the sign
+    assert!(ab(&a, &b, QIMGV_SORT_NAME) < 0);
+    assert!(ab(&b, &a, QIMGV_SORT_NAME) > 0);
+    assert_eq!(ab(&a, &a, QIMGV_SORT_NAME), 0);
+    // NAME_DESC is the exact mirror, not a different rule
+    assert!(ab(&a, &b, QIMGV_SORT_NAME_DESC) > 0);
+    assert!(ab(&b, &a, QIMGV_SORT_NAME_DESC) < 0);
+    // numeric digit runs compare by value, not lexically: "img2" < "img10"
+    let img2 = CString::new("img2.jpg").unwrap();
+    let img10 = CString::new("img10.jpg").unwrap();
+    assert!(ab(&img2, &img10, QIMGV_SORT_NAME) < 0);
+    // null inputs answer 0 rather than panicking across the ABI
+    unsafe {
+        assert_eq!(
+            qimgv_engine_compare_names(std::ptr::null(), b.as_ptr(), QIMGV_SORT_NAME),
+            0
+        );
+    }
+}
+
+#[test]
+fn export_listing_header_and_row_identity() {
+    // The arena's header (file_count, dir_count, session, revision,
+    // applied_sort, directory) and the per-row id/content_revision are the
+    // snapshot contract: a consumer reads identity and the applied sort from
+    // here, not from the mutation notices. Getting an offset wrong yields a
+    // plausible but wrong listing, so the bytes are decoded and checked here
+    // where the C-ABI semantics are owned.
+    let flag = AtomicBool::new(false);
+    let engine = new_engine(Some("jpg"), true, &flag);
+    assert!(!engine.is_null());
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.jpg"), b"x").unwrap();
+    std::fs::write(dir.path().join("b.jpg"), b"y").unwrap();
+    std::fs::create_dir(dir.path().join("sub")).unwrap();
+    let path_c = CString::new(dir.path().to_str().unwrap()).unwrap();
+    let mut open_epoch: u64 = 0;
+    unsafe {
+        assert_eq!(
+            qimgv_engine_open_dir(engine, path_c.as_ptr(), QIMGV_SORT_NAME, &mut open_epoch),
+            QIMGV_OK
+        );
+    }
+    take_event(engine, Duration::from_secs(5)).expect("no DirListed event");
+
+    let rd32 = |b: &[u8], off: usize| -> u32 {
+        u32::from_le_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]])
+    };
+    let rd64 =
+        |b: &[u8], off: usize| -> u64 { u64::from_le_bytes(b[off..off + 8].try_into().unwrap()) };
+    let mut needed: u32 = 0;
+    let (mut fc, mut dc, mut rev) = (0u32, 0u32, 0u64);
+    unsafe {
+        assert_eq!(
+            qimgv_engine_export_listing(
+                engine,
+                std::ptr::null_mut(),
+                0,
+                &mut needed,
+                &mut fc,
+                &mut dc,
+                &mut rev
+            ),
+            QIMGV_ERR_TRUNCATED
+        );
+        assert!(
+            needed > 32,
+            "the header alone is 32 bytes plus the directory"
+        );
+        let mut arena = vec![0u8; needed as usize];
+        assert_eq!(
+            qimgv_engine_export_listing(
+                engine,
+                arena.as_mut_ptr(),
+                arena.len(),
+                &mut needed,
+                &mut fc,
+                &mut dc,
+                &mut rev
+            ),
+            QIMGV_OK
+        );
+        assert_eq!((fc, dc), (2, 1));
+        assert_eq!(rd32(&arena, 0), 2);
+        assert_eq!(rd32(&arena, 4), 1);
+        assert_eq!(
+            rd64(&arena, 8),
+            open_epoch,
+            "header session must be the open's"
+        );
+        assert_eq!(
+            rd64(&arena, 16),
+            rev,
+            "header revision must match revision_out"
+        );
+        assert_eq!(rd32(&arena, 24) as c_int, QIMGV_SORT_NAME);
+        let dir_len = rd32(&arena, 28) as usize;
+        assert_eq!(
+            &arena[32..32 + dir_len],
+            dir.path().to_str().unwrap().as_bytes(),
+            "the header carries the directory the rows belong to"
+        );
+        // walk the rows: distinct non-zero ids, and the arena consumed exactly
+        let mut off = 32 + dir_len;
+        let mut ids = Vec::new();
+        for _ in 0..(fc + dc) {
+            let id = rd64(&arena, off);
+            assert_ne!(id, 0, "a row with no identity cannot be followed");
+            assert_ne!(rd64(&arena, off + 8), 0, "content_revision starts at 1");
+            ids.push(id);
+            off += 40 + rd32(&arena, off + 32) as usize + rd32(&arena, off + 36) as usize;
+        }
+        assert_eq!(off, arena.len(), "the arena must be consumed exactly");
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), (fc + dc) as usize, "ids are unique");
+        qimgv_engine_free(engine);
+    }
+}

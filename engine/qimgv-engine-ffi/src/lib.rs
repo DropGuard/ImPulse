@@ -110,15 +110,12 @@ pub struct QimgvEvent {
     /// kinds. It carries no authority — nothing compares it, and a listing does
     /// not have to be the same size at the same number — it exists so a line
     /// printed by the engine and a line printed by the C++ mirror can be
-    /// matched by a human reading both. Truncated from the engine's u64 for
-    /// that reason: at 4 billion mutations it wraps, and a wrap changes which
-    /// number is printed, never which event follows which.
+    /// matched by a human reading both.
     pub seq: u64,
-    /// The listing version this event leaves the engine at. A mirror applies
-    /// the event and stores it, so `mirror.revision == export.revision` means
-    /// the rows and that export came from the same listing. Truncated from the
-    /// engine's u64; a wrap moves both sides' numbers together, and equality
-    /// is all that is ever asked.
+    /// Diagnostic version at emission. A snapshot consumer does not compare it
+    /// against its rows: a pull can already include more than the notice that
+    /// woke it, so the export's own revision is what the mirror stores. This
+    /// field exists to name the commit a trace line came from.
     pub revision: u64,
 }
 
@@ -139,8 +136,8 @@ pub struct QimgvMutation {
     pub mtime_ms: i64,
     /// The entry's position in the engine's own order at the time of the
     /// event: where an Added entry was inserted, where a Modified entry sits
-    /// after its metadata re-sort, where a Removed entry lived. The mirror's
-    /// only order decision is to splice at this index.
+    /// after its metadata re-sort, where a Removed entry lived. Diagnostic
+    /// only — it does not index the mirror or a later snapshot.
     pub index: c_int,
 }
 
