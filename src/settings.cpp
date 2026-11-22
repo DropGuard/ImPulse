@@ -144,29 +144,36 @@ void Settings::retirePrivateThumbnailStores(const QString &cacheRoot) {
         done.write(QByteArrayLiteral("thumbnails moved to the freedesktop store\n"));
 }
 
-Settings::Settings(QObject *parent) : QObject(parent) {
+QString Settings::portableConfDir() {
 #if defined(__linux__) || defined(__FreeBSD__)
-    // config files
-    QSettings::setDefaultFormat(QSettings::NativeFormat);
-    m_settingsConf = new QSettings();
-    m_stateConf = new QSettings(QCoreApplication::organizationName(), "savedState");
-    m_themeConf = new QSettings(QCoreApplication::organizationName(), "theme");
+    return QString();
 #else
-    // Portable mode: the conf dir rides the exe — EXCEPT when tests redirect
-    // it. QIMGV_CONF_DIR is what makes FreshSettings' org/app isolation
-    // actually hold on this platform: without it, every test instance shares
-    // one ini next to the binary and the junk-vs-default pins read whatever
-    // the previous unit left behind.
-    const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
-                                 ? QApplication::applicationDirPath() + "/conf"
-                                 : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
-    m_confDir = new QDir(confBase);
-    m_confDir->mkpath(confBase);
-    m_settingsConf =
-        new QSettings(m_confDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
-    m_stateConf = new QSettings(m_confDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
-    m_themeConf = new QSettings(m_confDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
+    return qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR") ? QApplication::applicationDirPath() + "/conf"
+                                                         : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
 #endif
+}
+
+Settings::Settings(QObject *parent) : QObject(parent) {
+    const QString confBase = portableConfDir();
+    if(confBase.isEmpty()) {
+        // config files
+        QSettings::setDefaultFormat(QSettings::NativeFormat);
+        m_settingsConf = new QSettings();
+        m_stateConf = new QSettings(QCoreApplication::organizationName(), "savedState");
+        m_themeConf = new QSettings(QCoreApplication::organizationName(), "theme");
+    } else {
+        // Portable mode: the conf dir rides the exe — EXCEPT when tests redirect
+        // it. QIMGV_CONF_DIR is what makes FreshSettings' org/app isolation
+        // actually hold on this platform: without it, every test instance shares
+        // one ini next to the binary and the junk-vs-default pins read whatever
+        // the previous unit left behind.
+        m_confDir = new QDir(confBase);
+        m_confDir->mkpath(confBase);
+        m_settingsConf =
+            new QSettings(m_confDir->absolutePath() + "/" + qApp->applicationName() + ".ini", QSettings::IniFormat);
+        m_stateConf = new QSettings(m_confDir->absolutePath() + "/savedState.ini", QSettings::IniFormat);
+        m_themeConf = new QSettings(m_confDir->absolutePath() + "/theme.ini", QSettings::IniFormat);
+    }
     fillVideoFormats();
     // cache paths live in the constructor, not in an external protocol: a
     // directly-constructed instance (tests) used to carry uninitialized
@@ -221,9 +228,7 @@ QString Settings::resolveCacheDir() {
     // it outranks QIMGV_CACHE_DIR — the test-isolation twin that names a fresh
     // directory only where no explicit key exists, exactly as the Linux
     // branch's redirected QSettings does.
-    const QString confBase = qEnvironmentVariableIsEmpty("QIMGV_CONF_DIR")
-                                 ? QApplication::applicationDirPath() + "/conf"
-                                 : QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
+    const QString confBase = portableConfDir();
     QSettings conf(confBase + "/" + QCoreApplication::applicationName() + ".ini", QSettings::IniFormat);
     if(conf.contains(QStringLiteral("cacheDir"))) {
         const QString explicitDir = conf.value(QStringLiteral("cacheDir")).toString();

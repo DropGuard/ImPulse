@@ -405,18 +405,10 @@ TEST_F(TestGuiWidgets, resizeDialogSeedsItsFieldsFromTheArgument) {
 
 TEST_F(TestGuiWidgets, themeColorRowsSurviveJunk) {
     FreshSettings fresh;
-    // the conf backend is per-platform: Linux reads QSettings(org, app),
-    // Windows portable mode reads the redirected ini — write through the
-    // SAME backend loadTheme reads, or the junk lands where nothing reads
-    // it back
-#ifdef Q_OS_WIN
-    const QString confBase = QString::fromUtf8(qgetenv("QIMGV_CONF_DIR"));
-    QSettings theme((confBase.isEmpty() ? QCoreApplication::applicationDirPath() + "/conf" : confBase) +
-                        QStringLiteral("/theme.ini"),
-                    QSettings::IniFormat);
-#else
-    QSettings theme(QCoreApplication::organizationName(), "theme");
-#endif
+    // the conf backend is production's decision (see confStoreHandle): the
+    // theme handle must open the SAME store loadTheme reads, or the junk
+    // lands where nothing reads it back
+    QSettings theme = confStoreHandle(QStringLiteral("theme"));
     theme.beginGroup("Colors");
     theme.setValue("background", "banana"); // junk -> default
     theme.setValue("accent", "#ff0000");    // valid -> passes through

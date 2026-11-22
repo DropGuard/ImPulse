@@ -167,6 +167,16 @@ class Settings : public QObject {
     // single source of truth for the cache location, usable before any
     // Settings instance exists (main installs the file log handler with it)
     static QString resolveCacheDir();
+    // THE single derivation of the conf-backend decision: where the portable
+    // conf ini lives (QIMGV_CONF_DIR when set, else beside the exe), or an
+    // empty string where the conf backends read the native org/app store
+    // instead. The constructor builds its handles from it, and the tests that
+    // write junk through the same backend call it too. That second caller is
+    // the point: the per-platform polarity used to be re-derived in eight
+    // test sites as !Q_OS_WIN while production asked __linux__||__FreeBSD__
+    // — the same question answered with inverted words, which on any third
+    // platform would write the junk into a store production never opens.
+    static QString portableConfDir();
     // The pre-XDG private thumbnail store (this identity's) is removed once per
     // cache root. The legacy "qimgv" name is deliberately NOT touched: upstream
     // qimgv uses it too, and making it regenerate its library is the exact waste

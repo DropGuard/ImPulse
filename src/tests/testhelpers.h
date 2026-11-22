@@ -119,6 +119,23 @@ class IsolatedHome {
     QTemporaryDir m_dir;
 };
 
+// A QSettings handle on the SAME conf store the Settings instance reads:
+// tests that write junk through one backend and expect the accessors to
+// answer from it build the handle here instead of re-deriving the backend
+// polarity per file. Construct AFTER FreshSettings — the store follows the
+// redirected env and the fresh applicationName, exactly like the handles the
+// old per-site Q_OS_WIN copies built. The backend decision itself is
+// production's (Settings::portableConfDir); the old copies asked !Q_OS_WIN
+// while production asked __linux__||__FreeBSD__ — inverted words for the
+// same question, which on any third platform would have written the junk
+// into a store production never opens.
+inline QSettings confStoreHandle(const QString &fileStem) {
+    const QString confDir = Settings::portableConfDir();
+    if(confDir.isEmpty())
+        return QSettings(QCoreApplication::organizationName(), fileStem);
+    return QSettings(confDir + "/" + fileStem + ".ini", QSettings::IniFormat);
+}
+
 // Swaps the global `settings` pointer to a brand-new Settings instance bound
 // to a unique config identity, so a test's writes are invisible to every
 // other test and to the original instance. The original pointer (and its

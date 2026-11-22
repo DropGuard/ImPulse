@@ -24,12 +24,7 @@ TEST_F(TestSettingsTable, settingsTableRowsSurviveJunkAndClamps) {
     // the conf backend is per-platform (see FreshSettings): write through
     // the SAME one the Settings instance reads, or the junk lands in a
     // backend the app never opens
-#ifdef Q_OS_WIN
-    QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-                   QSettings::IniFormat);
-#else
-    QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-#endif
+    QSettings junk = confStoreHandle(QCoreApplication::applicationName());
 
     // missing key: every row serves its default
     for(const SettingDesc *d : kAllSettings) {
@@ -119,12 +114,7 @@ TEST_F(TestSettingsTable, jpegSaveQualityServesTheDeclaredDefaultOnJunk) {
     FreshSettings fresh;
     // the conf backend is per-platform (see FreshSettings): write through
     // the SAME one the Settings instance reads
-#ifdef Q_OS_WIN
-    QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-                   QSettings::IniFormat);
-#else
-    QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-#endif
+    QSettings junk = confStoreHandle(QCoreApplication::applicationName());
 
     junk.setValue("JPEGSaveQuality", QVariant(QStringLiteral("banana")));
     junk.sync();
@@ -145,12 +135,7 @@ TEST_F(TestSettingsTable, jpegSaveQualityServesTheDeclaredDefaultOnJunk) {
 // would otherwise hide every case after the first.
 TEST_F(TestSettingsTable, junkFallsBackToTheDeclaredDefaultNotToSomeOtherValue) {
     FreshSettings fresh;
-#ifdef Q_OS_WIN
-    QSettings junk(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-                   QSettings::IniFormat);
-#else
-    QSettings junk(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-#endif
+    QSettings junk = confStoreHandle(QCoreApplication::applicationName());
     const QList<QByteArray> keys{"backgroundOpacity",     "folderViewMode", "thumbPanelStyle",
                                  "memoryAllocationLimit", "imageScrolling", "focusPointIn1to1Mode"};
     for(const QByteArray &k : keys)
@@ -183,12 +168,7 @@ TEST_F(TestSettingsTable, junkFallsBackToTheDeclaredDefaultNotToSomeOtherValue) 
 // the machinery audit above does not.
 TEST_F(TestSettingsTable, outOfRangeSettingsResolveThroughTheirAccessors) {
     FreshSettings fresh;
-#ifdef Q_OS_WIN
-    QSettings probe(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-                    QSettings::IniFormat);
-#else
-    QSettings probe(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-#endif
+    QSettings probe = confStoreHandle(QCoreApplication::applicationName());
 
     struct Item {
         const SettingDesc *row = nullptr;
@@ -485,14 +465,7 @@ TEST_F(TestSettingsTable, scriptsRoundTripAsJsonNotMetatypeShells) {
     // The probe must read the SAME backend saveScripts wrote: portable
     // mode keeps the conf in the redirected ini, and the org/app mapping
     // would answer from a store nothing here wrote
-    QSettings probe(
-#ifdef Q_OS_WIN
-        QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-        QSettings::IniFormat
-#else
-        QCoreApplication::organizationName(), QCoreApplication::applicationName()
-#endif
-    );
+    QSettings probe = confStoreHandle(QCoreApplication::applicationName());
     probe.beginGroup("Scripts");
     const QVariant raw = probe.value("script/1/value");
     probe.endGroup();
@@ -502,12 +475,7 @@ TEST_F(TestSettingsTable, scriptsRoundTripAsJsonNotMetatypeShells) {
 
 TEST_F(TestSettingsTable, scriptsFallBackToPreJsonPlainKeys) {
     FreshSettings fresh;
-#ifdef Q_OS_WIN
-    QSettings conf(QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-                   QSettings::IniFormat);
-#else
-    QSettings conf(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-#endif
+    QSettings conf = confStoreHandle(QCoreApplication::applicationName());
     conf.beginGroup("Scripts");
     conf.beginWriteArray("script");
     conf.setArrayIndex(0);
@@ -532,14 +500,7 @@ TEST_F(TestSettingsTable, resolveCacheDirHonorsExplicitCacheDirKey) {
     FreshSettings fresh;
     const QString alt =
         QDir::tempPath() + QStringLiteral("/qimgv-cache-alt-%1").arg(QCoreApplication::applicationPid());
-    QSettings conf(
-#ifdef Q_OS_WIN
-        QString::fromUtf8(qgetenv("QIMGV_CONF_DIR")) + "/" + QCoreApplication::applicationName() + ".ini",
-        QSettings::IniFormat
-#else
-        QCoreApplication::organizationName(), QCoreApplication::applicationName()
-#endif
-    );
+    QSettings conf = confStoreHandle(QCoreApplication::applicationName());
     conf.setValue(QStringLiteral("cacheDir"), alt);
     conf.sync();
     EXPECT_EQ(Settings::resolveCacheDir(), alt);
