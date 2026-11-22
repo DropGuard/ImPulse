@@ -88,9 +88,13 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '^engine/.*\.rs$'
     fi
 fi
 
-# the static-analysis gate is pinned to its instrument: a foreign toolchain
-# fails it BY DESIGN (the fingerprint names the change), and a machine without
-# the tools cannot scan anything — skipping loudly is the honest state there.
+# the static-analysis gate is pinned to its instrument, per machine: the
+# baseline ledger is grouped by fingerprint (scripts/lint.py), so each box is
+# judged by its own instrument's rows — a toolchain update that moves counts
+# under rows it once measured still fails BY DESIGN, while an instrument with
+# no group and no rows anywhere runs unprotected (every finding is NEW on its
+# own). A machine without the tools cannot scan anything — skipping loudly is
+# the honest state there.
 if ! have python3 && ! [ -x "$PYTHON_CMD" ]; then
     echo "pre-commit: python3 not found — lint gate skipped" >&2
 elif ! have cppcheck || ! have clang-tidy; then
