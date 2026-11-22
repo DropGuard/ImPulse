@@ -118,10 +118,19 @@ TEST_F(TestListing, theMirrorRevisionTracksTheEngineItApplied) {
 // the current row.
 TEST_F(TestListing, siblingNavigationUsesTheEnginesNameOrder) {
     resetFixture();
-    // two siblings whose names differ only in case: the case-sensitive
-    // filesystem keeps them distinct, and the engine's tiebreak decides
+    // Two siblings whose names differ only in case pin the exact collator
+    // divergence — but that pair cannot exist on a case-insensitive file
+    // system (DEVELOPING.md: `IMG2.jpg` and `img2.jpg` are one name), so the
+    // Windows branch uses a non-colliding pair. Both branches still assert the
+    // contract that survives either way: the sibling walk follows the engine's
+    // order, not a re-derived one.
+#ifdef Q_OS_WIN
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("CaseDir"));
+    EXPECT_TRUE(QDir(m_fixtureDir).mkdir("ALPHADir")); // non-colliding: no case twin
+#else
     EXPECT_TRUE(QDir(m_fixtureDir).mkdir("CaseDir"));
     EXPECT_TRUE(QDir(m_fixtureDir).mkdir("casedir"));
+#endif
 
     DirectoryManager dm{EngineBridge::instance()};
     EXPECT_TRUE(dm.setDirectory(m_fixtureDir));
@@ -139,10 +148,13 @@ TEST_F(TestListing, siblingNavigationUsesTheEnginesNameOrder) {
         cur = dm.adjacentDirectory(cur, true, SORT_NAME);
     }
     EXPECT_EQ(walked, rows) << "the sibling walk and the rows disagreed";
-    // the case pair is the part a collator gets wrong: both are present, and
-    // their relative order is the engine's, not ICU's
     EXPECT_TRUE(rows.contains(QStringLiteral("CaseDir")));
+#ifndef Q_OS_WIN
+    // the case pair is the part a collator gets wrong: both are present, and
+    // their relative order is the engine's, not ICU's — only meaningful where
+    // the two are distinct entries
     EXPECT_TRUE(rows.contains(QStringLiteral("casedir")));
+#endif
 }
 
 TEST_F(TestListing, missingDirectoryFailsFast) {
