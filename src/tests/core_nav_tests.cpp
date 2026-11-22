@@ -1117,12 +1117,29 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     writeImage(longFile);
 #ifdef Q_OS_WIN
     HANDLE held = INVALID_HANDLE_VALUE; // the compile-time fact: the lock mechanism
-    if(!QFileInfo::exists(longFile)) {
+    // Staging the name is half the premise; the other half is that the trash
+    // REFUSES it — a host with long-path support, or a trash whose own path
+    // still fits, would take the name happily. The premise is verified with
+    // a sacrificial twin of the same name length: where the twin is trashed,
+    // the long name is not a refusal and the lock answers instead.
+    const QString twin = QDir(m_alpha).filePath(QString(250, QLatin1Char('p')) + QStringLiteral(".png"));
+    writeImage(twin);
+    FileOpResult twinResult = FileOpResult::OTHER_ERROR;
+    if(QFileInfo::exists(twin))
+        FileOperations::moveToTrash(twin, twinResult);
+    if(!QFileInfo::exists(longFile) || twinResult == FileOpResult::SUCCESS) {
         longFile = QDir(m_alpha).filePath(QStringLiteral("locked.png"));
         writeImage(longFile);
         held = CreateFileW(reinterpret_cast<const WCHAR *>(longFile.utf16()), GENERIC_READ | GENERIC_WRITE,
                            0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         EXPECT_TRUE(held != INVALID_HANDLE_VALUE) << "the lock fixture failed to open the refusable subject";
+    }
+    if(QFileInfo::exists(twin)) {
+        // refused, so still in place: the twin must not join the listing the
+        // test is about to navigate
+        FileOpResult cleanup = FileOpResult::OTHER_ERROR;
+        FileOperations::removeFile(twin, cleanup);
+        EXPECT_EQ(cleanup, FileOpResult::SUCCESS);
     }
 #else
     EXPECT_TRUE(QFileInfo::exists(longFile)) << "the refusable subject failed to stage on a POSIX host";
