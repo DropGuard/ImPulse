@@ -116,7 +116,11 @@ incremental build + the full ctest set + `lint --gate`
 mechanical staged-path check, with watcher/fd.rs, watcher/fd_windows.rs and
 engine.rs excluded because their tests are the ones Miri refuses. The hook is **CMake
 self-installing**: every configure points `core.hooksPath` at
-`scripts/hooks` — clone → configure → build is itself the install step.
+`scripts/hooks` — clone → configure → build is itself the install step. It arms
+wherever the tree configures, on both dev platforms: the Windows box runs this
+same gate end to end (verified 2026-11-22 from its Git Bash), and it works from
+any shell because the tests carry their toolchain PATH from configure time
+(TEST_ENV) rather than trusting the invoking shell's.
 The lint gate used to be a manual ritual, and the stretch it stayed a
 memory (2026-11-09/10) is what let #636's and #612's findings ride into
 history on green suites alone; it then sat at push time because a full
