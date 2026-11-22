@@ -5,12 +5,14 @@ name: ci
 # could not build this tree again, which is why Windows CI sat out for a
 # while). What CI can and should carry is the pipeline the repo already
 # trusts locally — the build with its zero-warning contract, the ctest
-# suites, and the Rust suite. The deep checks (the lint gate, the sanitizer
-# tree, Miri) stay out of the per-push path: the gate's clazy counts are
-# baseline-sensitive to the toolchain version and belong to the pre-commit
-# gate on the machine that owns the baseline, and the sanitizer and
-# interpreter runs pay minutes the push path does not need to pay. They run
-# on the nightly schedule instead, and on demand.
+# suites, and the Rust suite. The sanitizer tree and Miri stay out of the
+# per-push path — they pay minutes the push does not need to pay — and run
+# nightly and on demand. The lint gate was nightly too, until the rolling
+# toolchains made its per-push run the one instrument that sees what the dev
+# machines cannot: LLVM 23's seven findings (2026-11-22) arrived with a
+# package update rather than a push, and the per-push gate caught them the
+# same hour. Baseline-sensitive counts on a drifting toolchain are the
+# false-alarm class that buys it.
 on:
   push:
     branches: [rustcore]
