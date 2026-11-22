@@ -7,6 +7,11 @@
 # are filtered out of the scan (GATED/REPORT/FROZEN below), with the rationale
 # in lint-baseline.txt.
 #
+# Every text-mode open() names its encoding: Python's default is the ANSI
+# codepage on Windows (GBK on a zh-CN box, not UTF-8), and the baseline's
+# comments carry UTF-8 punctuation that codepage cannot decode — the gate died
+# inside open(BASELINE) on the first Windows run before comparing a count.
+#
 #   scripts/lint.py [build-dir]          report only
 #   scripts/lint.py [build-dir] --gate   fail if any count moved
 #   scripts/lint.py [build-dir] --no-cache   bypass the cache entirely
@@ -120,7 +125,7 @@ def read_exemptions():
     """{(tool, relpath): reason} — empty when the file is absent."""
     out = {}
     try:
-        lines = open(EXEMPT).read().splitlines()
+        lines = open(EXEMPT, encoding='utf-8').read().splitlines()
     except OSError:
         return out
     for line in lines:
@@ -136,7 +141,7 @@ def entries():
     db = os.path.join(BUILD, 'compile_commands.json')
     if not os.path.exists(db):
         sys.exit(f'no compile_commands.json in {BUILD} — configure that directory first')
-    return [e for e in json.load(open(db)) if not any(s in e['file'] for s in SKIP)]
+    return [e for e in json.load(open(db, encoding='utf-8')) if not any(s in e['file'] for s in SKIP)]
 
 def resolve(tool):
     # The tool goes to CreateProcess as a bare name, and CreateProcess searches
@@ -289,7 +294,7 @@ def depfile_path(e):
 
 def read_deps(e):
     try:
-        text = open(depfile_path(e)).read()
+        text = open(depfile_path(e), encoding='utf-8').read()
     except OSError:
         return None
     text = text.replace('\\\n', ' ')
@@ -344,7 +349,7 @@ def cache_read(tool, key):
     if key is None:
         return None
     try:
-        return open(os.path.join(CACHE, tool, key + '.out')).read()
+        return open(os.path.join(CACHE, tool, key + '.out'), encoding='utf-8').read()
     except OSError:
         return None
 
@@ -353,7 +358,7 @@ def cache_write(tool, key, out):
         return
     d = os.path.join(CACHE, tool)
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, key + '.out'), 'w') as f:
+    with open(os.path.join(d, key + '.out'), 'w', encoding='utf-8') as f:
         f.write(out)
 
 def cache_gc(sub, used, suffix):
@@ -538,9 +543,9 @@ def cppcheck_counts():
     # its keys would flap every key on the next run (observed: warm run 0 hits)
     os.makedirs(CACHE, exist_ok=True)
     db = os.path.join(CACHE, 'compile_commands.cppcheck.json')
-    db_entries = json.load(open(raw_db))
+    db_entries = json.load(open(raw_db, encoding='utf-8'))
     kept = [e for e in db_entries if not any(s in e['file'] for s in SKIP)]
-    with open(db, 'w') as f:
+    with open(db, 'w', encoding='utf-8') as f:
         json.dump(kept, f)
     # no --quiet: the progress lines ("Checking <file> ...") are the liveness
     # signal — cppcheck answers a broken invocation (phantom -i, unresolvable
@@ -632,7 +637,7 @@ def main():
     base = {}
     base_fp = None
     if os.path.exists(BASELINE):
-        for line in open(BASELINE):
+        for line in open(BASELINE, encoding='utf-8'):
             if line.strip() and not line.startswith('#'):
                 parts = line.split()
                 if parts[0] == 'instrument':
