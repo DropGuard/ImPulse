@@ -41,6 +41,17 @@ class FileOperations {
     static void removeDir(const QString &dirPath, bool recursive, FileOpResult &result);
     static void moveToTrash(const QString &filePath, FileOpResult &result);
 
+    // Create a REAL symbolic link. QFile::link is the wrong API here: its
+    // documented Windows contract is a shortcut ("be it a shortcut on Windows
+    // or a symbolic link on Unix"), so a directory copy that trusted it would
+    // degrade every link into a .lnk file. What the copy/move guard needs is
+    // a real symlink, and on Windows that means the platform's own
+    // CreateSymbolicLinkW. The unprivileged-create flag lets a Developer-Mode
+    // machine make links without elevation, and where no privilege exists the
+    // failure is loud instead of a .lnk that pretends to be a link. Unix
+    // keeps QFile::link, whose contract there is the symlink itself.
+    static bool createSymlink(const QString &target, const QString &linkPath);
+
     static QString decodeResult(const FileOpResult &result);
 
     // The desktop's "file (1).jpg" pattern, owned here: the first

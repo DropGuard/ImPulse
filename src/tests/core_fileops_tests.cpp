@@ -241,9 +241,14 @@ TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
     const QString realDir = QDir(srcDir).filePath("real");
     EXPECT_TRUE(QDir().mkpath(realDir));
     makeTxt(realDir, "inside.txt", "inner");
-    // a link to a sibling directory, and one pointing back at the parent
-    EXPECT_TRUE(QFile::link(realDir, QDir(srcDir).filePath("linkdir")));
-    EXPECT_TRUE(QFile::link(srcDir, QDir(realDir).filePath("up")));
+    // a link to a sibling directory, and one pointing back at the parent.
+    // REAL symlinks via FileOperations::createSymlink: QFile::link writes a
+    // .lnk shortcut on Windows, which would test the copy against shortcut
+    // files. Where the host grants no link privilege, skip loudly - the same
+    // discipline as the unreadable-fixture skips.
+    if(!FileOperations::createSymlink(realDir, QDir(srcDir).filePath("linkdir")) ||
+       !FileOperations::createSymlink(srcDir, QDir(realDir).filePath("up")))
+        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
 
     const QString destDir = QDir(m_base).filePath("linkdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
@@ -384,8 +389,9 @@ TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
     const QString realDir = QDir(srcDir).filePath("real");
     EXPECT_TRUE(QDir().mkpath(realDir));
     makeTxt(realDir, "inside.txt", "inner");
-    EXPECT_TRUE(QFile::link(realDir, QDir(srcDir).filePath("linkdir")));
-    EXPECT_TRUE(QFile::link(srcDir, QDir(realDir).filePath("up")));
+    if(!FileOperations::createSymlink(realDir, QDir(srcDir).filePath("linkdir")) ||
+       !FileOperations::createSymlink(srcDir, QDir(realDir).filePath("up")))
+        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
 
     const QString destDir = QDir(m_base).filePath("mvdst");
     EXPECT_TRUE(QDir().mkpath(destDir));

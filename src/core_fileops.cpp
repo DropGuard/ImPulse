@@ -330,11 +330,16 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
         const QString entryPath = srcDir.absolutePath() + "/" + entry;
         if(QFileInfo(entryPath).isSymLink()) {
             // Copy the LINK, not what it points at: QFile::copy follows the
-            // link and would duplicate the target's contents (measured).
-            const QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            // link and would duplicate the target's contents (measured). A
+            // target the reader refuses to name (or a relative one) is
+            // re-anchored to the absolute resolved path, so the recreation
+            // lands correctly wherever the destination sits.
+            QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            if(linkTarget.isEmpty())
+                linkTarget = QFileInfo(entryPath).canonicalFilePath();
             const QString linkDest = dstDir.absolutePath() + "/" + entry;
             QFile::remove(linkDest);
-            QFile::link(linkTarget, linkDest);
+            FileOperations::createSymlink(linkTarget, linkDest);
             continue;
         }
         doInteractiveCopy(entryPath, dstDir.absolutePath(), overwriteFiles);
@@ -431,11 +436,22 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
             // Move the LINK, not its target: QFile::copy (which moveFileTo
             // uses) follows it. Recreate the same link at the destination and
             // drop the original; a failure here is reported like any other.
-            const QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            // Same re-anchoring as the copy: a relative or unnamed target
+            // must not recreate the link against the wrong directory.
+            QString linkTarget = QFileInfo(entryPath).symLinkTarget();
+            if(linkTarget.isEmpty())
+                linkTarget = QFileInfo(entryPath).canonicalFilePath();
             const QString linkDest = dstDir.absolutePath() + "/" + entry;
             QFile::remove(linkDest);
-            if(QFile::link(linkTarget, linkDest))
-                QFile::remove(entryPath);
+            if(FileOperations::createSymlink(linkTarget, linkDest)) {
+                // The link goes with the move. QFile::remove cannot delete a
+                // directory symlink on Windows (DeleteFileW answers
+                // ACCESS_DENIED on a directory reparse point), so a failed
+                // unlink falls back to the directory removal, which deletes
+                // the link itself and never the target.
+                if(!QFile::remove(entryPath))
+                    QDir().rmdir(entryPath);
+            }
             continue;
         }
         doInteractiveMove(entryPath, dstDir.absolutePath(), overwriteFiles);

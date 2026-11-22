@@ -3,6 +3,7 @@
 #include "utils/stuff.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QImage>
 #include <QSaveFile>
 
@@ -467,6 +468,31 @@ bool FileOperations::carryMetadata(const QString &source, const QString &dest, b
     Q_UNUSED(source)
     Q_UNUSED(dest)
     Q_UNUSED(resetOrientation)
+    return false;
+#endif
+}
+
+bool FileOperations::createSymlink(const QString &target, const QString &linkPath) {
+#ifndef Q_OS_WIN32
+    return QFile::link(target, linkPath);
+#else
+    // The unprivileged-create flag is accepted since Windows 10 build 14972;
+    // older builds reject it outright with ERROR_INVALID_PARAMETER, so fall
+    // back to the plain call and let the privilege error speak for itself.
+#ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
+#define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
+#endif
+    const DWORD flags =
+        (QFileInfo(target).isDir() ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0) | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+    const QString linkName = QDir::toNativeSeparators(linkPath);
+    const QString targetName = QDir::toNativeSeparators(target);
+    if(::CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(linkName.utf16()), reinterpret_cast<LPCWSTR>(targetName.utf16()),
+                             flags))
+        return true;
+    if(::GetLastError() == ERROR_INVALID_PARAMETER)
+        return ::CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(linkName.utf16()),
+                                     reinterpret_cast<LPCWSTR>(targetName.utf16()),
+                                     flags & ~SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != 0;
     return false;
 #endif
 }
