@@ -358,9 +358,13 @@ TEST_F(TestThumbnailStore, savedThumbnailsAndTheirDirectoriesArePrivate) {
     const coretest::Capability bits = coretest::modeBits();
     if(!bits.ok)
         GTEST_SKIP() << qPrintable(bits.reason);
-    EXPECT_EQ(int(st.st_mode & 07777), 0600);
+    // st_mode is mode_t: unsigned short on the Windows CRT, and the integer
+    // promotion of THAT is signed int — LLVM 23's signed-bitwise census
+    // names the expression the moment it compiles here instead of hiding
+    // behind the old #else. The reads stay unsigned end to end.
+    EXPECT_EQ(int(unsigned(st.st_mode) & 07777u), 0600);
     EXPECT_TRUE(::stat(QFileInfo(path).absolutePath().toLocal8Bit().constData(), &st) == 0);
-    EXPECT_EQ(int(st.st_mode & 07777), 0700);
+    EXPECT_EQ(int(unsigned(st.st_mode) & 07777u), 0700);
 }
 
 // A zoom step must not be a new file: the request is answered from a bucket
