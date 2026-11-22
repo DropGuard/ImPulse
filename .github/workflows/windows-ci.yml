@@ -16,19 +16,27 @@ name: windows-ci
 # Deliberately NO aqtinstall: Qt 6.12 comes from the msys2 packages, so the
 # job never faces the Qt-download problem the aqt-based Linux job did.
 #
-# Trigger policy: workflow_dispatch and pushes to the integration trunk (and
-# to windows-port while that branch is still the port's workbench). The
-# per-push iteration loop is the local pre-commit gate — the machine that
-# owns the code runs the full build and suite set in ~2 minutes — so CI here
-# is not the dev loop, it is the fresh-clone confirmation: it catches what a
-# warm local tree cannot see (package-set drift in the rolling msys2 repos,
-# a configure step that quietly depended on local state). The old
-# msys2-test.yml (created 51278bec) predates the engine rework and was a
-# stub; this job is its replacement, written from the measured local recipe.
+# Trigger policy: workflow_dispatch, pushes to the integration trunk, and a
+# weekly schedule. The per-push iteration loop is the local pre-commit gate —
+# the machine that owns the code runs the full build and suite set in ~2
+# minutes — so CI here is not the dev loop, it is the fresh-clone
+# confirmation: it catches what a warm local tree cannot see (a configure
+# step that quietly depended on local state). The rolling msys2 repos are a
+# different problem: a per-push run paid the update pass every time and could
+# inherit a drifted package set mid-review, so per-push now runs the frozen
+# cached package set and the drift promise moved to the schedule — the
+# weekly run downloads fresh and updates to the rolling tip, naming a broken
+# package bump within a week instead of on every push. The sentinel runs
+# cache:false so the drifted environment it builds can never flow back into
+# the frozen set the per-push runs restore. The old msys2-test.yml (created
+# 51278bec) predates the engine rework and was a stub; this job is its
+# replacement, written from the measured local recipe.
 on:
   workflow_dispatch:
   push:
     branches: [rustcore]
+  schedule:
+    - cron: "0 4 * * 1"
 # A newer push makes an older run's verdict irrelevant: cancel it rather than
 # let it finish behind the new one. `github.ref` keeps a tag push and a branch
 # push from cancelling each other.
@@ -53,11 +61,16 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANG64
-          update: true
+          # the weekly sentinel rides the rolling repos (update + fresh env);
+          # per-push runs the frozen cached set — see the trigger comment above
+          update: ${{ github.event_name == 'schedule' }}
           release: false
           # the pacman package cache: 230s of the job was downloading and
-          # unpacking the same packages on every run
-          cache: true
+          # unpacking the same packages on every run. Off on the schedule:
+          # the sentinel must measure the repos as they are, and a post-update
+          # environment saved into the cache would flow the drift back into
+          # the frozen set every per-push run restores.
+          cache: ${{ github.event_name != 'schedule' }}
           install: >-
             git
             mingw-w64-clang-x86_64-toolchain
