@@ -100,6 +100,12 @@ jobs:
           key: ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ runner.os }}-clang64-${{ hashFiles('.github/workflows/windows-ci.yml') }}-
+      # the frozen cache is the pin, and a pin you cannot read is not one:
+      # this prints the restored package set into the run's log, so "which Qt
+      # did that run test against" has an answer that does not rot (the
+      # sentinel run's own log shows its update pass instead)
+      - name: record the package set
+        run: pacman -Q
       # the lint gate's per-TU verdict cache (build/.lint-cache): LINT alone
       # was 378s of the suites step on this runner. Same pattern as ccache —
       # the key carries the commit, restore-keys falls back to the newest
