@@ -5,8 +5,8 @@ WallpaperSetter::WallpaperSetter() {
 
 void WallpaperSetter::setWallpaper(const QString &path) {
 #ifdef _WIN32
-    bool ok =
-        SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, (PVOID)path.utf16(), SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
+    bool ok = SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, const_cast<ushort *>(path.utf16()),
+                                   SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
     qDebug() << "wallpaper changed:" << (ok ? "true" : "false");
 #elif defined(__linux__) || defined(__FreeBSD__)
     QString command;

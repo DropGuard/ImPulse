@@ -107,18 +107,32 @@ with tempfile.TemporaryDirectory() as tmp:
     # The other half is that the run must be CACHED with its status: a crash
     # that only shows on a cold run turns into a silent zero the moment the
     # output is reused, and the gate would go green on the second invocation.
-    fake = os.path.join(tmp, 'fake-clazy')
-    write(fake, '#!/bin/sh\n'
-                '# the instrument fingerprint runs every tool with --version first\n'
-                'case "$*" in\n'
-                '  *--version*) echo "clazy version 1.17"; exit 0 ;;\n'
-                '  *b.cpp*) echo "Assertion `x == 1` failed." >&2; exit 134 ;;\n'
-                '  *) exit 0 ;;\n'
-                'esac\n')
-    os.chmod(fake, 0o755)
+    # A stand-in compiled with the same c++ the db commands name. A #!/bin/sh
+    # script cannot be exec'd by CreateProcess on Windows (WinError 193), and
+    # the stand-in must be a real executable on both platforms for the exit
+    # status - the whole signal this section pins - to exist at all.
+    fake_src = (
+        '#include <stdio.h>\n'
+        '#include <string.h>\n'
+        'int main(int argc, char **argv) {\n'
+        '    int version = 0, hit = 0;\n'
+        '    for (int i = 1; i < argc; i++) {\n'
+        '        if (strstr(argv[i], "--version")) version = 1;\n'
+        '        if (strstr(argv[i], "b.cpp")) hit = 1;\n'
+        '    }\n'
+        '    if (version) { printf("clazy version 1.17\\n"); return 0; }\n'
+        '    if (hit) { fprintf(stderr, "Assertion `x == 1` failed.\\n"); return 134; }\n'
+        '    return 0;\n'
+        '}\n'
+    )
+    fake = os.path.join(tmp, 'clazy-standalone')
+    if os.name == 'nt':
+        fake += '.exe'
+    r = subprocess.run(['c++', '-x', 'c', '-', '-o', fake], input=fake_src,
+                       capture_output=True, text=True)
+    check(r.returncode == 0, f'the stand-in clazy did not compile: {r.stderr}')
     env = dict(os.environ)
     env['PATH'] = tmp + os.pathsep + env.get('PATH', '')
-    os.rename(fake, os.path.join(tmp, 'clazy-standalone'))
 
     def lint_env(build, *args):
         return subprocess.run([sys.executable, LINT, build, *args],

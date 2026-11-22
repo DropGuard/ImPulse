@@ -191,7 +191,7 @@ TEST_F(TestSettingsTable, outOfRangeSettingsResolveThroughTheirAccessors) {
 #endif
 
     struct Item {
-        const SettingDesc *row;
+        const SettingDesc *row = nullptr;
         std::function<double()> get;
     };
     const QList<Item> items{

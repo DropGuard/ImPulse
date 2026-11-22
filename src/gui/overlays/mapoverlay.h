@@ -66,7 +66,7 @@ class MapOverlay : public QWidget {
     void mouseReleaseEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void leaveEvent(QEvent *) override;
-    virtual void enterEvent(QEvent *);
+    void enterEvent(QEnterEvent *event) override;
 
   private:
     bool m_visibilityEnabled = false, m_imageDoesNotFit = false;

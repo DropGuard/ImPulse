@@ -154,7 +154,7 @@ class DirectoryManager : public QObject {
     QTimer *m_rescanTimer = nullptr; // the mechanism behind Scheduled, not state
     int m_rejectedListings = 0;      // consecutive refusals, for the log level
     struct PendingListed {
-        qint64 token;
+        qint64 token = 0;
         QString dir;
         std::function<void()> action;
     };

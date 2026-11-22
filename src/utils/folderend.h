@@ -16,7 +16,7 @@ enum class Outcome {
 };
 
 struct Decision {
-    Outcome outcome;
+    Outcome outcome = Outcome::ReportBoundary;
     int index = -1; // only meaningful for LoadIndex
 };
 

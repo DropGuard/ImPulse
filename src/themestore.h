@@ -14,7 +14,7 @@ enum ColorSchemes {
 };
 
 struct BaseColorScheme {
-    int tid;
+    int tid = 0;
     QColor background;
     QColor background_fullscreen;
     QColor text;

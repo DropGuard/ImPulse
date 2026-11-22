@@ -452,11 +452,12 @@ void Core::setWallpaper() {
     if((status == ERROR_SUCCESS) && (hKey != NULL)) {
         LPCTSTR value = TEXT("WallpaperStyle");
         LPCTSTR data = TEXT("10");
-        status = RegSetValueEx(hKey, value, 0, REG_SZ, (LPBYTE)data, _tcslen(data) + 1);
+        status = RegSetValueEx(hKey, value, 0, REG_SZ, reinterpret_cast<const BYTE *>(data), _tcslen(data) + 1);
         RegCloseKey(hKey);
     }
     // set wallpaper path
-    SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, (char *)(selectedPath().toStdWString().c_str()),
+    const std::wstring wall = selectedPath().toStdWString();
+    SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, const_cast<LPWSTR>(wall.c_str()),
                           SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
 #else
     // detached, not ScriptManager::runCommand: the blocking variant froze the

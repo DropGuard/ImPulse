@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <QObject>
 #include <QKeyEvent>
@@ -308,7 +308,7 @@ class ActionManager : public QObject {
     // table token produced it ("Enter" expands to two sequences, so squinting
     // at sc->key() would miss half the claim).
     struct SurfaceClaim {
-        QShortcut *shortcut;
+        QShortcut *shortcut = nullptr;
         QString token;
     };
     QList<SurfaceClaim> m_documentProjections; // the document table's claims

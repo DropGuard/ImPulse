@@ -13,7 +13,7 @@
 #include "utils/folderend.h"
 #include "utils/randomizer.h"
 
-class State;
+struct State;
 class Image;
 class DirectoryModel;
 class DirectoryPresenter;

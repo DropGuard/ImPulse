@@ -179,9 +179,9 @@ class WorkerPool {
 
   private:
     struct Entry {
-        PoolOwner owner;
-        int priority;
-        unsigned long seq; // FIFO within one priority
+        PoolOwner owner = PoolOwner{};
+        int priority = 0;
+        unsigned long seq = 0; // FIFO within one priority
         std::unique_ptr<PoolJob> job;
     };
     // A running job's owner and address, for the duration of run(). The record is

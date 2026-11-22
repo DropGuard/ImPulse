@@ -378,7 +378,7 @@ ThumbnailCache::PurgeReport ThumbnailCache::purgeOlderThan(int days, qint64 byte
 
     struct Entry {
         QString path;
-        qint64 size;
+        qint64 size = 0;
         QDateTime mtime;
     };
     QVector<Entry> ours;

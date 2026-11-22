@@ -26,7 +26,7 @@
 # instead of flags guessed at here — a hand-rolled cppcheck invocation once
 # reported this tree as unanalyzable, which is how a tool that scans nothing
 # looks identical to one that works.
-import collections, concurrent.futures, hashlib, json, os, re, subprocess, sys
+import collections, concurrent.futures, hashlib, json, os, re, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = next((a for a in sys.argv[1:] if not a.startswith('-')), os.path.join(ROOT, 'build'))
@@ -60,6 +60,18 @@ REPORT = ['-Wold-style-cast', '-Wsuggest-override']
 #   cppcheck passedByValue / duplInheritedMember — Qt's implicit sharing and
 #   signal re-declaration idioms make these recommendations wrong here.
 FROZEN = {'duplInheritedMember'}  # passedByValue re-armed at zero (2026-11-05)
+# gcc-family findings that name Qt's own macro contract, not tree code: the
+# qCDebug(category) streaming form omits the macro's variadic slot BY DESIGN,
+# and clang names the invocation site. Unfixable at the call site, so the
+# family is counted nowhere.
+GCC_FROZEN = {'variadic-macro-arguments-omitted'}
+# families whose findings live only in test files, where the shape is the
+# test's own vocabulary: an EXPECT guards the optional the macro hides from
+# tidy's dataflow, a bench reads its own argv, a test main may throw into the
+# harness. Exempted under /tests/ only - production code stays armed.
+TEST_NOISE = {'bugprone-unchecked-optional-access',
+              'bugprone-unchecked-string-to-number-conversion',
+              'bugprone-exception-escape'}
 # clang-tidy: the bugprone census (2026-11-10). Excluded at selection, not
 # post-filtered — the gate stops paying to re-derive judged noise (same
 # philosophy as REPORT driving the gcc pass). Rationale per family lives in
@@ -73,7 +85,7 @@ TIDY_EXCLUDE = ['bugprone-narrowing-conversions',
 # m_ prefix on private/protected members, no prefix on public ones), and it is
 # part of the gate so the convention cannot rot the way an unenforced one did.
 TIDY_CHECKS = '-*,bugprone-*,readability-identifier-naming' + ''.join(',-' + c for c in TIDY_EXCLUDE)
-DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+)\]$')
+DIAG = re.compile(r'^((?:[A-Za-z]:)?[\\/][^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+)\]$')
 # The check set is explicit, not clazy's default. AGENTS.md documents
 # level0,level1,detaching for the build-clazy tree, where clazy is the compiler
 # and reads CLAZY_CHECKS from the environment; clazy-standalone does NOT read
@@ -88,10 +100,14 @@ DIAG = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[-?W?([a-z0-9-]+
 # "Invalid check: detaching" on every TU and ran level0,level1 anyway. Passing
 # it never changed a verdict, which is exactly why it survived.
 CLAZY_CHECKS = 'level0,level1'
-CLAZY = re.compile(r'^(/[^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
-TIDY = re.compile(r'^(/[^:]+):(\d+):\d+: (?:warning|error): .*?\[((?:bugprone|readability)-[a-z0-9-]+)(?:,.*)?\]$')
-CPPCHECK = re.compile(r'^(/[^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
-SKIP = ('/3rdparty/', '_autogen/', '/corrosion/')
+CLAZY = re.compile(r'^((?:[A-Za-z]:)?[\\/][^:]+):(\d+):\d+: warning: .* \[-Wclazy-([a-z0-9-]+)\]$')
+TIDY = re.compile(r'^((?:[A-Za-z]:)?[\\/][^:]+):(\d+):\d+: (?:warning|error): .*?\[((?:bugprone|readability)-[a-z0-9-]+)(?:,.*)?\]$')
+CPPCHECK = re.compile(r'^((?:[A-Za-z]:)?[\\/][^:]+):(\d+):\d+: (?:style|warning|performance|portability): .* \[([a-zA-Z0-9_]+)\]$')
+# .rc is a Windows resource script: windres compiles it (so the compile db
+# lists it as a TU), none of the four tools can read it, and cppcheck's
+# coverage assertion would then name it as silently unchecked. Not review
+# surface - excluded at the source like the generated directories above.
+SKIP = ('/3rdparty/', '_autogen/', '/corrosion/', '.rc')
 
 # Known tool failures, tracked like the baseline and for the same reason: an
 # exempted TU is documented, reviewed data, not a silent hole. The format is
@@ -122,6 +138,16 @@ def entries():
         sys.exit(f'no compile_commands.json in {BUILD} — configure that directory first')
     return [e for e in json.load(open(db)) if not any(s in e['file'] for s in SKIP)]
 
+def resolve(tool):
+    # The tool goes to CreateProcess as a bare name, and CreateProcess searches
+    # the running interpreter's own directory BEFORE PATH - which, on this
+    # toolchain, is the real clazy's home, so a bare name can never be
+    # shadowed by a PATH entry and the LINT_CACHE stand-in could not exist.
+    # shutil.which honors PATH order, which is the contract the stand-in (and
+    # anyone pinning one tool over another) needs; falling back to the bare
+    # name keeps the missing tool loud on machines that have none.
+    return shutil.which(tool) or tool
+
 def instrument_versions(srcs):
     # Verdicts belong to the tool that issued them. A compiler or clazy upgrade
     # moves counts under an unchanged (file, command) set, and the gate would
@@ -131,7 +157,7 @@ def instrument_versions(srcs):
     # version first and its own ("clazy version 1.17") on the third line, so a
     # first-line slice would miss exactly the tool whose counts proved unstable.
     tools = sorted({e['command'].split()[0] for e in srcs}) + ['clazy-standalone', 'clang-tidy', 'cppcheck']
-    return [[t, run_status([t, '--version'], ROOT)[0].strip()] for t in tools]
+    return [[t, run_status([resolve(t), '--version'], ROOT)[0].strip()] for t in tools]
 
 def fingerprint(srcs):
     # The baseline counts are only meaningful for the instrument state that
@@ -145,6 +171,39 @@ def fingerprint(srcs):
     payload = json.dumps([[e['file'], e['command']] for e in srcs] + instrument_versions(srcs),
                          sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+def split_argv(cmd):
+    # The compile db's command field is shell-escaped, but CMake on Windows
+    # mixes the two conventions: quotes are POSIX-escaped (\") while paths stay
+    # native backslashes. shlex mangles that in both modes - posix=True eats
+    # every path backslash, posix=False leaves \" in the -D values and the
+    # preprocessor dies on the mangled command line (measured: 153 TUs of
+    # <command line> warnings and zero verdicts). This splitter honors both
+    # conventions at once: backslashes are literal except before a quote,
+    # quotes group and carry the escape - which is exactly what a shell would
+    # hand the compiler on either platform.
+    out, cur, in_quote, i = [], [], False, 0
+    while i < len(cmd):
+        c = cmd[i]
+        if c == '\\' and i + 1 < len(cmd) and cmd[i + 1] == '"':
+            cur.append('"')
+            i += 2
+            continue
+        if c == '"':
+            in_quote = not in_quote
+            i += 1
+            continue
+        if c in ' \t' and not in_quote:
+            if cur:
+                out.append(''.join(cur))
+                cur = []
+            i += 1
+            continue
+        cur.append(c)
+        i += 1
+    if cur:
+        out.append(''.join(cur))
+    return out
 
 def run_status(cmd, cwd, timeout=1800):
     """Output AND exit status.
@@ -162,7 +221,18 @@ def run_status(cmd, cwd, timeout=1800):
     forever instead of naming the file.
     """
     try:
-        p = subprocess.run(cmd, shell=isinstance(cmd, str), cwd=cwd,
+        # argv, never a shell. The compile db hands us argv joined with
+        # spaces, and splitting it back is the faithful round-trip; handing
+        # the string to a shell on Windows means cmd.exe, whose parser
+        # answers the forward-slash tokens a clang command line is full of
+        # with "The syntax of the command is incorrect" - a finished, silent,
+        # zero-finding run (measured: every gcc-family TU read as clean while
+        # nothing was compiled and no depfile was written). The db's commands
+        # carry no shell syntax beyond quoting, so the split loses nothing;
+        # the list-form tool invocations below already ran this way. posix        # stays off on Windows so native backslash paths survive the split.
+        if isinstance(cmd, str):
+            cmd = split_argv(cmd)
+        p = subprocess.run(cmd, cwd=cwd,
                            capture_output=True, text=True, timeout=timeout)
         # subprocess reports a signalled child as the negated signal number
         # (-6 for SIGABRT). The shell's 128+n convention is what a reader
@@ -222,7 +292,17 @@ def read_deps(e):
         text = open(depfile_path(e)).read()
     except OSError:
         return None
-    return text.replace('\\\n', ' ').partition(':')[2].split()
+    text = text.replace('\\\n', ' ')
+    # The make target separator is ': ' - never the first colon. A Windows
+    # drive letter ("C:\\x") owns a colon of its own, and splitting on it
+    # turned the target into a token ("\\path\\a.cpp.o:") that no open() can
+    # resolve, poisoning the content hashes: the key went None, cache_write
+    # stored nothing, and every run after the first was a miss (measured: the
+    # whole LINT_CACHE contract flapped to (0, 2) warm).
+    head, sep, tail = text.partition(': ')
+    if not sep:
+        head, sep, tail = text.partition(':')
+    return tail.split()
 
 def content_hashes(files, memo):
     # None on any unreadable file: the caller must treat the whole key as a
@@ -330,7 +410,7 @@ def gcc_counts(srcs, versions, memo):
     def parse_gcc(out, found):
         for line in out.splitlines():
             m = DIAG.match(line)
-            if m:
+            if m and m.group(3) not in GCC_FROZEN:
                 found[m.group(3)].add((m.group(1), m.group(2)))
     # LINT_JOBS caps the parallel gcc fan-out (the pass that runs one process
     # per core by default). Unset means full cores; 0 or an empty value means
@@ -359,7 +439,7 @@ def clazy_counts(srcs, version, memo):
         out = cache_read('clazy', key)
         hit = out is not None
         if not hit:
-            out, status = run_status(['clazy-standalone', '-p', BUILD, '--checks=' + CLAZY_CHECKS, e['file']],
+            out, status = run_status([resolve('clazy-standalone'), '-p', BUILD, '--checks=' + CLAZY_CHECKS, e['file']],
                                      ROOT)
             # The status is cached with the output: a crashed TU stays visible
             # on a warm run instead of becoming a silent zero once cached.
@@ -372,7 +452,7 @@ def clazy_counts(srcs, version, memo):
                 # INSTANTIATE_TEST_SUITE_P expands to a global object holding
                 # the parameter table, and gtest constructs it before main by
                 # design. Flagging the framework's own shape teaches nothing.
-                if m.group(3) == 'non-pod-global-static' and '/tests/' in m.group(1):
+                if m.group(3) == 'non-pod-global-static' and '/tests/' in m.group(1).replace('\\', '/'):
                     continue
                 found[m.group(3)].add((m.group(1), m.group(2)))
         if unfinished(status_of(out)):
@@ -405,16 +485,20 @@ def clang_tidy_counts(srcs, version, memo):
             # default suppresses header diagnostics, which is where a member
             # declaration lives — measured: a probe field in cache.h passed
             # unseen until the filter moved into the project config.
-            out, status = run_status(['clang-tidy', '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
+            out, status = run_status([resolve('clang-tidy'), '-p', BUILD, '--checks=' + TIDY_CHECKS, '--quiet', e['file']], ROOT)
             out = f'{STATUS_PREFIX}{status}\n' + out
             cache_write('clang-tidy', key, out)
         for line in out.splitlines():
             m = TIDY.match(line)
             if m:
-                # unchecked-optional's hits are all in tests/, where QVERIFY
-                # guards the access but the macro is invisible to tidy's
-                # dataflow. Production code stays armed.
-                if m.group(3) == 'bugprone-unchecked-optional-access' and '/tests/' in m.group(1):
+                # TEST_NOISE's hits are all in tests/, where the guard is the
+                # test's own: QVERIFY is invisible to tidy's dataflow, a bench
+                # reads its argv, a test main may throw into the harness.
+                # Production code stays armed. The path check is
+                # separator-agnostic: Windows diagnostics spell it with
+                # backslashes, and a '/tests/' probe against them never
+                # matched (measured: 36 findings rode straight through).
+                if m.group(3) in TEST_NOISE and '/tests/' in m.group(1).replace('\\', '/'):
                     continue
                 # Generated code is not review surface: with --header-filter=.*
                 # the ui_*.h AUTOGEN output comes back too, and its reserved
@@ -462,7 +546,7 @@ def cppcheck_counts():
     # signal — cppcheck answers a broken invocation (phantom -i, unresolvable
     # project) with one error line, exit code 0, and zero findings, which is
     # indistinguishable from a clean scan unless coverage is asserted.
-    cmd = ['cppcheck', f'--project={os.path.abspath(db)}',
+    cmd = [resolve('cppcheck'), f'--project={os.path.abspath(db)}',
            '--library=qt', '--suppress=unknownMacro', '--suppress=syntaxError',
            '--suppress=missingIncludeSystem',
            '--enable=warning,performance,portability', '--inline-suppr']
@@ -509,6 +593,16 @@ def show(name, found):
                 print(f'          {path}:{line}')
         counts[check] = len(sites)
     return counts
+
+def rel_to_root(path):
+    # os.path.relpath cannot cross drives on Windows: the repo lives on one
+    # and the scanned tree (or the cache test's temp dir) may live on another,
+    # and a cross-drive relpath is a ValueError that would take the whole
+    # crash report down instead of naming the TU. A same-drive path shortens;
+    # a different drive is already as short as it gets.
+    if os.path.splitdrive(path)[0].lower() != os.path.splitdrive(ROOT)[0].lower():
+        return path
+    return os.path.relpath(path, ROOT)
 
 def main():
     srcs = entries()
@@ -557,7 +651,7 @@ def main():
     for tool, crash_list in (('gcc', gcc_crashes), ('clazy', clazy_crashes),
                              ('clang-tidy', tidy_crashes)):
         for path, status, first in sorted(crash_list):
-            rel = os.path.relpath(path, ROOT)
+            rel = rel_to_root(path)
             if (tool, rel) in exemptions:
                 # Documented and reviewed: the reason lives in
                 # scripts/lint-exempt.txt beside the bug it belongs to. Still

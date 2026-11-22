@@ -109,3 +109,18 @@ instrument c6395492fe177ecd
 # iterateByValue — retired at zero on 2026-11-10: the range-loop sweep's
 # const-ref elements removed cppcheck's one site (its own view of the same
 # disease range-loop-reference counted).
+#
+# --- clang64 adoption, 2026-11-22 -----------------------------------------
+# The Windows toolchain (msys2 clang64, LLVM 22.1.8, newer cppcheck) scanned
+# the tree for the first time; the table stays empty, with dispositions made
+# with the owner and the rationale beside the filters in scripts/lint.py:
+#   gcc variadic-macro-arguments-omitted - GCC_FROZEN: Qt's
+#     qCDebug(category) streaming form omits the macro's variadic slot by
+#     design; clang names the invocation site, the contract is Qt's.
+#   tidy bugprone-unchecked-optional-access / -string-to-number-conversion /
+#   exception-escape under /tests/ - TEST_NOISE: the tests' own guards are
+#     invisible to tidy's dataflow, and the old '/tests/' probe never matched
+#     Windows backslash paths (measured: 36 findings rode straight through).
+#   19 product-code sites fixed in the same commit the census landed
+#   (mismatched-tags, old-style-cast, overloaded-virtual, member-init 12):
+#   each pinned by this gate returning to an empty table on a cold scan.

@@ -82,8 +82,8 @@ class SettingsDialog : public QDialog {
     QVector<CheckBinding> m_checks;
 
     struct ComboBinding {
-        QComboBox *box;
-        const SettingDesc *desc;
+        QComboBox *box = nullptr;
+        const SettingDesc *desc = nullptr;
         QStringList values; // combo index -> stored value
         QString fallback;   // used when the stored value is not in the list
     };

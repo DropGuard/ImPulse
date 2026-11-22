@@ -55,7 +55,7 @@ bool writeBig(const QString &path, const QSize &size, const char *format) {
 
 struct Arrival {
     QString path;
-    qint64 at; // round-clock ms at delivery
+    qint64 at = 0; // round-clock ms at delivery
 };
 
 struct FlightReport {
