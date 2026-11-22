@@ -43,12 +43,9 @@ static std::string makeFixture() {
     fs::create_directory(dir / "subdir");
     // the wire hands paths back in the form the caller opened with — Qt's
     // forward slashes on Windows — so the fixture is built forward too and
-    // the string compares below mean the same thing on both platforms
-    std::string out = dir.string();
-#ifdef _WIN32
-    std::replace(out.begin(), out.end(), '\\', '/');
-#endif
-    return out;
+    // the string compares below mean the same thing on both platforms.
+    // generic_string() IS that forward-slash form, on every platform.
+    return dir.generic_string();
 }
 
 int main() {

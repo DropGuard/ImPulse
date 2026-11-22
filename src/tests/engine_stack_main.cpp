@@ -26,16 +26,17 @@ int main(int argc, char **argv) {
     const QString mine = base + "/pid" + QString::number(QCoreApplication::applicationPid());
     QDir(mine).removeRecursively();
     QDir(base).mkpath(QFileInfo(mine).fileName());
-#ifdef Q_OS_WIN
-    // the /proc sweep is the Linux idiom for "is that pid still alive"; the
-    // orphan dirs are per-pid and self-limiting, so Windows only guarantees its
-    // own tree is clean rather than guessing at liveness without it
-#else
-    const QStringList orphans = QDir(base).entryList(QStringList() << QStringLiteral("pid*"), QDir::Dirs);
-    for(const QString &stale : orphans)
-        if(!QFile::exists(QStringLiteral("/proc/%1").arg(stale.mid(3))))
-            QDir(base + "/" + stale).removeRecursively();
-#endif
+    // The /proc sweep is the Linux idiom for "is that pid still alive", and
+    // the probe is the filesystem itself: where /proc exists, dead orphans
+    // are identified and swept; where it does not, sweeping would delete the
+    // trees of LIVE processes, so only this process's own tree was guaranteed
+    // clean above (the orphan dirs are per-pid and self-limiting either way).
+    if(QFile::exists(QStringLiteral("/proc/self"))) {
+        const QStringList orphans = QDir(base).entryList(QStringList() << QStringLiteral("pid*"), QDir::Dirs);
+        for(const QString &stale : orphans)
+            if(!QFile::exists(QStringLiteral("/proc/%1").arg(stale.mid(3))))
+                QDir(base + "/" + stale).removeRecursively();
+    }
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

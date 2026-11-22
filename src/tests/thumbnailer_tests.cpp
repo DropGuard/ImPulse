@@ -72,14 +72,14 @@ TEST_F(TestThumbnailer, waitForProcessKillsARealProcessOnTheMark) {
     CancelToken token;
     token.request();
     QProcess process;
-#ifdef Q_OS_WIN
-    // sleep is coreutils; the always-present Windows face of "a process
-    // that runs for 30 seconds" is ping against the loopback (one second
-    // per -n beyond the first, killable mid-wait)
-    process.start("cmd", {"/c", "ping", "-n", "31", "127.0.0.1"});
-#else
+    // sleep is coreutils — the POSIX face of "a process that runs for 30
+    // seconds"; the always-present Windows spelling is ping against the
+    // loopback (one second per -n beyond the first, killable mid-wait). The
+    // spelling is probed, not assumed: where the host cannot start the first,
+    // the second answers.
     process.start("sleep", {"30"});
-#endif
+    if(!process.waitForStarted(2000))
+        process.start("cmd", {"/c", "ping", "-n", "31", "127.0.0.1"});
     EXPECT_TRUE(process.waitForStarted(2000));
     QElapsedTimer t;
     t.start();
@@ -90,11 +90,11 @@ TEST_F(TestThumbnailer, waitForProcessKillsARealProcessOnTheMark) {
 
 TEST_F(TestThumbnailer, waitForProcessWithoutATokenWaitsInTheOneCall) {
     QProcess process;
-#ifdef Q_OS_WIN
-    process.start("cmd", {"/c", "exit", "0"});
-#else
+    // probe-first spelling, same as the 30-second sibling above: "true" is
+    // coreutils, cmd's exit 0 is the always-present Windows face
     process.start("true");
-#endif
+    if(!process.waitForStarted(2000))
+        process.start("cmd", {"/c", "exit", "0"});
     EXPECT_TRUE(process.waitForStarted(2000));
     ThumbnailerRunnable::waitForProcess(process, nullptr, 8000);
     EXPECT_EQ(process.state(), QProcess::NotRunning);

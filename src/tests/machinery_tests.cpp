@@ -285,13 +285,18 @@ TEST_F(TestMachinery, scriptBlockingRunCompletesWithoutError) {
     auto sm = ScriptManager::getInstance();
     QSignalSpy errored(sm, &ScriptManager::error);
     EXPECT_TRUE(errored.isValid());
-#ifdef Q_OS_WIN
     // /bin/true is a POSIX face of "a command that exits 0"; the always-
-    // present Windows spelling is cmd /c exit
-    sm->addScript("true-bin", Script(QStringLiteral("cmd /c exit 0"), true));
-#else
-    sm->addScript("true-bin", Script("/bin/true", true));
-#endif
+    // present Windows spelling is cmd /c exit. The spelling is probed, not
+    // assumed — the same shape the thumbnailer's process-spawn tests use.
+    {
+        QProcess probe;
+        probe.start(QStringLiteral("/bin/true"));
+        const QString exitedZero =
+            probe.waitForStarted(2000) ? QStringLiteral("/bin/true") : QStringLiteral("cmd /c exit 0");
+        probe.kill();
+        probe.waitForFinished(1000);
+        sm->addScript("true-bin", Script(exitedZero, true));
+    }
     sm->runScript("true-bin", nullptr);
     // runScript blocks internally, so nothing is pending: drain rather than
     // sleep, and the assertion means "the queue had nothing in it"

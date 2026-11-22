@@ -455,14 +455,11 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
     resetFixture();
     EXPECT_TRUE(writeBigImage(m_fixtureDir + "/src.png", "png", QSize(8, 8)));
     QFile src(m_fixtureDir + "/src.png");
-#ifdef Q_OS_WIN
-    // futimens works through an O_RDONLY fd for the file's owner;
-    // SetFileTime needs FILE_WRITE_ATTRIBUTES, which a read-only open
-    // does not carry — the write-capable open changes no bytes
+    // futimens accepts a read-only handle on POSIX, but SetFileTime needs
+    // FILE_WRITE_ATTRIBUTES, which a read-only open does not carry — the
+    // write-capable open is the one path both platforms accept, and it
+    // changes no bytes
     EXPECT_TRUE(src.open(QIODevice::ReadWrite));
-#else
-    EXPECT_TRUE(src.open(QIODevice::ReadOnly));
-#endif
     EXPECT_TRUE(src.setFileTime(QDateTime(QDate(2020, 1, 2), QTime(3, 4, 5)), QFileDevice::FileModificationTime));
     src.close();
     QDir().mkpath(m_fixtureDir + "/destdir");
@@ -498,17 +495,15 @@ TEST_F(TestImageOps, fileOperationsCopyMoveRenameMatrices) {
     // that with wall-clock time; setting it says it directly, cannot be
     // shortened by a coarse clock, and costs nothing.
     EXPECT_TRUE(writeBigImage(m_fixtureDir + "/newer.png", "png", QSize(8, 8)));
-#ifdef Q_OS_WIN
     {
+        // one portable path: setFileTime through a write-capable open (the
+        // read-only alternative only exists on POSIX, where futimens accepts
+        // it; SetFileTime needs FILE_WRITE_ATTRIBUTES)
         QFile backdate(m_fixtureDir + "/newer.png");
         EXPECT_TRUE(backdate.open(QIODevice::ReadWrite));
         EXPECT_TRUE(backdate.setFileTime(QDateTime::fromSecsSinceEpoch(before.toSecsSinceEpoch() - 60),
                                          QFileDevice::FileModificationTime));
     }
-#else
-    const struct timespec stamp[2] = {{0, UTIME_OMIT}, {before.toSecsSinceEpoch() - 60, 0}};
-    EXPECT_TRUE(::utimensat(AT_FDCWD, (m_fixtureDir + "/newer.png").toLocal8Bit().constData(), stamp, 0) == 0);
-#endif
     FileOperations::copyFileTo(m_fixtureDir + "/newer.png", m_fixtureDir + "/destdir", true, result);
     EXPECT_EQ(result, FileOpResult::SUCCESS);
     QFileInfo overwritten(m_fixtureDir + "/destdir/renamed.png");

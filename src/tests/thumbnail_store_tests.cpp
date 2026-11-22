@@ -24,20 +24,17 @@
 #include <sys/stat.h>
 #include <time.h>
 
-// The mtime the cache's clocks read, set to whole-second epochs: utimensat on
-// POSIX; Qt's setFileTime over a ReadWrite open on Windows (utimensat is
-// POSIX-only, and a WriteOnly open would truncate). Returns success -- the
+// The mtime the cache's clocks read, set to whole-second epochs through ONE
+// portable path: Qt's setFileTime over a write-capable open. futimens accepts
+// a read-only handle on POSIX, but SetFileTime needs FILE_WRITE_ATTRIBUTES,
+// which a read-only open does not carry — the write-capable open is the one
+// path both platforms accept, and it changes no bytes. Returns success -- the
 // callers QVERIFY it, so a silent no-op cannot fake an aged file.
 static bool setMTimeSecs(const QString &path, qint64 secs) {
-#ifdef Q_OS_WIN
     QFile f(path);
     if(!f.open(QIODevice::ReadWrite))
         return false;
     return f.setFileTime(QDateTime::fromSecsSinceEpoch(secs), QFileDevice::FileModificationTime);
-#else
-    const struct timespec times[2] = {{0, UTIME_OMIT}, {secs, 0}};
-    return ::utimensat(AT_FDCWD, path.toLocal8Bit().constData(), times, 0) == 0;
-#endif
 }
 
 class TestThumbnailStore : public ::testing::Test, protected EngineStackFixture {
@@ -177,24 +174,32 @@ TEST_F(TestThumbnailStore, anUnreadableSourceIsNeitherReadNorWritten) {
     EXPECT_TRUE(cache.exists(source, 128));
 
     QFileInfo locked(source);
+    // The refusal channel is the host's choice, so it is probed. POSIX
+    // refuses through mode bits (chmod 0 — isReadable() answers false);
+    // Windows has no mode bits — Qt's ACL-derived isReadable() answers true
+    // for anything that exists — and its denial channel is sharing: a file
+    // held open with no sharing cannot be opened for read by anyone, and the
+    // cache's open-probe is what refuses. Qt has no portable share-none
+    // open, so the lock is the one compile-time fact left here; bits are
+    // tried first, and where they refuse, the portable channel answered.
+    const bool bitsRefused = QFile::setPermissions(source, QFile::Permissions()) && !locked.isReadable();
 #ifdef Q_OS_WIN
-    // mode bits do not exist here — Qt's ACL-derived isReadable() answers
-    // true for anything that exists. The platform's denial channel is
-    // sharing: a file held open with no sharing cannot be opened for read
-    // by anyone, and the cache's open-probe is what refuses.
-    HANDLE held = CreateFileW(reinterpret_cast<const WCHAR *>(source.utf16()), GENERIC_READ | GENERIC_WRITE,
-                              0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    EXPECT_TRUE(held != INVALID_HANDLE_VALUE) << "the lock fixture failed to open the source";
+    HANDLE held = INVALID_HANDLE_VALUE;
+    if(!bitsRefused) {
+        held = CreateFileW(reinterpret_cast<const WCHAR *>(source.utf16()), GENERIC_READ | GENERIC_WRITE,
+                           0 /* no sharing */, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        EXPECT_TRUE(held != INVALID_HANDLE_VALUE) << "the lock fixture failed to open the source";
+    }
 #else
-    EXPECT_TRUE(::chmod(source.toLocal8Bit().constData(), 0) == 0);
-    EXPECT_TRUE(!locked.isReadable());
+    EXPECT_TRUE(bitsRefused) << "the mode-bit refusal did not hold on a POSIX host";
 #endif
     EXPECT_TRUE(!cache.read(source, 128, locked).has_value())
         << "an unreadable original must not be served from the cache";
     EXPECT_TRUE(!cache.save(picture, source, 128, locked, QSize(64, 64), false, false))
         << "nothing may be written for an unreadable original, the failure marker included";
 #ifdef Q_OS_WIN
-    EXPECT_TRUE(CloseHandle(held));
+    if(held != INVALID_HANDLE_VALUE)
+        EXPECT_TRUE(CloseHandle(held));
 #else
     ::chmod(source.toLocal8Bit().constData(), 0644);
 #endif
