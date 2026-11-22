@@ -248,7 +248,7 @@ TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
     // discipline as the unreadable-fixture skips.
     if(!FileOperations::createSymlink(realDir, QDir(srcDir).filePath("linkdir")) ||
        !FileOperations::createSymlink(srcDir, QDir(realDir).filePath("up")))
-        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+        GTEST_SKIP() << coretest::kSymlinkPrivilegeSkip;
 
     const QString destDir = QDir(m_base).filePath("linkdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
@@ -391,7 +391,7 @@ TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
     makeTxt(realDir, "inside.txt", "inner");
     if(!FileOperations::createSymlink(realDir, QDir(srcDir).filePath("linkdir")) ||
        !FileOperations::createSymlink(srcDir, QDir(realDir).filePath("up")))
-        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+        GTEST_SKIP() << coretest::kSymlinkPrivilegeSkip;
 
     const QString destDir = QDir(m_base).filePath("mvdst");
     EXPECT_TRUE(QDir().mkpath(destDir));

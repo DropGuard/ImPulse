@@ -141,16 +141,14 @@ TEST_F(TestFileOps, copyFileToRejectsADirectoryCollision) {
 }
 
 TEST_F(TestFileOps, copyFileToReportsAnUnwritableDestination) {
-    // act runs its container as root, and root ignores permission bits — "unwritable" is not
-    // expressible there. The pin needs a user account to exist. Windows has no
-    // POSIX permission-bit model either (a directory's read-only attribute does
-    // not stop file creation), so this pin stays where its premise holds.
-#ifdef Q_OS_WIN
-    GTEST_SKIP() << "windows: permission bits cannot make a destination unwritable";
-#else
-    if(geteuid() == 0)
-        GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
-#endif
+    // The premise "a directory that refuses file creation" is the host's to
+    // grant, not the compile target's — root ignores permission bits, ACL
+    // storage has none. The empirical probe stages 0x5555 and answers on
+    // what actually happened, so no compile-time assumption speaks for a
+    // machine it never saw.
+    const coretest::Capability unwritable = coretest::unwritableDirectories();
+    if(!unwritable.ok)
+        GTEST_SKIP() << qPrintable(unwritable.reason);
     resetFixture();
     QString src = makeFile(m_fixtureDir + "/a.txt", "x");
     QString destDir = m_fixtureDir + "/rodest";
@@ -193,16 +191,11 @@ TEST_F(TestFileOps, moveFileToMovesContentAndRemovesTheSource) {
 // completed: the destination holds the file, the source is still there, and
 // SOURCE_NOT_REMOVED says so in those words.
 TEST_F(TestFileOps, moveFileToReportsASourceItCouldNotRemove) {
-    // act runs its container as root, and root ignores permission bits — "unwritable" is not
-    // expressible there. The pin needs a user account to exist. Windows has no
-    // POSIX permission-bit model either (a directory's read-only attribute does
-    // not stop file creation), so this pin stays where its premise holds.
-#ifdef Q_OS_WIN
-    GTEST_SKIP() << "windows: permission bits cannot make a destination unwritable";
-#else
-    if(geteuid() == 0)
-        GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
-#endif
+    // Same empirical premise as copyFileToReportsAnUnwritableDestination:
+    // the probe stages the bit and answers on the host's actual behavior.
+    const coretest::Capability unwritable = coretest::unwritableDirectories();
+    if(!unwritable.ok)
+        GTEST_SKIP() << qPrintable(unwritable.reason);
     resetFixture();
     QString srcDir = m_fixtureDir + "/mvsrc";
     EXPECT_TRUE(QDir().mkpath(srcDir));
@@ -328,7 +321,7 @@ TEST_F(TestFileOps, aSymlinkIsRemovedAsALinkNeverFollowingIt) {
     makeFile(real + "/keep.txt", "precious");
     const QString link = m_fixtureDir + "/linkdir";
     if(!FileOperations::createSymlink(real, link))
-        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+        GTEST_SKIP() << coretest::kSymlinkPrivilegeSkip;
     ASSERT_TRUE(QFileInfo(link).isSymLink());
 
     // removeSymlink: the link goes, the target and its contents stay
@@ -376,7 +369,7 @@ TEST_F(TestFileOps, recursiveRemoveTakesADirectorySymlinkInsideTheTreeAndNeverIt
     makeFile(target + "/keep.txt", "x");
     if(!FileOperations::createSymlink(target, tree + "/dirlink") ||
        !FileOperations::createSymlink(target + "/keep.txt", tree + "/filelink"))
-        GTEST_SKIP() << "cannot create real symlinks here (no privilege; Developer Mode off?)";
+        GTEST_SKIP() << coretest::kSymlinkPrivilegeSkip;
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::removeDir(tree, false, result);
@@ -392,21 +385,17 @@ TEST_F(TestFileOps, recursiveRemoveTakesADirectorySymlinkInsideTheTreeAndNeverIt
 
 TEST_F(TestFileOps, moveToTrashRemovesTheFileFromItsPlace) {
     // QFile::moveToTrash selects the trash on the SOURCE's filesystem
-    // (top-level .Trash-<uid>, freedesktop spec). A fixture under /tmp cannot
-    // host one without root, so whether the success path is runnable depends
-    // on the mount topology — probed here, with a visible, reasoned GTEST_SKIP when
-    // the topology refuses. The refusal contract below is unconditional: it is
-    // the part FileOperations itself owns.
+    // (top-level .Trash-<uid>, freedesktop spec): whether the success path
+    // is runnable depends on the mount topology, so the probe is empirical
+    // (trashOnThisMount) and skips with its reason when the topology
+    // refuses. The refusal contract below is unconditional: it is the part
+    // FileOperations itself owns.
     resetFixture();
-    QString probe = makeFile(m_fixtureDir + "/trash-probe.txt", "x");
-    FileOpResult probeResult = OTHER_ERROR;
-    FileOperations::moveToTrash(probe, probeResult);
-    if(probeResult != SUCCESS)
-        GTEST_SKIP()
-            << "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)";
+    const coretest::Capability trash = coretest::trashOnThisMount(m_fixtureDir);
+    if(!trash.ok)
+        GTEST_SKIP() << qPrintable(trash.reason);
 
-    EXPECT_TRUE(!QFileInfo::exists(probe)); // the probe already proved the happy path
-    EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/trash-probe.txt"));
+    EXPECT_TRUE(!QFileInfo::exists(m_fixtureDir + "/trash-capability-probe.txt")); // the probe proved the happy path
 
     FileOpResult result = OTHER_ERROR;
     FileOperations::moveToTrash(m_fixtureDir + "/missing.txt", result);

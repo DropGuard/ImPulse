@@ -347,16 +347,15 @@ TEST_F(TestThumbnailStore, savedThumbnailsAndTheirDirectoriesArePrivate) {
     struct stat st{};
     const QString path = cache.thumbnailPath(source, 128);
     EXPECT_TRUE(::stat(path.toLocal8Bit().constData(), &st) == 0);
-#ifdef Q_OS_WIN
-    // there are no mode bits on Windows: the spec's 600/700 question is
-    // answered by the profile's ACLs (a per-user store is already
-    // private), and the CRT stat reports a flat 0666 for everything
-    GTEST_SKIP() << "mode bits are a POSIX fact; the Windows store is per-user by ACL";
-#else
+    // The 600/700 question is chmod semantics of the filesystem: ACL storage
+    // answers flat 0666 and the per-user store is already private, so the
+    // probe screens that host out before the raw ::stat assertions run.
+    const coretest::Capability bits = coretest::modeBits();
+    if(!bits.ok)
+        GTEST_SKIP() << qPrintable(bits.reason);
     EXPECT_EQ(int(st.st_mode & 07777), 0600);
     EXPECT_TRUE(::stat(QFileInfo(path).absolutePath().toLocal8Bit().constData(), &st) == 0);
     EXPECT_EQ(int(st.st_mode & 07777), 0700);
-#endif
 }
 
 // A zoom step must not be a new file: the request is answered from a bucket

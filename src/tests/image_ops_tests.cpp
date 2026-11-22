@@ -175,14 +175,13 @@ TEST_F(TestImageOps, saveWithBackupOverwritesAndRestores) {
 // write left there, which QFile::rename cannot do, that call being
 // RENAME_NOREPLACE — and consumes the backup, so the row never leaves.
 TEST_F(TestImageOps, rolledBackSaveRestoresTheRowInsteadOfRebuildingIt) {
-    // act runs its container as root, and root ignores permission bits — a save
-    // into a read-only file SUCCEEDS there. The pin needs a user account.
-    // Windows needs no root skip: its read-only attribute refuses the same
-    // reopen, so the premise holds without the POSIX check.
-#ifndef Q_OS_WIN
-    if(geteuid() == 0)
-        GTEST_SKIP() << "running as root: permission bits cannot make a destination unwritable";
-#endif
+    // The premise "a file that refuses reopen-for-write" is empirical: the
+    // read-only attribute refuses it on Windows, a 0600 file refuses it on
+    // POSIX, and root reopens either — the probe answers for whichever host
+    // is running, so no compile-time assumption speaks for the other side.
+    const coretest::Capability readOnly = coretest::readOnlyFiles();
+    if(!readOnly.ok)
+        GTEST_SKIP() << qPrintable(readOnly.reason);
     resetFixture();
     DirectoryManager dm{EngineBridge::instance()};
     EXPECT_TRUE(dm.setDirectory(m_fixtureDir));

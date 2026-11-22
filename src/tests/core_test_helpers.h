@@ -23,19 +23,23 @@
 #include <gmock/gmock.h>
 #include <QApplication>
 #include <QByteArray>
+#include <QDir>
 #include <QDragMoveEvent>
 #include <QFile>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QMap>
 #include <QString>
 #include <QEventLoop>
 #include <QQueue>
+#include <QTemporaryDir>
 #include <QWidget>
 
 #include "components/actionmanager/actionmanager.h"
 #include "components/scriptmanager/scriptmanager.h"
 #include "settings.h"
 #include "sharedresources.h"
+#include "utils/fileoperations.h"
 #include "gui/iuserinteractions.h"
 #include "gui/ioverlayhost.h"
 #include "gui/icoreview.h"
@@ -192,6 +196,109 @@ inline bool deliverWindowKey(QWidget *target, Qt::Key key, Qt::KeyboardModifiers
     QCoreApplication::processEvents(QEventLoop::AllEvents);
     return true;
 }
+
+// ---- capability probes: premises the ENVIRONMENT grants, not the compile target ----
+
+// A test's premise can be refused by the host it runs on: root ignores
+// permission bits, ACL storage has none to set, symlink creation needs
+// privilege, a /tmp mount hosts no trash. These probes are EMPIRICAL on
+// purpose — each one attempts the premise on a throwaway and reports what
+// the host actually did — because the fact they measure is the host's
+// behavior, not its platform name: a Windows box in Developer Mode creates
+// real symlinks, and root can sit under a Q_OS_UNIX too. A compile-time
+// branch here would answer for a machine it never saw.
+//
+// ok=true means the premise is stageable; !ok carries the skip reason the
+// caller raises in its own vocabulary (GTEST_SKIP here), the way
+// deliverWindowKey returns false for the caller to report.
+struct Capability {
+    bool ok = false;
+    QString reason;
+};
+
+// The premise "a directory that refuses file creation". The probe stages
+// 0x5555 on a throwaway and tries to create inside — and the WRITE is the
+// only verdict, because Qt's setPermissions can answer true while the
+// storage underneath maps the request to nothing.
+inline Capability unwritableDirectories() {
+    QTemporaryDir probe;
+    if(!probe.isValid())
+        return {false, QStringLiteral("no writable temp dir to probe permission bits in")};
+    const QString dir = probe.filePath(QStringLiteral("ro"));
+    if(!QDir().mkpath(dir))
+        return {false, QStringLiteral("could not stage the permission-bit probe directory")};
+    QFile::setPermissions(dir, QFile::Permissions(0x5555));
+    const bool writable = QFile(dir + QStringLiteral("/probe.txt")).open(QIODevice::WriteOnly);
+    QFile::setPermissions(dir, QFile::Permissions(0x7555));
+    if(writable)
+        return {false, QStringLiteral("permission bits cannot make a destination unwritable here (root ignores them; "
+                                      "ACL storage has none)")};
+    return {true, QString()};
+}
+
+// The premise "a file that refuses reopen-for-write". The read-only
+// attribute refuses it on Windows; a 0600 file refuses it on POSIX; root
+// reopens either — hence empirical, same as unwritableDirectories.
+inline Capability readOnlyFiles() {
+    QTemporaryDir probe;
+    if(!probe.isValid())
+        return {false, QStringLiteral("no writable temp dir to probe the read-only premise in")};
+    const QString file = probe.filePath(QStringLiteral("ro.txt"));
+    if(!QFile(file).open(QIODevice::WriteOnly))
+        return {false, QStringLiteral("could not stage the read-only probe file")};
+    QFile::setPermissions(file, QFile::Permissions(0x0400)); // ReadOwner
+    const bool reopenable = QFile(file).open(QIODevice::WriteOnly);
+    QFile::setPermissions(file, QFile::Permissions(0x0644));
+    if(reopenable)
+        return {false, QStringLiteral("permission bits cannot make a file read-only here (root ignores them)")};
+    return {true, QString()};
+}
+
+// The premise "explicit permission bits are stored and read back": the
+// private-store pins ask chmod semantics of the filesystem, and ACL storage
+// answers flat 0666 for everything. Set-and-read-back is the honest
+// question.
+inline Capability modeBits() {
+    QTemporaryDir probe;
+    if(!probe.isValid())
+        return {false, QStringLiteral("no writable temp dir to probe mode bits in")};
+    const QString file = probe.filePath(QStringLiteral("bits.txt"));
+    if(!QFile(file).open(QIODevice::WriteOnly))
+        return {false, QStringLiteral("could not stage the mode-bit probe file")};
+    const QFile::Permissions want = QFile::ReadOwner | QFile::WriteOwner;
+    QFile::setPermissions(file, want);
+    // POSIX chmod answers in BOTH representations Qt offers (Owner and its
+    // User alias), so the read-back is compared with the alias bits stripped
+    // — comparing raw equality would fail on the very platform the premise
+    // holds on.
+    const QFile::Permissions userAlias = QFile::ReadUser | QFile::WriteUser | QFile::ExeUser;
+    if((QFileInfo(file).permissions() & ~userAlias) != want)
+        return {false, QStringLiteral("mode bits are a POSIX fact; this store answers through ACLs")};
+    return {true, QString()};
+}
+
+// The premise "moveToTrash succeeds on this mount": the trash is selected
+// on the SOURCE's filesystem (top-level .Trash-<uid>, freedesktop spec), so
+// whether the success path is runnable depends on the mount topology. The
+// probe file is consumed by the probe itself — a success trashes it.
+inline Capability trashOnThisMount(const QString &baseDir) {
+    const QString probeFile = baseDir + QStringLiteral("/trash-capability-probe.txt");
+    if(!QFile(probeFile).open(QIODevice::WriteOnly))
+        return {false, QStringLiteral("could not stage the trash probe file in ") + baseDir};
+    FileOpResult result = FileOpResult::OTHER_ERROR;
+    FileOperations::moveToTrash(probeFile, result);
+    if(result != FileOpResult::SUCCESS)
+        return {false, QStringLiteral("moveToTrash unavailable on this filesystem topology (no writable top-level "
+                                      "trash for the fixture mount)")};
+    return {true, QString()};
+}
+
+// Skip reasons stated once: four symlink skips lived in two binaries, two of
+// them byte-identical, and the strings drifted the way duplicated strings
+// do. The symlink sites keep their on-fixture probe (the link they create IS
+// the fixture) and share only the wording.
+inline constexpr const char *kSymlinkPrivilegeSkip =
+    "cannot create real symlinks here (no privilege; Developer Mode off?)";
 
 // ---- grid/test helpers shared by the widget-facing suites ----
 

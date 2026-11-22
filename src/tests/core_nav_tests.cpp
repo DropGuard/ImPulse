@@ -1165,13 +1165,12 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
 
 TEST_F(TestCoreNav, batchTrashAllSuccessStillReportsTheCount) {
     const QString dir = uniqueDir("trashok");
-    const QString probe = QDir(dir).filePath("trash-probe.txt");
-    EXPECT_TRUE(QFile(probe).open(QIODevice::WriteOnly));
-    FileOpResult probeResult;
-    FileOperations::moveToTrash(probe, probeResult);
-    if(probeResult != FileOpResult::SUCCESS)
-        GTEST_SKIP()
-            << "moveToTrash unavailable on this filesystem topology (no writable top-level trash for the fixture mount)";
+    // the topology probe is empirical (trashOnThisMount): the trash is
+    // selected on the source's filesystem, and this fixture's mount may host
+    // no trash at all
+    const coretest::Capability trash = coretest::trashOnThisMount(dir);
+    if(!trash.ok)
+        GTEST_SKIP() << qPrintable(trash.reason);
 
     writeImage(QDir(dir).filePath("a.png"));
     writeImage(QDir(dir).filePath("b.png"));
