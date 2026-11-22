@@ -120,7 +120,10 @@ self-installing**: every configure points `core.hooksPath` at
 wherever the tree configures, on both dev platforms: the Windows box runs this
 same gate end to end (verified 2026-11-22 from its Git Bash), and it works from
 any shell because the tests carry their toolchain PATH from configure time
-(TEST_ENV) rather than trusting the invoking shell's.
+(TEST_ENV) rather than trusting the invoking shell's. On a machine that must
+stay responsive while commits run, `LINT_JOBS` is the one knob: it caps the
+hook's build fan-out, the lint workers and the ctest fan-out together (unset
+means full cores for the build and lint, 4 for the tests).
 The lint gate used to be a manual ritual, and the stretch it stayed a
 memory (2026-11-09/10) is what let #636's and #612's findings ride into
 history on green suites alone; it then sat at push time because a full

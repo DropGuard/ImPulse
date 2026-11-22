@@ -112,13 +112,21 @@ fi
     grep -E "error|FAILED" /tmp/qimgv-hook-build.log | head -10 >&2
     exit 1
 }
-# -j4: the binaries are independent processes and the wall time quarters
-# against serial. Safe by construction, not by luck: engine_stack_main sweeps
-# only its own pid-scoped fixture tree ("Sweeping the whole base was wrong:
-# it deletes the directories a concurrently running instance is watching"),
-# and FreshSettings gives every test instance a pid-unique application name,
-# so its config file is one nothing else reads or has cached.
-if ! (cd build && "$CTEST_CMD" -Q -j4); then
+# ctest's default fan-out is 4: the binaries are independent processes and
+# the wall time quarters against serial, and short-lived bursts at four keep
+# a desktop responsive. LINT_JOBS caps it too — the knob is one variable, one
+# cap across the build fan-out above, the lint workers and this, for the
+# machine that must stay responsive while commits run. Safe by construction,
+# not by luck: engine_stack_main sweeps only its own pid-scoped fixture tree
+# ("Sweeping the whole base was wrong: it deletes the directories a
+# concurrently running instance is watching"), and FreshSettings gives every
+# test instance a pid-unique application name, so its config file is one
+# nothing else reads or has cached.
+CTEST_JOBS=4
+if [ -n "$LINT_JOBS" ] && [ "$LINT_JOBS" -gt 0 ] 2>/dev/null; then
+    CTEST_JOBS=$LINT_JOBS
+fi
+if ! (cd build && "$CTEST_CMD" -Q -j"$CTEST_JOBS"); then
     echo "pre-commit: ctest red — evidence in build/Testing/Temporary/LastTest.log" >&2
     echo "(fix it, or git commit --no-verify if you truly mean it)" >&2
     exit 1
