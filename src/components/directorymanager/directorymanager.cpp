@@ -11,7 +11,6 @@
 #include "utils/stuff.h"
 
 #include <algorithm>
-#include <chrono>
 #include <utility>
 
 namespace fs = std::filesystem;
@@ -453,9 +452,9 @@ void DirectoryManager::applySnapshot(EngineBridge::Snapshot snapshot) {
     // numbers is the mirror's cost, not the engine's.
     qInfo() << "[snapshot] applied session" << snapshot.session << "rev" << snapshot.revision << "("
             << m_fileEntryVec.size() << "files," << m_dirEntryVec.size() << "dirs) at" << startupMs() << "ms";
-    if(opened)
+    if(opened) {
         emit loaded(m_mirroredDir);
-    else if(changes.hasAdditions || !changes.displaced.isEmpty() || !changes.contentChanged.isEmpty())
+    } else if(changes.hasAdditions || !changes.displaced.isEmpty() || !changes.contentChanged.isEmpty())
         emit filesChanged(changes);
     if(resorted)
         emit sortingChanged();
