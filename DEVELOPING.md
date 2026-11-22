@@ -244,6 +244,40 @@ event-loop waits are `ASSERT_TRY_TRUE_TIMEOUT` / `ASSERT_TRY_EQ_TIMEOUT`
 (built on `QTest::qWaitFor`, which returns a bool rather than reporting), and
 a skip is `GTEST_SKIP()`
 
+**Platform divergence in the tests answers to a taxonomy.** The suite runs on
+two hosts (347 cases on both, and the invariant is that the REGISTRY stays
+identical — divergence happens in outcomes, pass or visibly-reasoned skip,
+never in which tests exist), and each platform fact a test can lean on is one
+of three kinds, each with its own tool:
+
+* **Compile-time facts** — an API, header or type exists on one side only
+  (`MoveFileExW`, `CreateFileW`, the `RLIMIT` headers). These stay behind
+  `#ifdef Q_OS_WIN`/`_WIN32`, because a probe cannot ask about code the other
+  platform cannot compile. They are the only legitimate macro sites.
+* **Environment facts** — the premise is granted by the HOST, not the
+  compile target: root ignores permission bits, ACL storage has none to set,
+  symlinks need privilege, a mount hosts no trash. These are answered by the
+  EMPIRICAL probes in `core_test_helpers.h` (`coretest::Capability` —
+  `unwritableDirectories`, `readOnlyFiles`, `modeBits`, `trashOnThisMount`,
+  each staging the premise on a throwaway and reporting what the host
+  actually did), because a Windows box in Developer Mode creates real
+  symlinks and root sits under `Q_OS_UNIX` too. A compile-time branch here
+  would answer for a machine it never saw. Probes that cannot be
+  de-macroed to the end (the share-none open needs `CreateFileW`) keep a
+  narrow macro around the residual API only, with the portable channel
+  tried first.
+* **Data facts** — the fixture itself cannot exist on one side (a
+  case-colliding name pair, a name that outruns `MAX_PATH` before it can
+  outrun `NAME_MAX`). Create-and-fall-back: attempt the canonical data, and
+  where the filesystem refuses it, stage a non-colliding substitute — the
+  assertions that survive either way are shared, and the ones that need the
+  canonical form are gated on the probe's own answer.
+
+A decision production makes per platform (which conf store, which fallback
+directory) is never re-derived in a test with an inverted macro — the test
+calls the production seam (`Settings::portableConfDir`) so the polarity has
+one owner.
+
 `coretest::MockCoreView` is gmock over `ICoreView`, and
 `coretest::RecordingView` beside it is a plain tally. They answer different
 questions: the mock is right when the CALLS are the contract ("delivered
