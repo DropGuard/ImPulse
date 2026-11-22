@@ -196,14 +196,14 @@ gtest_discover_tests(harness_sanity_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRO
 # run and a pass here covers the whole tree, not the staged subset.
 add_test(NAME FORMAT_RULES
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/format_rules.py)
-set_tests_properties(FORMAT_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
+set_tests_properties(FORMAT_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=;${TEST_ENV}" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 # lint cache contract: cold==warm, header fan-out, include shadowing. Skips
 # (77) where the lint tools are not installed — the gate itself needs them,
 # but a bare configure-and-test should not fail on their absence.
 add_test(NAME LINT_CACHE
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/lint_cache_test.py)
-set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=" SKIP_RETURN_CODE 77 TIMEOUT 300)
+set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=;${TEST_ENV}" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
 # The flip-flight instrument: manual measurement, never a gate. Drives real
 # navigation over a large-image directory at keyboard rate and prints
