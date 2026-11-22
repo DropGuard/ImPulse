@@ -174,14 +174,14 @@ fn rapid_open_dir_keeps_only_latest() {
     }
 }
 
-// The owner's live mismatch (2026-11-11, a photo collection): Dolphin
-// (ICU/DUCET collation) orders the bracket-named file first; a codepoint
-// comparison puts the digit-named one first. The comparator weights
-// character classes punctuation < digits < letters, case-insensitively,
-// with numeric runs by value.
+// A real-world mismatch that motivated this comparator: the desktop collation
+// (ICU/DUCET) orders a bracket-led name first; a codepoint comparison puts a
+// digit-led one first. The comparator weights character classes
+// punctuation < digits < letters, case-insensitively, with numeric runs by
+// value.
 #[test]
 fn natural_orders_classes_like_the_desktop_and_runs_digits_by_value() {
-    let bracket = "[Album] VOL.003 title_a [87P-199.47 MB]_00004.jpg";
+    let bracket = "[Album] VOL.003 title_a [12P-34.5 MB]_00004.jpg";
     let digit_led = "0gallery1234567890 (2)_00-00-26.367.jpg";
     assert_eq!(
         qimgv_engine::natural(bracket, digit_led),

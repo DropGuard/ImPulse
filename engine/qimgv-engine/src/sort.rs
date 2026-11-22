@@ -34,9 +34,9 @@ impl TryFrom<i32> for SortMode {
 /// Natural, case-insensitive name comparison, with character classes
 /// weighted the way ICU/DUCET (and therefore Dolphin) orders them:
 /// whitespace and punctuation before digits before letters. A plain
-/// codepoint comparison has digits before brackets — `0gallery…` before
-/// `[Album]…` — which is the Dolphin mismatch the owner reported
-/// live (2026-11-11, a photo collection). Digit runs compare by
+/// codepoint comparison sorts a digit-led name before a bracket-led one,
+/// while the desktop collation puts the bracket first — the mismatch that
+/// motivated this comparator. Digit runs compare by
 /// numeric value ("2" < "10"); full ICU collation is still deliberately
 /// out of scope, this is its practical core.
 pub fn natural(a: &str, b: &str) -> Ordering {
