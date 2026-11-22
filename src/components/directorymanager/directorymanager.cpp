@@ -3,10 +3,12 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QHash>
+#include <QElapsedTimer>
 #include <QScopedValueRollback>
 
 #include "enginebridge.h"
 #include "qimgv_engine.h"
+#include "utils/stuff.h"
 
 #include <algorithm>
 #include <chrono>
@@ -445,6 +447,12 @@ void DirectoryManager::applySnapshot(EngineBridge::Snapshot snapshot) {
     }
 
     emit listingChanged();
+    // Startup and per-open timing, ms since the process started
+    // (QElapsedTimer's static epoch): the engine logs its own scan+sort split,
+    // and this line is the mirror-side counterpart — the gap between the two
+    // numbers is the mirror's cost, not the engine's.
+    qInfo() << "[snapshot] applied session" << snapshot.session << "rev" << snapshot.revision << "("
+            << m_fileEntryVec.size() << "files," << m_dirEntryVec.size() << "dirs) at" << startupMs() << "ms";
     if(opened)
         emit loaded(m_mirroredDir);
     else if(changes.hasAdditions || !changes.displaced.isEmpty() || !changes.contentChanged.isEmpty())

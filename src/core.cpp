@@ -6,6 +6,7 @@
  */
 
 #include "core.h"
+#include "utils/stuff.h"
 #include <utility>
 
 #include "utils/folderend.h"
@@ -164,6 +165,7 @@ void Core::onViewModeChanged(ViewMode mode) {
 void Core::showGui() {
     if(!m_mw)
         return; // headless Core has nothing to show
+    qInfo() << "[startup] gui revealed at" << startupMs() << "ms";
     m_view->showWindowDefault();
     // the heavy-UI trigger is the window's own first show (shownOnce, wired
     // in the MW constructor) — the processEvents + 50 ms guess this used to

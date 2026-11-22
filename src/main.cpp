@@ -16,6 +16,7 @@
 #include "sharedresources.h"
 #include "proxystyle.h"
 #include "core.h"
+#include "utils/stuff.h"
 #include "utils/filelog.h"
 
 #include "qimgv_engine.h"
@@ -26,6 +27,7 @@ void saveSettings() {
 }
 //------------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
+    startupMs(); // the clock's epoch: main entry, not exec
 
     // force some env variables
 
@@ -130,9 +132,10 @@ int main(int argc, char *argv[]) {
 
     Core core;
 
-    if(parser.positionalArguments().count())
+    if(parser.positionalArguments().count()) {
+        qInfo() << "[startup] open submitted at" << startupMs() << "ms";
         core.loadPath(parser.positionalArguments().at(0));
-    else if(settings->defaultViewMode() == MODE_FOLDERVIEW)
+    } else if(settings->defaultViewMode() == MODE_FOLDERVIEW)
         core.loadPath(QDir::homePath());
 
     // wait for event queue to catch up before showing window

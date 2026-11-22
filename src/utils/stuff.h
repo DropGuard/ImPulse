@@ -21,3 +21,18 @@ int clamp(int x, int lower, int upper);
 int probeOS();
 StdString toStdString(const QString &str);
 QString fromStdString(const StdString &str);
+
+// Milliseconds since this binary's first startup checkpoint ran. The epoch is
+// the FIRST call (main entry on every real startup), not the process's exec —
+// loader and static-init time ahead of main is a linker property, not an app
+// cost, and measuring it would put a constant in every number. Inline so the
+// one static clock is shared by every checkpoint's translation unit.
+#include <QElapsedTimer>
+inline qint64 startupMs() {
+    static const QElapsedTimer clock = [] {
+        QElapsedTimer c;
+        c.start();
+        return c;
+    }();
+    return clock.elapsed();
+}
