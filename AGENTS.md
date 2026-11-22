@@ -118,7 +118,7 @@ engine.rs excluded because their tests are the ones Miri refuses. The hook is **
 self-installing**: every configure points `core.hooksPath` at
 `scripts/hooks` — clone → configure → build is itself the install step. It arms
 wherever the tree configures, on both dev platforms: the Windows box runs this
-same gate end to end (verified 2026-11-22 from its Git Bash), and it works from
+same gate end to end from its Git Bash — and it works from
 any shell because the tests carry their toolchain PATH from configure time
 (TEST_ENV) rather than trusting the invoking shell's. On a machine that must
 stay responsive while commits run, `LINT_JOBS` is the one knob: it caps the
