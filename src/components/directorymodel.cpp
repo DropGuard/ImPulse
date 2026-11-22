@@ -1,16 +1,29 @@
 #include "directorymodel.h"
 
 #include "components/directorymanager/enginebridge.h"
+#include "sourcecontainers/imagestatic.h"
 
+#include <QCryptographicHash>
+#include <QFile>
 #include <QSet>
 
+namespace {
+QByteArray sourceDigest(const QString &path) {
+    if(!QFileInfo(path).isFile())
+        return {};
+    QFile file(path);
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    return file.open(QIODevice::ReadOnly) && hash.addData(&file) ? hash.result() : QByteArray();
+}
+} // namespace
+
 DirectoryModel::DirectoryModel(WorkerPool &pool, EngineBridge &bridge, QObject *parent)
-    : QObject(parent), scaler(std::make_unique<Scaler>(&m_cache, pool)), m_dirManager(bridge), m_loader(pool) {
-    connect(&m_dirManager, &DirectoryManager::fileRemoved, this, &DirectoryModel::onFileRemoved);
-    connect(&m_dirManager, &DirectoryManager::fileAdded, this, &DirectoryModel::onFileAdded);
-    connect(&m_dirManager, &DirectoryManager::fileModified, this, &DirectoryModel::onFileModified);
-    connect(&m_dirManager, &DirectoryManager::fileRenamed, this, &DirectoryModel::onFileRenamed);
+    : QObject(parent), scaler(std::make_unique<Scaler>(&m_cache, pool)), m_dirManager(bridge), m_loader(pool),
+      m_draftStore(pool) {
+    connect(&m_dirManager, &DirectoryManager::loaded, this, &DirectoryModel::onListingOpened);
+    connect(&m_dirManager, &DirectoryManager::filesChanged, this, &DirectoryModel::onFilesChanged);
     connect(&m_dirManager, &DirectoryManager::sortingChanged, this, &DirectoryModel::onSortingChanged);
+    connect(&m_draftStore, &EditDraftStore::writeFailed, this, &DirectoryModel::editDraftWriteFailed);
     connect(&m_loader, &Loader::loadFinished, this, &DirectoryModel::onImageReady);
     connect(&m_loader, &Loader::loadFailed, this, &DirectoryModel::loadFailed);
 }
@@ -23,7 +36,7 @@ DirectoryModel::~DirectoryModel() {
 
 void DirectoryModel::removeFile(const QString &filePath, bool trash, FileOpResult &result) {
     // no mirror write here: the engine's watch sees the change and the
-    // listing follows via fileRemoved — one writer, no reconciliation
+    // The listing follows the watcher; the file operation does not edit it.
     if(trash)
         FileOperations::moveToTrash(filePath, result);
     else
@@ -86,6 +99,8 @@ bool DirectoryModel::loaderBusy() const {
 }
 
 void DirectoryModel::onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled) {
+    if(editedImageAt(path))
+        return;
     if(!img) {
         emit loadFailed(path);
         return;
@@ -99,37 +114,102 @@ void DirectoryModel::onImageReady(std::shared_ptr<Image> img, const QString &pat
     emit imageReady(img, path, scaled);
 }
 
-bool DirectoryModel::saveFile(const QString &filePath) {
-    return saveFile(filePath, filePath);
-}
-
-bool DirectoryModel::saveFile(const QString &filePath, const QString &destPath) {
-    if(!m_dirManager.containsFile(filePath) || !m_cache.contains(filePath))
-        return false;
-    auto img = m_cache.get(filePath);
-    if(img->save(destPath, settings->JPEGSaveQuality())) {
-        // listing changes (modified/new) surface through the engine's watch
-        // and arrive via fileModified/fileAdded — same as any external edit
-        return true;
+DirectoryModel::SaveResult DirectoryModel::saveFile(const QString &filePath, const QString &destPath) {
+    const QUuid id = editAt(filePath);
+    if(id.isNull()) {
+        if(!m_dirManager.containsFile(filePath))
+            return SaveResult::Failed;
+        auto image = m_cache.get(filePath);
+        return image && image->save(destPath, settings->JPEGSaveQuality()) ? SaveResult::Saved : SaveResult::Failed;
     }
-    return false;
+
+    const auto draft = m_edits.value(id);
+    const auto pixels = draft.image->getImage();
+    const auto sourceUnchanged = [&draft] {
+        return sourceDigest(draft.sourcePath) == draft.sourceDigest;
+    };
+    const bool replacingSource = QFileInfo(filePath) == QFileInfo(destPath);
+    bool saved = false;
+    if(replacingSource) {
+        bool conflict = false;
+        saved = FileOperations::saveWithBackup(*pixels, destPath, settings->JPEGSaveQuality(), filePath, [&] {
+            conflict = !sourceUnchanged();
+            return !conflict;
+        });
+        if(conflict)
+            return SaveResult::SourceChanged;
+    } else if(sourceUnchanged()) {
+        saved = FileOperations::saveWithBackup(*pixels, destPath, settings->JPEGSaveQuality(), filePath);
+    } else {
+        saved = EditDraftStore::exportNew(*pixels, destPath);
+        if(!saved)
+            return SaveResult::SourceChanged;
+    }
+    if(!saved)
+        return SaveResult::Failed;
+    finishEdit(id);
+    if(replacingSource) {
+        unload(filePath);
+        load(filePath, false);
+    } else {
+        emit imageUpdated(filePath);
+    }
+    return SaveResult::Saved;
 }
 
 // dirManager events
 
 void DirectoryModel::onSortingChanged() {
-    emit sortingChanged(m_dirManager.sortingMode());
+    emit sortingChanged(m_dirManager.appliedSortingMode());
 }
 
-void DirectoryModel::onFileAdded(const QString &filePath) {
-    emit fileAdded(filePath);
+void DirectoryModel::onListingOpened() {
+    bool detached = false;
+    for(auto it = m_edits.begin(); it != m_edits.end(); ++it) {
+        if(it->entryId != 0 && editAt(it->sourcePath) != it.key()) {
+            it->entryId = 0;
+            detached = true;
+        }
+    }
+    if(detached)
+        emit editDraftDetached();
+}
+
+void DirectoryModel::onFilesChanged(const ListingFileChanges &changes) {
+    bool detached = false;
+    for(const auto &file : changes.displaced) {
+        unload(file.oldPath);
+        m_announcedDivergences.remove(file.oldPath);
+    }
+    for(const auto &file : changes.displaced) {
+        for(auto it = m_edits.begin(); it != m_edits.end(); ++it) {
+            if(it->entryId != file.id)
+                continue;
+            if(file.newPath.isEmpty()) {
+                it->entryId = 0;
+                detached = true;
+            } else {
+                const auto pixels = it->image->getImage();
+                it->sourcePath = file.newPath;
+                it->image = it->image->editedCopy(file.newPath, pixels);
+                m_draftStore.write(it.key(), file.newPath, pixels);
+            }
+        }
+    }
+    if(detached)
+        emit editDraftDetached();
+    for(const auto &path : changes.contentChanged)
+        onFileModified(path);
+    emit filesReconciled(changes);
 }
 
 void DirectoryModel::onFileModified(const QString &filePath) {
     QDateTime modTime = m_dirManager.lastModified(filePath);
     if(!modTime.isValid())
         return;
-    auto img = m_cache.get(filePath);
+    std::shared_ptr<Image> img = editedImageAt(filePath);
+    if(!img)
+        img = m_cache.get(filePath);
     if(!img) {
         // nothing cached to compare against: the mirror saw it, pass it on
         emit fileModified(filePath);
@@ -153,28 +233,12 @@ void DirectoryModel::onFileModified(const QString &filePath) {
     emit fileModified(filePath);
 }
 
-void DirectoryModel::onFileRemoved(const QString &filePath, int index) {
-    unload(filePath);
-    emit fileRemoved(filePath, index);
-}
-
-// The bytes did not move, only the name they are reached by — but the image
-// cache is keyed by path and has no rekey, so the old key is dropped rather
-// than followed. That is the same memory behavior the remove+add pair had: the
-// renamed file decodes again on the next request, and nothing stale waits
-// under a path the listing no longer has.
-void DirectoryModel::onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex) {
-    Q_UNUSED(oldIndex)
-    unload(filePath);
-    emit fileRenamed(filePath, newPath, oldIndex);
-}
-
 bool DirectoryModel::isLoaded(int index) const {
-    return m_cache.contains(m_dirManager.filePathAt(index));
+    return isLoaded(m_dirManager.filePathAt(index));
 }
 
 bool DirectoryModel::isLoaded(const QString &filePath) const {
-    return m_cache.contains(filePath);
+    return m_cache.contains(filePath) || !editAt(filePath).isNull();
 }
 
 std::shared_ptr<Image> DirectoryModel::getImageAt(int index) {
@@ -185,6 +249,8 @@ std::shared_ptr<Image> DirectoryModel::getImageAt(int index) {
 // if image is not cached, loads it in the main thread
 // for async access use loadAsync(), then catch onImageReady()
 std::shared_ptr<Image> DirectoryModel::getImage(const QString &filePath) {
+    if(auto edited = editedImageAt(filePath))
+        return edited;
     std::shared_ptr<Image> img = m_cache.get(filePath);
     if(img)
         return img;
@@ -195,13 +261,87 @@ std::shared_ptr<Image> DirectoryModel::getImage(const QString &filePath) {
     return m_loader.load(filePath, LoadPolicy::fromSettings()).value_or(nullptr);
 }
 
-void DirectoryModel::updateImage(const QString &filePath, std::shared_ptr<Image> img) {
-    if(m_dirManager.containsFile(filePath)) {
-        const bool cached = m_cache.contains(filePath);
-        m_cache.insert(img);
-        if(cached)
-            emit imageUpdated(filePath);
+QUuid DirectoryModel::editAt(const QString &path) const {
+    for(auto it = m_edits.cbegin(); it != m_edits.cend(); ++it) {
+        if(it->entryId != 0 && it->sourcePath == path &&
+           m_dirManager.fileEntryAt(m_dirManager.indexOfFile(path)).id == it->entryId)
+            return it.key();
     }
+    return {};
+}
+
+std::shared_ptr<ImageStatic> DirectoryModel::editedImageAt(const QString &path) const {
+    const auto it = m_edits.constFind(editAt(path));
+    return it != m_edits.cend() ? it->image : nullptr;
+}
+
+bool DirectoryModel::editImage(const QString &filePath, const EditTransform &transform) {
+    const quint64 entryId = m_dirManager.fileEntryAt(m_dirManager.indexOfFile(filePath)).id;
+    if(entryId == 0)
+        return false;
+    QUuid id = editAt(filePath);
+    EditDraft draft = m_edits.value(id);
+    if(id.isNull()) {
+        draft.entryId = entryId;
+        draft.sourcePath = filePath;
+        draft.sourceDigest = sourceDigest(filePath);
+        if(draft.sourceDigest.isEmpty())
+            return false;
+        auto original = m_loader.load(filePath, LoadPolicy::fromSettings()).value_or(nullptr);
+        draft.image = std::dynamic_pointer_cast<ImageStatic>(original);
+        if(!draft.image || sourceDigest(filePath) != draft.sourceDigest)
+            return false;
+        id = QUuid::createUuid();
+    }
+    const auto input = draft.image->getImage();
+    if(!input || input->isNull())
+        return false;
+    std::shared_ptr<const QImage> pixels = transform(input);
+    if(!pixels || pixels->isNull())
+        return false;
+    draft.image = draft.image->editedCopy(filePath, pixels);
+    m_edits.insert(id, std::move(draft));
+    m_draftStore.write(id, filePath, pixels);
+    emit imageUpdated(filePath);
+    return true;
+}
+
+void DirectoryModel::finishEdit(const QUuid &id) {
+    m_edits.remove(id);
+    m_draftStore.remove(id);
+}
+
+void DirectoryModel::discardEdit(const QString &filePath) {
+    const auto id = editAt(filePath);
+    if(!id.isNull()) {
+        finishEdit(id);
+        unload(filePath);
+        m_scaledCache.remove(filePath);
+        emit imageUpdated(filePath);
+    }
+}
+
+QList<RecoverableEdit> DirectoryModel::recoverableEdits() const {
+    auto edits = m_draftStore.recoverable();
+    edits.removeIf([this](const auto &edit) {
+        return m_edits.contains(edit.id);
+    });
+    for(auto it = m_edits.cbegin(); it != m_edits.cend(); ++it) {
+        if(it->entryId == 0)
+            edits.append({it.key(), it->sourcePath});
+    }
+    return edits;
+}
+
+bool DirectoryModel::exportRecoveredEdit(const QUuid &id, const QString &destPath) {
+    const auto it = m_edits.constFind(id);
+    if(it != m_edits.cend() && it->entryId != 0)
+        return false;
+    const QImage pixels = it == m_edits.cend() ? m_draftStore.read(id) : *it->image->getImage();
+    if(pixels.isNull() || !EditDraftStore::exportNew(pixels, destPath))
+        return false;
+    finishEdit(id);
+    return true;
 }
 
 void DirectoryModel::load(const QString &filePath, bool asyncHint) {
@@ -209,6 +349,10 @@ void DirectoryModel::load(const QString &filePath, bool asyncHint) {
 }
 
 void DirectoryModel::load(const QString &filePath, bool asyncHint, bool scaled) {
+    if(auto edited = editedImageAt(filePath)) {
+        emit imageReady(edited, filePath, false);
+        return;
+    }
     if(!m_dirManager.containsFile(filePath) || m_loader.isLoading(filePath))
         return;
     if(!m_cache.contains(filePath)) {
@@ -241,6 +385,10 @@ void DirectoryModel::reload(const QString &filePath) {
 }
 
 void DirectoryModel::loadFocused(const QString &filePath, bool forward, bool withPreload) {
+    if(auto edited = editedImageAt(filePath)) {
+        emit imageReady(edited, filePath, false);
+        return;
+    }
     if(!m_dirManager.containsFile(filePath))
         return;
     QSet<QString> window;

@@ -227,7 +227,12 @@ TEST_F(TestSlideshow, editingIsRefusedWhileTheSlideshowRuns) {
     // stopping the slideshow is the whole resolution — nothing else
     core().stopSlideshow();
     core().flipH();
-    EXPECT_TRUE(img->isEdited()) << "the edit stayed refused after the clock stopped";
+    // Re-read: an edit is a draft the model holds against the path, and
+    // getImage() answers with it. The pointer captured at the top is the
+    // ORIGINAL, which an edit does not mutate in place.
+    const auto afterEdit = core().directoryModel()->getImage(core().currentFilePath());
+    ASSERT_TRUE(afterEdit);
+    EXPECT_TRUE(afterEdit->isEdited()) << "the edit stayed refused after the clock stopped";
 }
 
 int main(int argc, char **argv) {

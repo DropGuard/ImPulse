@@ -6,6 +6,7 @@
 #include "gui/dialogs/filereplacedialog.h"
 #include "gui/dialogs/settingsdialog.h"
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QImageWriter>
 
@@ -43,10 +44,18 @@ void DialogHost::showOpenDialog(const QString &path) {
     dialog.exec();
 }
 
-void DialogHost::showSaveDialog(const QString &filePath) {
-    QString newFilePath = getSaveFileName(filePath);
-    if(!newFilePath.isEmpty())
-        emit saveAsRequested(newFilePath);
+int DialogHost::chooseEditDraft(const QStringList &labels) {
+    bool accepted = false;
+    const auto item = QInputDialog::getItem(m_window, tr("Recover edits"), tr("Choose a draft to export:"), labels, 0,
+                                            false, &accepted);
+    return accepted ? labels.indexOf(item) : -1;
+}
+
+QString DialogHost::getRecoveryFileName(const QString &suggested) {
+    QFileDialog dialog(m_window, tr("Export recovered edit"), suggested, tr("PNG (*.png)"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setDefaultSuffix(QStringLiteral("png"));
+    return dialog.exec() == QDialog::Accepted ? dialog.selectedFiles().value(0) : QString();
 }
 
 QString DialogHost::getSaveFileName(const QString &filePath) {

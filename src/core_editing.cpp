@@ -53,7 +53,7 @@ void Core::toggleCropPanel() {
 }
 
 void Core::requestSavePath() {
-    if(m_model->listing().isEmpty())
+    if(!m_mw || m_model->listing().isEmpty())
         return;
     const QString path = selectedPath();
     // an edited image earns a fresh target: Save As's quick path writes a
@@ -61,7 +61,17 @@ void Core::requestSavePath() {
     // otherwise — the same law that keeps the disk off the bare keys
     const auto img = m_model->getImage(path);
     const QString suggested = (img && img->isEdited()) ? FileOperations::nextFreeVariantPath(path) : path;
-    m_dialogs->showSaveDialog(suggested);
+    const QString destination = m_dialogs->getSaveFileName(suggested);
+    if(destination.isEmpty())
+        return;
+    if(m_model->getImage(path) != img) {
+        m_overlays->showError(tr("The selected image changed while the save dialog was open. Try again."));
+        return;
+    }
+    if(saveFile(path, destination)) {
+        m_overlays->showMessageSuccess(tr("File saved"));
+        updateInfoString();
+    }
 }
 
 void Core::showResizeDialog() {
@@ -77,10 +87,6 @@ void Core::showResizeDialog() {
     auto img = m_model->getImage(selectedPath());
     if(img)
         m_dialogs->showResizeDialog(img->size());
-}
-
-std::shared_ptr<ImageStatic> Core::getEditableImage(const QString &filePath) {
-    return std::dynamic_pointer_cast<ImageStatic>(m_model->getImage(filePath));
 }
 
 // The edit contract: a transform applied to the selection, in memory. There is
@@ -111,16 +117,10 @@ void Core::edit_template(
     case NavigationController::InteractionState::Document: break;
     }
     const auto selection = currentSelection();
-    for(const auto &path : selection) {
-        auto img = getEditableImage(path);
-        if(!img)
-            continue;
-        // no std::forward here: the pack is used once per selected file, and a
-        // forwarded rvalue is empty from the second file on. Every current call
-        // site passes lvalues, so forwarding bought nothing but the trap.
-        img->setEditedImage(editFunc(img->getImage(), as...));
-        m_model->updateImage(path, std::static_pointer_cast<Image>(img));
-    }
+    for(const auto &path : selection)
+        m_model->editImage(path, [&](auto pixels) {
+            return editFunc(std::move(pixels), as...);
+        });
     updateInfoString();
 }
 
@@ -164,8 +164,15 @@ bool Core::saveFile(const QString &filePath) {
 }
 
 bool Core::saveFile(const QString &filePath, const QString &newPath) {
-    if(!m_model->saveFile(filePath, newPath))
+    const auto result = m_model->saveFile(filePath, newPath);
+    if(result == DirectoryModel::SaveResult::SourceChanged) {
+        m_overlays->showError(tr("The original changed. Keep your edit by saving to a new PNG file."));
         return false;
+    }
+    if(result != DirectoryModel::SaveResult::Saved) {
+        m_overlays->showError(tr("Could not save file"));
+        return false;
+    }
     m_overlays->hideSaveOverlay();
     // switch to the new file
     if(m_model->listing().containsFile(newPath) && m_state.currentFilePath != newPath) {
@@ -186,8 +193,6 @@ void Core::saveCurrentFileAs(const QString &destPath) {
     if(saveFile(selectedPath(), destPath)) {
         m_overlays->showMessageSuccess(tr("File saved"));
         updateInfoString();
-    } else {
-        m_overlays->showError(tr("Could not save file"));
     }
 }
 
@@ -195,11 +200,33 @@ void Core::discardEdits() {
     if(m_model->listing().isEmpty())
         return;
 
-    std::shared_ptr<Image> img = m_model->getImage(selectedPath());
-    if(img && img->type() == STATIC) {
-        auto imgStatic = dynamic_cast<ImageStatic *>(img.get());
-        imgStatic->discardEditedImage();
-        m_model->updateImage(selectedPath(), img);
-    }
+    m_model->discardEdit(selectedPath());
     m_overlays->hideSaveOverlay();
+}
+
+void Core::recoverEdits() {
+    if(!m_mw)
+        return;
+    const auto edits = m_model->recoverableEdits();
+    if(edits.isEmpty()) {
+        m_overlays->showMessage(tr("No edits to recover."));
+        return;
+    }
+    QStringList labels;
+    for(const auto &edit : edits)
+        labels.append(tr("%1 — %2").arg(edit.sourcePath, edit.id.toString(QUuid::WithoutBraces).left(8)));
+    const int index = m_dialogs->chooseEditDraft(labels);
+    if(index < 0)
+        return;
+    const auto &draft = edits.at(index);
+    const QFileInfo original(draft.sourcePath);
+    const QString directory = original.absoluteDir().exists() ? original.absolutePath() : QDir::homePath();
+    const QString suggested = QDir(directory).filePath(original.completeBaseName() + tr("-recovered.png"));
+    const QString destination = m_dialogs->getRecoveryFileName(suggested);
+    if(destination.isEmpty())
+        return;
+    if(m_model->exportRecoveredEdit(draft.id, destination))
+        m_overlays->showMessageSuccess(tr("Edit recovered to a new file."));
+    else
+        m_overlays->showError(tr("Could not export the draft. Choose a new PNG file."));
 }

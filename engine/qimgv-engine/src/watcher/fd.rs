@@ -31,10 +31,9 @@ pub(crate) struct WatcherHandle {
 impl WatcherHandle {
     pub(crate) fn spawn(
         options: crate::scan::ScanOptions,
-        res_tx: Sender<crate::engine::ScanDone>,
-    ) -> (WatcherHandle, Receiver<super::RawWatchEvent>) {
+    ) -> (WatcherHandle, Receiver<super::WatchMessage>) {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded::<WatchCmd>();
-        let (ev_tx, ev_rx) = crossbeam_channel::unbounded::<super::RawWatchEvent>();
+        let (ev_tx, ev_rx) = crossbeam_channel::unbounded::<super::WatchMessage>();
         let running = Arc::new(AtomicBool::new(true));
         let running_flag = Arc::clone(&running);
 
@@ -46,9 +45,7 @@ impl WatcherHandle {
 
         let join = std::thread::Builder::new()
             .name("qimgv-watch".into())
-            .spawn(move || {
-                watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, loop_wake, running_flag)
-            })
+            .spawn(move || watcher_loop(&cmd_rx, &ev_tx, &options, loop_wake, running_flag))
             .expect("spawn watcher thread");
 
         (
@@ -110,8 +107,7 @@ impl Drop for WatcherHandle {
 
 fn watcher_loop(
     cmd_rx: &Receiver<WatchCmd>,
-    ev_tx: &Sender<super::RawWatchEvent>,
-    res_tx: &Sender<crate::engine::ScanDone>,
+    ev_tx: &Sender<super::WatchMessage>,
     options: &crate::scan::ScanOptions,
     wake: OwnedFd,
     running: Arc<AtomicBool>,
@@ -123,6 +119,7 @@ fn watcher_loop(
             return;
         }
     };
+    let mut session = 0;
     let mut watch: Option<inotify::WatchDescriptor> = None;
     // the directory `watch` was added for; every event this thread emits names it
     let mut watch_dir: PathBuf = PathBuf::new();
@@ -183,14 +180,14 @@ fn watcher_loop(
                             name: ev.name.map(|c| c.to_string_lossy().into_owned()),
                         };
                         for out in pairer.intake(rec, dir, live_wd) {
-                            if !dispatch(ev_tx, out, live_wd) {
+                            if !dispatch(ev_tx, out, live_wd, session) {
                                 return;
                             }
                         }
                     }
                     // The batch ended without the other half, if one was held.
                     for out in pairer.settle() {
-                        if !dispatch(ev_tx, out, live_wd) {
+                        if !dispatch(ev_tx, out, live_wd, session) {
                             return;
                         }
                     }
@@ -219,6 +216,7 @@ fn watcher_loop(
                         install,
                     } => {
                         if install {
+                            session = epoch;
                             if let Some(w) = watch.take() {
                                 let _ = inotify.watches().remove(w);
                             }
@@ -250,7 +248,7 @@ fn watcher_loop(
                         // thread can enumerate this folder, so a change cannot land
                         // in a gap between the two acts: it is either in the snapshot
                         // or it arrives on the event queue afterwards.
-                        enumerate_and_report(&path, epoch, dispatch, &res_tx, options);
+                        enumerate_and_report(&path, epoch, dispatch, ev_tx, options);
                     }
                     WatchCmd::Unwatch => {
                         if let Some(w) = watch.take() {

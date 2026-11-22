@@ -16,6 +16,7 @@
 struct State;
 class Image;
 class DirectoryModel;
+struct ListingFileChanges;
 class DirectoryPresenter;
 class ICoreView;
 class IOverlayHost;
@@ -114,9 +115,6 @@ class NavigationController : public QObject {
     void onModelItemUpdated(const QString &filePath);
     void onModelSortingChanged(SortingMode mode);
     void onLoadFailed(const QString &path);
-    void onFileRemoved(const QString &filePath, int index);
-    void onFileAdded(const QString &filePath);
-    void onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
     void onDivergenceDetected(const QString &filePath);
 
   private slots:
@@ -127,9 +125,11 @@ class NavigationController : public QObject {
     bool loadPathInternal(const QString &path);
 
   private:
+    void onFilesReconciled(const ListingFileChanges &changes);
+
     // the navigation slice of State this controller writes: currentFilePath,
     // directoryPath, viewMode, slideshow, shuffle, pendingListedToken,
-    // delayModel, and the two hasActiveImage clears (reset, onFileRemoved).
+    // delayModel, and the two hasActiveImage clears (reset, onFilesReconciled).
     // The rest of State is the coordinator's.
     State *m_state;
     INavigationHost *m_host;

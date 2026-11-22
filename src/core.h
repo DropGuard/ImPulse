@@ -366,8 +366,6 @@ class Core : public QObject, public INavigationHost {
     bool saveFile(const QString &filePath, const QString &newPath);
     bool saveFile(const QString &filePath);
 
-    std::shared_ptr<ImageStatic> getEditableImage(const QString &filePath);
-
     template <typename... Args>
     void edit_template(const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
                        Args &&...as);
@@ -497,6 +495,7 @@ class Core : public QObject, public INavigationHost {
     void outputError(const FileOpResult &error) const;
     void reportBatchRemoval(const QString &doneVerb, int total, int successCount) const;
     void showOpenDialog();
+    void recoverEdits();
     void showInDirectory();
     void quickCopyToFixedDirectory();
     void print();

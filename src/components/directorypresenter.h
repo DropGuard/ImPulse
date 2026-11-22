@@ -31,14 +31,12 @@ class DirectoryPresenter : public QObject {
             return; // the binding is already live
         m_view = newView;
         m_viewSender = newView; // a QPointer: it goes null with the widget
-        if(m_model)
-            m_view->populate(m_showDirs ? m_model->listing().totalCount() : m_model->listing().fileCount());
-
         connect(newView, &View::itemActivated, this, &DirectoryPresenter::onItemActivated);
         connect(newView, &View::thumbnailsRequested, this, &DirectoryPresenter::generateThumbnails);
         connect(newView, &View::draggedOut, this, &DirectoryPresenter::onDraggedOut);
         connect(newView, &View::draggedOver, this, &DirectoryPresenter::onDraggedOver);
         connect(newView, &View::droppedInto, this, &DirectoryPresenter::onDroppedInto);
+        populateView();
         // these five connects are the only view -> presenter wiring there is,
         // so disconnectView can sever them all by sender+receiver without a
         // second list of signatures to keep in agreement
@@ -48,15 +46,6 @@ class DirectoryPresenter : public QObject {
 
     void selectAndFocus(int index);
     void selectAndFocus(const QString &path);
-
-    void onFileRemoved(const QString &filePath, int index);
-    void onFileAdded(const QString &filePath);
-    void onFileModified(const QString &filePath);
-    void onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
-
-    void onDirRemoved(const QString &dirPath, int index);
-    void onDirAdded(const QString &dirPath);
-    void onDirRenamed(const QString &dirPath, const QString &newPath, int oldIndex);
 
     bool showDirs();
     void setShowDirs(bool mode);
@@ -71,12 +60,12 @@ class DirectoryPresenter : public QObject {
 
   public slots:
     void disconnectView();
-    void reloadModel();
 
   private slots:
     void generateThumbnails(const QList<int> &, int, bool, bool);
     void onThumbnailReady(std::shared_ptr<Thumbnail> thumb, const QString &filePath);
     void populateView();
+    void syncRows();
     void onItemActivated(int absoluteIndex);
     void onDraggedOut();
     void onDraggedOver(int index);
@@ -95,5 +84,11 @@ class DirectoryPresenter : public QObject {
     // made the broadcast ThumbNext run the same decode twice and hand two mpv
     // writers one frame file
     Thumbnailer &m_thumbnailer;
+    struct ViewEntry {
+        quint64 id;
+        QString name, path;
+        quint64 contentRevision;
+    };
+    QList<ViewEntry> m_rows;
     bool m_showDirs;
 };

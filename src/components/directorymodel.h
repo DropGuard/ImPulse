@@ -4,9 +4,12 @@
 #include <QObject>
 #include "cache/cache.h"
 #include "directorymanager/directorymanager.h"
+#include "editdraftstore.h"
 #include "scaler/scaler.h"
 #include "loader/loader.h"
 #include "utils/fileoperations.h"
+
+class ImageStatic;
 
 class DirectoryModel : public QObject {
     Q_OBJECT
@@ -26,8 +29,7 @@ class DirectoryModel : public QObject {
     // side — cache, loader, divergence — and everything the manager decides is
     // reached through here rather than re-declared query by query: a
     // pass-through layer must be edited in triplicate and hides which layer
-    // decides. The manager is also the object to connect for directory events
-    // (dirAdded/dirRemoved/dirRenamed/loaded).
+    // decides. Connect to the manager for listing publications and opens.
     DirectoryManager &listing() {
         return m_dirManager;
     }
@@ -61,7 +63,11 @@ class DirectoryModel : public QObject {
     std::shared_ptr<Image> getImageAt(int index);
     std::shared_ptr<Image> getImage(const QString &filePath);
 
-    void updateImage(const QString &filePath, std::shared_ptr<Image> img);
+    using EditTransform = std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>)>;
+    bool editImage(const QString &filePath, const EditTransform &transform);
+    void discardEdit(const QString &filePath);
+    QList<RecoverableEdit> recoverableEdits() const;
+    bool exportRecoveredEdit(const QUuid &id, const QString &destPath);
 
     void unload(const QString &filePath);
     bool isLoaded(int index) const;
@@ -69,11 +75,14 @@ class DirectoryModel : public QObject {
     void reload(const QString &filePath);
     void unloadExcept(const QString &filePath, bool keepNearby);
 
-    bool saveFile(const QString &filePath);
-    bool saveFile(const QString &filePath, const QString &destPath);
+    enum class SaveResult {
+        Saved,
+        Failed,
+        SourceChanged
+    };
+    SaveResult saveFile(const QString &filePath, const QString &destPath);
   signals:
-    void fileRemoved(const QString &filePath, int index);
-    void fileAdded(const QString &filePath);
+    void filesReconciled(const ListingFileChanges &changes);
     void fileModified(const QString &filePath);
     void divergenceDetected(const QString &filePath);
     // EDGE events. fileModified fires when this model observed a real change
@@ -81,17 +90,31 @@ class DirectoryModel : public QObject {
     // divergenceDetected fires once per (path, disk mtime) when the disk
     // moved under an entry holding uncommitted edits. The dedup lives here
     // because the mtime comparison lives here.
-    void fileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
     void loadFailed(const QString &path);
     void sortingChanged(SortingMode);
     void imageReady(std::shared_ptr<Image> img, const QString &, bool scaled);
     void imageUpdated(const QString &filePath);
+    void editDraftWriteFailed();
+    void editDraftDetached();
 
   private:
     DirectoryManager m_dirManager;
     Loader m_loader;
     QSet<QString> m_scaledCache; // paths whose cached image is tier-1 (scaled)
     Cache m_cache;
+    struct EditDraft {
+        quint64 entryId = 0;
+        QString sourcePath;
+        QByteArray sourceDigest;
+        std::shared_ptr<ImageStatic> image;
+    };
+    QHash<QUuid, EditDraft> m_edits;
+    EditDraftStore m_draftStore;
+
+    QUuid editAt(const QString &path) const;
+    std::shared_ptr<ImageStatic> editedImageAt(const QString &path) const;
+    void finishEdit(const QUuid &id);
+    void onListingOpened();
 
     // the disk mtime the last divergence announcement was made for, per path:
     // one external save surfaces as several wire/mirror cycles, and each must
@@ -102,8 +125,6 @@ class DirectoryModel : public QObject {
   private slots:
     void onImageReady(std::shared_ptr<Image> img, const QString &path, bool scaled);
     void onSortingChanged();
-    void onFileAdded(const QString &filePath);
-    void onFileRemoved(const QString &filePath, int index);
+    void onFilesChanged(const ListingFileChanges &changes);
     void onFileModified(const QString &filePath);
-    void onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
 };

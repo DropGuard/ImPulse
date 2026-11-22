@@ -75,6 +75,10 @@ ContextMenu::ContextMenu(QWidget *parent) : QWidget(parent), m_ui(new Ui::Contex
     m_ui->open->setText(tr("Open"));
     m_ui->open->setIconPath(":/res/icons/common/menuitem/open16.png");
 
+    m_ui->recoverEdits->setAction("recoverEdits");
+    m_ui->recoverEdits->setText(tr("Recover edits"));
+    m_ui->recoverEdits->setIconPath(":/res/icons/common/menuitem/open16.png");
+
     m_ui->folderView->setAction("folderView");
     m_ui->folderView->setText(tr("Folder View"));
     m_ui->folderView->setIconPath(":/res/icons/common/menuitem/folderview16.png");

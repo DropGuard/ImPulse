@@ -1,5 +1,4 @@
 #include "thumbnailview.h"
-#include "gui/customwidgets/selectionremap.h"
 #include <utility>
 
 ThumbnailView::ThumbnailView(Qt::Orientation _orientation, QWidget *parent)
@@ -215,150 +214,68 @@ void ThumbnailView::showEvent(QShowEvent *event) {
 }
 
 void ThumbnailView::populate(int newCount) {
-    // wait for possible queued layout events before removing items
-    qApp->processEvents();
-
-    clearSelection();
-    // reset
+    if(newCount < 0)
+        return;
     m_lastScrollDirection = SCROLL_FORWARDS;
-    // pause updates until the layout is calculated
-    // without this you will see scene moving when scrollbar appears
-    this->setUpdatesEnabled(false);
-    QElapsedTimer t;
-    t.start();
-    if(newCount >= 0) {
-        /* test this later
-        // reuse existing items
-        auto currentCount = thumbnails.count();
-        if(currentCount > newCount) {
-            qDebug() << this << "removing";
-            for(auto i = currentCount - 1; i >= newCount; i--) {
-                //removeItemFromLayout(i); // slow. is this needed?
-                delete thumbnails.takeLast();
-            }
-            // reset existing
-            QList<ThumbnailWidget*>::iterator i;
-            for(i = thumbnails.begin(); i != thumbnails.end(); ++i)
-                (*i)->reset();
-        } else if(currentCount <= newCount) {
-            // reset existing
-            QList<ThumbnailWidget*>::iterator i;
-            for(i = thumbnails.begin(); i != thumbnails.end(); ++i)
-                (*i)->reset();
-            qDebug() << this << "adding";
-            for(auto i = currentCount; i < newCount; i++) {
-                ThumbnailWidget *widget = createThumbnailWidget();
-                widget->setThumbnailSize(m_thumbnailSize);
-                thumbnails.append(widget);
-                addItemToLayout(widget, i);
-            }
-        }
-        */
-
-        if(newCount == m_thumbnails.count()) {
-            QList<ThumbnailWidget *>::iterator i;
-            for(i = m_thumbnails.begin(); i != m_thumbnails.end(); ++i) {
-                (*i)->reset();
-            }
-        } else {
-            removeAll();
-            for(int i = 0; i < newCount; i++) {
-                ThumbnailWidget *widget = createThumbnailWidget();
-                widget->setThumbnailSize(m_thumbnailSize);
-                m_thumbnails.append(widget);
-                addItemToLayout(widget, i);
-            }
-        }
-    }
-    updateLayout();
-    fitSceneToContents();
+    applyRows(QList<DirectoryViewRow>(newCount));
     resetViewport();
-    //qDebug() << "_______POPULATE" << this << t.elapsed();
-    // wait for layout before updating
-    qApp->processEvents();
-    this->setUpdatesEnabled(true);
     loadVisibleThumbnails();
 }
 
-void ThumbnailView::addItem() {
-    insertItem(m_thumbnails.count());
-}
-
-// insert at index
-void ThumbnailView::insertItem(int index) {
-    ThumbnailWidget *widget = createThumbnailWidget();
-    m_thumbnails.insert(index, widget);
-    addItemToLayout(widget, index);
-    updateLayout();
-    fitSceneToContents();
-
-    auto newSelection = m_selection;
-    for(int i = 0; i < newSelection.count(); i++) {
-        if(index <= newSelection[i])
-            newSelection[i]++;
-    }
-    select(newSelection);
-
-    updateScrollbarIndicator();
-    loadVisibleThumbnails();
-}
-
-void ThumbnailView::removeItem(int index) {
-    if(checkRange(index)) {
-        auto newSelection = m_selection;
-        clearSelection();
-        removeItemFromLayout(index);
-        delete m_thumbnails.takeAt(index);
-        fitSceneToContents();
-        newSelection.removeAll(index);
-        for(int i = 0; i < newSelection.count(); i++) {
-            if(newSelection[i] >= index)
-                newSelection[i]--;
+void ThumbnailView::applyRows(const QList<DirectoryViewRow> &rows) {
+    auto previous = std::exchange(m_thumbnails, {});
+    QList<int> newIndices(previous.size(), -1);
+    bool layoutChanged = previous.size() != rows.size();
+    bool contentChanged = false;
+    m_thumbnails.reserve(rows.size());
+    for(int index = 0; index < rows.size(); ++index) {
+        const auto &row = rows[index];
+        ThumbnailWidget *widget = nullptr;
+        if(row.previousIndex >= 0 && row.previousIndex < previous.size()) {
+            widget = std::exchange(previous[row.previousIndex], nullptr);
+            if(widget)
+                newIndices[row.previousIndex] = index;
         }
-        if(!newSelection.count() && itemCount())
-            newSelection << ((index >= itemCount()) ? itemCount() - 1 : index);
-        select(newSelection);
-        updateScrollbarIndicator();
-        loadVisibleThumbnails();
+        if(!widget) {
+            widget = createThumbnailWidget();
+            widget->setThumbnailSize(m_thumbnailSize);
+            m_scene.addItem(widget);
+            layoutChanged = true;
+        }
+        if(!row.newName.isNull())
+            widget->renameThumbnail(row.newName);
+        if(row.contentChanged) {
+            widget->invalidateThumbnail();
+            contentChanged = true;
+        }
+        m_thumbnails.append(widget);
+        layoutChanged |= row.previousIndex != index;
     }
-}
 
-void ThumbnailView::reloadItem(int index) {
-    if(!checkRange(index))
-        return;
-    auto thumb = m_thumbnails.at(index);
-    if(thumb->isLoaded)
-        thumb->unsetThumbnail();
-    emit thumbnailsRequested(QList<int>() << index, static_cast<int>(qApp->devicePixelRatio() * m_thumbnailSize),
-                             m_cropThumbnails, true);
-}
-
-// One row moving: the widget keeps its identity, and so does the picture it
-// holds. removeItem+insertItem would have destroyed both, asked for a decode
-// the disk cache cannot answer for a renamed path, and renumbered every
-// selection index around the hole — for a file whose bytes never changed.
-void ThumbnailView::renameItem(int oldIndex, int newIndex, const QString &name) {
-    if(!checkRange(oldIndex) || !checkRange(newIndex))
-        return;
-    ThumbnailWidget *widget = m_thumbnails.at(oldIndex);
-    widget->renameThumbnail(name);
-    if(oldIndex == newIndex)
-        return;
-
-    // the two layout hooks read the row list on either side of the change:
-    // removeItemFromLayout expects the widget still in it, addItemToLayout
-    // expects it already re-seated
-    removeItemFromLayout(oldIndex);
-    m_thumbnails.move(oldIndex, newIndex);
-    addItemToLayout(widget, newIndex);
-    updateLayout();
-
-    // the same permutation the rows went through, applied to the selection —
-    // the shared rule lives in remapSelectionForRename, one copy for this view
-    // and the viewless proxy
-    auto newSelection = m_selection;
-    remapSelectionForRename(newSelection, oldIndex, newIndex);
-    select(newSelection);
+    const auto remap = [&newIndices](const QList<int> &selection) {
+        QList<int> mapped;
+        for(int index : selection) {
+            const int target = newIndices.value(index, -1);
+            if(target >= 0)
+                mapped.append(target);
+        }
+        return mapped;
+    };
+    const int previousFocus = lastSelected();
+    m_selection = remap(m_selection);
+    m_rangeSelectionSnapshot = remap(m_rangeSelectionSnapshot);
+    if(layoutChanged)
+        syncThumbnailLayout();
+    qDeleteAll(previous);
+    if(layoutChanged) {
+        updateLayout();
+        fitSceneToContents();
+        updateScrollbarIndicator();
+    }
+    if(lastSelected() >= 0 && lastSelected() != previousFocus)
+        focusOnSelection();
+    else if(layoutChanged || contentChanged)
+        loadVisibleThumbnails();
 }
 
 void ThumbnailView::setDragHover(int index) {
@@ -413,9 +330,11 @@ void ThumbnailView::loadVisibleThumbnails() {
         visibleItems.append(m_scene.items(offRectFront, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder));
         // select
         QList<int> loadList;
+        bool force = false;
         for(int i = 0; i < visibleItems.count(); i++) {
             ThumbnailWidget *widget = qgraphicsitem_cast<ThumbnailWidget *>(visibleItems.at(i));
             if(widget && !widget->isLoaded) {
+                force |= widget->needsFreshThumbnail();
                 int idx = m_thumbnails.indexOf(widget);
                 if(!loadList.contains(idx))
                     loadList.append(idx);
@@ -424,7 +343,7 @@ void ThumbnailView::loadVisibleThumbnails() {
         // load
         if(loadList.count())
             emit thumbnailsRequested(loadList, static_cast<int>(qApp->devicePixelRatio() * m_thumbnailSize),
-                                     m_cropThumbnails, false);
+                                     m_cropThumbnails, force);
         // unload offscreen
         if(settings->unloadThumbs()) {
             for(int i = 0; i < m_thumbnails.count(); i++)

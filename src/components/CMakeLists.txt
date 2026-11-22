@@ -3,6 +3,7 @@
 target_sources(qimgv_nongui PRIVATE
     directorymodel.cpp
     directorypresenter.cpp
+    editdraftstore.cpp
 
     scriptmanager/scriptmanager.cpp
     actionmanager/actionmanager.cpp
@@ -25,4 +26,3 @@ target_sources(qimgv_nongui PRIVATE
     directorymanager/directorymanager.cpp
     directorymanager/enginebridge.cpp
 )
-

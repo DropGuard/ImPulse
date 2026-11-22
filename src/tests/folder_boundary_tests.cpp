@@ -131,9 +131,8 @@ TEST_F(TestFolderBoundary, folderBoundaryLookupKeepsWatchingTheCurrentFolder) {
     // therefore the last folder here
     EXPECT_TRUE(dm.adjacentDirectory(m_fixtureDir + "/subdir", true, SORT_NAME).isEmpty());
 
-    QSignalSpy added(&dm, &DirectoryManager::fileAdded);
     makeFile("after-boundary.jpg");
-    ASSERT_TRY_EQ_TIMEOUT(added.count(), 1, 10000);
+    ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(m_fixtureDir + "/after-boundary.jpg"), 10000);
     EXPECT_EQ(dm.fileCount(), 4UL);
 }
 

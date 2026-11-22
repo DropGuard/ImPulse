@@ -63,6 +63,7 @@ add_executable(engine_stack_tests
     workerpool_tests.cpp
     fileops_tests.cpp
     image_ops_tests.cpp
+    edit_draft_store_tests.cpp
     infra_tests.cpp)
 # USE_EXIV2 arrives with qimgv_nongui's PUBLIC compile definitions: one answer
 # to "is Exiv2 available" for every target, instead of each restating it.

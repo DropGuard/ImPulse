@@ -251,6 +251,44 @@ TEST_F(TestCoreNav, titleFollowsTheProjection) {
     }
 }
 
+TEST_F(TestCoreNav, theDisplayedFileFollowsItsOwnRenameWhenAnOldNameIsReused) {
+    settings->setSortingMode(SORT_NAME);
+    const QString original = QDir(m_alpha).filePath("a.png");
+    const QString other = QDir(m_alpha).filePath("b.png");
+    const QString movedOther = QDir(m_alpha).filePath("c.png");
+    writeImage(other);
+
+    Core core;
+    ASSERT_TRUE(core.loadPath(original));
+    ASSERT_TRY_TRUE_TIMEOUT(core.isSettled() && core.currentFilePath() == original, 10000);
+
+    auto &bridge = EngineBridge::instance();
+    const auto awaitNamesWithoutPumpingQt = [&bridge](const QStringList &expected) {
+        QElapsedTimer deadline;
+        deadline.start();
+        while(deadline.elapsed() < 10000) {
+            EngineBridge::Snapshot snapshot;
+            if(bridge.readSnapshot(snapshot) && snapshot.session == bridge.session()) {
+                QStringList names;
+                for(const auto &file : snapshot.files)
+                    names << file.name;
+                if(names == expected)
+                    return true;
+            }
+            QThread::msleep(2);
+        }
+        return false;
+    };
+    ASSERT_TRUE(QFile::rename(other, movedOther));
+    ASSERT_TRUE(awaitNamesWithoutPumpingQt({"a.png", "c.png"}));
+    ASSERT_TRUE(QFile::rename(original, other));
+    ASSERT_TRUE(awaitNamesWithoutPumpingQt({"b.png", "c.png"}));
+
+    EXPECT_EQ(core.currentFilePath(), original);
+    ASSERT_TRY_TRUE_TIMEOUT(core.currentFilePath() != original, 10000);
+    EXPECT_EQ(core.currentFilePath(), other);
+}
+
 TEST_F(TestCoreNav, folderViewFollowsTheDirectoryState) {
     QDir().mkpath(QDir(m_base).filePath("projdir"));
     Core core;

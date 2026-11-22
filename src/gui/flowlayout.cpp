@@ -117,6 +117,14 @@ void FlowLayout::insertItem(int index, QGraphicsLayoutItem *item) {
     invalidate();
 }
 
+void FlowLayout::setItems(QList<QGraphicsLayoutItem *> items) {
+    for(auto *item : std::as_const(items)) {
+        item->setParentLayoutItem(this);
+    }
+    m_items = std::move(items);
+    invalidate();
+}
+
 int FlowLayout::count() const {
     return m_items.count();
 }

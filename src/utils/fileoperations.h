@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <QDebug>
 #include <QString>
 #include <QFileInfo>
@@ -73,7 +75,7 @@ class FileOperations {
     // would otherwise strip everything the camera recorded. Empty for a source
     // that has none — the clipboard import, a brand-new file.
     static bool saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality,
-                               const QString &metadataSource = QString());
+                               const QString &metadataSource = QString(), const std::function<bool()> &canCommit = {});
 
   private:
     static bool moveToTrashImpl(const QString &path);

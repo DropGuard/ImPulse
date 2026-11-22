@@ -202,6 +202,12 @@ void Core::connectComponents() {
     connect(m_overlays, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
 
     connect(m_model->scaler.get(), &Scaler::scalingFinished, this, &Core::onScalingFinished);
+    connect(m_model.get(), &DirectoryModel::editDraftWriteFailed, this, [this] {
+        m_overlays->showError(tr("Could not update edit recovery on disk."));
+    });
+    connect(m_model.get(), &DirectoryModel::editDraftDetached, this, [this] {
+        m_overlays->showMessage(tr("The original is no longer available. Your edit is in Recover edits."));
+    });
 
     if(m_mw)
         connectWindowComponents();
@@ -224,7 +230,6 @@ void Core::connectWindowComponents() {
     connect(m_mw->dialogs(), &DialogHost::opened, m_nav, &NavigationController::loadPath);
     connect(m_mw->crop(), &CropController::cropRequested, this, &Core::crop);
     connect(m_mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
-    connect(m_mw->dialogs(), &DialogHost::saveAsRequested, this, &Core::saveCurrentFileAs);
     connect(m_mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
 }
 
@@ -239,6 +244,7 @@ void Core::initActions() {
     actionManager->connectAction("crop", this, &Core::toggleCropPanel);
     actionManager->connectAction("setWallpaper", this, &Core::setWallpaper);
     actionManager->connectAction("open", this, &Core::showOpenDialog);
+    actionManager->connectAction("recoverEdits", this, &Core::recoverEdits);
     actionManager->connectAction("save", this, &Core::saveCurrentFile);
     actionManager->connectAction("saveAs", this, &Core::requestSavePath);
     actionManager->connectAction("exit", this, &Core::close);

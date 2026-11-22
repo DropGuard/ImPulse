@@ -42,6 +42,7 @@ enum class PoolOwner : quint8 {
     Loader,
     Scaler,
     Thumbnailer,
+    EditDrafts,
     // Background upkeep that belongs to no request: the thumbnail store's
     // sweep is the first such job. It gets its own owner rather than riding
     // Thumbnailer's, because the two have opposite lifetimes — a sweep must not

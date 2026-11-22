@@ -246,68 +246,31 @@ TEST_F(TestGrid, dropReportsMimeSourceAndLandingIndex) {
     EXPECT_EQ(spy.at(0).at(0).value<const QMimeData *>()->urls(), urls);
 }
 
-// The row is the unit a rename moves. Driven straight at the view because
-// populate() is a fixture of real rows with no filesystem behind them, and
-// everything at stake here is view arithmetic: the widget surviving (its
-// pixels ride along with its name), the rows it jumped over sliding the other
-// way, and the selection following the row instead of staying on the vacated
-// index — that last one is the visible bug shape, a highlight left behind on
-// a row the user is no longer on.
-TEST_F(TestGrid, renameMovesTheRowAndCarriesItsWidgetAndSelection) {
+TEST_F(TestGrid, snapshotMovesReuseWidgetsAndOnlyInvalidateChangedContent) {
     FolderGridView grid;
     grid.resize(500, 600);
-    grid.populate(25);
+    grid.populate(4);
     grid.show();
-    const QList<ThumbnailWidget *> before = coretest::orderedThumbnails(grid);
-    // ASSERT: before.at(1) and before.at(2) below index the list this guards
-    ASSERT_TRUE(before.count() == 25) << qPrintable(
-        QStringLiteral("populate(25) laid out %1 rows").arg(before.count()));
-    grid.select(1);
-    ThumbnailWidget *const moving = before.at(1);
+    const auto before = coretest::orderedThumbnails(grid);
+    ASSERT_EQ(before.size(), 4);
+    grid.select(QList<int>{1, 2});
+    QPointer<ThumbnailWidget> removed = before[0];
+    for(int row : {1, 2}) {
+        before[row]->setThumbnail(std::make_shared<Thumbnail>(QStringLiteral("file.png"), QString(), 120,
+                                                              std::make_shared<QImage>(16, 16, QImage::Format_RGB32)));
+    }
 
-    grid.renameItem(1, 4, QStringLiteral("moved.png"));
+    grid.applyRows({{2, {}, true}, {3}, {1, QStringLiteral("renamed.png")}, {-1}});
 
-    const QList<ThumbnailWidget *> after = coretest::orderedThumbnails(grid);
-    ASSERT_EQ(after.count(), 25); // guards the at(4)/at(3) reads below
-    EXPECT_TRUE(after.at(4) == moving) << "the moved row is a different widget — renaming does not recreate the row";
-    EXPECT_TRUE(after.at(1) == before.at(2) && after.at(3) == before.at(4))
-        << "the rows the move jumped over did not slide into the space it left";
-    EXPECT_EQ(grid.selection(), QList<int>({4}));
-
-    // and back again: the same rows slide the other way
-    grid.renameItem(4, 0, QStringLiteral("front.png"));
-    const QList<ThumbnailWidget *> back = coretest::orderedThumbnails(grid);
-    EXPECT_TRUE(back.at(0) == moving) << "the row did not move back to the front";
-    EXPECT_TRUE(back.at(1) == before.at(0) && back.at(4) == before.at(4))
-        << "the rows it passed going back did not shift down";
-    EXPECT_EQ(grid.selection(), QList<int>({0}));
-
-    // an in-place rename — the name-sort case where the row does not move —
-    // touches neither the layout nor the selection
-    grid.renameItem(0, 0, QStringLiteral("still.png"));
-    EXPECT_TRUE(coretest::orderedThumbnails(grid).at(0) == moving) << "an in-place rename moved a row";
-    EXPECT_EQ(grid.selection(), QList<int>({0}));
-
-    // out-of-range on either side is refused rather than clamped: the caller
-    // is a live event about a row the view may already have dropped
-    grid.renameItem(0, 99, QStringLiteral("nowhere.png"));
-    ASSERT_EQ(coretest::orderedThumbnails(grid).count(), 25); // guards the at(0) read below
-    EXPECT_TRUE(coretest::orderedThumbnails(grid).at(0) == moving) << "an out-of-range rename moved a row";
-
-    // A multi-row selection is the other half of the remap: the selected row
-    // moves and the selected rows it passes shift the other way. One selected
-    // index reaches only the first branch, and the branches it does not reach
-    // are the ones that leave a highlight on the wrong picture.
-    grid.select(QList<int>{1, 2, 3});
-    grid.renameItem(1, 4, QStringLiteral("moved.png"));
-    QList<int> shifted = grid.selection();
-    std::sort(shifted.begin(), shifted.end());
-    EXPECT_EQ(shifted, QList<int>({1, 2, 4}));
-
-    grid.renameItem(4, 0, QStringLiteral("front.png"));
-    shifted = grid.selection();
-    std::sort(shifted.begin(), shifted.end());
-    EXPECT_EQ(shifted, QList<int>({0, 2, 3}));
+    const auto after = coretest::orderedThumbnails(grid);
+    ASSERT_EQ(after.size(), 4);
+    EXPECT_TRUE(removed.isNull());
+    EXPECT_EQ(after[0], before[2]);
+    EXPECT_FALSE(after[0]->isLoaded);
+    EXPECT_EQ(after[1], before[3]);
+    EXPECT_EQ(after[2], before[1]);
+    EXPECT_TRUE(after[2]->isLoaded);
+    EXPECT_EQ(grid.selection(), (QList<int>{2, 0}));
 }
 
 int main(int argc, char **argv) {

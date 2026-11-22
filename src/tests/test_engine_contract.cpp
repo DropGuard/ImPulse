@@ -76,7 +76,7 @@ int main() {
 
     // async open on a real directory
     std::string fixture = makeFixture();
-    uint32_t openEpoch = 0;
+    uint64_t openEpoch = 0;
     CHECK(qimgv_engine_open_dir(engine, fixture.c_str(), 0, &openEpoch) == QIMGV_OK);
     CHECK(openEpoch > 0);
 

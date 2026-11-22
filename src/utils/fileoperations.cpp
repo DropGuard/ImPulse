@@ -364,7 +364,8 @@ bool FileOperations::moveToTrashImpl(const QString &filePath) {
 // deserves. png gets libpng's flat 30 (levels 3-6 perform as well as 9 here),
 // jpeg gets the user's setting, anything else is left to the default and will
 // simply fail to encode.
-static bool writeImageTo(const QImage &image, const QString &destPath, int jpegQuality) {
+static bool writeImageTo(const QImage &image, const QString &destPath, int jpegQuality,
+                         const std::function<bool()> &canCommit) {
     const QString ext = QFileInfo(destPath).suffix();
     int quality = 95;
     if(ext.compare("png", Qt::CaseInsensitive) == 0)
@@ -395,12 +396,12 @@ static bool writeImageTo(const QImage &image, const QString &destPath, int jpegQ
         out.cancelWriting();
         return false;
     }
-    return out.commit();
+    return (!canCommit || canCommit()) && out.commit();
 }
 
 bool FileOperations::saveWithBackup(const QImage &image, const QString &destPath, int jpegQuality,
-                                    const QString &metadataSource) {
-    if(!writeImageTo(image, destPath, jpegQuality))
+                                    const QString &metadataSource, const std::function<bool()> &canCommit) {
+    if(!writeImageTo(image, destPath, jpegQuality, canCommit))
         return false;
     // Pixels first, metadata second, and the order is load-bearing: Qt's
     // writers emit no EXIF/XMP/IPTC at all, so the file is complete but bare at

@@ -16,4 +16,6 @@ class FSEntry {
     std::uintmax_t size = 0;
     std::filesystem::file_time_type modifyTime;
     bool isDirectory = false;
+    quint64 id = 0;
+    quint64 contentRevision = 0;
 };

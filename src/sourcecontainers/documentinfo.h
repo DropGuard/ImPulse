@@ -43,6 +43,7 @@ class DocumentInfo {
     QString filePath() const;
     QString fileName() const;
     QString baseName() const;
+    std::unique_ptr<DocumentInfo> atPath(const QString &path) const;
     qint64 fileSize() const;
     DocumentType type() const;
     QMimeType mimeType() const;

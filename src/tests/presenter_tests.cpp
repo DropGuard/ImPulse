@@ -240,7 +240,9 @@ TEST_F(TestPresenter, presenterRoutesThumbnailsAndDragHoverToTheView) {
     EXPECT_TRUE(QDir(m_alpha).mkpath("subdir"));
     EXPECT_TRUE(QDir(m_alpha).mkpath("subdir2"));
     presenter.setShowDirs(true);
-    presenter.reloadModel();
+    // the two new folders arrive through the engine's own watch; the
+    // presenter syncs on the publication, so there is nothing to re-populate
+    // by hand
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return model->listing().dirCount() == 2;
@@ -308,130 +310,65 @@ TEST_F(TestPresenter, presenterForwardsDragFromTheView) {
 // entry the event named. The events are emitted by hand because the
 // contract under test is the translation, not the arrival — arrival and
 // index provenance are pinned by the mirror-contract test.
-TEST_F(TestPresenter, presenterTranslatesEngineIndicesIntoGridIndices) {
+TEST_F(TestPresenter, aSizeDrivenMoveKeepsSelectionAndActivationOnTheSameFile) {
     WorkerPool pool(2);
     auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    const QString dir = uniqueDir("splice");
-    EXPECT_TRUE(QDir(dir).mkpath("d1"));
-    EXPECT_TRUE(QDir(dir).mkpath("d2"));
-    writeImage(QDir(dir).filePath("f1.png"));
-    writeImage(QDir(dir).filePath("f2.png"));
-    EXPECT_TRUE(model->setDirectory(dir));
-    EXPECT_TRUE(QTest::qWaitFor(
-        [&] {
-            return model->listing().fileCount() == 2;
-        },
-        10000));
-    EXPECT_EQ(model->listing().fileCount(), 2);
-    EXPECT_TRUE(QTest::qWaitFor(
-        [&] {
-            return model->listing().dirCount() == 2;
-        },
-        10000));
-    EXPECT_EQ(model->listing().dirCount(), 2);
-    const QString f0 = model->listing().filePathAt(0);
-    const QString f1 = model->listing().filePathAt(1);
-    const QString d0 = model->listing().dirPathAt(0);
-    const QString d1 = model->listing().dirPathAt(1);
-    const int dirCount = model->listing().dirCount();
-    EXPECT_TRUE(dirCount > 0) << "precondition broken: no directories to offset by";
+    const QDir dir(uniqueDir("size-reorder"));
+    const QString selected = dir.filePath("a.png");
+    const auto resize = [](const QString &path, qint64 size) {
+        QFile file(path);
+        return file.open(QIODevice::ReadWrite) && file.resize(size);
+    };
+    ASSERT_TRUE(dir.mkdir("folder"));
+    ASSERT_TRUE(resize(selected, 10));
+    ASSERT_TRUE(resize(dir.filePath("b.png"), 20));
+    model->listing().setSortingMode(SORT_SIZE);
+    EXPECT_TRUE(model->setDirectory(dir.path()));
+    ASSERT_TRY_TRUE_TIMEOUT(model->listing().isSettled(), 10000);
 
-    coretest::CountingStripProxy view;
+    ThumbnailStrip view;
+    Thumbnailer thumbnailer(pool);
+    DirectoryPresenter presenter(thumbnailer);
+    presenter.setShowDirs(true);
+    presenter.setView(&view);
+    presenter.setModel(model);
+    presenter.selectAndFocus(selected);
+    EXPECT_EQ(presenter.selectedPaths(), QList<QString>{selected});
+    QSignalSpy activated(&presenter, &DirectoryPresenter::fileActivated);
+
+    ASSERT_TRUE(resize(selected, 30));
+    ASSERT_TRY_EQ_TIMEOUT(model->listing().indexOfFile(selected), 1, 10000);
+    EXPECT_EQ(view.selection(), QList<int>{2});
+    EXPECT_EQ(presenter.selectedPaths(), QList<QString>{selected});
+    emit view.itemActivated(2);
+    ASSERT_EQ(activated.count(), 1);
+    EXPECT_EQ(activated.at(0).at(0).toString(), selected);
+}
+
+TEST_F(TestPresenter, aRenameFollowsTheSelectionEvenInAnUnshownView) {
+    WorkerPool pool(2);
+    auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
+    const QDir dir(uniqueDir("proxyrename"));
+    writeImage(dir.filePath("a.png"));
+    writeImage(dir.filePath("b.png"));
+    writeImage(dir.filePath("c.png"));
+    EXPECT_TRUE(model->setDirectory(dir.path()));
+    ASSERT_TRY_TRUE_TIMEOUT(model->listing().isSettled(), 10000);
+
+    ThumbnailStrip view;
     Thumbnailer thumbnailer(pool);
     DirectoryPresenter presenter(thumbnailer);
     presenter.setView(&view);
     presenter.setModel(model);
+    const QString original = dir.filePath("a.png");
+    const QString renamed = dir.filePath("z.png");
+    EXPECT_EQ(presenter.selectedPaths(), QList<QString>{original});
+    const quint64 originalId = model->listing().fileEntryAt(0).id;
 
-    // files-only: the engine index goes to the grid untranslated, and the
-    // directory handlers refuse the event outright
-    QMetaObject::invokeMethod(model.get(), "fileModified", Q_ARG(QString, f0));
-    EXPECT_EQ(view.reloaded, QList<int>({0}));
-    QMetaObject::invokeMethod(model.get(), "fileAdded", Q_ARG(QString, f1));
-    EXPECT_EQ(view.inserted, QList<int>({1}));
-    QMetaObject::invokeMethod(model.get(), "fileRemoved", Q_ARG(QString, f0), Q_ARG(int, 0));
-    EXPECT_EQ(view.removed, QList<int>({0}));
-    QMetaObject::invokeMethod(&model->listing(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(&model->listing(), "dirAdded", Q_ARG(QString, d0));
-    EXPECT_EQ(view.removed.count(), 1); // dirs are not in the grid: no splice
-    EXPECT_EQ(view.inserted.count(), 1);
-
-    // A rename is one call, not a remove plus an insert: the old row comes
-    // from the event (the mirror has already spliced, so the listing cannot
-    // answer "where was it") and the new row and the name come from the
-    // listing. In files-only mode a directory rename is refused outright.
-    QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
-    EXPECT_EQ(view.renamed, QList<int>({0, 1}));
-    EXPECT_EQ(view.renamedTo, QList<QString>({QFileInfo(f1).fileName()}));
-    QMetaObject::invokeMethod(&model->listing(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
-    EXPECT_EQ(view.renamed.count(), 2);
-
-    view.removed.clear();
-    view.inserted.clear();
-    view.reloaded.clear();
-    view.renamed.clear();
-    view.renamedTo.clear();
-
-    // dirs shown: every file index shifts by dirCount, dir indices do not
-    presenter.setShowDirs(true);
-    QMetaObject::invokeMethod(model.get(), "fileModified", Q_ARG(QString, f0));
-    EXPECT_EQ(view.reloaded, QList<int>({dirCount}));
-    QMetaObject::invokeMethod(model.get(), "fileAdded", Q_ARG(QString, f1));
-    EXPECT_EQ(view.inserted, QList<int>({dirCount + 1}));
-    QMetaObject::invokeMethod(model.get(), "fileRemoved", Q_ARG(QString, f0), Q_ARG(int, 0));
-    EXPECT_EQ(view.removed, QList<int>({dirCount}));
-    QMetaObject::invokeMethod(&model->listing(), "dirRemoved", Q_ARG(QString, d0), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(&model->listing(), "dirAdded", Q_ARG(QString, d0));
-    EXPECT_EQ(view.removed, QList<int>({dirCount, 0}));
-    EXPECT_EQ(view.inserted, QList<int>({dirCount + 1, 0}));
-
-    // with dirs in front, both rename sides of a *file* shift by dirCount
-    // while a dir row — already in the leading block — does not shift at all
-    view.renamed.clear();
-    view.renamedTo.clear();
-    QMetaObject::invokeMethod(model.get(), "fileRenamed", Q_ARG(QString, f0), Q_ARG(QString, f1), Q_ARG(int, 0));
-    QMetaObject::invokeMethod(&model->listing(), "dirRenamed", Q_ARG(QString, d0), Q_ARG(QString, d1), Q_ARG(int, 0));
-    EXPECT_EQ(view.renamed, QList<int>({dirCount, dirCount + 1, 0, 1}));
-    EXPECT_EQ(view.renamedTo, QList<QString>({QFileInfo(f1).fileName(), QFileInfo(d1).fileName()}));
-}
-
-TEST_F(TestPresenter, aRenameFollowsTheSelectionEvenInAnUnshownView) {
-    // The strip is real from construction now (the buffering proxy retired),
-    // but "shown" and "functional" are still different things: this view is
-    // never shown, and the rename that lands must still move the selection
-    // with the row — the same contract the buffer used to pin.
-    WorkerPool pool(2);
-    auto model = std::make_shared<DirectoryModel>(pool, EngineBridge::instance());
-    const QString dir = uniqueDir("proxyrename");
-    writeImage(QDir(dir).filePath("a.png"));
-    writeImage(QDir(dir).filePath("b.png"));
-    writeImage(QDir(dir).filePath("c.png"));
-    EXPECT_TRUE(model->setDirectory(dir));
-    EXPECT_TRUE(QTest::qWaitFor(
-        [&] {
-            return model->listing().fileCount() == 3;
-        },
-        10000));
-    EXPECT_EQ(model->listing().fileCount(), 3);
-
-    coretest::CountingStripProxy view; // real, but never shown
-    Thumbnailer thumbnailer(pool);
-    DirectoryPresenter presenter(thumbnailer);
-    presenter.setView(&view);
-    presenter.setModel(model); // populate + select(0)
-    EXPECT_EQ(view.selection(), QList<int>({0}));
-    EXPECT_EQ(model->listing().fileNameAt(0), QStringLiteral("a.png"));
-
-    EXPECT_TRUE(QFile::rename(QDir(dir).filePath("a.png"), QDir(dir).filePath("z.png")));
-
-    EXPECT_TRUE(QTest::qWaitFor(
-        [&] {
-            return view.renamed.count() == 2;
-        },
-        10000));
-    EXPECT_EQ(view.renamed.count(), 2);
-    // a.png was row 0 and z.png is the last row: the selection moves with it
-    EXPECT_EQ(view.renamed, QList<int>({0, 2}));
-    EXPECT_EQ(view.selection(), QList<int>({2}));
+    EXPECT_TRUE(QFile::rename(original, renamed));
+    ASSERT_TRY_EQ_TIMEOUT(model->listing().indexOfFile(renamed), 2, 10000);
+    EXPECT_EQ(model->listing().fileEntryAt(2).id, originalId);
+    EXPECT_EQ(presenter.selectedPaths(), QList<QString>{renamed});
 }
 
 TEST_F(TestPresenter, disconnectViewAfterTheViewDiedIsSafe) {

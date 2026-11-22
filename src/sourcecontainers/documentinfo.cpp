@@ -33,6 +33,13 @@ QString DocumentInfo::baseName() const {
     return m_fileInfo.baseName();
 }
 
+std::unique_ptr<DocumentInfo> DocumentInfo::atPath(const QString &path) const {
+    auto copy = std::make_unique<DocumentInfo>(*this);
+    if(path != filePath())
+        copy->m_fileInfo.setFile(path);
+    return copy;
+}
+
 // bytes
 qint64 DocumentInfo::fileSize() const {
     return m_fileInfo.size();

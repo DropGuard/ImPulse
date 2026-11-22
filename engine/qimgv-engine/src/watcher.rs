@@ -74,17 +74,22 @@ pub(crate) enum WatchCmd {
     Stop,
 }
 
+pub(crate) enum WatchMessage {
+    Scan(crate::engine::ScanDone),
+    Change { session: u64, raw: RawWatchEvent },
+}
+
 /// Sends one raw event. False means the consumer is gone and the watcher
 /// thread has nothing left to do.
-fn send(ev_tx: &Sender<RawWatchEvent>, raw: RawWatchEvent) -> bool {
+fn send(ev_tx: &Sender<WatchMessage>, session: u64, raw: RawWatchEvent) -> bool {
     crate::trace::line("read", || format!("{raw:?}"));
-    ev_tx.send(raw).is_ok()
+    ev_tx.send(WatchMessage::Change { session, raw }).is_ok()
 }
 
 /// Hands one of the pairing layer's outcomes to the stream: the trace line
 /// names what happened, the channel gets the event. False means the consumer
 /// is gone.
-fn dispatch(ev_tx: &Sender<RawWatchEvent>, out: Out, live_wd: Option<i32>) -> bool {
+fn dispatch(ev_tx: &Sender<WatchMessage>, out: Out, live_wd: Option<i32>, session: u64) -> bool {
     match out {
         Out::Report {
             ev,
@@ -100,12 +105,12 @@ fn dispatch(ev_tx: &Sender<RawWatchEvent>, out: Out, live_wd: Option<i32>) -> bo
                     ev.name.as_deref().unwrap_or("?")
                 )
             });
-            send(ev_tx, ev)
+            send(ev_tx, session, ev)
         }
         Out::Report {
             ev,
             paired_cookie: None,
-        } => send(ev_tx, ev),
+        } => send(ev_tx, session, ev),
         Out::Unpaired { ev, cookie } => {
             crate::trace::line("move", || {
                 format!(
@@ -113,7 +118,7 @@ fn dispatch(ev_tx: &Sender<RawWatchEvent>, out: Out, live_wd: Option<i32>) -> bo
                     ev.name.as_deref().unwrap_or("?")
                 )
             });
-            send(ev_tx, ev)
+            send(ev_tx, session, ev)
         }
         Out::Drop(reason) => {
             match &reason {
@@ -144,7 +149,7 @@ fn enumerate_and_report(
     path: &Path,
     epoch: u64,
     dispatch: u64,
-    res_tx: &Sender<crate::engine::ScanDone>,
+    ev_tx: &Sender<WatchMessage>,
     options: &crate::scan::ScanOptions,
 ) {
     let start = std::time::Instant::now();
@@ -157,11 +162,11 @@ fn enumerate_and_report(
             source: std::io::Error::other("scan worker panicked"),
         })
     });
-    let _ = res_tx.send(crate::engine::ScanDone {
+    let _ = ev_tx.send(WatchMessage::Scan(crate::engine::ScanDone {
         epoch,
         dispatch,
         path: path.to_path_buf(),
         result,
         scan_ms: start.elapsed().as_millis(),
-    });
+    }));
 }

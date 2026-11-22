@@ -14,6 +14,17 @@ ImageStatic::ImageStatic(std::unique_ptr<DocumentInfo> _info, bool scaled, const
 ImageStatic::~ImageStatic() {
 }
 
+ImageStatic::ImageStatic(const ImageStatic &source, const QString &path, std::shared_ptr<const QImage> pixels)
+    : Image(source.m_docInfo->atPath(path)), m_originalSize(source.m_originalSize),
+      m_allocationLimitMb(source.m_allocationLimitMb), m_image(source.m_image), m_imageEdited(std::move(pixels)) {
+    m_loadAttempted = true;
+    m_edited = true;
+}
+
+std::shared_ptr<ImageStatic> ImageStatic::editedCopy(const QString &path, std::shared_ptr<const QImage> pixels) const {
+    return std::shared_ptr<ImageStatic>(new ImageStatic(*this, path, std::move(pixels)));
+}
+
 //load image data from disk
 void ImageStatic::load() {
     if(m_loadAttempted) {

@@ -33,6 +33,9 @@ class ThumbnailWidget : public QGraphicsWidget {
     }
 
     bool isLoaded;
+    bool needsFreshThumbnail() const {
+        return m_needsFreshThumbnail;
+    }
     void setThumbnail(std::shared_ptr<Thumbnail> _thumbnail);
     void renameThumbnail(const QString &newName);
 
@@ -56,7 +59,7 @@ class ThumbnailWidget : public QGraphicsWidget {
     void setPadding(int _padding);
     void setMargins(int _marginX, int _marginY);
     int thumbnailSize();
-    void reset();
+    void invalidateThumbnail();
     void unsetThumbnail();
 
   protected:
@@ -82,6 +85,7 @@ class ThumbnailWidget : public QGraphicsWidget {
     void refreshCacheMode();
 
     std::shared_ptr<Thumbnail> m_thumbnail;
+    bool m_needsFreshThumbnail = false;
     // the paint-device copy of the thumbnail's image: converted once per
     // assignment, here on the GUI thread — the worker only ever makes QImage
     QPixmap m_displayPixmap;

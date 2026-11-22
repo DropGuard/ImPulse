@@ -45,3 +45,5 @@ Testing/
 __pycache__/
 *.pyc
 *.pyo
+# an editor's per-project scaffolding, created in whatever repo it is opened on
+.perch/

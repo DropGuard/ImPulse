@@ -27,16 +27,9 @@ FolderGridView::FolderGridView(QWidget *parent) : ThumbnailView(Qt::Vertical, pa
 }
 
 FolderGridView::~FolderGridView() {
-    // the thumbnail widgets' QGraphicsLayoutItemPrivate::parentLayoutItem
-    // points at this class's FlowLayout, and derived-member destruction kills
-    // that layout BEFORE the base ThumbnailView's scene member deletes the
-    // widgets — a teardown that has never once run in the app's history, and
-    // which SEGVs inside ~QGraphicsLayoutItem through the dead layout pointer.
-    // Discharge the widgets while the layout can still be notified: removeAll
-    // is the exact order populate's own re-populate path uses (the layout
-    // drops references first, then the widgets die), so it is the
-    // battle-tested sequence, not a new one.
-    removeAll();
+    m_flowLayout->clear();
+    qDeleteAll(m_thumbnails);
+    m_thumbnails.clear();
 }
 
 void FolderGridView::dropEvent(QDropEvent *event) {
@@ -307,19 +300,15 @@ ThumbnailWidget *FolderGridView::createThumbnailWidget() {
     return widget;
 }
 
-void FolderGridView::addItemToLayout(ThumbnailWidget *widget, int pos) {
-    m_scene.addItem(widget);
-    m_flowLayout->insertItem(pos, widget);
-}
-
-void FolderGridView::removeItemFromLayout(int pos) {
-    m_flowLayout->removeAt(pos);
-}
-
-void FolderGridView::removeAll() {
-    m_flowLayout->clear();
-    qDeleteAll(m_thumbnails);
-    m_thumbnails.clear();
+void FolderGridView::syncThumbnailLayout() {
+    QList<QGraphicsLayoutItem *> items;
+    items.reserve(m_thumbnails.size());
+    for(auto *thumbnail : std::as_const(m_thumbnails)) {
+        thumbnail->setDropHovered(false);
+        items.append(thumbnail);
+    }
+    m_lastDragTarget = -1;
+    m_flowLayout->setItems(std::move(items));
 }
 
 void FolderGridView::updateLayout() {

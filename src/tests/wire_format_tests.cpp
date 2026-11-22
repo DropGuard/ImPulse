@@ -34,8 +34,14 @@ TEST_F(TestWireFormat, listingArenaRoundTripsThroughTheCppParser) {
     EXPECT_EQ(int(fc), bridge.fileCount());
     EXPECT_EQ(int(dc), bridge.dirCount());
 
-    std::vector<EngineBridge::EngineEntry> files, dirs;
-    EXPECT_TRUE(EngineBridge::parseListing(arena, files, dirs));
+    EngineBridge::Snapshot snapshot;
+    EXPECT_TRUE(EngineBridge::parseListing(arena, snapshot));
+    EXPECT_EQ(snapshot.directory, m_fixtureDir);
+    EXPECT_EQ(snapshot.session, bridge.session());
+    EXPECT_EQ(snapshot.revision, revision);
+    EXPECT_EQ(snapshot.sort, QIMGV_SORT_NAME);
+    const auto &files = snapshot.files;
+    const auto &dirs = snapshot.dirs;
     EXPECT_EQ(int(files.size()), int(fc));
     EXPECT_EQ(int(dirs.size()), int(dc));
 
@@ -48,7 +54,8 @@ TEST_F(TestWireFormat, listingArenaRoundTripsThroughTheCppParser) {
         EXPECT_EQ(files[i].path, ref.path);
         EXPECT_EQ(files[i].size, ref.size);
         EXPECT_EQ(files[i].mtimeMs, ref.mtimeMs);
-        EXPECT_EQ(files[i].isDir, false);
+        EXPECT_FALSE(files[i].isDir);
+        EXPECT_NE(files[i].id, 0U);
     }
     EngineBridge::EngineEntry dirRef;
     EXPECT_TRUE(bridge.entryAt(0, true, dirRef));
@@ -71,11 +78,11 @@ TEST_F(TestWireFormat, unicodeNamesSurviveTheArenaByteForByte) {
     quint32 fc = 0, dc = 0;
     quint64 revision = 0;
     EXPECT_TRUE(bridge.exportListing(arena, fc, dc, revision));
-    std::vector<EngineBridge::EngineEntry> files, dirs;
-    EXPECT_TRUE(EngineBridge::parseListing(arena, files, dirs));
+    EngineBridge::Snapshot snapshot;
+    EXPECT_TRUE(EngineBridge::parseListing(arena, snapshot));
 
     bool found = false;
-    for(const auto &f : files) {
+    for(const auto &f : snapshot.files) {
         if(f.name == wide) {
             found = true;
             EXPECT_EQ(f.path, m_fixtureDir + QStringLiteral("/") + wide);
@@ -95,54 +102,53 @@ TEST_F(TestWireFormat, truncatedArenaStopsAtARecordBoundary) {
     quint32 fc = 0, dc = 0;
     quint64 revision = 0;
     EXPECT_TRUE(bridge.exportListing(arena, fc, dc, revision));
-    std::vector<EngineBridge::EngineEntry> fullFiles, fullDirs;
-    EXPECT_TRUE(EngineBridge::parseListing(arena, fullFiles, fullDirs));
-    EXPECT_EQ(int(fullFiles.size()), 3);
-    EXPECT_EQ(int(fullDirs.size()), 1);
+    EngineBridge::Snapshot full;
+    EXPECT_TRUE(EngineBridge::parseListing(arena, full));
+    EXPECT_EQ(int(full.files.size()), 3);
+    EXPECT_EQ(int(full.dirs.size()), 1);
 
     // Cut into the final record. A rejected arena yields NOTHING: a prefix
     // that decoded cleanly is indistinguishable, at the call site, from a
     // directory that genuinely has fewer entries — and the mirror would
     // install it as such (missing entries in the view, in the counts and in
     // end-of-folder navigation, with nothing crashed to point at).
-    std::vector<EngineBridge::EngineEntry> files, dirs;
-    EXPECT_TRUE(!EngineBridge::parseListing(arena.left(arena.size() - 3), files, dirs));
-    EXPECT_TRUE(files.empty());
-    EXPECT_TRUE(dirs.empty());
+    EngineBridge::Snapshot snapshot;
+    EXPECT_TRUE(!EngineBridge::parseListing(arena.left(arena.size() - 3), snapshot));
+    EXPECT_TRUE(snapshot.files.empty());
+    EXPECT_TRUE(snapshot.dirs.empty());
 
     // and a header that overstates the records is rejected the same way
     const quint32 overstated = fc + 1;
     QByteArray lyingHeader = arena;
     lyingHeader.replace(0, 4, QByteArray::fromRawData(reinterpret_cast<const char *>(&overstated), 4));
-    EXPECT_TRUE(!EngineBridge::parseListing(lyingHeader, files, dirs));
-    EXPECT_TRUE(files.empty());
-    EXPECT_TRUE(dirs.empty());
+    EXPECT_TRUE(!EngineBridge::parseListing(lyingHeader, snapshot));
+    EXPECT_TRUE(snapshot.files.empty());
+    EXPECT_TRUE(snapshot.dirs.empty());
 }
 
 TEST_F(TestWireFormat, headerCountsDisagreeingWithTheArenaAreRejected) {
     // the failure mode when producer and consumer drift: a header promising
     // entries the bytes do not contain. Must not allocate for them, must not
     // report success with a silently empty listing
-    QByteArray arena;
-    arena.resize(8);
+    QByteArray arena(32, '\0');
     auto *h = reinterpret_cast<unsigned char *>(arena.data());
     for(int i = 0; i < 4; ++i)
         h[i] = 0xff; // file_count = 0xffffffff
     // dir_count stays 0
 
-    std::vector<EngineBridge::EngineEntry> files, dirs;
-    EXPECT_TRUE(!EngineBridge::parseListing(arena, files, dirs));
-    EXPECT_TRUE(files.empty());
-    EXPECT_TRUE(dirs.empty());
+    EngineBridge::Snapshot snapshot;
+    EXPECT_TRUE(!EngineBridge::parseListing(arena, snapshot));
+    EXPECT_TRUE(snapshot.files.empty());
+    EXPECT_TRUE(snapshot.dirs.empty());
 
     // an arena shorter than the header is not a listing at all
-    EXPECT_TRUE(!EngineBridge::parseListing(QByteArray(), files, dirs));
-    EXPECT_TRUE(!EngineBridge::parseListing(arena.left(7), files, dirs));
+    EXPECT_TRUE(!EngineBridge::parseListing(QByteArray(), snapshot));
+    EXPECT_TRUE(!EngineBridge::parseListing(arena.left(7), snapshot));
 
     // header with zero counts IS a complete empty listing
-    const QByteArray empty(8, '\0');
-    EXPECT_TRUE(EngineBridge::parseListing(empty, files, dirs));
-    EXPECT_TRUE(files.empty());
+    const QByteArray empty(32, '\0');
+    EXPECT_TRUE(EngineBridge::parseListing(empty, snapshot));
+    EXPECT_TRUE(snapshot.files.empty());
 }
 
 // settings.h orders the modes name, name-desc, size, size-desc, time,

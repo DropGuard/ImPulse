@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -12,28 +14,31 @@ pub struct EntryData {
     pub mtime: SystemTime,
 }
 
-/// The single source of truth for the current directory. Mutation happens on
-/// the engine loop thread; the FFI layer reads it through the shared
-/// `Arc<RwLock<_>>` on the UI thread.
-///
-/// The rows live directly in the two order vectors — files and directories
-/// sorted independently. There are no handles: the only consumer that ever
-/// keyed on one was a set of FFI navigation functions nothing called (the C++
-/// mirror keys on path and navigates its own vectors), so the generational
-/// slotmap, the two position maps synced at four mutation sites, and the
-/// handle bytes on the wire all retired together.
+#[derive(Debug)]
+struct Row {
+    entry: EntryData,
+    id: u64,
+    content_revision: u64,
+}
+
+impl Deref for Row {
+    type Target = EntryData;
+
+    fn deref(&self) -> &EntryData {
+        &self.entry
+    }
+}
+
+/// The published directory, sort, and rows always describe the same commit.
 #[derive(Debug)]
 pub struct DirectoryState {
     dir: Option<PathBuf>,
-    file_order: Vec<EntryData>,
-    dir_order: Vec<EntryData>,
+    file_order: Vec<Row>,
+    dir_order: Vec<Row>,
     sort: SortMode,
-    /// Bumped whenever the listing's contents OR its order change. A reader
-    /// that wants a snapshot it can trust reads this before and after: the
-    /// same number means the listing did not move under it. Without it the
-    /// only way to notice a change is to compare the data, which is a guess
-    /// about how long the comparison takes.
+    session: u64,
     revision: u64,
+    next_id: u64,
 }
 
 impl DirectoryState {
@@ -43,13 +48,23 @@ impl DirectoryState {
             file_order: Vec::new(),
             dir_order: Vec::new(),
             sort,
+            session: 0,
             revision: 0,
+            next_id: 1,
         }
     }
 
     /// The listing's version. Every mutation bumps it; nothing else does.
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub fn session(&self) -> u64 {
+        self.session
+    }
+
+    fn commit(&mut self) {
+        self.revision += 1;
     }
 
     pub fn dir(&self) -> Option<&Path> {
@@ -60,33 +75,68 @@ impl DirectoryState {
         self.sort
     }
 
-    /// Replaces the whole listing. The rows the reader held are gone; the new
-    /// ones are assigned here and ordered.
     pub fn replace_all(&mut self, dir: PathBuf, files: Vec<EntryData>, dirs: Vec<EntryData>) {
+        self.install(self.session, dir, self.sort, files, dirs);
+    }
+
+    pub(crate) fn install(
+        &mut self,
+        session: u64,
+        dir: PathBuf,
+        sort: SortMode,
+        files: Vec<EntryData>,
+        dirs: Vec<EntryData>,
+    ) {
+        let mut prior = HashMap::new();
+        if self.session == session && self.dir.as_ref() == Some(&dir) {
+            for row in self.file_order.drain(..).chain(self.dir_order.drain(..)) {
+                prior.insert(
+                    row.entry.path,
+                    (
+                        row.id,
+                        row.content_revision,
+                        row.entry.size,
+                        row.entry.mtime,
+                        row.entry.is_dir,
+                    ),
+                );
+            }
+        }
+        let mut identity = |entry: EntryData| {
+            if let Some((id, version, size, mtime, is_dir)) = prior.remove(&entry.path) {
+                if is_dir == entry.is_dir {
+                    let changed = size != entry.size || mtime != entry.mtime;
+                    return Row {
+                        entry,
+                        id,
+                        content_revision: version + u64::from(changed),
+                    };
+                }
+            }
+            self.new_row(entry)
+        };
+        let files = files.into_iter().map(&mut identity).collect();
+        let dirs = dirs.into_iter().map(identity).collect();
+        self.session = session;
         self.dir = Some(dir);
         self.file_order = files;
         self.dir_order = dirs;
-        self.reorder();
-    }
-
-    pub fn resort(&mut self, sort: SortMode) {
         self.sort = sort;
         self.reorder();
+        self.commit();
     }
 
-    /// Records the sort a listing is asked for, without reordering anything.
-    /// For an open: the listing this mode will govern does not exist yet, and
-    /// resorting the outgoing one would spend an O(n log n) pass on rows
-    /// `replace_all` is about to discard — and strand a revision bump that no
-    /// event will ever carry. The reorder happens when the listing lands.
-    pub fn set_sort_mode(&mut self, sort: SortMode) {
+    pub fn resort(&mut self, sort: SortMode) -> bool {
+        if self.sort == sort {
+            return false;
+        }
         self.sort = sort;
+        self.reorder();
+        self.commit();
+        true
     }
 
     fn reorder(&mut self) {
-        // the one place an order is decided, so the one place the version
-        // moves for an order change
-        self.revision = self.revision.wrapping_add(1);
         let mode = self.sort;
         self.file_order.sort_by(|a, b| mode.compare(a, b));
         self.dir_order.sort_by(|a, b| mode.compare(a, b));
@@ -101,34 +151,43 @@ impl DirectoryState {
     }
 
     pub fn file_at(&self, index: usize) -> Option<&EntryData> {
-        self.file_order.get(index)
+        self.file_order.get(index).map(|row| &row.entry)
     }
 
     pub fn dir_at(&self, index: usize) -> Option<&EntryData> {
-        self.dir_order.get(index)
+        self.dir_order.get(index).map(|row| &row.entry)
+    }
+
+    fn new_row(&mut self, entry: EntryData) -> Row {
+        let id = self.next_id;
+        self.next_id += 1;
+        Row {
+            entry,
+            id,
+            content_revision: 1,
+        }
     }
 
     // --- incremental mutations (engine watcher) ---------------------------------
 
     /// Inserts an entry keeping the current sort order. Returns the position
-    /// the engine chose for it, or None if the path is already listed. The
-    /// position is what the mutation event carries: the mirror splices there
-    /// instead of re-deriving an order.
+    /// the engine chose for it, or None if the path is already listed.
     pub fn insert_entry(&mut self, data: EntryData) -> Option<u32> {
         if self.contains_path(&data.path) {
             return None;
         }
-        let (order, _) = if data.is_dir {
-            (&mut self.dir_order, true)
+        let row = self.new_row(data);
+        let order = if row.is_dir {
+            &mut self.dir_order
         } else {
-            (&mut self.file_order, false)
+            &mut self.file_order
         };
         let mode = self.sort;
         let idx = order
-            .binary_search_by(|e| mode.compare(e, &data))
+            .binary_search_by(|entry| mode.compare(entry, &row))
             .unwrap_or_else(|i| i);
-        order.insert(idx, data);
-        self.revision = self.revision.wrapping_add(1);
+        order.insert(idx, row);
+        self.commit();
         Some(idx as u32)
     }
 
@@ -141,6 +200,12 @@ impl DirectoryState {
     /// Removes by full path from whichever order it lives in. Returns the
     /// position the entry held before removal.
     pub fn remove_entry_by_path(&mut self, path: &str) -> Option<u32> {
+        let index = self.erase(path)?;
+        self.commit();
+        Some(index)
+    }
+
+    fn erase(&mut self, path: &str) -> Option<u32> {
         let index = self.file_order.iter().position(|e| e.path == path);
         let order = match index {
             Some(_) => &mut self.file_order,
@@ -151,7 +216,6 @@ impl DirectoryState {
             None => order.iter().position(|e| e.path == path)?,
         };
         order.remove(index);
-        self.revision = self.revision.wrapping_add(1);
         Some(index as u32)
     }
 
@@ -176,17 +240,18 @@ impl DirectoryState {
         } else {
             &mut self.dir_order
         };
-        let e = order.iter_mut().find(|e| e.path == path)?;
-        e.size = size;
-        e.mtime = mtime;
-        // a name sort keys on the name, which a metadata change never moves
-        if matches!(self.sort, SortMode::Name | SortMode::NameDesc) {
-            // size/mtime changed, so the listing changed even though no row
-            // moved — a reader's snapshot is stale either way
-            self.revision = self.revision.wrapping_add(1);
-            return order.iter().position(|e| e.path == path).map(|i| i as u32);
-        }
-        Self::reseat(order, self.sort, path)
+        let index = order.iter().position(|entry| entry.path == path)?;
+        let row = &mut order[index];
+        row.entry.size = size;
+        row.entry.mtime = mtime;
+        row.content_revision += 1;
+        let index = if matches!(self.sort, SortMode::Name | SortMode::NameDesc) {
+            index as u32
+        } else {
+            Self::reseat(order, self.sort, index)
+        };
+        self.commit();
+        Some(index)
     }
 
     /// Gives a listed entry a new path and name without replacing it, and
@@ -196,9 +261,7 @@ impl DirectoryState {
     /// metadata update, a rename re-seats under EVERY mode, because `Name`
     /// sorts by the name that just changed.
     ///
-    /// The destination must not already be listed: an overwrite takes the old
-    /// destination row out first (`remove_entry_by_path`), so the identity that
-    /// survives is the moved-in file's, and one event can describe the result.
+    /// An overwrite retires the previous destination's ID in the same commit.
     pub fn rename_entry(
         &mut self,
         from: &str,
@@ -208,57 +271,60 @@ impl DirectoryState {
         mtime: SystemTime,
     ) -> Option<u32> {
         let from_is_file = self.file_order.iter().any(|e| e.path == from);
-        if !from_is_file && !self.dir_order.iter().any(|e| e.path == from) {
+        if from == to || (!from_is_file && !self.dir_order.iter().any(|e| e.path == from)) {
             return None;
         }
-        // the destination must not already be listed, in either order: an
-        // overwrite takes the old destination row out first, so the identity
-        // that survives is the moved-in file's
-        if self.contains_path(to) {
-            return None;
-        }
+        self.erase(to);
         let order = if from_is_file {
             &mut self.file_order
         } else {
             &mut self.dir_order
         };
-        let e = order.iter_mut().find(|e| e.path == from)?;
-        e.path = to.to_owned();
-        e.name = name.to_owned();
-        e.size = size;
-        e.mtime = mtime;
-        Self::reseat(order, self.sort, to)
+        let index = order.iter().position(|entry| entry.path == from)?;
+        let row = &mut order[index];
+        if row.size != size || row.mtime != mtime {
+            row.content_revision += 1;
+        }
+        row.entry.path = to.to_owned();
+        row.entry.name = name.to_owned();
+        row.entry.size = size;
+        row.entry.mtime = mtime;
+        let index = Self::reseat(order, self.sort, index);
+        self.commit();
+        Some(index)
     }
 
     /// Re-seats one entry in its own order after its sort keys changed: remove
     /// from the old position, binary-search the new one, splice. Returns the
     /// new position.
-    fn reseat(order: &mut Vec<EntryData>, mode: SortMode, path: &str) -> Option<u32> {
-        let old = order.iter().position(|e| e.path == path)?;
-        let e = order.remove(old);
+    fn reseat(order: &mut Vec<Row>, mode: SortMode, old: usize) -> u32 {
+        let row = order.remove(old);
         let idx = order
-            .binary_search_by(|other| mode.compare(other, &e))
+            .binary_search_by(|other| mode.compare(other, &row))
             .unwrap_or_else(|i| i);
-        order.insert(idx, e);
-        Some(idx as u32)
+        order.insert(idx, row);
+        idx as u32
     }
 
     // --- bulk listing export ------------------------------------------------
 
     /// Serializes the whole listing into `buf` (little-endian, one read-lock pass):
     ///
-    ///   u32 file_count, u32 dir_count
+    ///   u32 file_count, u32 dir_count, u64 session, u64 revision, i32 sort,
+    ///   u32 directory_len, directory bytes (UTF-8, no NUL)
     ///   then file_count + dir_count records (files first):
-    ///     u64 size, i64 mtime_ms, u32 name_len, u32 path_len
+    ///     u64 id, u64 content_revision, u64 size, i64 mtime_ms,
+    ///     u32 name_len, u32 path_len
     ///     name bytes, path bytes (no NUL)
     ///
     /// Returns (needed_bytes, file_count, dir_count). When `buf` is smaller than
     /// needed, nothing is written and needed_bytes tells the caller how much to
     /// allocate.
     pub fn write_listing(&self, buf: &mut [u8]) -> (usize, usize, usize) {
-        let mut needed = 8usize;
+        let dir = self.dir().map(Path::to_string_lossy).unwrap_or_default();
+        let mut needed = 32 + dir.len();
         for e in self.file_order.iter().chain(&self.dir_order) {
-            needed += 24 + e.name.len() + e.path.len();
+            needed += 40 + e.name.len() + e.path.len();
         }
         let file_count = self.file_order.len();
         let dir_count = self.dir_order.len();
@@ -273,7 +339,14 @@ impl DirectoryState {
         };
         put(&(file_count as u32).to_le_bytes());
         put(&(dir_count as u32).to_le_bytes());
+        put(&self.session.to_le_bytes());
+        put(&self.revision.to_le_bytes());
+        put(&(self.sort as i32).to_le_bytes());
+        put(&(dir.len() as u32).to_le_bytes());
+        put(dir.as_bytes());
         for e in self.file_order.iter().chain(&self.dir_order) {
+            put(&e.id.to_le_bytes());
+            put(&e.content_revision.to_le_bytes());
             put(&e.size.to_le_bytes());
             put(&crate::watcher::mtime_ms(e.mtime).to_le_bytes());
             put(&(e.name.len() as u32).to_le_bytes());

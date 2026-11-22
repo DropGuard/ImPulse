@@ -164,21 +164,20 @@ fn a_rename_is_a_move_not_a_death() {
 }
 
 #[test]
-fn a_rename_refuses_a_destination_the_listing_holds() {
-    // Two rows cannot share a path, and the state has no way to pick which one
-    // dies — that decision belongs to the event applier, which takes the old
-    // destination row out first and then renames into it. Refusing is what keeps
-    // the ordering a listing from ever holding the same path twice.
-    let mut st = DirectoryState::new(SortMode::Name);
-    st.replace_all(
+fn overwrite_rename_publishes_one_revision() {
+    let mut state = DirectoryState::new(SortMode::Name);
+    state.replace_all(
         "/tmp".into(),
         vec![entry("a.jpg", 1, 0), entry("b.jpg", 2, 0)],
         vec![],
     );
+    let revision = state.revision();
     assert_eq!(
-        st.rename_entry("/tmp/a.jpg", "/tmp/b.jpg", "b.jpg", 1, SystemTime::now()),
-        None
+        state.rename_entry("/tmp/a.jpg", "/tmp/b.jpg", "b.jpg", 1, SystemTime::now()),
+        Some(0)
     );
-    assert_eq!(st.file_count(), 2, "a refusal changes nothing");
-    assert_eq!(st.file_at(0).unwrap().name, "a.jpg");
+    assert_eq!(state.revision(), revision + 1);
+    assert_eq!(state.file_count(), 1);
+    assert_eq!(state.file_at(0).unwrap().name, "b.jpg");
+    assert_eq!(state.file_at(0).unwrap().size, 1);
 }

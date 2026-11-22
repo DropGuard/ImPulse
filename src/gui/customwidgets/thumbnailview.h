@@ -56,15 +56,10 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     void loadVisibleThumbnails();
     void loadVisibleThumbnailsDelayed();
 
-    void addItem();
-
     void focusOnSelection() override = 0;
     void populate(int count) override;
+    void applyRows(const QList<DirectoryViewRow> &rows) override;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override;
-    void insertItem(int index) override;
-    void removeItem(int index) override;
-    void reloadItem(int index) override;
-    void renameItem(int oldIndex, int newIndex, const QString &name) override;
     void setDragHover(int index) override;
 
   signals:
@@ -124,9 +119,7 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     bool checkRange(int pos);
 
     virtual ThumbnailWidget *createThumbnailWidget() = 0;
-    virtual void addItemToLayout(ThumbnailWidget *widget, int pos) = 0;
-    virtual void removeItemFromLayout(int pos) = 0;
-    virtual void removeAll() = 0;
+    virtual void syncThumbnailLayout() = 0;
     virtual void updateLayout();
     virtual void fitSceneToContents();
     virtual void updateScrollbarIndicator() = 0;

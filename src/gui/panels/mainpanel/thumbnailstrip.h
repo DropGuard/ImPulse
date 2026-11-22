@@ -37,8 +37,6 @@ class ThumbnailStrip : public ThumbnailView {
   protected:
     void resizeEvent(QResizeEvent *event) override;
     void updateScrollbarIndicator() override;
-    void addItemToLayout(ThumbnailWidget *widget, int pos) override;
-    void removeItemFromLayout(int pos) override;
-    void removeAll() override;
+    void syncThumbnailLayout() override;
     ThumbnailWidget *createThumbnailWidget() override;
 };

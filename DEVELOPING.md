@@ -83,52 +83,63 @@ redirect — logs and temp frames must follow the same directory the app picks.
 
 ## Architecture: what changed underneath
 
-**One writer for the listing.** The Rust engine (`engine/qimgv-engine`) owns the
-directory listing — the one order decision, handed to the mirror as engine-side
-indices so C++ never re-derives it. Decode execution and its scheduling live on
-the C++ side: the shared WorkerPool runs the work, and each owner carries its
-own staleness policy (the Scaler coalesces to the latest request, the
-Thumbnailer invalidates per batch, the Loader drains its queue on a priority
-submit).
-The C++ side is otherwise a read-only mirror plus Qt rendering: mutation events
-carry engine-side indices and watcher-statted data, and C++ only splices. The
-monopoly is enforced by a test, not by convention.
+**One writer for the listing.** Rust owns membership, metadata and order.
+The watcher sends the scan result and subsequent observations on one ordered
+stream, tagged with the subscription's session. Retired subscriptions cannot
+edit a new listing, even when reopening the same directory. The engine loop is
+the only place that commits. An open's requested sort is not applied to the
+outgoing rows; the incoming directory, sort and rows land together.
 
-**A sort is a permutation, and says so.** `SetSort` used to emit `DirListed`,
-so a reorder walked the full resync path — vectors rebuilt, every row compared
-for arrival and departure — for a change that only moved rows. `SortChanged`
-is its own event now, and the mirror permutes what it already holds by walking
-the engine's export order (that order is still the engine's decision; this
-side only rearranges). No arrival or departure is emitted, because none
-happened.
+**The mirror pulls snapshots; it does not replay changes.** A publication is
+`(session, revision, directory, applied_sort, rows)`. The 64-bit session identifies
+an open, and the 64-bit revision identifies a commit in this engine. The bridge
+coalesces notices and pulls the current publication, whose header and rows are
+read under one lock. A notice does not name a base or authorize a row edit.
+The mirror installs only a newer snapshot for its current request and publishes
+its rows, actual sort and revision before notifying observers. A late notice is
+harmless; a failed pull retries the in-memory export. Only the engine reconciles
+with the filesystem when the watcher reports loss. `isSettled()` describes the
+requested open and sort, not whether the filesystem has stopped changing.
 
-`IncludePath` still emits `DirListed`: it can change what the listing
-contains, so it is a listing event in fact.
+**Rows are not positions.** A row has an engine-assigned ID that follows a known
+rename, including a rename over a destination (the destination ID retires).
+Observed deletion and recreation creates a new ID. Rescans of the same session
+match by path when no finer identity is known; an unpaired move can appear as
+remove/add. Separately, a content revision advances when the watcher observes a
+size or modification-time change. The presenter maps the old view to the new
+snapshot by ID. Both thumbnail views reuse surviving widgets and remap selection
+and focus in one pass. Position changes do not invalidate pixels, and content
+changes do not replace a row's identity.
+For the main image, the model clears stale path-keyed cache entries before
+navigation follows the active file's old-to-new path once per publication.
+The comparison is not a rename log: reusing an old name in the same commit
+does not cause the active file to follow a second file's rename.
 
-**The listing carries a revision, so "same instant" is a question with an
-answer.** Every mutation bumps the version in `DirectoryState` — reorder,
-insert, remove, metadata update — and it travels two ways: the export returns
-it with the bytes, read under the same lock, so it names the listing that copy
-came from; and `qimgv_event` carries it, so a mirror applying an event knows
-which version it now holds. `DirectoryManager::appliedRevision()` is the other
-half, and it moves only when an event was APPLIED — every guard that drops one
-returns without touching it, because a dropped event leaves the mirror behind
-the engine and the number is supposed to say so. A reader compares two
-integers instead of two exports, and "not settled yet" is a distinct answer
-from "these disagree". A mismatch acts: the sort handler's revision check and
-every drop that can leave the mirror behind arm their own rescan instead of
-waiting for the next `DirListed` — which a quiet directory never produces.
-One behind-window stays by design: after a failed open, in-flight
-stale-session mutations can strand bumps in the listing the engine retains,
-with no corrective event until the next successful open repairs it — the
-mirror does not rescan a directory that just refused to open.
+Decode execution and scheduling remain on the C++ side. The shared WorkerPool
+runs the work, and the Scaler, Thumbnailer and Loader each own their staleness
+policy.
 
-**A rename is one event, end to end.** The engine pairs the kernel's inotify
-cookie, the wire carries both subjects, and the mirror moves a row instead of
-killing one and growing another — so the thumbnail survives, the selection stays
-put, and the viewer keeps showing the file you were looking at when another
-program renames it. Pairing is best-effort by design: a pair can straddle a read
-boundary, so remove+add remains a shape consumers must tolerate.
+**An edit is a draft against a row, never a mutation of a file.** `DirectoryModel`
+holds the edited pixels keyed by draft id, and the draft names the row it was
+made from by that engine-assigned ID, not by position or path — so the edit
+follows a rename, and a publication that reorders rows cannot move it to a
+neighbour. `getImage()` answers with the draft when one exists; the original
+object is never mutated in place, which is why a caller that captured the
+pointer before the edit keeps the original (by design; re-read by path).
+The disk is reached only by an explicit save. On the way there the model
+distinguishes "the source is unchanged" (byte digest taken when the draft was
+born) from "the source moved under us": a save that would overwrite a changed
+original is refused as `SourceChanged`, and a save to a new path falls back to
+export-new rather than clobbering.
+
+`EditDraftStore` is the crash-recovery half: each draft is written to a PNG in
+the app's data directory under its draft UUID, by a single writer job on the
+pool's `EditDrafts` owner. The source path rides PNG's `Description` text
+chunk behind an `impulse-draft:` marker — a custom PNG text key is accepted by
+the writer and silently dropped, measured — and `recoverable()` accepts only
+values carrying that marker, so a Description someone else wrote is never
+offered back as a source path. Removing a draft is the commit path and deletes
+its file.
 
 **Settings never touch worker threads.** The decode environment is captured once
 per request on the UI thread and travels with the work (`LoadPolicy`); pool

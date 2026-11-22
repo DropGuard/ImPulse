@@ -2,11 +2,17 @@
 
 #include <QtPlugin>
 #include <QList>
+#include <QString>
 #include <memory>
 
 class Thumbnail;
-class QString;
 class QMimeData;
+
+struct DirectoryViewRow {
+    int previousIndex = -1;
+    QString newName = {};
+    bool contentChanged = false;
+};
 
 class IDirectoryView {
   public:
@@ -14,6 +20,7 @@ class IDirectoryView {
     }
 
     virtual void populate(int) = 0;
+    virtual void applyRows(const QList<DirectoryViewRow> &rows) = 0;
     virtual void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) = 0;
     virtual void select(QList<int>) = 0;
     virtual void select(int) = 0;
@@ -21,12 +28,6 @@ class IDirectoryView {
     virtual void focusOnSelection() = 0;
     virtual QList<int> selection() = 0;
     virtual void setDirectoryPath(QString path) = 0;
-    virtual void insertItem(int index) = 0;
-    virtual void removeItem(int index) = 0;
-    virtual void reloadItem(int index) = 0;
-    // One row moving, not a row destroyed and a row built: the entry keeps its
-    // widget and its picture, and only its name and position change.
-    virtual void renameItem(int oldIndex, int newIndex, const QString &name) = 0;
     virtual void setDragHover(int index) = 0;
 
     // No signal declarations here: the interface is not a QObject, so these

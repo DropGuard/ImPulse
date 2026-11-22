@@ -3,6 +3,8 @@
 #include <QObject>
 #include <QString>
 
+#include "settings.h" // SortingMode
+
 #include <memory>
 #include <vector>
 
@@ -68,6 +70,16 @@ class EngineBridge : public QObject {
         quint64 size = 0;
         qint64 mtimeMs = 0;
         bool isDir = false;
+        quint64 id = 0;
+        quint64 contentRevision = 0;
+    };
+
+    struct Snapshot {
+        QString directory;
+        quint64 session = 0;
+        quint64 revision = 0;
+        int sort = 0;
+        std::vector<EngineEntry> files, dirs;
     };
 
     static EngineBridge &instance();
@@ -85,6 +97,9 @@ class EngineBridge : public QObject {
     // results arrive later via dirListed()/openFailed(). sortMode uses the
     // QIMGV_SORT_* codes; the caller maps qimgv's SortingMode explicitly.
     bool openDir(const QString &path, int sortMode, bool showHidden);
+    quint64 session() const {
+        return m_sessionEpoch;
+    }
     void setSort(int sortMode);
     void setShowHidden(bool show);
 
@@ -112,13 +127,21 @@ class EngineBridge : public QObject {
     // this consumer can be round-tripped against each other in a test.
     // Returns false unless the record counts and the arena agree exactly —
     // a truncated tail or producer/consumer drift.
-    static bool parseListing(const QByteArray &arena, std::vector<EngineEntry> &files, std::vector<EngineEntry> &dirs);
+    static bool parseListing(const QByteArray &arena, Snapshot &out);
+    bool readSnapshot(Snapshot &out);
 
     // Joins the engine's extension whitelist wire format ('\n'-separated).
     // Pure: the formats come in, so tests can pin the seam where an empty
     // list once meant "accept nothing" against the documented NULL contract.
     // An empty result means "accept everything" (the FFI constructor's NULL).
     static QByteArray extensionListFor(const QList<QByteArray> &formats);
+
+    // The engine's own name order, so a caller that sorts outside the mirror
+    // agrees with one that reads the mirror's rows. A collator is an
+    // approximation: QCollator and the engine's comparator disagree on names
+    // that differ only in case, which made sibling navigation land on a
+    // different folder than the one next to it on screen.
+    static int compareNames(const QString &a, const QString &b, SortingMode mode);
 
     // The event-path trace, on when QIMGV_ENGINE_TRACE is set to anything but
     // "0". The engine reads the same variable name on its side, so a line
@@ -131,11 +154,8 @@ class EngineBridge : public QObject {
 
   signals:
     void dirListed(const QString &dirPath);
-    // the same rows, reordered: the mirror permutes what it holds
-    void sortChanged(const QString &dirPath, quint64 revision);
+    void listingChanged();
     void openFailed(const QString &dirPath, int statusCode);
-    void dirMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
-                    const QString &oldPath, quint64 revision);
 
   private:
     static void notifyCb(void *user);
@@ -145,6 +165,7 @@ class EngineBridge : public QObject {
 
   private:
     EngineHandle m_engine;
-    quint32 m_sessionEpoch = 0;
+    quint64 m_sessionEpoch = 0;
+    QString m_requestedDir;
     QString m_listedDir;
 };

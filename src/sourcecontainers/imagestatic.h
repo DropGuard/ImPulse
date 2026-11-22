@@ -28,6 +28,7 @@ class ImageStatic : public Image {
     QSize size() override;
     QSize originalSize() override;
 
+    std::shared_ptr<ImageStatic> editedCopy(const QString &path, std::shared_ptr<const QImage> pixels) const;
     bool setEditedImage(std::unique_ptr<const QImage> imageEditedNew);
     bool discardEditedImage();
 
@@ -36,6 +37,7 @@ class ImageStatic : public Image {
     bool save(QString destPath, int jpegQuality) override;
 
   private:
+    ImageStatic(const ImageStatic &source, const QString &path, std::shared_ptr<const QImage> pixels);
     bool m_scaledRequest = false;
     bool m_scaledApplied = false;
     QSize m_originalSize;

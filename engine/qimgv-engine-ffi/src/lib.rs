@@ -42,6 +42,12 @@ pub const QIMGV_EVENT_OPEN_FAILED: c_int = 2;
 pub const QIMGV_EVENT_DIR_MUTATED: c_int = 3;
 pub const QIMGV_EVENT_SORT_CHANGED: c_int = 4;
 
+// --- sort modes (the sort_mode arguments) -----------------------------------
+// The two this library orders names by. The size and time modes need entry
+// metadata, which qimgv_engine_compare_names does not take.
+pub const QIMGV_SORT_NAME: c_int = 0;
+pub const QIMGV_SORT_NAME_DESC: c_int = 1;
+
 // --- mutation kinds (qimgv_mutation.kind) -----------------------------------
 pub const QIMGV_MUT_ADDED: c_int = 1;
 pub const QIMGV_MUT_MODIFIED: c_int = 2;
@@ -98,7 +104,7 @@ pub struct QimgvEvent {
     pub code: c_int,
     /// Session the event belongs to; open_dir hands out the session id and
     /// consumers drop events from older sessions.
-    pub epoch: u32,
+    pub epoch: u64,
     /// For DIR_MUTATED: the engine's own ordinal of this mutation, assigned
     /// before the event could be dropped anywhere downstream. 0 for the other
     /// kinds. It carries no authority — nothing compares it, and a listing does
@@ -107,13 +113,13 @@ pub struct QimgvEvent {
     /// matched by a human reading both. Truncated from the engine's u64 for
     /// that reason: at 4 billion mutations it wraps, and a wrap changes which
     /// number is printed, never which event follows which.
-    pub seq: u32,
+    pub seq: u64,
     /// The listing version this event leaves the engine at. A mirror applies
     /// the event and stores it, so `mirror.revision == export.revision` means
     /// the rows and that export came from the same listing. Truncated from the
     /// engine's u64; a wrap moves both sides' numbers together, and equality
     /// is all that is ever asked.
-    pub revision: u32,
+    pub revision: u64,
 }
 
 #[repr(C)]
@@ -150,12 +156,12 @@ const _: () = {
     assert!(offset_of!(QimgvEntryMeta, size) == 0);
     assert!(offset_of!(QimgvEntryMeta, mtime_ms) == 8);
     assert!(offset_of!(QimgvEntryMeta, is_dir) == 16);
-    assert!(size_of::<QimgvEvent>() == 20);
+    assert!(size_of::<QimgvEvent>() == 32);
     assert!(offset_of!(QimgvEvent, kind) == 0);
     assert!(offset_of!(QimgvEvent, code) == 4);
     assert!(offset_of!(QimgvEvent, epoch) == 8);
-    assert!(offset_of!(QimgvEvent, seq) == 12);
-    assert!(offset_of!(QimgvEvent, revision) == 16);
+    assert!(offset_of!(QimgvEvent, seq) == 16);
+    assert!(offset_of!(QimgvEvent, revision) == 24);
     assert!(size_of::<QimgvMutation>() == 32);
     assert!(offset_of!(QimgvMutation, kind) == 0);
     assert!(offset_of!(QimgvMutation, is_dir) == 4);
@@ -351,7 +357,7 @@ pub unsafe extern "C" fn qimgv_engine_open_dir(
     engine: *mut QimgvEngine,
     path: *const c_char,
     sort_mode: c_int,
-    epoch_out: *mut u32,
+    epoch_out: *mut u64,
 ) -> c_int {
     let attempt = || -> Result<c_int, c_int> {
         let path = read_path(path)?;
@@ -365,7 +371,7 @@ pub unsafe extern "C" fn qimgv_engine_open_dir(
             e.send(Command::OpenDir { path, sort, epoch })
                 .map(|_| {
                     if !epoch_out.is_null() {
-                        unsafe { *epoch_out = epoch as u32 };
+                        unsafe { *epoch_out = epoch };
                     }
                     QIMGV_OK
                 })
@@ -383,6 +389,38 @@ pub unsafe extern "C" fn qimgv_engine_open_dir(
             QIMGV_ERR_PANIC
         }
     }
+}
+
+/// Name order, as the engine sorts listings. Pure and thread-safe: it touches
+/// no engine instance, so a caller outside this library can sort by the same
+/// rule instead of approximating it with a collator that disagrees on ties.
+///
+/// Returns <0, 0 or >0 like strcmp. The third argument picks the mode: 0 is
+/// Name, 1 is NameDesc (the only two QIMGV_SORT_* codes whose order this
+/// answers — the size and time modes need metadata this function does not take).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn qimgv_engine_compare_names(
+    a: *const c_char,
+    b: *const c_char,
+    sort_mode: c_int,
+) -> c_int {
+    let attempt = || -> c_int {
+        let Ok(a) = read_path(a) else { return 0 };
+        let Ok(b) = read_path(b) else { return 0 };
+        let name_a = a.to_string_lossy();
+        let name_b = b.to_string_lossy();
+        let ord = if sort_mode == QIMGV_SORT_NAME_DESC {
+            qimgv_engine::natural(&name_b, &name_a)
+        } else {
+            qimgv_engine::natural(&name_a, &name_b)
+        };
+        match ord {
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 1,
+        }
+    };
+    catch_unwind(AssertUnwindSafe(attempt)).unwrap_or(0)
 }
 
 /// Re-sorts the current listing by QIMGV_SORT_*; an out-of-range mode is
@@ -724,21 +762,9 @@ pub extern "C" fn qimgv_engine_supports_watching() -> c_int {
 
 // --- events -----------------------------------------------------------------
 
-/// Returns 1 if an event was written to `out`, 0 if none is pending, otherwise
-/// a positive `QIMGV_ERR_*` code (the codes are enum values, not negated — so
-/// compare against 1, and treat anything else as "wrote nothing"). `subject_buf`
-/// receives the event's subject, which is the directory for DIR_LISTED and
-/// OPEN_FAILED and the *full path* for DIR_MUTATED (the table lives in
-/// qimgv_engine.h next to the declaration); `mutation` is filled for
-/// DIR_MUTATED.
-///
-/// `old_buf` is written for ONE mutation kind, QIMGV_MUT_RENAMED, and holds the
-/// path the entry had. A rename has two subjects and one slot, so the second
-/// buffer exists rather than the old path being guessed by the consumer: a
-/// rename delivered without it cannot be applied in place, and applying it as an
-/// add leaves a row behind for a file that is still on disk under that name.
-/// Every other kind leaves `old_buf` untouched, and a NULL `old_buf` refuses a
-/// rename (it stays queued) instead of reporting it incompletely.
+/// Polls one notice. All three payload pointers can be null to read only its
+/// kind and stamp. Diagnostic callers can request the subjects and mutation.
+/// A refused diagnostic read does not consume the notice.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn qimgv_engine_take_event(
     engine: *mut QimgvEngine,
@@ -758,6 +784,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
         // Lock order is stashed then engine, everywhere; take_event is the only
         // function that touches both.
         let mut stash = eng.stashed.lock().unwrap_or_else(|p| p.into_inner());
+        let notice_only = subject_buf.is_null() && old_buf.is_null() && mutation.is_null();
         let pending: Option<Event> = match stash.take() {
             Some(ev) => Some(ev),
             None => with_engine(engine, |e| e.try_event()),
@@ -774,14 +801,16 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         epoch,
                         revision,
                     } => {
-                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        if !notice_only {
+                            write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        }
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_DIR_LISTED,
                                 code: QIMGV_OK,
-                                epoch: *epoch as u32,
+                                epoch: *epoch,
                                 seq: 0,
-                                revision: *revision as u32,
+                                revision: *revision,
                             };
                         }
                         Ok(1)
@@ -791,27 +820,31 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         epoch,
                         revision,
                     } => {
-                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        if !notice_only {
+                            write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        }
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_SORT_CHANGED,
                                 code: QIMGV_OK,
-                                epoch: *epoch as u32,
+                                epoch: *epoch,
                                 seq: 0,
-                                revision: *revision as u32,
+                                revision: *revision,
                             };
                         }
                         Ok(1)
                     }
                     Event::OpenFailed { dir, error, epoch } => {
-                        write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        if !notice_only {
+                            write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
+                        }
                         let code = map_engine_error(error);
                         set_last_error(&error.to_string());
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_OPEN_FAILED,
                                 code,
-                                epoch: *epoch as u32,
+                                epoch: *epoch,
                                 seq: 0,
                                 revision: 0,
                             };
@@ -837,12 +870,14 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                             qimgv_engine::WatchChangeKind::Renamed { from } => Some(from),
                             _ => None,
                         };
-                        if let Some(from) = from {
-                            fits(old_buf, old_cap, from)?;
-                        }
-                        write_str(subject_buf, subject_cap, path)?;
-                        if let Some(from) = from {
-                            write_str(old_buf, old_cap, from)?;
+                        if !notice_only {
+                            if let Some(from) = from {
+                                fits(old_buf, old_cap, from)?;
+                            }
+                            write_str(subject_buf, subject_cap, path)?;
+                            if let Some(from) = from {
+                                write_str(old_buf, old_cap, from)?;
+                            }
                         }
                         let mkind = match kind {
                             qimgv_engine::WatchChangeKind::Added => QIMGV_MUT_ADDED,
@@ -865,9 +900,9 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_DIR_MUTATED,
                                 code: QIMGV_OK,
-                                epoch: *epoch as u32,
-                                seq: *seq as u32,
-                                revision: *revision as u32,
+                                epoch: *epoch,
+                                seq: *seq,
+                                revision: *revision,
                             };
                         }
                         Ok(1)

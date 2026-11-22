@@ -21,6 +21,7 @@
  */
 
 #include "core.h"
+#include <algorithm>
 #include <utility>
 
 #include "utils/folderend.h"
@@ -82,9 +83,7 @@ void NavigationController::attachModel(DirectoryModel *m) {
     connect(m_model, &DirectoryModel::imageUpdated, this, &NavigationController::onModelItemUpdated);
     connect(m_model, &DirectoryModel::sortingChanged, this, &NavigationController::onModelSortingChanged);
     connect(m_model, &DirectoryModel::loadFailed, this, &NavigationController::onLoadFailed);
-    connect(m_model, &DirectoryModel::fileAdded, this, &NavigationController::onFileAdded);
-    connect(m_model, &DirectoryModel::fileRemoved, this, &NavigationController::onFileRemoved);
-    connect(m_model, &DirectoryModel::fileRenamed, this, &NavigationController::onFileRenamed);
+    connect(m_model, &DirectoryModel::filesReconciled, this, &NavigationController::onFilesReconciled);
     connect(m_model, &DirectoryModel::divergenceDetected, this, &NavigationController::onDivergenceDetected);
     if(m_state->shuffle)
         syncRandomizer();
@@ -155,8 +154,6 @@ void NavigationController::syncRandomizer() {
 }
 
 void NavigationController::onModelLoaded() {
-    m_thumbPanelPresenter.reloadModel();
-    m_folderViewPresenter.reloadModel();
     m_thumbPanelPresenter.selectAndFocus(m_state->currentFilePath);
     m_folderViewPresenter.selectAndFocus(m_state->currentFilePath);
     if(m_state->shuffle)
@@ -219,42 +216,34 @@ void NavigationController::setFoldersDisplay(bool mode) {
         m_folderViewPresenter.setShowDirs(mode);
 }
 
-void NavigationController::onFileRemoved(const QString &filePath, int index) {
-    // no files left
-    if(m_model->listing().isEmpty()) {
+void NavigationController::onFilesReconciled(const ListingFileChanges &changes) {
+    if(changes.displaced.isEmpty() && !changes.hasAdditions)
+        return;
+
+    const auto &listing = m_model->listing();
+    const QString previousPath = m_state->currentFilePath;
+    const auto displaced =
+        std::find_if(changes.displaced.cbegin(), changes.displaced.cend(), [&previousPath](const auto &file) {
+            return file.oldPath == previousPath;
+        });
+    if(listing.isEmpty()) {
         m_view->closeImage();
         m_state->hasActiveImage = false;
         m_state->currentFilePath = "";
-    }
-    // image mode && removed current file
-    if(m_state->currentFilePath == filePath) {
-        if(m_state->viewMode.value() == MODE_DOCUMENT) {
-            if(!loadFileIndex(index, true, settings->usePreloader()))
-                loadFileIndex(--index, true, settings->usePreloader());
+    } else if(displaced != changes.displaced.cend()) {
+        if(!displaced->newPath.isEmpty()) {
+            loadFileIndex(listing.indexOfFile(displaced->newPath), false, settings->usePreloader());
+        } else if(m_state->viewMode.value() == MODE_DOCUMENT) {
+            const int candidate = std::min(displaced->oldIndex, int(listing.fileCount()) - 1);
+            if(!loadFileIndex(candidate, true, settings->usePreloader()) && candidate > 0)
+                loadFileIndex(candidate - 1, true, settings->usePreloader());
         } else {
             m_state->hasActiveImage = false;
             m_state->currentFilePath = "";
         }
-    }
-    m_host->updateInfoString();
-}
-
-void NavigationController::onFileAdded(const QString &filePath) {
-    Q_UNUSED(filePath)
-    // update file count
-    m_host->updateInfoString();
-    if(m_model->listing().fileCount() == 1 && m_state->currentFilePath == "")
+    } else if(changes.hasAdditions && listing.fileCount() == 1 && previousPath.isEmpty()) {
         loadFileIndex(0, false, settings->usePreloader());
-}
-
-// Following the file the viewer is showing across a rename is the reason the
-// rename is one event: the Removed half of the old pair had already bounced
-// currentFilePath to "" by the time the Added half arrived, and only a rename
-// the app itself issued could be patched back.
-void NavigationController::onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex) {
-    Q_UNUSED(oldIndex)
-    if(m_state->currentFilePath == filePath)
-        loadPathInternal(newPath);
+    }
     m_host->updateInfoString();
 }
 
@@ -657,10 +646,6 @@ void NavigationController::onModelItemUpdated(const QString &filePath) {
 
 void NavigationController::onModelSortingChanged(SortingMode mode) {
     m_view->onSortingChanged(mode);
-    m_thumbPanelPresenter.reloadModel();
-    m_thumbPanelPresenter.selectAndFocus(m_state->currentFilePath);
-    m_folderViewPresenter.reloadModel();
-    m_folderViewPresenter.selectAndFocus(m_state->currentFilePath);
 }
 
 void NavigationController::reset() {

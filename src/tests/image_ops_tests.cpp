@@ -165,13 +165,6 @@ TEST_F(TestImageOps, saveWithBackupOverwritesAndRestores) {
     EXPECT_EQ(filesHere(), beforeFailure);
 }
 
-static QStringList readPaths(const QSignalSpy &spy) {
-    QStringList out;
-    for(const QList<QVariant> &args : spy)
-        out << QFileInfo(args.at(0).toString()).fileName();
-    return out;
-}
-
 // The rollback is the path a failed save takes, and until it was one
 // syscall it was two with a gap between them: remove the destination, then
 // copy the backup back. The watch saw that as a death and a birth, the
@@ -200,9 +193,11 @@ TEST_F(TestImageOps, rolledBackSaveRestoresTheRowInsteadOfRebuildingIt) {
     const QByteArray original = readBytes(dest);
     const QString backup =
         dest + "_" + QString(QCryptographicHash::hash(dest.toUtf8(), QCryptographicHash::Md5).toHex());
-    QSignalSpy removed(&dm, &DirectoryManager::fileRemoved);
-    QSignalSpy added(&dm, &DirectoryManager::fileAdded);
-    EXPECT_TRUE(removed.isValid() && added.isValid());
+    const quint64 id = dm.fileEntryAt(row).id;
+    bool replaced = false;
+    QObject::connect(&dm, &DirectoryManager::listingChanged, &dm, [&] {
+        replaced |= dm.fileEntryAt(dm.indexOfFile(dest)).id != id;
+    });
 
     // The write has to fail while the restore still can: the file itself
     // becomes read-only, and the directory stays writable, which is all
@@ -222,17 +217,11 @@ TEST_F(TestImageOps, rolledBackSaveRestoresTheRowInsteadOfRebuildingIt) {
     // not the failed write's
     EXPECT_EQ(dm.fileEntryAt(row).size, static_cast<std::uintmax_t>(original.size()));
 
-    // The two zeros below are evidence only once the events the restore
-    // produced have actually been delivered, and agreement with the engine's
-    // export cannot say that — agreement is also the state from before them,
-    // which is what made an earlier version of this test pass while the
-    // remove + copy it meant to reject was still in the binary. So fence on a
-    // mutation that must land: the queue is FIFO, so an event delivered behind
-    // these proves nothing in front of them went missing.
+    // Wait for a later change so the assertion covers the restore, not just
+    // the publication that preceded it.
     makeFile("fence.jpg");
-    ASSERT_TRY_TRUE_TIMEOUT(readPaths(added).contains(QStringLiteral("fence.jpg")), 10000);
-    EXPECT_EQ(removed.count(), 0);
-    EXPECT_EQ(readPaths(added), QStringList{QStringLiteral("fence.jpg")});
+    ASSERT_TRY_TRUE_TIMEOUT(dm.containsFile(m_fixtureDir + "/fence.jpg"), 10000);
+    EXPECT_FALSE(replaced);
     assertMirrorMatchesEngineExport(dm);
     EXPECT_EQ(dm.fileCount(), 4UL);
 

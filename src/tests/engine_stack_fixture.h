@@ -173,47 +173,6 @@ class EngineStackFixture {
             qFatal("waitLoaderIdle: the loader never went idle");
     }
 
-    // Serialize a listing exactly the way model.rs::write_listing does: u32 file
-    // count, u32 dir count, then records (files first) of u64 size, i64
-    // mtime_ms, u32 name_len, u32 path_len, name bytes, path bytes, all
-    // little-endian. A test needs a producer to go with EngineBridge::parseListing
-    // because the states worth pinning are ones a real filesystem does not hand
-    // over on demand — a snapshot that lags a file which is still on disk, for
-    // instance.
-    static QByteArray arenaFor(const QStringList &files, const QStringList &dirs) {
-        QByteArray arena;
-        auto append = [&arena](const void *data, int n) {
-            arena.append(static_cast<const char *>(data), n);
-        };
-        auto put32 = [&append](quint32 v) {
-            v = qToLittleEndian(v);
-            append(&v, 4);
-        };
-        auto put64 = [&append](quint64 v) {
-            v = qToLittleEndian(v);
-            append(&v, 8);
-        };
-        auto putI64 = [&append](qint64 v) {
-            v = qToLittleEndian(v);
-            append(&v, 8);
-        };
-
-        put32(quint32(files.size()));
-        put32(quint32(dirs.size()));
-        for(const QStringList *list : {&files, &dirs})
-            for(const QString &path : *list) {
-                const QByteArray name = QFileInfo(path).fileName().toUtf8();
-                const QByteArray full = path.toUtf8();
-                put64(1);
-                putI64(0);
-                put32(quint32(name.size()));
-                put32(quint32(full.size()));
-                append(name.constData(), int(name.size()));
-                append(full.constData(), int(full.size()));
-            }
-        return arena;
-    }
-
     // THE mirror contract, as a predicate: the mirror's vectors are the engine's
     // export, order included — same entries, same positions. Tells whether they
     // agree and, when they do not, names the disagreement, because a count that
@@ -226,29 +185,19 @@ class EngineStackFixture {
     // lets the caller's retry loop wait — there is no window to guess about and
     // no need to compare two exports byte for byte.
     static bool mirrorMatchesEngineExport(DirectoryManager &dm, QString &diff) {
-        QByteArray arena;
-        quint32 fc = 0, dc = 0;
-        quint64 revision = 0;
-        if(!EngineBridge::instance().exportListing(arena, fc, dc, revision)) {
-            diff = QStringLiteral("exportListing failed");
+        EngineBridge::Snapshot snapshot;
+        if(!EngineBridge::instance().readSnapshot(snapshot)) {
+            diff = QStringLiteral("snapshot export failed");
             return false;
         }
-        // The export names the listing it came from. If the mirror has not
-        // applied that version, its rows are a different snapshot and there is
-        // nothing to compare — say "not settled yet" rather than inventing a
-        // mismatch the caller would report as a bug. Both sides compare in the
-        // wire's width: the mirror stores the low 32 bits.
-        if(dm.appliedRevision() != quint32(revision)) {
-            diff = QStringLiteral("the mirror is at revision %1, the export at %2")
+        if(dm.appliedRevision() != snapshot.revision) {
+            diff = QStringLiteral("the mirror is at revision %1, the engine at %2")
                        .arg(dm.appliedRevision())
-                       .arg(revision);
+                       .arg(snapshot.revision);
             return false;
         }
-        std::vector<EngineBridge::EngineEntry> files, dirs;
-        if(!EngineBridge::parseListing(arena, files, dirs)) {
-            diff = QStringLiteral("parseListing rejected a %1-byte arena").arg(arena.size());
-            return false;
-        }
+        const auto &files = snapshot.files;
+        const auto &dirs = snapshot.dirs;
         auto joinNames = [](const std::vector<EngineBridge::EngineEntry> &entries) {
             QStringList out;
             for(const auto &e : entries)

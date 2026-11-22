@@ -69,15 +69,6 @@ int ThumbnailWidget::thumbnailSize() {
     return m_thumbnailSize;
 }
 
-void ThumbnailWidget::reset() {
-    if(m_thumbnail)
-        m_thumbnail.reset();
-    m_highlighted = false;
-    m_hovered = false;
-    isLoaded = false;
-    update();
-}
-
 void ThumbnailWidget::setThumbStyle(ThumbnailStyle _style) {
     if(m_thumbStyle != _style) {
         m_thumbStyle = _style;
@@ -107,6 +98,7 @@ QSizeF ThumbnailWidget::effectiveSizeHint(Qt::SizeHint which, const QSizeF &cons
 }
 
 void ThumbnailWidget::setThumbnail(std::shared_ptr<Thumbnail> _thumbnail) {
+    m_needsFreshThumbnail = false;
     if(_thumbnail) {
         m_thumbnail = _thumbnail;
         if(m_thumbnail && m_thumbnail->image())
@@ -119,6 +111,12 @@ void ThumbnailWidget::setThumbnail(std::shared_ptr<Thumbnail> _thumbnail) {
         updateBackgroundRect();
         update();
     }
+}
+
+void ThumbnailWidget::invalidateThumbnail() {
+    unsetThumbnail();
+    m_needsFreshThumbnail = true;
+    update();
 }
 
 void ThumbnailWidget::unsetThumbnail() {

@@ -202,10 +202,9 @@ pub(crate) struct WatcherHandle {
 impl WatcherHandle {
     pub(crate) fn spawn(
         options: crate::scan::ScanOptions,
-        res_tx: Sender<crate::engine::ScanDone>,
-    ) -> (WatcherHandle, Receiver<super::RawWatchEvent>) {
+    ) -> (WatcherHandle, Receiver<super::WatchMessage>) {
         let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded::<WatchCmd>();
-        let (ev_tx, ev_rx) = crossbeam_channel::unbounded::<super::RawWatchEvent>();
+        let (ev_tx, ev_rx) = crossbeam_channel::unbounded::<super::WatchMessage>();
         let running = Arc::new(AtomicBool::new(true));
         let running_flag = Arc::clone(&running);
         // the wake event lets command sends interrupt the wait from any
@@ -216,7 +215,7 @@ impl WatcherHandle {
 
         let join = std::thread::Builder::new()
             .name("qimgv-watch".into())
-            .spawn(move || watcher_loop(&cmd_rx, &ev_tx, &res_tx, &options, wake_raw, running_flag))
+            .spawn(move || watcher_loop(&cmd_rx, &ev_tx, &options, wake_raw, running_flag))
             .expect("spawn watcher thread");
 
         (
@@ -455,7 +454,8 @@ fn drain_records(
 fn retire_gone(
     watch: &mut Option<Watch>,
     overlapped: &mut Overlapped,
-    ev_tx: &Sender<super::RawWatchEvent>,
+    session: u64,
+    ev_tx: &Sender<super::WatchMessage>,
     pairer: &mut super::Pairer,
 ) {
     let Some(w) = watch.take() else { return };
@@ -472,12 +472,12 @@ fn retire_gone(
         name: None,
     };
     for out in pairer.intake(rec, Some(dir.as_path()), live_wd) {
-        if !dispatch(ev_tx, out, live_wd) {
+        if !dispatch(ev_tx, out, live_wd, session) {
             return;
         }
     }
     for out in pairer.settle() {
-        if !dispatch(ev_tx, out, live_wd) {
+        if !dispatch(ev_tx, out, live_wd, session) {
             return;
         }
     }
@@ -485,8 +485,7 @@ fn retire_gone(
 
 fn watcher_loop(
     cmd_rx: &Receiver<WatchCmd>,
-    ev_tx: &Sender<super::RawWatchEvent>,
-    res_tx: &Sender<crate::engine::ScanDone>,
+    ev_tx: &Sender<super::WatchMessage>,
     options: &crate::scan::ScanOptions,
     wake: HANDLE,
     running: Arc<AtomicBool>,
@@ -501,6 +500,7 @@ fn watcher_loop(
         }
     };
     let mut pairer = super::Pairer::new();
+    let mut session = 0;
     let mut watch: Option<Watch> = None;
     let mut armed = false;
     let mut next_id: i32 = 0;
@@ -546,14 +546,14 @@ fn watcher_loop(
                                 name: None,
                             };
                             for out in pairer.intake(rec, dir_opt, live_wd) {
-                                if !dispatch(ev_tx, out, live_wd) {
+                                if !dispatch(ev_tx, out, live_wd, session) {
                                     return;
                                 }
                             }
                         }
                         // the watched directory itself went away
                         ERROR_ACCESS_DENIED => {
-                            retire_gone(&mut watch, &mut overlapped, ev_tx, &mut pairer);
+                            retire_gone(&mut watch, &mut overlapped, session, ev_tx, &mut pairer);
                         }
                         _ => {
                             log::warn!("watcher: read failed: {}", std::io::Error::last_os_error());
@@ -569,7 +569,7 @@ fn watcher_loop(
                         name: None,
                     };
                     for out in pairer.intake(rec, dir_opt, live_wd) {
-                        if !dispatch(ev_tx, out, live_wd) {
+                        if !dispatch(ev_tx, out, live_wd, session) {
                             return;
                         }
                     }
@@ -586,7 +586,7 @@ fn watcher_loop(
                     let filled = &buffer.0[..transferred as usize];
                     for rec in drain_records(filled, w.id, &w.path, &mut next_cookie) {
                         for out in pairer.intake(rec, dir_opt, live_wd) {
-                            if !dispatch(ev_tx, out, live_wd) {
+                            if !dispatch(ev_tx, out, live_wd, session) {
                                 return;
                             }
                         }
@@ -595,7 +595,7 @@ fn watcher_loop(
                 // one settle per completed read (the batch ended — a held
                 // rename half never had its pair beside it)
                 for out in pairer.settle() {
-                    if !dispatch(ev_tx, out, live_wd) {
+                    if !dispatch(ev_tx, out, live_wd, session) {
                         return;
                     }
                 }
@@ -618,7 +618,7 @@ fn watcher_loop(
             // pairing layer so the engine's DirGone → rescan answer runs
             // unchanged.
             if watch.as_ref().is_some_and(|w| !w.path.exists()) {
-                retire_gone(&mut watch, &mut overlapped, ev_tx, &mut pairer);
+                retire_gone(&mut watch, &mut overlapped, session, ev_tx, &mut pairer);
             }
         }
 
@@ -638,6 +638,7 @@ fn watcher_loop(
                         install,
                     } => {
                         if install {
+                            session = epoch;
                             retire_watch(watch.take(), &mut overlapped, armed);
                             armed = false;
                             match open_dir(&path) {
@@ -678,7 +679,7 @@ fn watcher_loop(
                         // land in a gap between the two acts: it is either in
                         // the snapshot or it arrives on the notification
                         // queue afterwards.
-                        enumerate_and_report(&path, epoch, dispatch, res_tx, options);
+                        enumerate_and_report(&path, epoch, dispatch, ev_tx, options);
                     }
                     WatchCmd::Unwatch => {
                         retire_watch(watch.take(), &mut overlapped, armed);

@@ -14,7 +14,8 @@ use crate::model::DirectoryState;
 use crate::scan::{ScanOptions, ScanOutput};
 use crate::sort::SortMode;
 #[cfg(any(target_os = "linux", windows))]
-use crate::watcher::{self, WatcherHandle};
+use crate::watcher::WatcherHandle;
+use crate::watcher::{self, WatchMessage};
 
 /// Called (from an engine thread) after an event was queued. The FFI layer
 /// supplies an eventfd writer; tests supply a channel send. Foreign code may
@@ -69,12 +70,7 @@ pub enum Event {
         epoch: u64,
         revision: u64,
     },
-    /// The rows are the same and their order is not. A sort, not a listing:
-    /// the mirror permutes what it already holds instead of rebuilding it,
-    /// and the view re-reads. Kept apart from DirListed because on a large
-    /// folder the two are very different loads — rebuilding the model to move
-    /// pointers is work whose answer is already known. The epoch is the
-    /// current session's: a sort belongs to it, but allocates none.
+    /// A sort committed within the installed session.
     SortChanged {
         dir: PathBuf,
         epoch: u64,
@@ -85,9 +81,8 @@ pub enum Event {
         error: Arc<EngineError>,
         epoch: u64,
     },
-    /// Incremental change applied by the engine watcher. `index` is the
-    /// entry's position in the engine's own order — the single order decision,
-    /// handed to the mirror so it never re-derives one.
+    /// Diagnostic record of a committed watcher change. Its index belongs to
+    /// this commit only; snapshot readers use it solely as a wake.
     Mutated {
         /// This engine's own count of the mutations it has emitted, starting at
         /// 1. Crosses the ABI as `qimgv_event.seq`.
@@ -112,19 +107,7 @@ pub struct EngineConfig {
     pub initial_sort: SortMode,
 }
 
-/// One enumeration the watcher thread owes back to the loop: which request it
-/// answers (`epoch`, `dispatch`) and which folder was read.
-/// One directory-listing request, and the only place the loop decides whether a
-/// result is still wanted. It replaces three loose counters that each answered a
-/// piece of that question — `epoch` (whose answer the FFI filters on), a dispatch
-/// number (newest scan writes the listing), and `watch_gen` (does this event belong
-/// to the folder on screen, now answered by the event's own directory) — and adds
-/// the two the counters could not express at all: whether a scan is in flight, and
-/// whether the folder changed underneath it. A scan that was interrupted is not an
-/// answer: it is taken again, because otherwise a file created or deleted inside
-/// the window between asking for a watch and installing it would be in neither the
-/// snapshot nor any event, and the listing and the mirror would settle on different
-/// sets while their counts agreed.
+/// The current open request and the newest scan that may answer it.
 struct ListingRequest {
     dir: PathBuf,
     epoch: u64,
@@ -188,8 +171,6 @@ impl Engine {
     pub fn spawn(cfg: EngineConfig, notify: Notify) -> Engine {
         let (cmd_tx, cmd_rx) = unbounded();
         let (ev_tx, ev_rx) = unbounded::<Event>();
-        // the enumeration results channel; its producer is the watcher thread
-        let (res_tx, res_rx) = unbounded::<ScanDone>();
         let state = Arc::new(RwLock::new(DirectoryState::new(cfg.initial_sort)));
         let epoch = Arc::new(AtomicU64::new(0));
         let epoch_shared = Arc::clone(&epoch);
@@ -204,25 +185,21 @@ impl Engine {
                 filter: filter.clone(),
                 overrides: Arc::clone(&overrides),
             };
-            let (handle, rx) = WatcherHandle::spawn(options, res_tx.clone());
+            let (handle, rx) = WatcherHandle::spawn(options);
             (Some(handle), rx)
         };
         #[cfg(not(any(target_os = "linux", windows)))]
-        let watch_ev_rx: Receiver<()> = crossbeam_channel::never();
+        let watch_ev_rx: Receiver<WatchMessage> = crossbeam_channel::never();
 
         let loop_join = {
             let state = Arc::clone(&state);
             let show_hidden = Arc::clone(&show_hidden);
-            let epoch = Arc::clone(&epoch);
             let overrides = Arc::clone(&overrides);
             let filter = filter.clone();
             let cmd_tx_for_loop = cmd_tx.clone();
-            let epoch_at = {
-                let e = Arc::clone(&epoch);
-                move || e.load(Ordering::Relaxed)
-            };
             thread::spawn(move || {
                 let mut listing: Option<ListingRequest> = None;
+                let mut requested_sort = cfg.initial_sort;
                 // only this thread dispatches scans, so the number needs no atomic
                 let mut next_dispatch: u64 = 0;
                 // Ordinal of the mutations this engine has emitted. Assigned at
@@ -237,12 +214,7 @@ impl Engine {
                             match cmd {
                                 Err(_) | Ok(Command::Shutdown) => break,
                                 Ok(Command::OpenDir { path, sort, epoch: e }) => {
-                                    if let Some(mode) = sort {
-                                        // record the mode, reorder nothing: the outgoing
-                                        // listing is about to be replaced wholesale, and a
-                                        // resort here would strand a bump no event carries
-                                        state_write(&state).set_sort_mode(mode);
-                                    }
+                                    requested_sort = sort.unwrap_or(requested_sort);
                                     let mut req = ListingRequest {
                                         dir: path.clone(),
                                         epoch: e,
@@ -281,17 +253,17 @@ impl Engine {
                                     }
                                 }
                                 Ok(Command::SetSort(mode)) => {
-                                    // the revision is read with the state that
-                                    // produced it, so the event names the
-                                    // listing a consumer will hold after
-                                    // applying it
+                                    requested_sort = mode;
                                     let applied = {
                                         let mut st = state_write(&state);
-                                        st.resort(mode);
-                                        st.dir().map(|d| (d.to_owned(), st.revision()))
+                                        if matches!(&listing, Some(req) if req.epoch == st.session()) && st.resort(mode) {
+                                            st.dir().map(|dir| (dir.to_owned(), st.session(), st.revision()))
+                                        } else {
+                                            None
+                                        }
                                     };
-                                    if let Some((dir, revision)) = applied {
-                                        let _ = ev_tx.send(Event::SortChanged { dir, epoch: epoch_at(), revision });
+                                    if let Some((dir, epoch, revision)) = applied {
+                                        let _ = ev_tx.send(Event::SortChanged { dir, epoch, revision });
                                         fire_notify(&notify);
                                     }
                                 }
@@ -301,19 +273,22 @@ impl Engine {
                                         let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
                                         ov.insert(p.clone());
                                         let mut st = state_write(&state);
-                                        if let Ok(m) = meta {
-                                            let _ = st.insert_entry(crate::model::EntryData {
+                                        let inserted = matches!(&listing, Some(req) if req.epoch == st.session())
+                                            && meta.ok().and_then(|m| st.insert_entry(crate::model::EntryData {
                                                 name: p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
                                                 path: p.to_string_lossy().into_owned(),
                                                 is_dir: m.is_dir(),
                                                 size: if m.is_dir() { 0 } else { m.len() },
-                                                mtime: m.modified().unwrap_or(std::time::UNIX_EPOCH),
-                                            });
+                                                mtime: if m.is_dir() { std::time::UNIX_EPOCH } else { m.modified().unwrap_or(std::time::UNIX_EPOCH) },
+                                            })).is_some();
+                                        if inserted {
+                                            st.dir().map(|dir| (dir.to_owned(), st.session(), st.revision()))
+                                        } else {
+                                            None
                                         }
-                                        st.dir().map(|d| (d.to_owned(), st.revision()))
                                     };
-                                    if let Some((dir, revision)) = applied {
-                                        let _ = ev_tx.send(Event::DirListed { dir, epoch: epoch_at(), revision });
+                                    if let Some((dir, epoch, revision)) = applied {
+                                        let _ = ev_tx.send(Event::DirListed { dir, epoch, revision });
                                         fire_notify(&notify);
                                     }
                                 }
@@ -326,72 +301,50 @@ impl Engine {
                                 }
                             }
                         }
-                        recv(res_rx) -> done => {
-                            let Ok(done) = done else { break };
-                            // Three questions, in order, and the record answers all
-                            // of them: is this the dispatch that still owns the
-                            // answer; did the folder change while the scan ran; and
-                            // only then — what does the answer say. A superseded
-                            // dispatch is dropped silently because its replacement is
-                            // already on its way; an interrupted one is not an answer
-                            // at all, so nothing is reported until a scan lands with
-                            // the folder quiet.
-                            let current = listing.as_ref().map(|r| r.dispatch == done.dispatch).unwrap_or(false);
-                            if !current {
-                                continue;
-                            }
-                            match done.result {
-                                Ok(out) => {
-                                    let dir = done.path.clone();
-                                    let entry_count = out.files.len();
-                                    let apply_start = Instant::now();
-                                    let applied_revision = {
-                                        let mut st = state_write(&state);
-                                        st.replace_all(dir.clone(), out.files, out.dirs);
-                                        st.revision()
-                                    };
-                                    eprintln!(
-                                        "[engine] scan {} ms + insert/sort {} ms ({} entries, off UI thread)",
-                                        done.scan_ms,
-                                        apply_start.elapsed().as_millis(),
-                                        entry_count
-                                    );
-                                    let _ = ev_tx.send(Event::DirListed {
-                                        dir,
-                                        epoch: done.epoch,
-                                        revision: applied_revision,
-                                    });
-                                    fire_notify(&notify);
-                                }
-                                Err(e) => {
-                                    let _ = ev_tx.send(Event::OpenFailed {
-                                        dir: done.path,
-                                        error: Arc::new(e),
-                                        epoch: done.epoch,
-                                    });
-                                    fire_notify(&notify);
-                                }
-                            }
-                        }
-                        recv(watch_ev_rx) -> tagged => {
-                            #[cfg(any(target_os = "linux", windows))]
-                            {
-                                let Ok(raw) = tagged else { break };
-                                // Only events about the folder the current request
-                                // is answering for may touch the listing. There is no
-                                // "arrived while a scan was in flight" case to mark:
-                                // the same thread installs the watch and enumerates,
-                                // so a change during the enumeration is either in the
-                                // baseline or reaches this channel after it.
-                                if !matches!(&listing, Some(req) if req.dir == raw.dir) {
-                                    crate::trace::line("drop", || {
-                                        let wanted = listing.as_ref().map(|r| r.dir.clone())
-                                            .unwrap_or_default();
-                                        format!("subject {:?} is not the requested {:?}", raw.dir, wanted)
-                                    });
+                        recv(watch_ev_rx) -> message => match message {
+                            Err(_) => break,
+                            Ok(WatchMessage::Scan(done)) => {
+                                let current = listing.as_ref().map(|r| r.dispatch == done.dispatch).unwrap_or(false);
+                                if !current {
                                     continue;
                                 }
-                                let req_epoch = listing.as_ref().map(|r| r.epoch).unwrap_or(0);
+                                match done.result {
+                                    Ok(out) => {
+                                        let dir = done.path.clone();
+                                        let entry_count = out.files.len();
+                                        let apply_start = Instant::now();
+                                        let applied_revision = {
+                                            let mut st = state_write(&state);
+                                            st.install(done.epoch, dir.clone(), requested_sort, out.files, out.dirs);
+                                            st.revision()
+                                        };
+                                        eprintln!(
+                                            "[engine] scan {} ms + insert/sort {} ms ({} entries, off UI thread)",
+                                            done.scan_ms,
+                                            apply_start.elapsed().as_millis(),
+                                            entry_count
+                                        );
+                                        let _ = ev_tx.send(Event::DirListed {
+                                            dir,
+                                            epoch: done.epoch,
+                                            revision: applied_revision,
+                                        });
+                                        fire_notify(&notify);
+                                    }
+                                    Err(e) => {
+                                        let _ = ev_tx.send(Event::OpenFailed {
+                                            dir: done.path,
+                                            error: Arc::new(e),
+                                            epoch: done.epoch,
+                                        });
+                                        fire_notify(&notify);
+                                    }
+                                }
+                            }
+                            Ok(WatchMessage::Change { session, raw }) => {
+                                if !matches!(&listing, Some(req) if req.epoch == session && req.dir == raw.dir) {
+                                    continue;
+                                }
                                 // the event's stats are taken BEFORE the write
                                 // lock: state locks never span waits (rule 5),
                                 // and a slow mount's fs::metadata would stall a
@@ -399,6 +352,9 @@ impl Engine {
                                 let stats = watcher::Prestat::of_event(&raw);
                                 let action = {
                                     let mut st = state_write(&state);
+                                    if st.session() != session {
+                                        continue;
+                                    }
                                     let mut ov = overrides.lock().unwrap_or_else(|e| e.into_inner());
                                     catch_unwind(AssertUnwindSafe(|| {
                                         watcher::apply_event_with_stats(&mut st, &filter, &mut ov,
@@ -450,7 +406,7 @@ impl Engine {
                                         };
                                         next_mutation += 1;
                                         crate::trace::line("emit", || format!(
-                                            "seq={next_mutation} {kind:?} {path} index={index} epoch={req_epoch}"));
+                                            "seq={next_mutation} {kind:?} {path} index={index} epoch={session}"));
                                         let _ = ev_tx.send(Event::Mutated {
                                             seq: next_mutation,
                                             revision: applied_revision,
@@ -460,7 +416,7 @@ impl Engine {
                                             size,
                                             mtime_ms,
                                             index,
-                                            epoch: req_epoch,
+                                            epoch: session,
                                         });
                                         fire_notify(&notify);
                                     }
@@ -477,10 +433,6 @@ impl Engine {
                                     // named by the apply line above
                                     watcher::WatchAction::Ignored(_) => {}
                                 }
-                            }
-                            #[cfg(not(any(target_os = "linux", windows)))]
-                            {
-                                let _ = tagged;
                             }
                         }
                     }
@@ -516,13 +468,13 @@ impl Engine {
         (needed, files, dirs, st.revision())
     }
 
-    /// Current epoch; bumped by every OpenDir/rescan.
+    /// Most recently allocated open session, not the published session.
     pub fn epoch(&self) -> u64 {
         self.epoch.load(Ordering::Relaxed)
     }
 
-    /// Allocates the epoch for an OpenDir the caller is about to send.
-    /// Allocates the id of a NEW request. It is the only place an epoch is
+    /// Allocates the session for an OpenDir the caller is about to send.
+    /// It is the only place an epoch is
     /// born: the loop's own rescan (queue overflow, the watched folder deleted)
     /// re-answers the session that is already current and must not allocate here,
     /// because the stale-scan guard below asks "am I the newest" — so an internal

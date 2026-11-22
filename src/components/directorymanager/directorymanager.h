@@ -1,35 +1,28 @@
 #pragma once
 
 #include <QObject>
-#include <QElapsedTimer>
-#include <QString>
-#include <QSize>
-#include <QDebug>
-#include <QDateTime>
 #include <QRegularExpression>
-#include <functional>
+#include <QStringList>
+#include <QTimer>
 #include <QVector>
-
+#include <functional>
 #include <vector>
-#include <string>
-#include <iostream>
-#include <filesystem>
-#include <algorithm>
 
-#include <QHash>
-#include <QPair>
-#include <QSet>
-
+#include "enginebridge.h"
 #include "settings.h"
-#include "utils/stuff.h"
 #include "sourcecontainers/fsentry.h"
 
-class QTimer;
-class EngineBridge;
-
-class DirectoryManager;
-
-//TODO: rename? EntrySomething?
+struct ListingFileChanges {
+    struct Displacement {
+        quint64 id;
+        QString oldPath;
+        QString newPath;
+        int oldIndex;
+    };
+    QList<Displacement> displaced;
+    QStringList contentChanged;
+    bool hasAdditions = false;
+};
 
 class DirectoryManager : public QObject {
     Q_OBJECT
@@ -69,27 +62,13 @@ class DirectoryManager : public QObject {
     unsigned long dirCount() const;
     inline bool isSupportedFile(const QString &filePath) const;
     bool isEmpty() const;
-    // True when nothing this instance asked the engine for is still in flight:
-    // the vectors reflect the directory that was opened, the requested sort is
-    // the applied sort, and no resync or bounded rescan is armed. Deliberately
-    // answers only "is anything pending", never "what is in the listing" — so a
-    // caller can wait on it instead of sleeping, but it can never stand in for
-    // an assertion about content (sortingMode() could: it reports the requested
-    // mode, which setSortingMode writes before it returns).
     bool isSettled() const;
-    // The engine listing version these rows reflect: the low 32 bits of the
-    // engine's u64 counter, zero-extended — the width the wire carries on
-    // events, and equality is the only question ever asked of it. Equal to an
-    // export's low 32 bits means the rows are that export's rows.
     quint64 appliedRevision() const {
         return m_appliedRevision;
     }
-    // The half of mirroring that applies a listing, split out so a test can hand
-    // the mirror one the engine does not currently hold. Nothing in production
-    // calls it directly: mirrorEngineListing pulls the arena and forwards. This
-    // lets a test describe divergence directly instead of hoping the
-    // filesystem produces it on demand.
-    bool applyArena(const QString &dirPath, const QByteArray &listing, quint32 newFileCount, quint32 newDirCount);
+    SortingMode appliedSortingMode() const {
+        return m_appliedSort;
+    }
 
     bool containsFile(const QString &filePath) const;
     QString fileNameAt(int index) const;
@@ -107,6 +86,7 @@ class DirectoryManager : public QObject {
     unsigned long totalCount() const;
     bool containsDir(const QString &dirPath) const;
     const FSEntry &fileEntryAt(int index) const;
+    const FSEntry &dirEntryAt(int index) const;
     QString dirPathAt(int index) const;
     QString dirNameAt(int index) const;
 
@@ -122,37 +102,15 @@ class DirectoryManager : public QObject {
     const FSEntry m_defaultEntry;
     QString m_directoryPath;
 
-    // --- the mirror's position against the engine's -----------------------
-    //
-    // Two layers, and knowing which one a field belongs to is the difference
-    // between reading this class and reverse-engineering it.
-    //
-    // POSITION: where the rows stand. These answer "are the vectors the
-    // engine's rows", and they are the only fields isSettled() reads as
-    // POSITION — the rest of its conditions are about whether work is still
-    // owed, not about where the mirror is.
-    QString m_engineDir;   // the directory we asked the engine to open
-    QString m_mirroredDir; // the directory the vectors currently reflect
-    SortingMode m_appliedSort;
+    QString m_mirroredDir;
+    quint64 m_requestedSession = 0;
+    quint64 m_appliedSession = 0;
+    SortingMode m_appliedSort = SORT_NAME;
     quint64 m_appliedRevision = 0;
+    QTimer m_snapshotRetry;
+    bool m_snapshotDirty = false;
+    bool m_publishing = false;
 
-    // OWED WORK — one machine, not a pile of flags: the phases an open and
-    // its repairs pass through, in order. Settled means nothing is owed;
-    // Scheduled is the debounced repair timer armed; OpenInFlight is an
-    // accepted open awaiting its DirListed/OpenFailed; Applying is the answer
-    // being consumed. m_repairOwedAfterPass is the one orthogonal bit:
-    // markBehind() ran while Applying held, and the pass's tail owes another
-    // round before Settled.
-    enum class CatchUpPhase {
-        Settled,
-        Scheduled,
-        OpenInFlight,
-        Applying
-    };
-    CatchUpPhase m_catchUp = CatchUpPhase::Settled;
-    bool m_repairOwedAfterPass = false;
-    QTimer *m_rescanTimer = nullptr; // the mechanism behind Scheduled, not state
-    int m_rejectedListings = 0;      // consecutive refusals, for the log level
     struct PendingListed {
         qint64 token = 0;
         QString dir;
@@ -160,30 +118,9 @@ class DirectoryManager : public QObject {
     };
     qint64 m_nextWhenListedToken = 1;
     QVector<PendingListed> m_pendingOnListed;
-    QHash<QString, QPair<quint64, qint64>> m_prevFileMeta; // engine size/mtime per path
 
-    // low-level mirror writes — reserved for the engine event applier; the
-    // listing has exactly one writer (the engine) and one reader (the mirror)
-    void removeFileEntry(const QString &filePath);
-    void removeDirEntry(const QString &dirPath);
-    // MODIFIED applied from the wire: the watcher stat'ed before emitting, so
-    // the mirror replaces content and splices to the engine's position — it
-    // never re-derives either
-    void applyEngineModification(const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index);
-    // RENAMED applied from the wire: one row moves instead of two being
-    // destroyed and rebuilt, and its pixels survive because a rename changes
-    // the name and nothing else. Also the only applier that can answer an
-    // overwrite — the engine removed the destination entry, so the mirror drops
-    // that row before splicing the source into the engine's position.
-    void applyEngineRename(const QString &from, const QString &to, bool isDir, quint64 size, qint64 mtimeMs, int index);
-    void markBehind();
-    void scheduleRescan();
-    // a landed listing is the definition of agreement: it clears any repair
-    // the mirror still owed from an earlier pass
-    void markListingInSync();
-    // false when the arena was rejected: the mirror keeps what it had, because a
-    // truncation applied is a directory that never existed anywhere.
-    bool mirrorEngineListing(const QString &dirPath);
+    void pullSnapshot();
+    void applySnapshot(EngineBridge::Snapshot snapshot);
     static bool directoryUsable(const QString &dirPath);
     static std::filesystem::file_time_type fileTimeFromMs(qint64 ms);
 
@@ -201,32 +138,15 @@ class DirectoryManager : public QObject {
     bool checkDirRange(int index) const;
 
   private slots:
-    void onEngineDirListed(const QString &dirPath);
-    void onEngineSortChanged(const QString &dirPath, quint64 revision);
+    void onEngineListingChanged();
     void onEngineOpenFailed(const QString &dirPath, int code);
-    void onEngineMutated(int kind, const QString &path, bool isDir, quint64 size, qint64 mtimeMs, int index,
-                         const QString &oldPath, quint64 revision);
 
   signals:
-    // The mutation vocabulary of the engine is Added | Modified | Removed |
-    // Renamed (watcher/apply.rs::Applied) and these signals mirror exactly that.
-    // Renamed is the one the watcher has to earn: the kernel reports a move as
-    // MOVED_FROM + MOVED_TO sharing a cookie, and watcher/fd.rs pairs adjacent
-    // halves into a single event before it can reach the applier — a pair it
-    // cannot pair (split across read batches at a 64 KiB burst) degrades to the
-    // Removed + Added these signals would otherwise have carried.
-    // The trailing index is the row the source held *after* a destination row
-    // this rename overwrote was already dropped, i.e. exactly the position the
-    // view holds when the signal fires. Pin: listing_tests liveRenameIsOneEvent.
+    void listingChanged();
     void loaded(const QString &path);
     void sortingChanged();
     void loadingFailed(const QString &dirPath);
-    void fileRemoved(const QString &filePath, int);
-    void fileModified(const QString &filePath);
-    void fileAdded(const QString &filePath);
-    void fileRenamed(const QString &filePath, const QString &newPath, int oldIndex);
-
-    void dirRemoved(const QString &dirPath, int);
-    void dirAdded(const QString &dirPath);
-    void dirRenamed(const QString &dirPath, const QString &newPath, int oldIndex);
+    // A single comparison of two same-session snapshots, not a sequence of
+    // operations: each old path maps directly to its new path (empty if gone).
+    void filesChanged(const ListingFileChanges &changes);
 };

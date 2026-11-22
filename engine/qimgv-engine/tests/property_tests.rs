@@ -166,8 +166,8 @@ proptest! {
         let dirs: Vec<EntryData> = ds.iter().map(|s| s.entry(true)).collect();
         st.replace_all(PathBuf::from("/root"), files.clone(), dirs.clone());
 
-        let needed = 8 + files.iter().chain(&dirs)
-            .map(|e| 24 + e.name.len() + e.path.len()).sum::<usize>();
+        let needed = 32 + "/root".len() + files.iter().chain(&dirs)
+            .map(|e| 40 + e.name.len() + e.path.len()).sum::<usize>();
         let mut buf = vec![0u8; needed + slack];
         let (n, fc, dc) = st.write_listing(&mut buf);
         prop_assert_eq!((n, fc, dc), (needed, files.len(), dirs.len()));
@@ -256,19 +256,19 @@ fn read_arena(buf: &[u8]) -> (Vec<Rec>, Vec<Rec>) {
     }
 
     let (fc, dc) = (u32le(buf, 0) as usize, u32le(buf, 4) as usize);
-    let mut off = 8usize;
+    let mut off = 32 + u32le(buf, 28) as usize;
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for (count, is_dir) in [(fc, false), (dc, true)] {
         for _ in 0..count {
-            let size = u64le(buf, off);
-            let mtime_ms = i64::from_le_bytes(buf[off + 8..off + 16].try_into().unwrap());
-            let nlen = u32le(buf, off + 16) as usize;
-            let plen = u32le(buf, off + 20) as usize;
-            let name = String::from_utf8(buf[off + 24..off + 24 + nlen].to_vec()).unwrap();
+            let size = u64le(buf, off + 16);
+            let mtime_ms = i64::from_le_bytes(buf[off + 24..off + 32].try_into().unwrap());
+            let nlen = u32le(buf, off + 32) as usize;
+            let plen = u32le(buf, off + 36) as usize;
+            let name = String::from_utf8(buf[off + 40..off + 40 + nlen].to_vec()).unwrap();
             let path =
-                String::from_utf8(buf[off + 24 + nlen..off + 24 + nlen + plen].to_vec()).unwrap();
-            off += 24 + nlen + plen;
+                String::from_utf8(buf[off + 40 + nlen..off + 40 + nlen + plen].to_vec()).unwrap();
+            off += 40 + nlen + plen;
             (if is_dir { &mut dirs } else { &mut files }).push(Rec {
                 name,
                 path,

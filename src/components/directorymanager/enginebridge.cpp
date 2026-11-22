@@ -106,10 +106,12 @@ bool EngineBridge::openDir(const QString &path, int sortMode, bool showHidden) {
     // would emit a stale resort event for the previous directory's state
     const QByteArray utf8 = path.toUtf8();
     qDebug() << "[EngineBridge] openDir" << path;
-    uint32_t epoch = 0;
+    uint64_t epoch = 0;
     const int rc = qimgv_engine_open_dir(m_engine.m_d->engine, utf8.constData(), sortMode, &epoch);
-    if(rc == QIMGV_OK)
-        m_sessionEpoch = epoch; // events from older sessions are stale
+    if(rc == QIMGV_OK) {
+        m_sessionEpoch = epoch;
+        m_requestedDir = path;
+    }
     return rc == QIMGV_OK;
 }
 
@@ -139,6 +141,15 @@ int EngineBridge::dirCount() const {
         return 0;
     const int n = qimgv_engine_dir_count(m_engine.m_d->engine);
     return n < 0 ? 0 : n;
+}
+
+int EngineBridge::compareNames(const QString &a, const QString &b, SortingMode mode) {
+    const QByteArray ua = a.toUtf8();
+    const QByteArray ub = b.toUtf8();
+    // only the two codes this answers for; the engine treats anything else as
+    // ascending name order, which is the same fallback the caller applies
+    const int code = (mode == SortingMode::SORT_NAME_DESC) ? QIMGV_SORT_NAME_DESC : QIMGV_SORT_NAME;
+    return qimgv_engine_compare_names(ua.constData(), ub.constData(), code);
 }
 
 bool EngineBridge::traceEnabled() {
@@ -200,72 +211,85 @@ bool EngineBridge::exportListing(QByteArray &out, quint32 &fileCount, quint32 &d
 }
 
 // Decodes the arena written by DirectoryState::write_listing (model.rs).
-// Little-endian: u32 file_count, u32 dir_count, then file_count + dir_count
-// records of u64 size, i64 mtime_ms, u32 name_len, u32 path_len,
-// name bytes, path bytes (no NUL) — files first. A record that does not fit
-// ends the parse early, so a truncated arena yields a short listing rather
-// than a crash.
+// Little-endian: u32 file_count, u32 dir_count, u64 session, u64 revision,
+// i32 applied_sort, u32 directory_len, directory bytes, then file_count +
+// dir_count records of u64 id, u64 content_revision, u64 size, i64 mtime_ms,
+// u32 name_len, u32 path_len, name bytes, path bytes (no NUL) — files first.
+// A record that does not fit is refused outright rather than yielding a
+// short listing: a prefix that decoded cleanly is indistinguishable, at the
+// call site, from a directory that genuinely has fewer entries.
 //
 // Returns false unless the arena held exactly file_count file records plus
 // dir_count dir records and was consumed to the last byte. Both checks matter:
 // the header counts are the only place where producer and consumer agree on how
 // much data SHOULD be here, so a disagreeing count is drift, not an empty list.
-bool EngineBridge::parseListing(const QByteArray &arena, std::vector<EngineEntry> &files,
-                                std::vector<EngineEntry> &dirs) {
-    if(arena.size() < 8)
+bool EngineBridge::parseListing(const QByteArray &arena, Snapshot &out) {
+    if(arena.size() < 32)
         return false;
-    const unsigned char *p = reinterpret_cast<const unsigned char *>(arena.constData());
-    const unsigned char *end = p + arena.size();
-    auto rd32 = [&p]() -> quint32 {
-        quint32 v = qFromLittleEndian<quint32>(p);
-        p += 4;
-        return v;
+    const auto *cursor = reinterpret_cast<const unsigned char *>(arena.constData());
+    const auto *end = cursor + arena.size();
+    auto read32 = [&cursor]() {
+        const quint32 value = qFromLittleEndian<quint32>(cursor);
+        cursor += 4;
+        return value;
     };
-    auto rd64 = [&p]() -> quint64 {
-        quint64 v = qFromLittleEndian<quint64>(p);
-        p += 8;
-        return v;
+    auto read64 = [&cursor]() {
+        const quint64 value = qFromLittleEndian<quint64>(cursor);
+        cursor += 8;
+        return value;
+    };
+    auto readString = [&cursor](quint32 length) {
+        const auto value = QString::fromUtf8(reinterpret_cast<const char *>(cursor), qsizetype(length));
+        cursor += length;
+        return value;
     };
 
-    const quint32 fc = rd32();
-    const quint32 dc = rd32();
-    files.clear();
-    dirs.clear();
-    // cap the reservation by the byte budget: a header that disagrees with the
-    // arena must not drive a huge allocation
-    const size_t maxRecords = size_t(arena.size()) / 24;
-    files.reserve(std::min<size_t>(fc, maxRecords));
-    dirs.reserve(std::min<size_t>(dc, maxRecords));
+    Snapshot snapshot;
+    const quint32 files = read32();
+    const quint32 dirs = read32();
+    snapshot.session = read64();
+    snapshot.revision = read64();
+    const quint32 sort = read32();
+    const quint32 dirLength = read32();
+    if(sort > QIMGV_SORT_SIZE_DESC || dirLength > quint64(end - cursor))
+        return false;
+    snapshot.sort = int(sort);
+    snapshot.directory = readString(dirLength);
+    if(quint64(files) + dirs > quint64(end - cursor) / 40)
+        return false;
 
-    auto readRun = [&](quint32 count, bool isDir) {
-        for(quint32 i = 0; i < count && p + 24 <= end; ++i) {
-            const quint64 size = rd64();
-            const qint64 mtimeMs = static_cast<qint64>(rd64());
-            const quint32 nlen = rd32();
-            const quint32 plen = rd32();
-            if(p + nlen + plen > end)
-                break;
-            EngineEntry e;
-            e.name = QString::fromUtf8(reinterpret_cast<const char *>(p), int(nlen));
-            p += nlen;
-            e.path = QString::fromUtf8(reinterpret_cast<const char *>(p), int(plen));
-            p += plen;
-            e.size = size;
-            e.mtimeMs = mtimeMs;
-            e.isDir = isDir;
-            (isDir ? dirs : files).push_back(std::move(e));
+    auto readRows = [&](quint32 count, bool isDir, std::vector<EngineEntry> &rows) {
+        rows.reserve(count);
+        for(quint32 row = 0; row < count; ++row) {
+            if(end - cursor < 40)
+                return false;
+            EngineEntry entry;
+            entry.id = read64();
+            entry.contentRevision = read64();
+            entry.size = read64();
+            entry.mtimeMs = static_cast<qint64>(read64());
+            const quint32 nameLength = read32();
+            const quint32 pathLength = read32();
+            if(entry.id == 0 || quint64(nameLength) + pathLength > quint64(end - cursor))
+                return false;
+            entry.name = readString(nameLength);
+            entry.path = readString(pathLength);
+            entry.isDir = isDir;
+            rows.push_back(std::move(entry));
         }
-    };
-    readRun(fc, false);
-    readRun(dc, true);
-    if(p == end && files.size() == fc && dirs.size() == dc)
         return true;
-    // Rejected means "this is not the listing the header promised" — the caller
-    // has no way to tell a truncation from a short directory, so a failure
-    // returns nothing rather than the prefix that happened to decode.
-    files.clear();
-    dirs.clear();
-    return false;
+    };
+    if(!readRows(files, false, snapshot.files) || !readRows(dirs, true, snapshot.dirs) || cursor != end)
+        return false;
+    out = std::move(snapshot);
+    return true;
+}
+
+bool EngineBridge::readSnapshot(Snapshot &out) {
+    QByteArray arena;
+    quint32 files = 0, dirs = 0;
+    quint64 revision = 0;
+    return exportListing(arena, files, dirs, revision) && parseListing(arena, out);
 }
 
 bool EngineBridge::entryAt(int index, bool dirs, EngineEntry &out) const {
@@ -289,82 +313,39 @@ bool EngineBridge::entryAt(int index, bool dirs, EngineEntry &out) const {
 void EngineBridge::drainEvents() {
     if(!m_engine)
         return;
-    // Grown on demand instead of fixed: an event the buffer could not hold is
-    // put back by the engine, so retrying with room neither loses it nor
-    // reorders it. A fixed 4096 would instead leave it queued until something
-    // else woke the notifier, which looks like a stalled listing.
-    QByteArray subjectBuf;
-    subjectBuf.resize(4096);
-    // The rename's second subject. Grown in lockstep with the subject above,
-    // because a truncation means "this event needs more room in both places" —
-    // the engine validates both buffers before it writes either, so the event
-    // is still queued when this loop retries.
-    QByteArray oldBuf;
-    oldBuf.resize(4096);
+    const auto session = m_sessionEpoch;
+    const auto dir = m_requestedDir;
+    bool changed = false;
+    bool listed = false;
+    int failure = QIMGV_OK;
+    qimgv_event event{};
     for(;;) {
-        qimgv_event ev{};
-        qimgv_mutation mut{};
-        int r;
-        for(;;) {
-            r = qimgv_engine_take_event(m_engine.m_d->engine, &ev, subjectBuf.data(), size_t(subjectBuf.size()),
-                                        oldBuf.data(), size_t(oldBuf.size()), &mut);
-            if(r != QIMGV_ERR_TRUNCATED)
-                break;
-            if(subjectBuf.size() >= (1 << 20)) {
-                qWarning() << "[EngineBridge] event subject needs more than 1 MiB";
-                break;
-            }
-            subjectBuf.resize(subjectBuf.size() * 2);
-            oldBuf.resize(oldBuf.size() * 2);
-        }
-        // 1 is the only value that means "out and the buffers now describe an
-        // event". Anything else wrote nothing and left them holding the previous
-        // event, so falling through here would re-apply a stale one — and the
-        // error codes are positive enum values, not negatives: a refused rename
-        // (QIMGV_ERR_INVALID, no room for old_buf) and the 1 MiB give-up above
-        // both answer with a code that a "r <= 0" test would wave through.
-        if(r != 1) {
-            if(r != 0)
-                qWarning() << "[EngineBridge] take_event refused:" << r
-                           << (qimgv_last_error() ? qimgv_last_error() : "");
+        const int result = qimgv_engine_take_event(m_engine.m_d->engine, &event, nullptr, 0, nullptr, 0, nullptr);
+        if(result != 1) {
+            if(result != 0)
+                qWarning() << "[EngineBridge] take_event refused:" << result;
             break;
         }
-        if(m_sessionEpoch != 0 && ev.epoch != 0 && ev.epoch < m_sessionEpoch) {
-            if(EngineBridge::traceEnabled()) {
-                qDebug() << "[bridge trace] drop seq" << ev.seq << "kind" << ev.kind << "epoch" << ev.epoch
-                         << "older than session" << m_sessionEpoch;
-            }
-            continue; // event from an older session (dead receiver) — drop
-        }
-        // One string, two subjects: a directory for DIR_LISTED/OPEN_FAILED and a
-        // full file path for DIR_MUTATED. Named for the ambiguity on purpose —
-        // the kind decides which it is, and the value cannot say so.
-        // See the table at qimgv_engine_take_event in qimgv_engine.h.
-        const QString subject = QString::fromUtf8(subjectBuf.constData());
-        // Read only for the one kind that writes it: for every other event
-        // oldBuf still holds a previous event's bytes, and a string built from
-        // them would be a path no rename ever named.
-        const QString oldPath = mut.kind == QIMGV_MUT_RENAMED ? QString::fromUtf8(oldBuf.constData()) : QString();
-        if(EngineBridge::traceEnabled()) {
-            // The last point where a mutation can vanish without the engine
-            // knowing. Everything a consumer does with it is decided on the next
-            // line, so "took" followed by nothing is the shape to look for.
-            qDebug() << "[bridge trace] took kind" << ev.kind << "seq" << ev.seq << "epoch" << ev.epoch << "index"
-                     << mut.index << subject << (oldPath.isEmpty() ? QString() : QStringLiteral("<-") + oldPath);
-        }
-        if(ev.kind == QIMGV_EVENT_DIR_LISTED) {
-            m_listedDir = subject;
-            emit dirListed(subject);
-        } else if(ev.kind == QIMGV_EVENT_SORT_CHANGED) {
-            m_listedDir = subject;
-            emit sortChanged(subject, ev.revision);
-        } else if(ev.kind == QIMGV_EVENT_DIR_MUTATED) {
-            emit dirMutated(mut.kind, subject, mut.is_dir != 0, mut.size, mut.mtime_ms, mut.index, oldPath,
-                            ev.revision);
-        } else if(ev.kind == QIMGV_EVENT_OPEN_FAILED) {
-            qWarning() << "[EngineBridge] open failed:" << subject << "code" << ev.code
-                       << (qimgv_last_error() ? qimgv_last_error() : "");
-            emit openFailed(subject, ev.code);
+        if(event.epoch != session)
+            continue;
+        if(traceEnabled())
+            qDebug() << "[bridge trace] notice" << event.kind << "session" << event.epoch << "revision"
+                     << event.revision;
+        if(event.kind == QIMGV_EVENT_OPEN_FAILED) {
+            failure = event.code;
+        } else {
+            changed = true;
+            listed |= event.kind == QIMGV_EVENT_DIR_LISTED;
         }
     }
+    if(listed)
+        m_listedDir = dir;
+    if(changed)
+        emit listingChanged();
+    if(m_sessionEpoch != session)
+        return;
+    if(listed)
+        emit dirListed(dir);
+    if(failure != QIMGV_OK && m_sessionEpoch == session)
+        emit openFailed(dir, failure);
 }

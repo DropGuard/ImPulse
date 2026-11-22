@@ -1,5 +1,7 @@
 ﻿#include "directorypresenter.h"
 
+#include <QHash>
+#include <QSet>
 #include <utility>
 
 DirectoryPresenter::DirectoryPresenter(Thumbnailer &_thumbnailer, QObject *parent)
@@ -8,13 +10,9 @@ DirectoryPresenter::DirectoryPresenter(Thumbnailer &_thumbnailer, QObject *paren
 }
 
 void DirectoryPresenter::unsetModel() {
-    disconnect(m_model.get(), &DirectoryModel::fileRemoved, this, &DirectoryPresenter::onFileRemoved);
-    disconnect(m_model.get(), &DirectoryModel::fileAdded, this, &DirectoryPresenter::onFileAdded);
-    disconnect(m_model.get(), &DirectoryModel::fileModified, this, &DirectoryPresenter::onFileModified);
-    disconnect(m_model.get(), &DirectoryModel::fileRenamed, this, &DirectoryPresenter::onFileRenamed);
-    disconnect(&m_model->listing(), &DirectoryManager::dirRemoved, this, &DirectoryPresenter::onDirRemoved);
-    disconnect(&m_model->listing(), &DirectoryManager::dirAdded, this, &DirectoryPresenter::onDirAdded);
-    disconnect(&m_model->listing(), &DirectoryManager::dirRenamed, this, &DirectoryPresenter::onDirRenamed);
+    if(m_model)
+        disconnect(&m_model->listing(), &DirectoryManager::listingChanged, this, &DirectoryPresenter::syncRows);
+    m_rows.clear();
     m_model = nullptr;
     // also empty view?
 }
@@ -27,25 +25,12 @@ void DirectoryPresenter::setModel(std::shared_ptr<DirectoryModel> newModel) {
     m_model = newModel;
     populateView();
 
-    // filesystem changes
-    connect(m_model.get(), &DirectoryModel::fileRemoved, this, &DirectoryPresenter::onFileRemoved);
-    connect(m_model.get(), &DirectoryModel::fileAdded, this, &DirectoryPresenter::onFileAdded);
-    connect(m_model.get(), &DirectoryModel::fileModified, this, &DirectoryPresenter::onFileModified);
-    connect(m_model.get(), &DirectoryModel::fileRenamed, this, &DirectoryPresenter::onFileRenamed);
-    connect(&m_model->listing(), &DirectoryManager::dirRemoved, this, &DirectoryPresenter::onDirRemoved);
-    connect(&m_model->listing(), &DirectoryManager::dirAdded, this, &DirectoryPresenter::onDirAdded);
-    connect(&m_model->listing(), &DirectoryManager::dirRenamed, this, &DirectoryPresenter::onDirRenamed);
-}
-
-void DirectoryPresenter::reloadModel() {
-    populateView();
+    connect(&m_model->listing(), &DirectoryManager::listingChanged, this, &DirectoryPresenter::syncRows);
 }
 
 void DirectoryPresenter::populateView() {
-    if(!m_model || !m_view)
-        return;
-    m_view->populate(m_showDirs ? m_model->listing().totalCount() : m_model->listing().fileCount());
-    selectAndFocus(0);
+    m_rows.clear();
+    syncRows();
 }
 
 void DirectoryPresenter::disconnectView() {
@@ -57,75 +42,53 @@ void DirectoryPresenter::disconnectView() {
     // — so the severing happens only while the widget is alive.
     if(m_viewSender)
         QObject::disconnect(m_viewSender, nullptr, this, nullptr);
+    m_rows.clear();
     m_viewSender = nullptr;
     m_view = nullptr;
 }
 
 //------------------------------------------------------------------------------
 
-void DirectoryPresenter::onFileRemoved(const QString &filePath, int index) {
-    Q_UNUSED(filePath)
-    if(!m_view)
+void DirectoryPresenter::syncRows() {
+    if(!m_model || !m_viewSender)
         return;
-    m_view->removeItem(m_showDirs ? index + m_model->listing().dirCount() : index);
-}
-
-void DirectoryPresenter::onFileAdded(const QString &filePath) {
-    if(!m_view)
-        return;
-    int index = m_model->listing().indexOfFile(filePath);
-    m_view->insertItem(m_showDirs ? m_model->listing().dirCount() + index : index);
-}
-
-void DirectoryPresenter::onFileModified(const QString &filePath) {
-    if(!m_view)
-        return;
-    int index = m_model->listing().indexOfFile(filePath);
-    m_view->reloadItem(m_showDirs ? m_model->listing().dirCount() + index : index);
-}
-
-// The row a rename moves is identified by the index the *event* carries, not by
-// a lookup: the mirror has already spliced, so the old path is gone from the
-// model by the time this runs. The destination index, on the other hand, is the
-// model's own answer — under name sort a rename repositions, and only the
-// listing knows where the entry ended up.
-void DirectoryPresenter::onFileRenamed(const QString &filePath, const QString &newPath, int oldIndex) {
-    Q_UNUSED(filePath)
-    if(!m_view)
-        return;
-    int index = m_model->listing().indexOfFile(newPath);
-    if(index < 0)
-        return;
-    m_view->renameItem(m_showDirs ? m_model->listing().dirCount() + oldIndex : oldIndex,
-                       m_showDirs ? m_model->listing().dirCount() + index : index,
-                       m_model->listing().fileNameAt(index));
-}
-
-void DirectoryPresenter::onDirRemoved(const QString &dirPath, int index) {
-    Q_UNUSED(dirPath)
-    if(!m_view || !m_showDirs)
-        return;
-    m_view->removeItem(index);
-}
-
-void DirectoryPresenter::onDirAdded(const QString &dirPath) {
-    if(!m_view || !m_showDirs)
-        return;
-    int index = m_model->listing().indexOfDir(dirPath);
-    m_view->insertItem(index);
-}
-
-// Dirs hold the leading rows, so no offset on either side; the same rule as
-// onFileRenamed applies to the indices — the old row comes from the event, the
-// new one from the listing.
-void DirectoryPresenter::onDirRenamed(const QString &dirPath, const QString &newPath, int oldIndex) {
-    Q_UNUSED(dirPath)
-    if(!m_view || !m_showDirs)
-        return;
-    int index = m_model->listing().indexOfDir(newPath);
-    if(index < 0)
-        return;
-    m_view->renameItem(oldIndex, index, m_model->listing().dirNameAt(index));
+    const auto &listing = m_model->listing();
+    QHash<quint64, int> previous;
+    QSet<QString> previousPaths;
+    previous.reserve(m_rows.size());
+    previousPaths.reserve(m_rows.size());
+    for(int index = 0; index < m_rows.size(); ++index) {
+        const auto &row = m_rows[index];
+        previous.insert(row.id, index);
+        previousPaths.insert(row.path);
+    }
+    QList<ViewEntry> next;
+    QList<DirectoryViewRow> plan;
+    const int dirs = m_showDirs ? int(listing.dirCount()) : 0;
+    const int count = dirs + int(listing.fileCount());
+    next.reserve(count);
+    plan.reserve(count);
+    for(int index = 0; index < count; ++index) {
+        const auto &entry = index < dirs ? listing.dirEntryAt(index) : listing.fileEntryAt(index - dirs);
+        const int oldIndex = previous.value(entry.id, -1);
+        DirectoryViewRow row;
+        row.previousIndex = oldIndex;
+        if(oldIndex >= 0) {
+            const auto &old = m_rows[oldIndex];
+            if(old.name != entry.name)
+                row.newName = entry.name;
+            row.contentChanged = old.contentRevision != entry.contentRevision;
+        } else {
+            row.contentChanged = !entry.isDirectory && previousPaths.contains(entry.path);
+        }
+        plan.append(std::move(row));
+        next.append(ViewEntry{entry.id, entry.name, entry.path, entry.contentRevision});
+    }
+    const bool firstRows = m_rows.isEmpty() && !next.isEmpty();
+    m_rows = std::move(next);
+    m_view->applyRows(plan);
+    if(firstRows)
+        selectAndFocus(0);
 }
 
 bool DirectoryPresenter::showDirs() {
@@ -136,7 +99,7 @@ void DirectoryPresenter::setShowDirs(bool mode) {
     if(mode == m_showDirs)
         return;
     m_showDirs = mode;
-    populateView();
+    syncRows();
 }
 
 QList<QString> DirectoryPresenter::selectedPaths() const {

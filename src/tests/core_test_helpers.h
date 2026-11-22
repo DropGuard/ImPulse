@@ -244,28 +244,9 @@ class CountingStripProxy : public ThumbnailStrip {
         ++hoverCalls;
         ThumbnailStrip::setDragHover(index);
     }
-    void removeItem(int index) override {
-        removed << index;
-        ThumbnailStrip::removeItem(index);
-    }
-    void insertItem(int index) override {
-        inserted << index;
-        ThumbnailStrip::insertItem(index);
-    }
-    void reloadItem(int index) override {
-        reloaded << index;
-        ThumbnailStrip::reloadItem(index);
-    }
-    void renameItem(int oldIndex, int newIndex, const QString &name) override {
-        renamed << oldIndex << newIndex;
-        renamedTo << name;
-        ThumbnailStrip::renameItem(oldIndex, newIndex, name);
-    }
     int thumbnailCalls = 0;
     int hoverCalls = 0;
     int lastThumbnailPos = -1;
-    QList<int> removed, inserted, reloaded, renamed;
-    QList<QString> renamedTo;
 };
 
 // the thumbnail widgets in layout order — the drop helper needs positions

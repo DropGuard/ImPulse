@@ -268,6 +268,10 @@ void FolderView::populate(int count) {
     m_ui->thumbnailGrid->populate(count);
 }
 
+void FolderView::applyRows(const QList<DirectoryViewRow> &rows) {
+    m_ui->thumbnailGrid->applyRows(rows);
+}
+
 void FolderView::setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) {
     m_ui->thumbnailGrid->setThumbnail(pos, thumb);
 }
@@ -343,26 +347,6 @@ void FolderView::fsTreeScrollToCurrent() {
 
 void FolderView::onTreeViewClicked(QModelIndex index) {
     emit directorySelected(m_dirModel->fileInfo(index).absoluteFilePath());
-}
-
-void FolderView::addItem() {
-    m_ui->thumbnailGrid->addItem();
-}
-
-void FolderView::insertItem(int index) {
-    m_ui->thumbnailGrid->insertItem(index);
-}
-
-void FolderView::removeItem(int index) {
-    m_ui->thumbnailGrid->removeItem(index);
-}
-
-void FolderView::reloadItem(int index) {
-    m_ui->thumbnailGrid->reloadItem(index);
-}
-
-void FolderView::renameItem(int oldIndex, int newIndex, const QString &name) {
-    m_ui->thumbnailGrid->renameItem(oldIndex, newIndex, name);
 }
 
 void FolderView::setDragHover(int index) {

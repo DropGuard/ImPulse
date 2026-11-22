@@ -220,41 +220,24 @@ for name, sigs in sorted(signals_of.items()):
             failures.append(f"R6 signal re-declared: {name}::{sig}() also exists in {parent} — "
                             f"connections made through &{parent}::{sig} will never fire")
 
-# Rule 7: the mirror has exactly one writer family. fileEntryVec/dirEntryVec may
-# only be mutated inside the engine-apply functions; every other local write is
-# the forceInsert-shaped exception that retired this rule's subject. Deterministic
-# single-file scan (function attribution by definition regex) — not the rejected
-# line-level lock heuristic: no sampling, no green-means-sampled downgrade.
-# The appliers reach the vectors through one alias and one splice helper, so the
-# scan covers all three forms: a named mutation, an alias mutation, a call of the
-# helper. An alias under another name would be invisible, which is why ALIAS_RE
-# fails the rule instead of quietly going green — a writer set nobody can see is
-# not a rule.
-MIRROR_WRITERS = {'applyArena', 'removeFileEntry', 'removeDirEntry',
-                  'applyEngineModification', 'applyEngineRename',
-                  'onEngineMutated', 'insertAtEngineIndex'}
-MUT_RE = re.compile(r'(?:(?:file|dir)EntryVec|\bvec)\.(push_back|insert|erase|clear|assign)')
-FN_RE = re.compile(r'^[a-zA-Z].*\bDirectoryManager::(\w+)')
-FREE_FN_RE = re.compile(r'^(?:static\s+)?[A-Za-z_][A-Za-z0-9_:<>&*]*\s+\*?(\w+)\(')
-SPLICE_RE = re.compile(r'\binsertAtEngineIndex\(')
-ALIAS_RE = re.compile(r'std::vector<FSEntry>\s*&\s*(\w+)')
+# Rule 7: only applySnapshot can access the mirror vectors mutably.
+MIRROR_ROWS = re.compile(r'\bm_(?:file|dir)EntryVec\b')
+DM_METHOD = re.compile(r'^\w.*\bDirectoryManager::(\w+)\([^;]*\)\s*(const)?\s*\{')
 dm_path = os.path.join(SRC, 'components', 'directorymanager', 'directorymanager.cpp')
 if os.path.exists(dm_path):
     scanned['R7'] = scanned.get('R7', 0) + 1
-    dm_text = text_of(dm_path)
-    fn = '?'
-    for lineno, line in enumerate(dm_text.splitlines(), 1):
-        m = FN_RE.match(line) or FREE_FN_RE.match(line)
-        if m:
-            fn = m.group(1)
-        writes = MUT_RE.search(line) or SPLICE_RE.search(line)
-        if writes and fn not in MIRROR_WRITERS:
-            failures.append(f"R7 mirror writer: directorymanager.cpp:{lineno} mutates the "
-                            f"listing inside {fn}() — only {sorted(MIRROR_WRITERS)} may")
-    for alias in sorted(set(ALIAS_RE.findall(dm_text)) - {'vec'}):
-        failures.append(f"R7 blind alias: directorymanager.cpp binds std::vector<FSEntry>& to "
-                        f"'{alias}' — the scan only sees 'fileEntryVec', 'dirEntryVec' and 'vec', "
-                        f"so renaming the appliers' alias hides new writers instead of failing")
+    method = '?'
+    read_only = False
+    for lineno, line in enumerate(text_of(dm_path).splitlines(), 1):
+        match = DM_METHOD.match(line)
+        if match:
+            method, qualifier = match.groups()
+            read_only = qualifier == 'const'
+        elif line.startswith('}'):
+            method, read_only = '?', False
+        if MIRROR_ROWS.search(line.split('//', 1)[0]) and not read_only and method != 'applySnapshot':
+            failures.append(f"R7 mirror writer: directorymanager.cpp:{lineno} accesses rows "
+                            f"in {method}() — use a const reader or replace the snapshot")
 else:
     failures.append("R7 cannot run: directorymanager.cpp missing — scanned 0 files is not a pass")
 

@@ -542,14 +542,6 @@ fn rename(
     ) {
         // The row is here and the new name is a member: one entry, one path.
         (true, None) => {
-            // The destination may be a listed row of its own — an overwrite by
-            // move — and its contents are gone with the moved-in file's inode
-            // now sitting at that path. It goes first, so the identity that
-            // survives is the moved-in entry's and the event describes the
-            // result: one row, at this path, with this metadata.
-            if state.contains_path(&to_str) {
-                state.remove_entry_by_path(&to_str);
-            }
             let meta = match stats.stat(&to_path) {
                 Ok(m) => m,
                 // Gone already: the only fact left is that the source is not

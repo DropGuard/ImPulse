@@ -34,6 +34,7 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     void show();
     void hide();
     void populate(int) override;
+    void applyRows(const QList<DirectoryViewRow> &rows) override;
     void setThumbnail(int pos, std::shared_ptr<Thumbnail> thumb) override;
     void select(QList<int>) override;
     void select(int) override;
@@ -41,12 +42,7 @@ class FolderView : public FloatingWidgetContainer, public IDirectoryView {
     void focusOn(int) override;
     void focusOnSelection() override;
     void setDirectoryPath(QString path) override;
-    void insertItem(int index) override;
-    void removeItem(int index) override;
-    void reloadItem(int index) override;
-    void renameItem(int oldIndex, int newIndex, const QString &name) override;
     void setDragHover(int) override;
-    void addItem();
     void onFullscreenModeChanged(bool mode);
     void onSortingChanged(SortingMode mode);
     // the grid scope actions' landing strip: one-liners to the thumbnail
