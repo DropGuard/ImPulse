@@ -39,9 +39,28 @@ target_include_directories(engine_contract_tests PRIVATE ${CMAKE_SOURCE_DIR}/eng
 # the whole baseline silently never applied there — 32 engine-boundary reports
 # a run, looking exactly like the residue the baseline exists to absorb.
 set(TSAN_ENV "TSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/tsan-noise.supp:report_thread_leaks=0")
+# Every test's shared environment, the property each registration passes as
+# ENVIRONMENT. On Windows it also carries the toolchain's bin dir on PATH:
+# msys2 keeps those DLLs OUT of the machine's global PATH (they would shadow
+# other software's zlib1.dll and friends), so a test binary launched by ctest
+# dies with STATUS_DLL_NOT_FOUND unless the invoking shell happened to be the
+# toolchain's own — an implicit context, the exact thing the hook already
+# refuses for cmake/ctest/python ("the configure-time cache records the exact
+# binaries the tree was configured with"). The DLL directory is recorded here
+# at configure time, next to the compiler; the caller's PATH is snapshotted at
+# configure too, which is the same policy: a test runs against what the tree
+# was configured with, not with whatever the invoking shell has. List
+# separation survives as \; inside the element; ctest unescapes on delivery.
+if(WIN32)
+    get_filename_component(_toolchain_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    string(REPLACE ";" "\\;" _configure_path "$ENV{PATH}")
+    set(TEST_ENV "${TSAN_ENV};PATH=${_toolchain_bin}\\;${_configure_path}")
+else()
+    set(TEST_ENV "${TSAN_ENV}")
+endif()
 
 add_test(NAME ENGINE_CONTRACT COMMAND engine_contract_tests)
-set_tests_properties(ENGINE_CONTRACT PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+set_tests_properties(ENGINE_CONTRACT PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # Engine stack integration: EngineBridge pump + DirectoryManager async wiring.
 # Links qimgv_nongui — the same objects the executable is built from — so a test
@@ -68,14 +87,14 @@ add_executable(engine_stack_tests
 # USE_EXIV2 arrives with qimgv_nongui's PUBLIC compile definitions: one answer
 # to "is Exiv2 available" for every target, instead of each restating it.
 target_link_libraries(engine_stack_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_nongui)
-gtest_discover_tests(engine_stack_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(engine_stack_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # Core-level navigation: links the widget tree too, so a real Core can be built
 # and driven under the offscreen platform. OBJECT libraries do not re-export each
 # other's objects, so both are listed — the same pair the executable links.
 add_executable(core_nav_tests core_nav_tests.cpp core_test_helpers.h)
 target_link_libraries(core_nav_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
-gtest_discover_tests(core_nav_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(core_nav_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # ---- the LLVM idiom: the tests are build targets, and the check targets fuse
 # the build in front of the run. A green suite on a stale binary is not
@@ -117,7 +136,7 @@ foreach(suite)
     add_executable(${suite} ${suite}.cpp core_test_helpers.h)
     target_link_libraries(${suite} PRIVATE Qt6::Test qimgv_gui qimgv_nongui)
     add_test(NAME ${suite} COMMAND ${suite})
-    set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+    set_tests_properties(${suite} PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 endforeach()
 
 # Migrated to GoogleTest: discovery, filtering and per-case processes are the
@@ -125,7 +144,7 @@ endforeach()
 foreach(suite grid_tests slideshow_tests clipboard_tests overlay_keys_tests crop_tests presenter_tests edit_save_tests shortcut_scope_tests)
     add_executable(${suite} ${suite}.cpp core_test_helpers.h)
     target_link_libraries(${suite} PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
-    gtest_discover_tests(${suite} DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+    gtest_discover_tests(${suite} DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 endforeach()
 
 # Core's file operations: copy, move, rename, delete and trash driven through
@@ -133,7 +152,7 @@ endforeach()
 # read, so it runs as its own binary with its own fixture domain.
 add_executable(core_fileops_tests core_fileops_tests.cpp core_test_helpers.h)
 target_link_libraries(core_fileops_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
-gtest_discover_tests(core_fileops_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(core_fileops_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # The widget surfaces: overlays, panels, the grid's keyboard and drag, the
 # settings dialog. Same object libraries, but nothing here builds a Core — this
@@ -141,13 +160,13 @@ gtest_discover_tests(core_fileops_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONM
 # a watcher and an async listing, and so a failure names the surface.
 add_executable(gui_widget_tests gui_widget_tests.cpp core_test_helpers.h)
 target_link_libraries(gui_widget_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test qimgv_gui qimgv_nongui)
-gtest_discover_tests(gui_widget_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(gui_widget_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # executable architecture rules (ArchUnit-style): gui isolation, FFI caller
 # allowlist, rust internal seal
 add_test(NAME ARCH_RULES
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/architecture_rules.py)
-set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300)
+set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=;${TEST_ENV}" TIMEOUT 300)
 
 # Dispatch probes: QShortcutMap behavior pinned against the offscreen platform
 # with local QShortcuts only — no Core, no ActionManager, so it links neither
@@ -161,7 +180,7 @@ set_tests_properties(ARCH_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=" TIMEOUT 300
 # macros are poisoned in a gtest TU by gtest_qt.h (see that header).
 add_executable(dispatch_probe_tests dispatch_probe_tests.cpp)
 target_link_libraries(dispatch_probe_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test Qt6::Widgets)
-gtest_discover_tests(dispatch_probe_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(dispatch_probe_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # The harness proving itself: that a timed-out wait is a real failure and that
 # QTest's assertion macros are unusable in a gtest translation unit. Without
@@ -169,7 +188,7 @@ gtest_discover_tests(dispatch_probe_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRO
 # no-op would look exactly like a green suite.
 add_executable(harness_sanity_tests harness_sanity_tests.cpp)
 target_link_libraries(harness_sanity_tests PRIVATE ${QIMGV_GTEST_TARGETS} Qt6::Test Qt6::Widgets)
-gtest_discover_tests(harness_sanity_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TSAN_ENV}" TIMEOUT 300)
+gtest_discover_tests(harness_sanity_tests DISCOVERY_TIMEOUT 60 PROPERTIES ENVIRONMENT "${TEST_ENV}" TIMEOUT 300)
 
 # the tree's style, as a test rather than only as a pre-commit stage: a
 # skipped hook leaves no trace in the history (that is how the Windows port's

@@ -195,7 +195,7 @@ endif()
 # suppressed for real — a set ordering bug left ENGINE_CONTRACT's suppression
 # property expanding to an empty env and 32 reports a run that looked like
 # residue and were just a missing baseline (src/tests/CMakeLists.txt,
-# TSAN_ENV).
+# TEST_ENV, the shared test environment TSAN_ENV feeds).
 # The Rust half is measured by Miri over the semantics layer, on the seam the
 # watcher split made explicit (watcher/apply is libc-free semantics; watcher/fd
 # is real syscalls by design):
