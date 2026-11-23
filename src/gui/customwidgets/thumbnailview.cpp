@@ -96,8 +96,13 @@ void ThumbnailView::createScrollTimeLine() {
     connect(m_scrollTimeLine, &QTimeLine::frameChanged, this, [this](int value) {
         m_scrollFrameTimer.start();
         this->m_centerOn(value);
-        // trigger repaint immediately
-        qApp->processEvents();
+        // paint this frame now, and only paint it: the nested processEvents
+        // this used to be ran every queued event inside a half-finished frame
+        // (a wheel event replacing m_scrollTimeLine under the lines below, a
+        // listing diff rebuilding the window mid-frame). repaint() is
+        // synchronous and runs no event loop, so the frame-time measurement
+        // below still sees the paint cost it throttles on.
+        viewport()->repaint();
         m_lastScrollFrameTime = m_scrollFrameTimer.elapsed();
         if(m_scrollTimeLine->state() == QTimeLine::Running && m_lastScrollFrameTime > m_scrollRefreshRate) {
             m_scrollTimeLine->setPaused(true);

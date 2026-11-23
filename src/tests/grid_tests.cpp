@@ -2,6 +2,7 @@
 #include <utility>
 #include <QSignalSpy>
 #include <QApplication>
+#include <QTimeLine>
 
 #include "core_test_helpers.h"
 #include "testhelpers.h"
@@ -340,6 +341,61 @@ TEST_F(TestGrid, everyWidgetLeavingTheWindowIsDestroyedAndNoneOutlivesItInTheSce
     EXPECT_EQ(stillAlive(before), 0) << "the rebuild kept a widget of the old window";
     EXPECT_GT(thumbnailWidgetsIn(*strip.scene()), 0) << "the rebuild did not re-materialize";
     EXPECT_EQ(trackedThumbnails(*strip.scene()).size(), thumbnailWidgetsIn(*strip.scene()));
+}
+
+// The smooth-scroll frame used to repaint by running the whole event loop
+// (qApp->processEvents()) from inside QTimeLine::frameChanged. Anything
+// queued then ran nested inside a half-finished frame: a wheel event that
+// replaces m_scrollTimeLine while the handler still has lines to run against
+// it, a presenter diff that rebuilds the window mid-frame. A frame paints and
+// returns; queued work runs after it, on the loop's own turn. The probe posts
+// one queued call from inside each frame (the scrollbar's valueChanged fires
+// inside centerOn) and records whether it ran before that frame's handler
+// returned.
+TEST_F(TestGrid, aSmoothScrollFrameRunsNoQueuedWorkInsideItself) {
+    coretest::TestableFolderGridView grid;
+    grid.resize(500, 600);
+    grid.populate(2000);
+    grid.show();
+
+    QTimeLine *timeline = nullptr;
+    bool inFrame = false;
+    int posted = 0, ran = 0, ranInsideAFrame = 0;
+    QObject::connect(grid.verticalScrollBar(), &QScrollBar::valueChanged, &grid, [&] {
+        if(!timeline)
+            return;
+        inFrame = true;
+        ++posted;
+        QMetaObject::invokeMethod(
+            &grid,
+            [&] {
+                ++ran;
+                if(inFrame)
+                    ++ranInsideAFrame;
+            },
+            Qt::QueuedConnection);
+    });
+
+    grid.scrollSmooth(-1500, 1.0, 1.0, false);
+    const QList<QTimeLine *> timelines = grid.findChildren<QTimeLine *>();
+    for(QTimeLine *candidate : timelines)
+        if(candidate->state() == QTimeLine::Running)
+            timeline = candidate;
+    ASSERT_NE(timeline, nullptr) << "scrollSmooth started no timeline";
+    // connected after the view's own handler, so this runs when that returns
+    QObject::connect(timeline, &QTimeLine::frameChanged, &grid, [&] {
+        inFrame = false;
+    });
+
+    ASSERT_TRUE(QTest::qWaitFor(
+        [&] {
+            return timeline->state() == QTimeLine::NotRunning;
+        },
+        5000));
+    QCoreApplication::processEvents(); // drain the last frame's post
+    ASSERT_GT(posted, 0) << "no frame moved the scrollbar — this pin would pass vacuously";
+    EXPECT_EQ(ran, posted);
+    EXPECT_EQ(ranInsideAFrame, 0) << "queued work ran nested inside a scroll frame";
 }
 
 int main(int argc, char **argv) {

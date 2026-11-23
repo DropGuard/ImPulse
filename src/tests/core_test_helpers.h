@@ -310,6 +310,7 @@ class TestableFolderGridView : public FolderGridView {
     using FolderGridView::dragMoveEvent;
     using FolderGridView::dropEvent;
     using FolderGridView::keyPressEvent;
+    using FolderGridView::scrollSmooth;
 };
 
 // a grid-targeted key press over keyPressFor: the crop and grid suites drive
