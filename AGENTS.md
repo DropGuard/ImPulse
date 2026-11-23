@@ -21,7 +21,9 @@ assertion macro in a gtest TU in ANY preprocessor branch — the compile-time
 poison cannot see a branch this platform does not preprocess, R15 single
 thumbnail-window owner — `delete`/`addItem`/`removeItem` in a file that
 handles ThumbnailWidgets belong to `thumbnailwindow.cpp` alone, because a
-QGraphicsWidget lives in the scene's ownership, not the QObject tree)
+QGraphicsWidget lives in the scene's ownership, not the QObject tree, R16
+no gui/ file includes `core.h` — core.h holds the window, so that include
+is a cycle; State and the title assembly live in `appstate.h`)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree

@@ -20,7 +20,10 @@
  * implementation — core.cpp keeps composition, wiring and the display sink.
  */
 
-#include "core.h"
+#include "appstate.h"
+#include "components/directorymodel.h"
+#include "components/directorypresenter.h"
+#include "components/directorymanager/directorymanager.h" // ListingFileChanges
 #include <algorithm>
 #include <utility>
 

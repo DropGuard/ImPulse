@@ -1,7 +1,7 @@
 #include "gui/crop/cropcontroller.h"
 
 // the complete State, for the view-mode gate
-#include "core.h"
+#include "appstate.h"
 
 #include "gui/crop/croppanel.h"
 #include "gui/crop/cropoverlay.h"

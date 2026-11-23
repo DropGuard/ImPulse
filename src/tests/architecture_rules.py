@@ -618,6 +618,24 @@ for path, rel in sources():
                             "every window widget belong to ThumbnailWindow; go through adopt/destroy/"
                             "destroyOutside/clear/rekey")
 
+# Rule 16: the widget tree does not include the composition root. core.h
+# includes the window (gui/mainwindow.h) to hold it, so a gui/ file that
+# includes core.h makes the two headers depend on each other: every edit to
+# Core recompiles the window, and nothing stops a widget from reaching back
+# into Core's commands. The window and the crop controller only ever wanted
+# State and the title assembly; those live in appstate.h, which includes no
+# component and no gui header. Matched on the include line itself.
+CORE_INCLUDE = re.compile(r'^\s*#\s*include\s*"core\.h"')
+for path, rel in sources():
+    if not rel.startswith('gui/'):
+        continue
+    scanned['R16'] = scanned.get('R16', 0) + 1
+    for lineno, line in enumerate(text_of(path).splitlines(), 1):
+        if CORE_INCLUDE.search(line):
+            failures.append(f"R16 gui includes the composition root: {rel}:{lineno} includes core.h \u2014 "
+                            "core.h includes the window, so this closes an include cycle; State and the "
+                            "title assembly are in appstate.h")
+
 if failures:
     print("architecture violations:")
     for f in failures:

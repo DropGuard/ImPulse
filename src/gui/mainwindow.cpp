@@ -1,4 +1,4 @@
-#include "core.h"
+#include "appstate.h"
 #include "mainwindow.h"
 #include "gui/windowshell.h"
 #include "gui/overlayhost.h"
