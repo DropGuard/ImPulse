@@ -16,6 +16,10 @@
 //! unsynchronised counter, reported at its own source line) before the tree
 //! was demoted; see the QIMGV_SANITIZERS block in the root CMakeLists.txt.
 
+// The unsynchronised access below is the test's whole point, not a defect: a
+// SAFETY comment claiming soundness here would be false by construction.
+#![allow(clippy::undocumented_unsafe_blocks)]
+
 #[test]
 #[ignore = "its expected result IS a sanitizer report — run explicitly, see module docs"]
 fn a_deliberately_unsynchronised_counter_is_reported() {

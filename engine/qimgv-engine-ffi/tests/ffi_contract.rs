@@ -6,6 +6,13 @@
 //! (symbols, struct layout, linkage) is verified by
 //! qimgv/tests/test_engine_contract.cpp. One behavior, one owner.
 
+// This file IS a C caller of the ABI: every `unsafe` in it is a call across
+// that boundary whose preconditions are the contract under test (valid handle,
+// NUL-terminated buffer, live user pointer). Restating them per call site would
+// be 35 copies of the same sentence; the library's own `unsafe` carries its
+// SAFETY comments.
+#![allow(clippy::undocumented_unsafe_blocks)]
+
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};

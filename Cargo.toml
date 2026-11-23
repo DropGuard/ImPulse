@@ -13,3 +13,8 @@ kamadak-exif = "0.6"
 inotify = "0.11"
 libc = "0.2"
 
+# The one lint that is a rule rather than a style: every `unsafe` block says why
+# it is sound. Declared here so an editor's clippy and scripts/clippy.sh agree;
+# each crate opts in with `[lints] workspace = true`.
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"

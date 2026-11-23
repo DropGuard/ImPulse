@@ -313,6 +313,25 @@ add_test(NAME ENGINE_RUST
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(ENGINE_RUST PROPERTIES TIMEOUT 600)
 
+# clippy over the Rust tree, with warnings as errors. A ctest and not only a hook
+# stage, for the reason FORMAT_RULES is one: a hook that skips for a missing tool
+# leaves no trace. scripts/clippy.sh exits 77 (SKIP) and names the missing
+# component rather than pretending to have checked, and it also checks the
+# windows-gnu target when that target is installed. It shares the workspace
+# target dir with ENGINE_RUST, so the two must not run at the same time: cargo
+# serializes them on its build-directory lock, and the RESOURCE_LOCK says so.
+find_program(SH_EXECUTABLE sh)
+if(SH_EXECUTABLE)
+    add_test(NAME RUST_CLIPPY
+             COMMAND ${SH_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/clippy.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(RUST_CLIPPY PROPERTIES
+                         TIMEOUT 600
+                         SKIP_RETURN_CODE 77
+                         RESOURCE_LOCK cargo_target_dir)
+    set_tests_properties(ENGINE_RUST PROPERTIES RESOURCE_LOCK cargo_target_dir)
+endif()
+
 # The static-analysis sweep is minutes, not seconds, so it is not in the default
 # ctest run: -DLINT_TESTS=ON adds it for whoever wants the whole gate in one
 # command. Otherwise scripts/lint.py stays the on-demand path, which is what the

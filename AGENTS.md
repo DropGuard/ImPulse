@@ -45,6 +45,10 @@ cmake --build build --target check-crop_tests
 # ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
 # --no-cache forces the full scan.
 python3 scripts/lint.py build --gate
+# clippy, warnings are errors; also the RUST_CLIPPY ctest, so the hook's full
+# ctest run covers it. Rules and exemptions: [workspace.lints.clippy] in the
+# root Cargo.toml and the header of scripts/clippy.sh.
+scripts/clippy.sh
 # style gate over the whole tree. A ctest, not only a hook stage: a hook that
 # skips for a missing tool leaves no trace, which is how the Windows port's
 # fifteen hand-formatted files arrived. Skips (77) and names the missing tool
