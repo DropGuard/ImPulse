@@ -303,12 +303,12 @@ TEST_F(TestGrid, selectingAndFocusingAnOffWindowRowSurvivesVirtualization) {
     grid.resize(500, 600);
     grid.populate(15413);
     grid.show();
-    // far beyond any materialized window
-    const int far = 15000;
-    grid.select(far);
-    EXPECT_EQ(grid.selection(), (QList<int>{far}));
+    // far beyond any materialized window (named farRow: windef.h defines `far` as an empty macro)
+    const int farRow = 15000;
+    grid.select(farRow);
+    EXPECT_EQ(grid.selection(), (QList<int>{farRow}));
     // the arithmetic geometry scrolls to a row that has no widget
-    grid.focusOn(far);
+    grid.focusOn(farRow);
     EXPECT_FALSE(grid.verticalScrollBar()->value() == 0) << "focusOn an off-window row did not scroll";
     // after the scroll, the row's widget is materialized and carries the
     // highlight the selection promised
@@ -316,7 +316,7 @@ TEST_F(TestGrid, selectingAndFocusingAnOffWindowRowSurvivesVirtualization) {
     bool found = false;
     const QList<ThumbnailWidget *> highlighted = coretest::orderedThumbnails(grid);
     for(auto *widget : highlighted)
-        if(widget->rowIndex() == far && widget->isHighlighted())
+        if(widget->rowIndex() == farRow && widget->isHighlighted())
             found = true;
     EXPECT_TRUE(found) << "the selected off-window row did not surface highlighted";
 }
@@ -326,18 +326,18 @@ TEST_F(TestGrid, thumbnailDeliveryToAnOffWindowRowIsDroppedAndReRequestedOnScrol
     grid.resize(500, 600);
     grid.populate(15413);
     grid.show();
-    const int far = 15000;
+    const int farRow = 15000;
     auto thumb = std::make_shared<Thumbnail>(QStringLiteral("far.png"), QString(), 120,
                                              std::make_shared<QImage>(16, 16, QImage::Format_RGB32));
     // no widget at that index: the delivery is dropped, not crashed into
-    grid.setThumbnail(far, thumb);
+    grid.setThumbnail(farRow, thumb);
     // scrolling there materializes the row and re-requests its thumbnail
-    grid.focusOn(far);
+    grid.focusOn(farRow);
     QTest::qWait(50);
     bool found = false;
     const QList<ThumbnailWidget *> materialized = coretest::orderedThumbnails(grid);
     for(auto *widget : materialized)
-        if(widget->rowIndex() == far)
+        if(widget->rowIndex() == farRow)
             found = true;
     EXPECT_TRUE(found) << "the scrolled-to row did not materialize";
 }
