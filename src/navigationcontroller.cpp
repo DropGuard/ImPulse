@@ -13,41 +13,19 @@
 
 #include "navigationcontroller.h"
 
-/*
- * Core's navigation half: path and index loading, the directory walk, the
- * slideshow clock, the mode transitions, and the model reactions that keep
- * the current image pinned to the listing. Same class, partial
- * implementation — core.cpp keeps composition, wiring and the display sink.
- */
-
 #include "appstate.h"
 #include "components/directorymodel.h"
 #include "components/directorypresenter.h"
 #include "components/directorymanager/directorymanager.h" // ListingFileChanges
+#include "gui/icoreview.h"
+#include "gui/ioverlayhost.h"
 #include <algorithm>
 #include <utility>
 
 #include "utils/folderend.h"
 
-#include "gui/windowshell.h"
-#include "gui/overlayhost.h"
-#include "gui/dialoghost.h"
-#include "gui/crop/cropcontroller.h"
-
-#include <QThread>
 #include <QTimer>
-#include <QDrag>
 #include <QFileInfo>
-#include <QTemporaryFile>
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusPendingCall>
-#include <QDBusPendingCallWatcher>
-#include <QDBusPendingReply>
-
-#ifdef _WIN32
-#include <tchar.h>
-#endif
 
 // How long a file must hold the view before its full-res upgrade starts. The
 // dwell is the structural fix for flight-time upgrade zombies (see

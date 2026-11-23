@@ -636,6 +636,75 @@ for path, rel in sources():
                             "core.h includes the window, so this closes an include cycle; State and the "
                             "title assembly are in appstate.h")
 
+
+# R17 controller boundary: the controllers Core composes, and the selection
+# query they share, see the coordinator only through the seams it hands them.
+# None may reach core.h or gui/mainwindow.h through ANY chain of quoted
+# includes, and none may name MW or Core in code. Transitive on purpose: the
+# direct form would have missed the case that motivated the rule —
+# navigationcontroller.cpp still carried gui/crop/cropcontroller.h from its
+# days as part of Core, and that header includes the window. The set is every
+# src/*controller.{h,cpp} plus selectionquery.*, globbed so a new controller
+# is covered the day it lands; the floor is the "rule went blind" alarm.
+import glob as _glob
+_R17_INC = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.M)
+_R17_FORBIDDEN = {os.path.join(SRC, 'core.h'), os.path.join(SRC, 'gui', 'mainwindow.h')}
+
+
+def _r17_resolve(name, frm):
+    for base in (os.path.dirname(frm), SRC):
+        candidate = os.path.normpath(os.path.join(base, name))
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _r17_chain(start):
+    parent = {start: None}
+    stack = [start]
+    while stack:
+        here = stack.pop()
+        if here in _R17_FORBIDDEN:
+            hops = [here]
+            while parent[hops[-1]]:
+                hops.append(parent[hops[-1]])
+            return ' -> '.join(os.path.relpath(h, SRC) for h in reversed(hops))
+        for name in _R17_INC.findall(text_of(here)):
+            found = _r17_resolve(name, here)
+            if found and found not in parent:
+                parent[found] = here
+                stack.append(found)
+    return None
+
+
+def _r17_code(text):
+    # comments and string literals are prose, not a dependency; newlines are
+    # kept so the line numbers stay the file's own
+    blank = lambda m: re.sub(r'[^\n]', ' ', m.group(0))
+    text = re.sub(r'/\*.*?\*/', blank, text, flags=re.S)
+    text = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', text)
+    return re.sub(r'//[^\n]*', '', text)
+
+
+R17_FLOOR = 10  # 10 today: four controllers and the selection query, .h and .cpp
+r17_files = sorted(set(_glob.glob(os.path.join(SRC, '*controller.h')) + _glob.glob(os.path.join(SRC, '*controller.cpp')) +
+                       _glob.glob(os.path.join(SRC, 'selectionquery.*'))))
+if len(r17_files) < R17_FLOOR:
+    failures.append(f"R17 cannot run: {len(r17_files)} controller files found (floor {R17_FLOOR}) — a controller "
+                    "was renamed or moved; fix the glob before trusting the tree")
+for path in r17_files:
+    scanned['R17'] = scanned.get('R17', 0) + 1
+    rel = os.path.relpath(path, SRC)
+    via = _r17_chain(path)
+    if via:
+        failures.append(f"R17 a controller reaches the composition root: {via} — a controller sees the "
+                        "coordinator through the seams it is handed (INavigationHost, ICoreView, IOverlayHost, "
+                        "...), never through core.h or the window")
+    for lineno, line in enumerate(_r17_code(text_of(path)).splitlines(), 1):
+        named = re.search(r'\b(MW|Core)\b', line)
+        if named:
+            failures.append(f"R17 a controller names {named.group(1)}: {rel}:{lineno} — ask through a seam instead")
+
 if failures:
     print("architecture violations:")
     for f in failures:

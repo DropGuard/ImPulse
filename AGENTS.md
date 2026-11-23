@@ -23,7 +23,11 @@ thumbnail-window owner — `delete`/`addItem`/`removeItem` in a file that
 handles ThumbnailWidgets belong to `thumbnailwindow.cpp` alone, because a
 QGraphicsWidget lives in the scene's ownership, not the QObject tree, R16
 no gui/ file includes `core.h` — core.h holds the window, so that include
-is a cycle; State and the title assembly live in `appstate.h`)
+is a cycle; State and the title assembly live in `appstate.h`, R17
+controller boundary — every `src/*controller.*` and `selectionquery.*`
+reaches neither `core.h` nor `gui/mainwindow.h` through any chain of
+includes and names neither `MW` nor `Core` in code: a controller sees the
+coordinator only through the seams it is handed)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree
