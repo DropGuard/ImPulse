@@ -24,6 +24,7 @@ target_sources(qimgv_gui PRIVATE
     customwidgets/spinboxinputfix.cpp
     customwidgets/thumbnailview.cpp
     customwidgets/thumbnailwidget.cpp
+    customwidgets/thumbnailwindow.cpp
     customwidgets/videoslider.cpp
     customwidgets/pushbuttonfocusind.cpp
     customwidgets/styledcombobox.cpp

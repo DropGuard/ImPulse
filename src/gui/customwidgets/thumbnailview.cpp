@@ -272,25 +272,11 @@ void ThumbnailView::applyRows(const QList<DirectoryViewRow> &rows) {
 
     // rekey the materialized widgets: a widget follows its row, whatever the
     // window does. A new index claimed by two rows (a presenter diff that
-    // named one previousIndex twice) is a malformed plan: the loser is
-    // destroyed, because QHash::insert would otherwise overwrite the
-    // key and leak a still-in-scene widget as a ghost the window never
-    // tracks again.
-    QHash<int, ThumbnailWidget *> rekeyed;
-    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw) {
-        const int newIndex = itw.key() < newIndices.size() ? newIndices[itw.key()] : -1;
-        if(newIndex < 0 || newIndex >= m_rowCount) {
-            delete itw.value();
-            continue;
-        }
-        ThumbnailWidget *widget = itw.value();
-        widget->setRowIndex(newIndex);
-        placeWidget(widget, newIndex);
-        if(auto *previous = rekeyed.value(newIndex, nullptr))
-            delete previous;
-        rekeyed.insert(newIndex, widget);
-    }
-    m_visible = std::move(rekeyed);
+    // named one previousIndex twice) is a malformed plan; the window destroys
+    // the loser rather than leaking it into the scene as a ghost.
+    m_visible.rekey(newIndices, m_rowCount);
+    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
+        placeWidget(itw.value(), itw.key());
 
     // per-row state over the materialized window: renames and invalidation
     for(int index = 0; index < rows.size(); ++index) {
@@ -318,42 +304,29 @@ int ThumbnailView::previousSizeFor(const QList<DirectoryViewRow> &rows) {
 
 void ThumbnailView::materializeWindow() {
     if(m_rowCount == 0) {
-        for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
-            delete itw.value();
         m_visible.clear();
         return;
     }
     const int first = qBound(0, materializeFirst(), m_rowCount - 1);
     const int last = qBound(first, materializeLast(), m_rowCount - 1);
-    // destroy out-of-window widgets
-    for(auto itw = m_visible.begin(); itw != m_visible.end();) {
-        if(itw.key() < first || itw.key() > last) {
-            delete itw.value();
-            itw = m_visible.erase(itw);
-        } else {
-            ++itw;
-        }
-    }
+    m_visible.destroyOutside(first, last);
     // create in-window widgets with their full state
     for(int index = first; index <= last; ++index) {
         if(m_visible.contains(index))
             continue;
         ThumbnailWidget *widget = createThumbnailWidget();
-        widget->setRowIndex(index);
-        m_scene.addItem(widget);
+        m_visible.adopt(index, widget);
         placeWidget(widget, index);
         widget->setHighlighted(m_selection.contains(index));
         if(m_dragHoverIndex == index)
             widget->setDropHovered(true);
         if(m_invalidated.contains(index))
             widget->invalidateThumbnail();
-        m_visible.insert(index, widget);
     }
 }
 
 void ThumbnailView::destroyVisible(int index) {
-    if(auto *widget = m_visible.take(index))
-        delete widget;
+    m_visible.destroy(index);
 }
 
 ThumbnailWidget *ThumbnailView::createThumbnailWidget() {

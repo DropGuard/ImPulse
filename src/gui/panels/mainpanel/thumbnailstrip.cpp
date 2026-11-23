@@ -114,8 +114,6 @@ void ThumbnailStrip::focusOnSelection() {
 // a config change reconfigures every materialized widget wholesale: destroy
 // the window and let it re-materialize with the new padding/margins/style
 void ThumbnailStrip::rebuildWindow() {
-    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
-        delete itw.value();
     m_visible.clear();
     updateSceneExtent();
     loadVisibleThumbnails();

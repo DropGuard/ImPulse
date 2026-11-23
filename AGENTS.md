@@ -18,7 +18,10 @@ nothing, so the global table owns no token a scope table claims, R13 no-suite-
 spawns-itself — per-test process isolation is the test framework's job now,
 and the one thing that can re-enter a test is banned by name, R14 no QTest
 assertion macro in a gtest TU in ANY preprocessor branch — the compile-time
-poison cannot see a branch this platform does not preprocess)
+poison cannot see a branch this platform does not preprocess, R15 single
+thumbnail-window owner — `delete`/`addItem`/`removeItem` in a file that
+handles ThumbnailWidgets belong to `thumbnailwindow.cpp` alone, because a
+QGraphicsWidget lives in the scene's ownership, not the QObject tree)
 — **structural rules live in the
 test suites, not in prose**. Two ownership rules are absolute and are
 enforced by construction rather than by discipline: the QObject parent tree

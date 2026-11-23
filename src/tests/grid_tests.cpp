@@ -274,6 +274,74 @@ TEST_F(TestGrid, snapshotMovesReuseWidgetsAndOnlyInvalidateChangedContent) {
     EXPECT_EQ(grid.selection(), (QList<int>{2, 0}));
 }
 
+namespace {
+int thumbnailWidgetsIn(const QGraphicsScene &scene) {
+    int count = 0;
+    const QList<QGraphicsItem *> sceneItems = scene.items(); // named: no detach
+    for(QGraphicsItem *item : sceneItems)
+        if(dynamic_cast<ThumbnailWidget *>(item))
+            ++count;
+    return count;
+}
+
+QList<QPointer<ThumbnailWidget>> trackedThumbnails(const QGraphicsScene &scene) {
+    QList<QPointer<ThumbnailWidget>> tracked;
+    const QList<QGraphicsItem *> sceneItems = scene.items();
+    for(QGraphicsItem *item : sceneItems)
+        if(auto *widget = dynamic_cast<ThumbnailWidget *>(item))
+            tracked << widget;
+    return tracked;
+}
+
+int stillAlive(const QList<QPointer<ThumbnailWidget>> &tracked) {
+    int alive = 0;
+    for(const auto &widget : tracked)
+        if(widget)
+            ++alive;
+    return alive;
+}
+} // namespace
+
+// The materialized window has one owner, ThumbnailWindow: a widget leaving it
+// is out of the scene and dead, and nothing in the scene is a widget the
+// window does not hold. The three ways a whole window goes away — the
+// listing emptying, the strip's settings rebuild, the view's own death — used
+// to be three hand-written delete loops in three files; this pins what each
+// must leave behind, whichever code does it.
+TEST_F(TestGrid, everyWidgetLeavingTheWindowIsDestroyedAndNoneOutlivesItInTheScene) {
+    auto *grid = new coretest::TestableFolderGridView();
+    grid->resize(500, 600);
+    grid->populate(200);
+    grid->show();
+    QList<QPointer<ThumbnailWidget>> first = trackedThumbnails(*grid->scene());
+    ASSERT_FALSE(first.isEmpty()) << "nothing materialized — this pin would pass vacuously";
+
+    // the listing empties: every widget is gone, and the scene holds none
+    grid->populate(0);
+    EXPECT_EQ(stillAlive(first), 0) << "a widget outlived its row leaving the listing";
+    EXPECT_EQ(thumbnailWidgetsIn(*grid->scene()), 0) << "an orphan widget stayed in the scene";
+
+    // and the view's death takes the re-materialized window with it
+    grid->populate(200);
+    QList<QPointer<ThumbnailWidget>> second = trackedThumbnails(*grid->scene());
+    ASSERT_FALSE(second.isEmpty());
+    delete grid;
+    EXPECT_EQ(stillAlive(second), 0) << "a widget outlived its view";
+
+    // the strip's settings rebuild replaces the window wholesale: the old
+    // widgets are dead and the scene holds exactly the new window
+    ThumbnailStrip strip;
+    strip.resize(800, 140);
+    strip.populate(100);
+    strip.show();
+    QList<QPointer<ThumbnailWidget>> before = trackedThumbnails(*strip.scene());
+    ASSERT_FALSE(before.isEmpty()) << "the strip materialized nothing";
+    strip.readSettings();
+    EXPECT_EQ(stillAlive(before), 0) << "the rebuild kept a widget of the old window";
+    EXPECT_GT(thumbnailWidgetsIn(*strip.scene()), 0) << "the rebuild did not re-materialize";
+    EXPECT_EQ(trackedThumbnails(*strip.scene()).size(), thumbnailWidgetsIn(*strip.scene()));
+}
+
 int main(int argc, char **argv) {
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication app(argc, argv);

@@ -583,6 +583,41 @@ for path, rel in sources():
             break
     scanned['R14'] = scanned.get('R14', 0) + 1
 
+# Rule 15: the materialized thumbnail window has one owner, ThumbnailWindow.
+# A QGraphicsWidget lives outside the QObject parent tree: the scene owns it
+# after addItem and deletes what is left at its own death, so a second
+# deleter is a double free and a forgotten removeItem is a ghost in the scene.
+# The window used to be a bare QHash with seven delete sites across three
+# files, each relying on the same unwritten rule; the rule is code now, and
+# this keeps it the only code. Every file that names ThumbnailWidget (matched
+# case-insensitively: rule 9 of AGENTS.md) may not `delete`, `addItem` or
+# `removeItem` — those verbs belong to thumbnailwindow.cpp alone. A deleted
+# special member (`= delete`) is a declaration, not a deletion, and passes.
+THUMB_WIDGET_NAME = re.compile(r'thumbnailwidget', re.IGNORECASE)
+OWNERSHIP_VERB = re.compile(r'\bdelete\b|\b(?:addItem|removeItem)\s*\(')
+DELETED_MEMBER = re.compile(r'=\s*delete\b')
+WINDOW_OWNER = 'gui/customwidgets/thumbnailwindow.cpp'
+for path, rel in sources():
+    if rel.startswith('tests'):
+        continue
+    text = text_of(path)
+    if not THUMB_WIDGET_NAME.search(text):
+        continue
+    scanned['R15'] = scanned.get('R15', 0) + 1
+    if rel == WINDOW_OWNER:
+        continue
+    for lineno, line in enumerate(text.splitlines(), 1):
+        stripped = line.lstrip()
+        if stripped.startswith(('*', '/*')):
+            continue
+        code = DELETED_MEMBER.sub('', line.split('//')[0])
+        hit = OWNERSHIP_VERB.search(code)
+        if hit:
+            failures.append(f"R15 second window owner: {rel}:{lineno} uses '{hit.group(0).rstrip('( ')}' in a "
+                            "file that handles ThumbnailWidgets — the scene membership and lifetime of "
+                            "every window widget belong to ThumbnailWindow; go through adopt/destroy/"
+                            "destroyOutside/clear/rekey")
+
 if failures:
     print("architecture violations:")
     for f in failures:

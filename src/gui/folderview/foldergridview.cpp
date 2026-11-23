@@ -24,8 +24,8 @@ FolderGridView::FolderGridView(QWidget *parent) : ThumbnailView(Qt::Vertical, pa
 }
 
 FolderGridView::~FolderGridView() {
-    for(auto itw = m_visible.constBegin(); itw != m_visible.constEnd(); ++itw)
-        delete itw.value();
+    // the window would clear itself at the base's death; doing it here keeps
+    // the old timing — the widgets die while this subclass is still whole
     m_visible.clear();
 }
 

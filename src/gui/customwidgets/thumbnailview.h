@@ -24,6 +24,7 @@
 #include <QSet>
 
 #include "gui/customwidgets/thumbnailwidget.h"
+#include "gui/customwidgets/thumbnailwindow.h"
 #include "gui/idirectoryview.h"
 #include "shortcutbuilder.h"
 
@@ -107,12 +108,11 @@ class ThumbnailView : public QGraphicsView, public IDirectoryView {
     int m_rowCount = 0;
     QSet<int> m_invalidated;
     // the materialized window: widgets for rows near the viewport only.
-    // Ownership: m_visible is the SOLE deleter. The scene holds the items
-    // after addItem (and would delete them at its own death), but a
-    // QGraphicsItem's destructor deregisters it from its scene, so the
-    // window's eager deletes compose with scene ownership — as long as no
-    // second path ever deletes one and no one touches one past deletion.
-    QHash<int, ThumbnailWidget *> m_visible;
+    // Ownership is the window type's, and only its: it puts each widget into
+    // the scene, re-keys it, and removes it from the scene before deleting
+    // it (R15 holds every other file to that). Declared after m_scene, so it
+    // dies first and deletes its widgets while their scene still exists.
+    ThumbnailWindow m_visible{m_scene};
     int m_dragHoverIndex = -1;
 
     QScrollBar *m_scrollBar;
