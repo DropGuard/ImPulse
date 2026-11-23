@@ -80,22 +80,32 @@ class OrderJob : public PoolJob {
 };
 
 // spins inside run() until the cancel mark arrives — the deterministic
-// stand-in for "cancel() fired while this job was running"
+// stand-in for "cancel() fired while this job was running". The spin carries
+// a deadline past every wait this file makes: an aborted test function never
+// reaches the matching cancel, and an abandoned spinning job would wedge the
+// pool's join forever — a ctest timeout that buries the failed assert naming
+// the real cause. The CI timeout on cancelSparesOtherOwners was exactly that.
 class CancelGatedJob : public PoolJob {
   public:
-    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_deaths) : m_sawMark(_sawMark), m_deaths(_deaths) {
+    CancelGatedJob(std::atomic_bool *_sawMark, std::atomic_int *_starts, std::atomic_int *_deaths)
+        : m_sawMark(_sawMark), m_starts(_starts), m_deaths(_deaths) {
     }
     ~CancelGatedJob() override {
         m_deaths->fetch_add(1);
     }
     void run() override {
-        while(!cancelRequested())
+        m_starts->fetch_add(1);
+        // 15000 × 1ms ≫ the 10s ASSERT_TRY_EQ_TIMEOUT ceilings, so a mark that
+        // will ever arrive wins the race against this deadline
+        for(int i = 0; i < 15000 && !cancelRequested(); ++i)
             QThread::msleep(1);
-        m_sawMark->store(true);
+        if(cancelRequested())
+            m_sawMark->store(true);
     }
 
   private:
     std::atomic_bool *m_sawMark;
+    std::atomic_int *m_starts;
     std::atomic_int *m_deaths;
 };
 
@@ -301,10 +311,13 @@ TEST_F(TestWorkerPool, cancelReachesQueuedJobs) {
 
 TEST_F(TestWorkerPool, cancelReachesAJobInsideRun) {
     std::atomic_bool sawMark{false};
-    std::atomic_int deaths{0};
+    std::atomic_int starts{0}, deaths{0};
     WorkerPool pool(1);
-    pool.submit(PoolOwner::Loader, 0, std::make_unique<CancelGatedJob>(&sawMark, &deaths));
-    QThread::msleep(50); // it is inside run(), spinning on the mark
+    pool.submit(PoolOwner::Loader, 0, std::make_unique<CancelGatedJob>(&sawMark, &starts, &deaths));
+    // it is inside run(), spinning on the mark — cancelling before the pop
+    // would discard the job at the checkpoint instead of marking it, and this
+    // test pins the running-job path, not the queued one
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 1, 10000);
     pool.cancel(PoolOwner::Loader);
     // this is the waitForOwner the consumers' clearTasks/dtor pair leans on:
     // it can only return once the running record was retired, so a record
@@ -316,11 +329,15 @@ TEST_F(TestWorkerPool, cancelReachesAJobInsideRun) {
 
 TEST_F(TestWorkerPool, cancelSparesOtherOwners) {
     std::atomic_bool loaderMark{false}, scalerMark{false};
-    std::atomic_int deaths{0};
+    std::atomic_int starts{0}, deaths{0};
     WorkerPool pool(2);
-    pool.submit(PoolOwner::Loader, 0, std::make_unique<CancelGatedJob>(&loaderMark, &deaths));
-    pool.submit(PoolOwner::Scaler, 0, std::make_unique<CancelGatedJob>(&scalerMark, &deaths));
-    QThread::msleep(50);
+    pool.submit(PoolOwner::Loader, 0, std::make_unique<CancelGatedJob>(&loaderMark, &starts, &deaths));
+    pool.submit(PoolOwner::Scaler, 0, std::make_unique<CancelGatedJob>(&scalerMark, &starts, &deaths));
+    // both jobs confirmed inside run() before any cancel: a mark landing on a
+    // queued job discards it at the pop checkpoint, loaderMark would never
+    // rise, and the aborted test function would leave the other job spinning
+    // into the pool's join (the Windows CI timeout, 300s of nothing)
+    ASSERT_TRY_EQ_TIMEOUT(starts.load(), 2, 10000);
     pool.cancel(PoolOwner::Loader);
     ASSERT_TRY_EQ_TIMEOUT(loaderMark.load(), true, 10000);
     QThread::msleep(100);
