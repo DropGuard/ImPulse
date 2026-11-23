@@ -47,3 +47,6 @@ __pycache__/
 *.pyo
 # an editor's per-project scaffolding, created in whatever repo it is opened on
 .perch/
+
+# aqtinstall writes its log into the cwd
+aqtinstall.log
