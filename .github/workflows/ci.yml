@@ -171,7 +171,7 @@ jobs:
           CXX: g++-12
         run: |
           cmake -S . -B build-appimage -G Ninja -DCMAKE_BUILD_TYPE=Release \
-           
+            -DCMAKE_PREFIX_PATH=/opt/qt/6.10.2/gcc_64
           cmake --build build-appimage -j$(nproc)
       - name: assemble the AppDir
         run: |
