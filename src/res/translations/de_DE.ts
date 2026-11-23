@@ -145,16 +145,6 @@
         <translation>Zuschneiden</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>Datei gespeichert</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>Datei konnte nicht gespeichert werden</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>Bild konnte nicht geöffnet werden</translation>
@@ -259,6 +249,17 @@
     <message>
         <source>Save File as...</source>
         <translation>Speichere Datei als...</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>Datei konnte nicht gespeichert werden</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>Datei gespeichert</translation>
     </message>
 </context>
 <context>

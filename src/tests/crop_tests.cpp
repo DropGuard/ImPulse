@@ -332,7 +332,7 @@ TEST_F(TestCrop, cropAndSaveWritesTheCroppedFile) {
         },
         10000));
 
-    core.cropAndSave(QRect(0, 0, 8, 8));
+    core.editing().cropAndSave(QRect(0, 0, 8, 8));
 
     EXPECT_EQ(QImage(img).size(), QSize(8, 8)); // cropped AND saved to disk
     EXPECT_EQ(fake.confirmCalls, 0);            // cropAndSave bypasses the confirmation

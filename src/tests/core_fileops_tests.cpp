@@ -591,7 +591,7 @@ TEST_F(TestCoreFileOps, saveRequestTravelingTheInjectedHostWritesTheEdit) {
     // an in-memory crop: the disk still carries the full-size file (a
     // uniform-color fixture would make flipH byte-identical, so the edit
     // must be one a file diff can see)
-    core().crop(QRect(0, 0, 6, 8));
+    core().editing().crop(QRect(0, 0, 6, 8));
     EXPECT_EQ(QImage(img).size(), QSize(8, 8));
     // the edit itself lit the prompt (the edited-state nudge); the leg
     // under test is measured from a clean slate
@@ -827,7 +827,7 @@ TEST_F(TestCoreFileOps, externalModificationFollowsTheDiskButNeverClobbersEdits)
     // edge detector. This pins the whole contract — announce the
     // divergence once, keep the edit, land no repaint — without betting
     // on watcher latency.
-    core().flipH();
+    core().editing().flipH();
     EXPECT_TRUE(core().directoryModel()->getImage(file)->isEdited());
     const int showCallsBefore = m_view.showImageCalls;
     QImage other(4, 4, QImage::Format_RGB32);
@@ -910,7 +910,7 @@ TEST_F(TestCoreFileOps, pendingSurfacesLockFolderEntryAndNavigation) {
         EXPECT_EQ(core().currentFilePath(), b)
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
-    core().flipH();
+    core().editing().flipH();
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -922,7 +922,7 @@ TEST_F(TestCoreFileOps, pendingSurfacesLockFolderEntryAndNavigation) {
     }
     EXPECT_TRUE(!core().loadPath(b)); // the walk away is denied: the edit is uncommitted
     EXPECT_EQ(core().currentFilePath(), b);
-    core().discardEdits();
+    core().editing().discardEdits();
     EXPECT_TRUE(core().loadPath(b)); // resolved by discard
 }
 

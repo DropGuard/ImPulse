@@ -210,7 +210,7 @@ TEST_F(TestSlideshow, editingIsRefusedWhileTheSlideshowRuns) {
     EXPECT_TRUE(core().viewState().slideshow);
     const int messagesBefore = m_overlays.messageCalls;
 
-    core().flipH();
+    core().editing().flipH();
     EXPECT_TRUE(!img->isEdited()) << "the edit landed while the slideshow was running";
     EXPECT_EQ(m_overlays.messageCalls, messagesBefore + 1);
     EXPECT_TRUE(m_overlays.lastMessage.contains(QStringLiteral("Stop the slideshow")))
@@ -220,13 +220,13 @@ TEST_F(TestSlideshow, editingIsRefusedWhileTheSlideshowRuns) {
 
     // the refusal is the state's, not flipH's: another edit verb goes
     // through the same gate
-    core().rotateRight();
+    core().editing().rotateRight();
     EXPECT_EQ(m_overlays.messageCalls, messagesBefore + 2);
     EXPECT_TRUE(!img->isEdited());
 
     // stopping the slideshow is the whole resolution — nothing else
     core().stopSlideshow();
-    core().flipH();
+    core().editing().flipH();
     // Re-read: an edit is a draft the model holds against the path, and
     // getImage() answers with it. The pointer captured at the top is the
     // ORIGINAL, which an edit does not mutate in place.

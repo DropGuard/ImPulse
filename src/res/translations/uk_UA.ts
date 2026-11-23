@@ -145,16 +145,6 @@
         <translation>Обрізати</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>Файл збережено</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>Не вдалос зберегти файл</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>Не вдалося відкрити зображення</translation>
@@ -258,6 +248,17 @@
     <message>
         <source>Save File as...</source>
         <translation>Зберегти файл як...</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>Не вдалос зберегти файл</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>Файл збережено</translation>
     </message>
 </context>
 <context>

@@ -268,7 +268,7 @@ TEST_F(TestGuiWidgets, pendingRegistryHoldsOnlyTypedButUnsubmittedInput) {
 
     // the crop surface: pending only once the crop is APPLIED, and then
     // through isEdited(), not through the registry
-    core.toggleCropPanel();
+    core.editing().toggleCropPanel();
     EXPECT_TRUE(core.mainWindow()->crop()->isActive());
     EXPECT_TRUE(!overlays->hasPendingSurface()) << "the crop surface registered as pending: an unapplied "
                                                    "selection loses nothing when the walk moves on";

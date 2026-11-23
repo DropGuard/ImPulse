@@ -145,16 +145,6 @@
         <translation>Recadrer</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>Fichier enregistré</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>Impossible d&apos;enregistrer le fichier</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>Impossible d&apos;ouvrir l&apos;image</translation>
@@ -258,6 +248,17 @@
     <message>
         <source>Save File as...</source>
         <translation>Enregistrer le fichier sous...</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>Impossible d&apos;enregistrer le fichier</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>Fichier enregistré</translation>
     </message>
 </context>
 <context>

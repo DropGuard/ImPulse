@@ -165,16 +165,6 @@
         <translation>Kırp</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>Dosya kaydedildi</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>Dosya kaydedilemedi</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>Görüntü açılamadı</translation>
@@ -278,6 +268,17 @@
     <message>
         <source>Save File as...</source>
         <translation>Dosyayı farklı kaydet...</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>Dosya kaydedilemedi</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>Dosya kaydedildi</translation>
     </message>
 </context>
 <context>

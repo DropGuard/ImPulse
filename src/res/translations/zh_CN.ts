@@ -149,16 +149,6 @@
         <translation>裁剪</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>文件已保存</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>不能保存文件</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>不能打开图片</translation>
@@ -262,6 +252,17 @@
     <message>
         <source>Save File as...</source>
         <translation>文件另存为...</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>不能保存文件</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>文件已保存</translation>
     </message>
 </context>
 <context>

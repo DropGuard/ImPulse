@@ -102,7 +102,7 @@ target_sources(qimgv_gui PRIVATE
     navigationcontroller.cpp
     fileopscontroller.cpp
     selectionquery.cpp
-    core_editing.cpp
+    editcontroller.cpp
     transfercontroller.cpp
     proxystyle.cpp
     resources.qrc

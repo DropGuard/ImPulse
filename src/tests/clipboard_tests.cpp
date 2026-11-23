@@ -171,7 +171,7 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
     // an edited image is written to a uniquely-named temp file and the url
     // points at what was written — never at the one fixed name two
     // concurrent consumers used to share
-    core.flipH();
+    core.editing().flipH();
     EXPECT_TRUE(waitLoaded(core));
     core.transfer().copyFileClipboard();
     const QUrl editedUrl = QApplication::clipboard()->mimeData()->urls().constFirst();
@@ -189,7 +189,7 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
     // copying again replaces the clipboard entry, and the entry the file is
     // owned by dies with the replacement: a new unique name, and the old
     // file autoremoved — unique names without accumulating litter
-    core.flipV();
+    core.editing().flipV();
     EXPECT_TRUE(waitLoaded(core));
     core.transfer().copyFileClipboard();
     const QString secondPath = QApplication::clipboard()->mimeData()->urls().constFirst().toLocalFile();

@@ -155,16 +155,6 @@
         <translation>切り抜き</translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1058"/>
-        <source>File saved</source>
-        <translation>ファイルが保存されました</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1061"/>
-        <source>Could not save file</source>
-        <translation>ファイルを保存できませんでした</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1171"/>
         <source>Could not open image</source>
         <translation>画像を開けませんでした</translation>
@@ -268,6 +258,17 @@
     <message>
         <source>Save File as...</source>
         <translation>名前を付けてファイルを保存</translation>
+    </message>
+</context>
+<context>
+    <name>EditController</name>
+    <message>
+        <source>Could not save file</source>
+        <translation>ファイルを保存できませんでした</translation>
+    </message>
+    <message>
+        <source>File saved</source>
+        <translation>ファイルが保存されました</translation>
     </message>
 </context>
 <context>

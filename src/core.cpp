@@ -76,14 +76,16 @@ Core::Core(const Deps &deps)
                                      this);
     m_fileOps = new FileOpsController(m_state, m_selection, this, m_view, m_dialogs, m_ui, m_overlays, this);
     m_transfer = new TransferController(m_selection, *m_nav, *m_fileOps, m_dialogs, m_overlays, this);
+    m_editing =
+        new EditController(m_state, m_selection, *m_nav, this, m_dialogs, m_overlays, m_crop, m_mw != nullptr, this);
     // the seam census — deliberately NOT Q_ASSERT, which compiles out of the
     // Release build this tree ships. A seam wired in one construction branch
     // only (nav_, in its day) must stay loud in every build shape, and the
     // message must say which seam set to inspect. crop_ is the documented
     // optional (crop-flow tests provide it); everything else is mandatory.
-    if(!m_ui || !m_view || !m_overlays || !m_dialogs || !m_nav || !m_fileOps || !m_transfer)
+    if(!m_ui || !m_view || !m_overlays || !m_dialogs || !m_nav || !m_fileOps || !m_transfer || !m_editing)
         qFatal("Core construction left a seam null (the census checks ui_, view_, overlays_, dialogs_, nav_, "
-               "fileOps_, transfer_) — "
+               "fileOps_, transfer_, editing_) — "
                "every seam must be wired in both construction branches");
     // the slideshow loop is a pure function of the state: slides advance by
     // timer, normal viewing loops. The relay rides the state binding and goes
@@ -191,6 +193,7 @@ void Core::attachModel(DirectoryModel *_model) {
     m_selection.attachModel(_model);
     m_fileOps->attachModel(_model);
     m_transfer->attachModel(_model);
+    m_editing->attachModel(_model);
 }
 
 void Core::initComponents() {
@@ -208,10 +211,10 @@ void Core::connectComponents() {
 
     connect(m_overlays, &IOverlayHost::copyRequested, m_fileOps, &FileOpsController::copyCurrentFile);
     connect(m_overlays, &IOverlayHost::moveRequested, m_fileOps, &FileOpsController::moveCurrentFile);
-    connect(m_overlays, &IOverlayHost::saveAsClicked, this, &Core::requestSavePath);
-    connect(m_overlays, &IOverlayHost::saveRequested, this, &Core::saveCurrentFile);
+    connect(m_overlays, &IOverlayHost::saveAsClicked, m_editing, &EditController::requestSavePath);
+    connect(m_overlays, &IOverlayHost::saveRequested, m_editing, &EditController::saveCurrentFile);
     connect(m_overlays, &IOverlayHost::renameRequested, m_fileOps, &FileOpsController::renameCurrentSelection);
-    connect(m_overlays, &IOverlayHost::discardEditsRequested, this, &Core::discardEdits);
+    connect(m_overlays, &IOverlayHost::discardEditsRequested, m_editing, &EditController::discardEdits);
 
     connect(m_model->scaler.get(), &Scaler::scalingFinished, this, &Core::onScalingFinished);
     connect(m_model.get(), &DirectoryModel::editDraftWriteFailed, this, [this] {
@@ -240,25 +243,25 @@ void Core::connectWindowComponents() {
     m_thumbPanelPresenter.setView(m_mw->getThumbnailPanel());
     m_folderViewPresenter.setView(m_mw->getFolderView());
     connect(m_mw->dialogs(), &DialogHost::opened, m_nav, &NavigationController::loadPath);
-    connect(m_mw->crop(), &CropController::cropRequested, this, &Core::crop);
-    connect(m_mw->crop(), &CropController::cropAndSaveRequested, this, &Core::cropAndSave);
-    connect(m_mw->dialogs(), &DialogHost::resizeRequested, this, &Core::resize);
+    connect(m_mw->crop(), &CropController::cropRequested, m_editing, &EditController::crop);
+    connect(m_mw->crop(), &CropController::cropAndSaveRequested, m_editing, &EditController::cropAndSave);
+    connect(m_mw->dialogs(), &DialogHost::resizeRequested, m_editing, &EditController::resize);
 }
 
 void Core::initActions() {
     actionManager->connectAction("nextImage", m_nav, &NavigationController::nextImage);
     actionManager->connectAction("prevImage", m_nav, &NavigationController::prevImage);
-    actionManager->connectAction("resize", this, &Core::showResizeDialog);
-    actionManager->connectAction("flipH", this, &Core::flipH);
-    actionManager->connectAction("flipV", this, &Core::flipV);
-    actionManager->connectAction("rotateLeft", this, &Core::rotateLeft);
-    actionManager->connectAction("rotateRight", this, &Core::rotateRight);
-    actionManager->connectAction("crop", this, &Core::toggleCropPanel);
+    actionManager->connectAction("resize", m_editing, &EditController::showResizeDialog);
+    actionManager->connectAction("flipH", m_editing, &EditController::flipH);
+    actionManager->connectAction("flipV", m_editing, &EditController::flipV);
+    actionManager->connectAction("rotateLeft", m_editing, &EditController::rotateLeft);
+    actionManager->connectAction("rotateRight", m_editing, &EditController::rotateRight);
+    actionManager->connectAction("crop", m_editing, &EditController::toggleCropPanel);
     actionManager->connectAction("setWallpaper", this, &Core::setWallpaper);
     actionManager->connectAction("open", m_fileOps, &FileOpsController::showOpenDialog);
-    actionManager->connectAction("recoverEdits", this, &Core::recoverEdits);
-    actionManager->connectAction("save", this, &Core::saveCurrentFile);
-    actionManager->connectAction("saveAs", this, &Core::requestSavePath);
+    actionManager->connectAction("recoverEdits", m_editing, &EditController::recoverEdits);
+    actionManager->connectAction("save", m_editing, &EditController::saveCurrentFile);
+    actionManager->connectAction("saveAs", m_editing, &EditController::requestSavePath);
     actionManager->connectAction("exit", this, &Core::close);
     actionManager->connectAction("removeFile", m_fileOps, &FileOpsController::removePermanent);
     actionManager->connectAction("moveToTrash", m_fileOps, &FileOpsController::moveToTrash);
@@ -286,7 +289,7 @@ void Core::initActions() {
     actionManager->connectAction("showInDirectory", m_fileOps, &FileOpsController::showInDirectory);
     actionManager->connectAction("toggleSlideshow", m_nav, &NavigationController::toggleSlideshow);
     actionManager->connectAction("goUp", m_nav, &NavigationController::loadParentDir);
-    actionManager->connectAction("discardEdits", this, &Core::discardEdits);
+    actionManager->connectAction("discardEdits", m_editing, &EditController::discardEdits);
     actionManager->connectAction("nextDirectory", m_nav, &NavigationController::nextDirectory);
     actionManager->connectAction("prevDirectory", m_nav, qOverload<>(&NavigationController::prevDirectory));
     actionManager->connectAction("print", this, &Core::print);

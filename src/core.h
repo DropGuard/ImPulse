@@ -23,6 +23,7 @@
 #include "fileopscontroller.h"
 #include "selectionquery.h"
 #include "transfercontroller.h"
+#include "editcontroller.h"
 #include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
@@ -115,6 +116,7 @@ class Core : public QObject, public INavigationHost {
         m_overlays = host;
         m_fileOps->setOverlayHost(host);
         m_transfer->setOverlayHost(host);
+        m_editing->setOverlayHost(host);
     }
     IOverlayHost *overlayHost() const {
         return m_overlays;
@@ -162,6 +164,10 @@ class Core : public QObject, public INavigationHost {
     // The clipboard and drag-and-drop, driven the same way.
     TransferController &transfer() const {
         return *m_transfer;
+    }
+    // The edits and the save contract, driven the same way.
+    EditController &editing() const {
+        return *m_editing;
     }
 
     // The folder view's presenter, for the tests that drive grid commands and
@@ -253,6 +259,8 @@ class Core : public QObject, public INavigationHost {
     FileOpsController *m_fileOps = nullptr;
     // the clipboard and drag-and-drop: the same ownership again
     TransferController *m_transfer = nullptr;
+    // the edits and the save contract: the same ownership again
+    EditController *m_editing = nullptr;
 
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
@@ -276,18 +284,10 @@ class Core : public QObject, public INavigationHost {
     // reads State and the folder presenter; declared after both
     SelectionQuery m_selection{m_state, m_folderViewPresenter};
 
-    void rotateByDegrees(int degrees);
-
     QTranslator *m_translator = nullptr;
 
     void attachModel(DirectoryModel *_model);
     void guiSetImage(std::shared_ptr<Image> img) override;
-    bool saveFile(const QString &filePath, const QString &newPath);
-    bool saveFile(const QString &filePath);
-
-    template <typename... Args>
-    void edit_template(const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
-                       Args &&...as);
 
   public slots:
     // ---------------------------------------------------------------------
@@ -299,9 +299,6 @@ class Core : public QObject, public INavigationHost {
     // and its successors. That made the tests the only callers who were not
     // allowed to be callers: every one of them drives a command exactly the way
     // a key press does. A friend declaration was the cost of not saying so.
-    void saveCurrentFileAs(const QString &destPath);
-    void crop(QRect rect);
-    void cropAndSave(QRect rect);
     // the two adjacent-folder commands; the bool is "land on the last file"
     void prevDirectory(bool selectLast) {
         m_nav->prevDirectory(selectLast);
@@ -330,14 +327,6 @@ class Core : public QObject, public INavigationHost {
     void jumpToLast() {
         m_nav->jumpToLast();
     }
-    void rotateLeft();
-    void rotateRight();
-    void flipH();
-    void flipV();
-    void discardEdits();
-    void toggleCropPanel();
-    void requestSavePath();
-    void saveCurrentFile();
     void setWallpaper();
     void toggleShuffle() {
         m_nav->toggleShuffle();
@@ -354,7 +343,6 @@ class Core : public QObject, public INavigationHost {
     void nextDirectory() {
         m_nav->nextDirectory();
     }
-    void resize(QSize size);
     // The wallpaper command dispatch, as a pure function of (session, path):
     // what the audit test pins. Public because it is the seam for that test and
     // hiding it behind a friend declaration was the only thing making it
@@ -366,7 +354,6 @@ class Core : public QObject, public INavigationHost {
     void close();
     void scalingRequest(QSize, ScalingFilter);
     void onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
-    void showResizeDialog();
     void toggleFullscreenInfoBar();
     void runScript(const QString &);
     void sortByName() {
@@ -378,6 +365,5 @@ class Core : public QObject, public INavigationHost {
     void sortBySize() {
         m_nav->sortBySize();
     }
-    void recoverEdits();
     void print();
 };

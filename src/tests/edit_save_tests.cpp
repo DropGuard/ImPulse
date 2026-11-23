@@ -91,7 +91,7 @@ TEST_F(TestEditSave, flipsEditInMemoryOnly) {
         10000));
     const QByteArray diskBefore = coretest::contentOf(img);
 
-    core().flipH();
+    core().editing().flipH();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core().isSettled();
@@ -107,7 +107,7 @@ TEST_F(TestEditSave, flipsEditInMemoryOnly) {
     EXPECT_EQ(shown.pixelColor(0, 0), QColor(Qt::blue)); // mirrored: blue moved left
     EXPECT_EQ(shown.pixelColor(15, 0), QColor(Qt::red));
 
-    core().flipV();
+    core().editing().flipV();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core().isSettled();
@@ -117,11 +117,11 @@ TEST_F(TestEditSave, flipsEditInMemoryOnly) {
     EXPECT_EQ(coretest::contentOf(img), diskBefore); // never asked, never written
 
     // and the folder view cannot edit at all: the key is not in its map
-    core().discardEdits();
+    core().editing().discardEdits();
     core().enableFolderView();
     EXPECT_EQ(core().viewState().viewMode.value(), MODE_FOLDERVIEW);
     const QByteArray beforeFolderFlip = coretest::contentOf(img);
-    core().flipH();
+    core().editing().flipH();
     EXPECT_EQ(m_ui.confirmCalls, 0); // no confirmation: no write path exists
     EXPECT_EQ(coretest::contentOf(img), beforeFolderFlip);
 }
@@ -141,7 +141,7 @@ TEST_F(TestEditSave, editingInDocumentModeEditsInMemoryWithoutConfirmation) {
         10000));
     const QByteArray diskBefore = coretest::contentOf(img);
 
-    core().rotateLeft();
+    core().editing().rotateLeft();
 
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
@@ -162,7 +162,7 @@ TEST_F(TestEditSave, resizeEditsTheLoadedImage) {
         },
         10000));
 
-    core().resize(QSize(4, 4));
+    core().editing().resize(QSize(4, 4));
 
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
@@ -205,7 +205,7 @@ TEST_F(TestEditSave, resizeBelongsToTheDocumentViewOnly) {
     core().toggleFolderView();
     EXPECT_EQ(core().viewState().viewMode.value(), MODE_DOCUMENT);
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_R)), QStringLiteral("resize"));
-    core().resize(QSize(4, 4));
+    core().editing().resize(QSize(4, 4));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core().directoryModel()->getImage(img)->size() == QSize(4, 4);
@@ -224,7 +224,7 @@ TEST_F(TestEditSave, discardEditsRestoresTheOnDiskImage) {
         },
         10000));
 
-    core().rotateLeft();
+    core().editing().rotateLeft();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core().directoryModel()->getImage(img)->size() == QSize(8, 16);
@@ -232,7 +232,7 @@ TEST_F(TestEditSave, discardEditsRestoresTheOnDiskImage) {
         10000));
     EXPECT_EQ(core().directoryModel()->getImage(img)->size(), QSize(8, 16));
 
-    core().discardEdits();
+    core().editing().discardEdits();
 
     EXPECT_EQ(core().directoryModel()->getImage(img)->size(), QSize(16, 8)); // back to the disk state
 }
@@ -251,7 +251,7 @@ TEST_F(TestEditSave, cropSurfaceTogglesThroughTheSeamAndIntentReachesTheEditLeg)
     Core::Deps deps = headlessDeps();
     deps.crop = &crop;
     Core core(deps);
-    core.toggleCropPanel();
+    core.editing().toggleCropPanel();
     EXPECT_EQ(crop.toggleCalls, 0); // the no-image guard, now testable headless
 
     EXPECT_TRUE(core.loadPath(img));
@@ -260,17 +260,17 @@ TEST_F(TestEditSave, cropSurfaceTogglesThroughTheSeamAndIntentReachesTheEditLeg)
             return core.isSettled();
         },
         10000));
-    core.toggleCropPanel();
+    core.editing().toggleCropPanel();
     EXPECT_EQ(crop.toggleCalls, 1);
     EXPECT_TRUE(crop.isActive());
-    core.toggleCropPanel();
+    core.editing().toggleCropPanel();
     EXPECT_EQ(crop.toggleCalls, 2);
     EXPECT_TRUE(!crop.isActive());
 
     // the intent leg: the surface's crop lands in Core's edit pipeline.
     // The fixture is 16x8; cropping to the left half leaves 8x8 in memory.
-    core.toggleCropPanel();
-    QObject::connect(&crop, &coretest::FakeCropSurface::cropRequested, &core, &Core::crop);
+    core.editing().toggleCropPanel();
+    QObject::connect(&crop, &coretest::FakeCropSurface::cropRequested, &core.editing(), &EditController::crop);
     emit crop.cropRequested(QRect(0, 0, 8, 8));
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
@@ -302,7 +302,7 @@ TEST_F(TestEditSave, theEditedImageExportGetsAUniqueTempFileOwnedByItsMime) {
             return core().directoryModel()->isLoaded(img);
         },
         10000));
-    core().rotateLeft();
+    core().editing().rotateLeft();
     auto image = core().directoryModel()->getImage(img);
     EXPECT_TRUE(image->isEdited());
 
@@ -355,7 +355,7 @@ TEST_F(TestEditSave, saveAsOnAnUneditedAnimationCopiesTheFileByteForByte) {
     EXPECT_TRUE(!image->isEdited());
 
     const QString dest = QDir(m_base).filePath("copy.gif");
-    core().saveCurrentFileAs(dest);
+    core().editing().saveCurrentFileAs(dest);
 
     QFile out(dest);
     EXPECT_TRUE(out.open(QIODevice::ReadOnly)) << "Save As of an animation wrote nothing";
@@ -363,6 +363,33 @@ TEST_F(TestEditSave, saveAsOnAnUneditedAnimationCopiesTheFileByteForByte) {
     QFile orig(src);
     EXPECT_TRUE(orig.open(QIODevice::ReadOnly));
     EXPECT_EQ(orig.readAll(), gif);
+}
+
+// requestSavePath and recoverEdits open a save dialog and a draft picker, and
+// the dialog host a headless Core owns has no window and no document widget
+// to hang them on. Both commands belong to a windowed Core only. The guard
+// used to read the window pointer; the edit controller cannot see the window,
+// so Core tells it at construction. This pins that a headless Core still
+// opens neither.
+TEST_F(TestEditSave, aHeadlessCoreOpensNeitherTheSaveDialogNorTheRecoveryPicker) {
+    const QString img = QDir(m_alpha).filePath("a.png");
+    writeImage(img);
+    EXPECT_TRUE(core().loadPath(img));
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core().isSettled();
+        },
+        10000));
+    const int messages = m_overlays.messageCalls;
+    const int errors = m_overlays.errorCalls;
+    const int successes = m_overlays.successCalls;
+
+    core().editing().recoverEdits();
+    EXPECT_EQ(m_overlays.messageCalls, messages) << "a headless recover went on to its picker";
+
+    core().editing().requestSavePath();
+    EXPECT_EQ(m_overlays.errorCalls, errors) << "a headless save-as went on to its dialog";
+    EXPECT_EQ(m_overlays.successCalls, successes) << "a headless save-as went on to its dialog";
 }
 
 int main(int argc, char **argv) {
