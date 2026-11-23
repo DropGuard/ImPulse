@@ -955,22 +955,26 @@ void ImageViewerV2::scrollPrecise(int dx, int dy) {
     saveViewportPos();
 }
 
-// used by scrollTimeLine
+// used by scrollTimeLine: paint this frame now, and only paint it. The
+// processEvents this used to run executed every queued and input event nested
+// inside a half-finished frame (a wheel event restarting this very timeline).
+// repaint() is synchronous and runs no event loop.
 void ImageViewerV2::scrollToX(int x) {
     m_hs->setValue(x);
     centerIfNecessary();
     snapToEdges();
-    update();
-    qApp->processEvents();
+    viewport()->repaint();
 }
 
-// used by scrollTimeLine
+// used by scrollTimeLine: paint this frame now, and only paint it. The
+// processEvents this used to run executed every queued and input event nested
+// inside a half-finished frame (a wheel event restarting this very timeline).
+// repaint() is synchronous and runs no event loop.
 void ImageViewerV2::scrollToY(int y) {
     m_vs->setValue(y);
     centerIfNecessary();
     snapToEdges();
-    update();
-    qApp->processEvents();
+    viewport()->repaint();
 }
 
 void ImageViewerV2::onScrollTimelineFinished() {

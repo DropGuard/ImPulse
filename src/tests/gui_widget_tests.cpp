@@ -25,6 +25,8 @@
 #include <QSettings>
 #include <QEventLoop>
 #include <QTemporaryDir>
+#include <QTimeLine>
+#include <QScrollBar>
 
 #include <algorithm>
 #include <cerrno>
@@ -501,6 +503,69 @@ TEST_F(TestGuiWidgets, wallpaperCommandDispatchesBySession) {
 TEST_F(TestGuiWidgets, wallpaperMenuIconIsCompiledIntoResources) {
     EXPECT_TRUE(QFile::exists(":/res/icons/common/menuitem/wallpaper16.png"));
     EXPECT_TRUE(QFile::exists(":/res/icons/common/menuitem/wallpaper16@2x.png"));
+}
+
+// The viewer's smooth-scroll frame (scrollToX/scrollToY, on QTimeLine::
+// frameChanged) used to repaint by running the whole event loop from inside
+// the frame, the way ThumbnailView's did before c3768482: any queued or input
+// event ran nested in a half-finished frame, including a wheel event that
+// restarts the very timeline whose handler is still on the stack. A frame
+// paints and returns. The probe posts one queued call from inside each frame
+// (the scrollbar's valueChanged fires inside scrollToY) and records whether it
+// ran before that frame's handler returned.
+TEST_F(TestGuiWidgets, aViewerSmoothScrollFrameRunsNoQueuedWorkInsideItself) {
+    // resizeEvent reads parentWidget(); the host is also every connection's
+    // context, so no lambda below outlives the locals it captures
+    QWidget host;
+    host.resize(400, 300);
+    auto *viewer = new ImageViewerV2(&host);
+    viewer->resize(400, 300);
+    host.show();
+    viewer->show();
+    auto pixmap = std::make_unique<QPixmap>(3000, 3000);
+    pixmap->fill(Qt::darkGray);
+    viewer->showImage(std::move(pixmap));
+    viewer->setFitOriginal();
+    QCoreApplication::processEvents();
+
+    QTimeLine *timeline = nullptr;
+    bool inFrame = false;
+    int posted = 0, ran = 0, ranInsideAFrame = 0;
+    QObject::connect(viewer->verticalScrollBar(), &QScrollBar::valueChanged, &host, [&] {
+        if(!timeline)
+            return;
+        inFrame = true;
+        ++posted;
+        QMetaObject::invokeMethod(
+            viewer,
+            [&] {
+                ++ran;
+                if(inFrame)
+                    ++ranInsideAFrame;
+            },
+            Qt::QueuedConnection);
+    });
+
+    viewer->scrollDown();
+    const QList<QTimeLine *> timelines = viewer->findChildren<QTimeLine *>();
+    for(QTimeLine *candidate : timelines)
+        if(candidate->state() == QTimeLine::Running)
+            timeline = candidate;
+    ASSERT_NE(timeline, nullptr) << "scrollDown started no timeline";
+    // connected after the viewer's own handler, so this runs when that returns
+    QObject::connect(timeline, &QTimeLine::frameChanged, &host, [&] {
+        inFrame = false;
+    });
+
+    ASSERT_TRUE(QTest::qWaitFor(
+        [&] {
+            return timeline->state() == QTimeLine::NotRunning;
+        },
+        5000));
+    QCoreApplication::processEvents(); // drain the last frame's post
+    ASSERT_GT(posted, 0) << "no frame moved the scrollbar - this pin would pass vacuously";
+    EXPECT_EQ(ran, posted);
+    EXPECT_EQ(ranInsideAFrame, 0) << "queued work ran nested inside a viewer scroll frame";
 }
 
 int main(int argc, char **argv) {
