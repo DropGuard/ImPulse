@@ -109,16 +109,6 @@
         <translation> versión </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>Archivo copiado</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>Ruta copiada</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>Ejecutar acción &quot;</translation>
@@ -1982,6 +1972,17 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <location filename="../../main.cpp" line="142"/>
         <source>Show build options.</source>
         <translation>Opciones de visualización.</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>Archivo copiado</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>Ruta copiada</translation>
     </message>
 </context>
 </TS>

@@ -109,16 +109,6 @@
         <translation> Version </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>Datei kopiert</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>Pfad kopiert</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>Aktion ausführen &quot;</translation>
@@ -2007,6 +1997,17 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <source>Show build options.</source>
         <translatorcomment>If I translate build, I fear no one will know what is meant. Programming related terms in Germany are inherently mixed German and English</translatorcomment>
         <translation>Zeige Build-Optionen.</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>Datei kopiert</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>Pfad kopiert</translation>
     </message>
 </context>
 </TS>

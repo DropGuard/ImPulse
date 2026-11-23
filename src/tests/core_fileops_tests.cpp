@@ -543,6 +543,10 @@ TEST_F(TestCoreFileOps, aSeamReplacedAfterConstructionReachesTheFileOperations) 
     core().fileOps().quickCopyToFixedDirectory();
     EXPECT_EQ(replacementOverlays.messageCalls, 1) << "the message never reached the replacement host";
     EXPECT_EQ(m_overlays.messageCalls, oldHostMessages) << "the message went to the replaced host";
+    // the clipboard half borrows the same seam
+    core().transfer().copyPathClipboard();
+    EXPECT_EQ(replacementOverlays.messageCalls, 2) << "the clipboard's message never reached the replacement host";
+    EXPECT_EQ(m_overlays.messageCalls, oldHostMessages) << "the clipboard's message went to the replaced host";
 
     // the fixture's fakes outlive the test body; the replacements do not
     core().setUserInteractions(&m_ui);

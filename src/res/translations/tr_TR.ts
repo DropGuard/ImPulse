@@ -129,16 +129,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>Dosya kopyalandı</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>Dosya yolu kopyalandı</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>Eylemi gerçekleştir: &quot;</translation>
@@ -2003,6 +1993,17 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <location filename="../../main.cpp" line="142"/>
         <source>Show build options.</source>
         <translation>Derleme seçeneklerini göster.</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>Dosya kopyalandı</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>Dosya yolu kopyalandı</translation>
     </message>
 </context>
 </TS>

@@ -22,6 +22,7 @@
 #include "navigationcontroller.h"
 #include "fileopscontroller.h"
 #include "selectionquery.h"
+#include "transfercontroller.h"
 #include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
@@ -36,11 +37,6 @@
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
-
-enum MimeDataTarget {
-    TARGET_CLIPBOARD,
-    TARGET_DROP
-};
 
 class Core : public QObject, public INavigationHost {
     Q_OBJECT
@@ -118,6 +114,7 @@ class Core : public QObject, public INavigationHost {
     void setOverlayHost(IOverlayHost *host) {
         m_overlays = host;
         m_fileOps->setOverlayHost(host);
+        m_transfer->setOverlayHost(host);
     }
     IOverlayHost *overlayHost() const {
         return m_overlays;
@@ -161,6 +158,10 @@ class Core : public QObject, public INavigationHost {
     // overlay does; the controller is a QObject child of Core.
     FileOpsController &fileOps() const {
         return *m_fileOps;
+    }
+    // The clipboard and drag-and-drop, driven the same way.
+    TransferController &transfer() const {
+        return *m_transfer;
     }
 
     // The folder view's presenter, for the tests that drive grid commands and
@@ -250,6 +251,8 @@ class Core : public QObject, public INavigationHost {
     // the file operations: delete, trash, rename, copy, move, reveal. Same
     // ownership as the navigation object — a QObject child of Core.
     FileOpsController *m_fileOps = nullptr;
+    // the clipboard and drag-and-drop: the same ownership again
+    TransferController *m_transfer = nullptr;
 
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
@@ -336,14 +339,6 @@ class Core : public QObject, public INavigationHost {
     void requestSavePath();
     void saveCurrentFile();
     void setWallpaper();
-    void copyFileClipboard();
-    void openFromClipboard();
-    // The folder view's Ctrl+V: the clipboard holds file paths, so this copies
-    // them into the directory being browsed. It is deliberately NOT the same
-    // command as openFromClipboard — that one shows the clipboard's image,
-    // which needs a document view; this one places files, which needs a
-    // directory. Same key, two scopes, because the subject differs.
-    void pasteFilesToCurrentDirectory();
     void toggleShuffle() {
         m_nav->toggleShuffle();
     }
@@ -359,13 +354,6 @@ class Core : public QObject, public INavigationHost {
     void nextDirectory() {
         m_nav->nextDirectory();
     }
-    // The drag-and-drop entry points a real gesture uses: a drop from outside
-    // the app, what a drag out of it produces, and the paths for it.
-    void onDropIn(const QMimeData *mimeData, QObject *source);
-    void onDraggedOut(const QList<QString> &paths);
-    QMimeData *mimeDataForPaths(const QList<QString> &paths);
-    // what a drag or clipboard entry carries for one image
-    QMimeData *getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget target);
     void resize(QSize size);
     // The wallpaper command dispatch, as a pure function of (session, path):
     // what the audit test pins. Public because it is the seam for that test and
@@ -381,7 +369,6 @@ class Core : public QObject, public INavigationHost {
     void showResizeDialog();
     void toggleFullscreenInfoBar();
     void runScript(const QString &);
-    void copyPathClipboard();
     void sortByName() {
         m_nav->sortByName();
     }
@@ -391,7 +378,6 @@ class Core : public QObject, public INavigationHost {
     void sortBySize() {
         m_nav->sortBySize();
     }
-    void onDraggedOut(); // the action's no-argument form; the paths form is public
     void recoverEdits();
     void print();
 };

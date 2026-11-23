@@ -113,16 +113,6 @@
         <translation> 版本 </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>文件已拷贝</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>目录已拷贝</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>执行操作 \&quot;</translation>
@@ -1977,6 +1967,17 @@ hr { height: 1px; border-width: 0; }
         <location filename="../../main.cpp" line="142"/>
         <source>Show build options.</source>
         <translation>显示编译选项.</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>文件已拷贝</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>目录已拷贝</translation>
     </message>
 </context>
 </TS>

@@ -65,10 +65,10 @@ TEST_F(TestClipboard, dropIntoTheAppOpensTheDroppedFileAndIgnoresItself) {
     mime.setUrls({QUrl::fromLocalFile(target)});
 
     // the self-drop guard: a drag that started in this app must not re-open
-    core.onDropIn(&mime, &core);
+    core.transfer().onDropIn(&mime, &core.transfer());
     EXPECT_EQ(core.currentFilePath(), before);
 
-    core.onDropIn(&mime, nullptr);
+    core.transfer().onDropIn(&mime, nullptr);
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.currentFilePath() == target;
@@ -102,7 +102,7 @@ TEST_F(TestClipboard, clipboardUrlOpensThatFileAndOtherFormsAreRefused) {
     QMimeData *local = new QMimeData();
     local->setUrls({QUrl::fromLocalFile(target)});
     QApplication::clipboard()->setMimeData(local);
-    core.openFromClipboard();
+    core.transfer().openFromClipboard();
     EXPECT_TRUE(QTest::qWaitFor(
         [&] {
             return core.currentFilePath() == target;
@@ -115,7 +115,7 @@ TEST_F(TestClipboard, clipboardUrlOpensThatFileAndOtherFormsAreRefused) {
     QMimeData *remote = new QMimeData();
     remote->setUrls({QUrl(QStringLiteral("https://example.com/notlocal.png"))});
     QApplication::clipboard()->setMimeData(remote);
-    core.openFromClipboard();
+    core.transfer().openFromClipboard();
     // "nothing happens" is checked after the queue is drained, not after an
     // arbitrary 200 ms: a sleep would pass for the wrong reason on a fast
     // machine and fail on a slow one, and neither says anything about the
@@ -127,7 +127,7 @@ TEST_F(TestClipboard, clipboardUrlOpensThatFileAndOtherFormsAreRefused) {
     QMimeData *textOnly = new QMimeData();
     textOnly->setText(QStringLiteral("just a sentence"));
     QApplication::clipboard()->setMimeData(textOnly);
-    core.openFromClipboard();
+    core.transfer().openFromClipboard();
     // "nothing happens" is checked after the queue is drained, not after an
     // arbitrary 200 ms: a sleep would pass for the wrong reason on a fast
     // machine and fail on a slow one, and neither says anything about the
@@ -156,7 +156,7 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
     EXPECT_TRUE(core.loadPath(img));
     EXPECT_TRUE(waitLoaded(core));
 
-    core.copyFileClipboard();
+    core.transfer().copyFileClipboard();
     const QMimeData *cb = QApplication::clipboard()->mimeData();
     EXPECT_TRUE(cb->hasUrls()) << "a copied file offered no urls";
     EXPECT_EQ(cb->urls().constFirst(), QUrl::fromLocalFile(img));
@@ -173,7 +173,7 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
     // concurrent consumers used to share
     core.flipH();
     EXPECT_TRUE(waitLoaded(core));
-    core.copyFileClipboard();
+    core.transfer().copyFileClipboard();
     const QUrl editedUrl = QApplication::clipboard()->mimeData()->urls().constFirst();
     const QString editedPath = editedUrl.toLocalFile();
     EXPECT_TRUE(editedPath.startsWith(settings->tmpDir()))
@@ -191,7 +191,7 @@ TEST_F(TestClipboard, clipboardFileCopyAdvertisesTheFileInEveryFormat) {
     // file autoremoved — unique names without accumulating litter
     core.flipV();
     EXPECT_TRUE(waitLoaded(core));
-    core.copyFileClipboard();
+    core.transfer().copyFileClipboard();
     const QString secondPath = QApplication::clipboard()->mimeData()->urls().constFirst().toLocalFile();
     EXPECT_TRUE(secondPath != editedPath) << "two clipboard entries shared one temp name";
     EXPECT_TRUE(!QFileInfo::exists(editedPath))
@@ -211,7 +211,7 @@ TEST_F(TestClipboard, draggingAnUndecodedEntryStillOffersTheFile) {
     EXPECT_TRUE(!core.directoryModel()->isLoaded(farPath))
         << "precondition broken: the far image is decoded, the test measures nothing";
 
-    std::unique_ptr<QMimeData> mime(core.mimeDataForPaths({farPath}));
+    std::unique_ptr<QMimeData> mime(core.transfer().mimeDataForPaths({farPath}));
 
     EXPECT_TRUE(mime->hasUrls()) << "dragging an undecoded entry produced a mime without urls";
     EXPECT_EQ(mime->urls().constFirst(), QUrl::fromLocalFile(farPath));
@@ -235,7 +235,7 @@ TEST_F(TestClipboard, draggingAnOverLimitImageStillOffersTheFile) {
     big.fill(Qt::red);
     EXPECT_TRUE(big.save(huge, "png"));
 
-    std::unique_ptr<QMimeData> mime(core.mimeDataForPaths({huge}));
+    std::unique_ptr<QMimeData> mime(core.transfer().mimeDataForPaths({huge}));
 
     EXPECT_TRUE(mime->hasUrls()) << "an over-limit entry produced a mime without urls";
     EXPECT_EQ(mime->urls().constFirst(), QUrl::fromLocalFile(huge));
@@ -253,17 +253,22 @@ TEST_F(TestClipboard, repeatedDragOutsRetainNothing) {
     EXPECT_TRUE(core.loadPath(QDir(m_alpha).filePath("a.png")));
     EXPECT_TRUE(waitLoaded(core));
     const QString file = QDir(m_alpha).filePath("a.png");
-    const int before = core.children().size();
+    // the drag is parented to the object that starts it, and since the
+    // clipboard and drag-and-drop left Core that is the transfer controller:
+    // counting Core's children would count nowhere a drag can land
+    QObject &owner = core.transfer();
+    const int before = owner.children().size();
 
     for(int i = 0; i < 8; ++i)
-        core.onDraggedOut({file});
+        core.transfer().onDraggedOut({file});
 
     int drags = 0;
-    for(QObject *child : core.children())
+    for(QObject *child : owner.children())
         if(child->metaObject()->className() == QLatin1String("QDrag"))
             ++drags;
-    EXPECT_TRUE(drags == 0) << qPrintable(QStringLiteral("QDrag objects retained by Core after 8 drag-outs"));
-    EXPECT_EQ(core.children().size(), before);
+    EXPECT_TRUE(drags == 0) << qPrintable(
+        QStringLiteral("QDrag objects retained by the transfer controller after 8 drag-outs"));
+    EXPECT_EQ(owner.children().size(), before);
 }
 
 // The folder view's Ctrl+V: the clipboard holds file paths, the browsing
@@ -289,7 +294,7 @@ TEST_F(TestClipboard, pastingFileUrlsPlacesThemInTheBrowsingDirectory) {
     mime->setUrls({QUrl::fromLocalFile(srcFile)});
     QApplication::clipboard()->setMimeData(mime);
 
-    core.pasteFilesToCurrentDirectory();
+    core.transfer().pasteFilesToCurrentDirectory();
 
     const QString pasted = dest + QStringLiteral("/copied.png");
     EXPECT_TRUE(QTest::qWaitFor(
@@ -323,7 +328,7 @@ TEST_F(TestClipboard, pastingAFileAlreadyInTheDirectoryIsSilent) {
     mime->setUrls({QUrl::fromLocalFile(file)});
     QApplication::clipboard()->setMimeData(mime);
 
-    core.pasteFilesToCurrentDirectory();
+    core.transfer().pasteFilesToCurrentDirectory();
     coretest::drainEvents();
 
     EXPECT_TRUE(overlayFake.errorCalls == 0)
@@ -346,7 +351,7 @@ TEST_F(TestClipboard, pastingARemoteUrlDoesNothing) {
     mime->setUrls({QUrl(QStringLiteral("https://example.com/x.png"))});
     QApplication::clipboard()->setMimeData(mime);
 
-    core.pasteFilesToCurrentDirectory();
+    core.transfer().pasteFilesToCurrentDirectory();
     coretest::drainEvents();
     EXPECT_TRUE(QDir(dest).entryList(QDir::Files | QDir::NoDotAndDotDot).isEmpty());
 }

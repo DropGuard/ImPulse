@@ -109,16 +109,6 @@
         <translation> версія </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>Файл скопійовано</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>Шлях скопійовано</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>Виконати дію &quot;</translation>
@@ -1969,6 +1959,17 @@ hr { height: 1px; border-width: 0; }
         <location filename="../../main.cpp" line="142"/>
         <source>Show build options.</source>
         <translation>Показати опції зборки.</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>Файл скопійовано</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>Шлях скопійовано</translation>
     </message>
 </context>
 </TS>

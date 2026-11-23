@@ -119,16 +119,6 @@
         <translation> </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="463"/>
-        <source>File copied</source>
-        <translation>ファイルがコピーされました</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="470"/>
-        <source>Path copied</source>
-        <translation>パスがコピーされました</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="984"/>
         <source>Perform action &quot;</source>
         <translation>アクションを実行 &quot;</translation>
@@ -1996,6 +1986,17 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <location filename="../../main.cpp" line="142"/>
         <source>Show build options.</source>
         <translation>ビルドオプションを表示します。</translation>
+    </message>
+</context>
+<context>
+    <name>TransferController</name>
+    <message>
+        <source>File copied</source>
+        <translation>ファイルがコピーされました</translation>
+    </message>
+    <message>
+        <source>Path copied</source>
+        <translation>パスがコピーされました</translation>
     </message>
 </context>
 </TS>

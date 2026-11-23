@@ -1,35 +1,55 @@
 /*
- * Core's clipboard and drag-and-drop half: the app as a mime source and
- * sink — clipboard writes, drop-ins, drag-outs and the mime payload
- * builders. Same class, partial implementation — core.cpp keeps
- * composition, wiring and the display sink.
+ * Core's clipboard and drag-and-drop, as an object: the app as a mime source
+ * and sink — clipboard writes, drop-ins, drag-outs, the folder view's paste
+ * and the mime payload builders. Owns no state of its own: it reads the
+ * selection and the model, opens through NavigationController, places files
+ * through FileOpsController, and speaks through the overlay and dialog seams.
+ * The listing materializes on first load, so the model arrives via
+ * attachModel.
+ *
+ * A QObject because a drag out is parented here and carries this object as
+ * its source: onDropIn's self-drop check compares against the same object
+ * that started the drag.
  */
 
-#include "core.h"
+#include "transfercontroller.h"
 #include <utility>
 
-#include "utils/folderend.h"
-
-#include "gui/windowshell.h"
-#include "gui/overlayhost.h"
+#include "selectionquery.h"
+#include "navigationcontroller.h"
+#include "fileopscontroller.h"
+#include "components/directorymodel.h"
+#include "gui/ioverlayhost.h"
 #include "gui/dialoghost.h"
-#include "gui/crop/cropcontroller.h"
+#include "settings.h"
+#include "utils/fileoperations.h"
 
-#include <QThread>
+#include <QApplication>
+#include <QClipboard>
+#include <QDir>
 #include <QDrag>
+#include <QFileInfo>
+#include <QMimeData>
 #include <QTemporaryFile>
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusPendingCall>
-#include <QDBusPendingCallWatcher>
-#include <QDBusPendingReply>
+#include <QUrl>
 
-#ifdef _WIN32
-#include <tchar.h>
-#endif
+TransferController::TransferController(const SelectionQuery &selection, NavigationController &nav,
+                                       FileOpsController &fileOps, DialogHost *dialogs, IOverlayHost *overlays,
+                                       QObject *parent)
+    : QObject(parent), m_selection(selection), m_nav(nav), m_fileOps(fileOps), m_dialogs(dialogs),
+      m_overlays(overlays) {
+}
+
+void TransferController::attachModel(DirectoryModel *model) {
+    m_model = model;
+}
+
+void TransferController::setOverlayHost(IOverlayHost *overlays) {
+    m_overlays = overlays;
+}
 
 // TODO: also copy selection from folder view?
-void Core::copyFileClipboard() {
+void TransferController::copyFileClipboard() {
     if(m_model->listing().isEmpty())
         return;
 
@@ -44,7 +64,7 @@ void Core::copyFileClipboard() {
     m_overlays->showMessage(tr("File copied"));
 }
 
-void Core::copyPathClipboard() {
+void TransferController::copyPathClipboard() {
     if(m_model->listing().isEmpty())
         return;
     QApplication::clipboard()->setText(m_selection.selectedPath());
@@ -67,7 +87,7 @@ void Core::copyPathClipboard() {
 //     itself is not a user intent, and interactiveCopy would raise an
 //     overwrite prompt for an operation that can only produce an identical
 //     file.
-void Core::pasteFilesToCurrentDirectory() {
+void TransferController::pasteFilesToCurrentDirectory() {
     const QString destDir = m_model->listing().directoryPath();
     if(destDir.isEmpty())
         return; // no directory to paste into
@@ -87,10 +107,10 @@ void Core::pasteFilesToCurrentDirectory() {
     }
     if(paths.isEmpty())
         return;
-    m_fileOps->interactiveCopy(paths, destDir);
+    m_fileOps.interactiveCopy(paths, destDir);
 }
 
-void Core::openFromClipboard() {
+void TransferController::openFromClipboard() {
     auto cb = QApplication::clipboard();
     auto mimeData = cb->mimeData();
     if(!mimeData)
@@ -103,7 +123,7 @@ void Core::openFromClipboard() {
         if(path.isEmpty()) {
             qDebug() << "Could not load url:" << url;
             qDebug() << "Currently only local files are supported.";
-        } else if(loadPath(path)) {
+        } else if(m_nav.loadPath(path)) {
             return;
         }
     }
@@ -122,11 +142,11 @@ void Core::openFromClipboard() {
         // a copy of it, and the copy kept the rollback path that discarded the
         // backup even when restoring it had failed
         if(FileOperations::saveWithBackup(image, destPath, settings->JPEGSaveQuality()))
-            loadPath(destPath);
+            m_nav.loadPath(destPath);
     }
 }
 
-void Core::onDropIn(const QMimeData *mimeData, QObject *source) {
+void TransferController::onDropIn(const QMimeData *mimeData, QObject *source) {
     // ignore self
     if(source == this)
         return;
@@ -138,17 +158,17 @@ void Core::onDropIn(const QMimeData *mimeData, QObject *source) {
         for(int i = 0; i < urlList.size(); ++i)
             pathList.append(urlList.at(i).toLocalFile());
         // try to open first file in the list
-        loadPath(pathList.first());
+        m_nav.loadPath(pathList.first());
     }
 }
 
 // drag'n'drop
 // drag image out of the program
-void Core::onDraggedOut() {
+void TransferController::onDraggedOut() {
     onDraggedOut(m_selection.currentSelection());
 }
 
-QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {
+QMimeData *TransferController::mimeDataForPaths(const QList<QString> &paths) {
     QMimeData *mimeData;
     // single selection, image
     if(paths.count() == 1 && m_model->listing().containsFile(paths.first())) {
@@ -169,19 +189,19 @@ QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {
     return mimeData;
 }
 
-void Core::onDraggedOut(const QList<QString> &paths) {
+void TransferController::onDraggedOut(const QList<QString> &paths) {
     if(paths.isEmpty())
         return;
     // exec() blocks for the whole gesture, so the drag handle is scoped to this
     // call: the QMimeData it owns goes with it. A member here would leave every
-    // past drag's payload parented to Core for the life of the session.
+    // past drag's payload parented here for the life of the session.
     QDrag drag(this);
     drag.setMimeData(mimeDataForPaths(paths));
     //drag.setPixmap(*thumb->pixmap().get());
     drag.exec(Qt::CopyAction | Qt::MoveAction | Qt::LinkAction, Qt::CopyAction);
 }
 
-QMimeData *Core::getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget target) {
+QMimeData *TransferController::getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget target) {
     QMimeData *mimeData = new QMimeData();
     if(!img)
         return mimeData;

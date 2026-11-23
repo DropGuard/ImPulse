@@ -75,14 +75,15 @@ Core::Core(const Deps &deps)
     m_nav = new NavigationController(&m_state, this, m_view, m_overlays, m_thumbPanelPresenter, m_folderViewPresenter,
                                      this);
     m_fileOps = new FileOpsController(m_state, m_selection, this, m_view, m_dialogs, m_ui, m_overlays, this);
+    m_transfer = new TransferController(m_selection, *m_nav, *m_fileOps, m_dialogs, m_overlays, this);
     // the seam census — deliberately NOT Q_ASSERT, which compiles out of the
     // Release build this tree ships. A seam wired in one construction branch
     // only (nav_, in its day) must stay loud in every build shape, and the
     // message must say which seam set to inspect. crop_ is the documented
     // optional (crop-flow tests provide it); everything else is mandatory.
-    if(!m_ui || !m_view || !m_overlays || !m_dialogs || !m_nav || !m_fileOps)
+    if(!m_ui || !m_view || !m_overlays || !m_dialogs || !m_nav || !m_fileOps || !m_transfer)
         qFatal("Core construction left a seam null (the census checks ui_, view_, overlays_, dialogs_, nav_, "
-               "fileOps_) — "
+               "fileOps_, transfer_) — "
                "every seam must be wired in both construction branches");
     // the slideshow loop is a pure function of the state: slides advance by
     // timer, normal viewing loops. The relay rides the state binding and goes
@@ -189,6 +190,7 @@ void Core::attachModel(DirectoryModel *_model) {
     m_nav->attachModel(_model);
     m_selection.attachModel(_model);
     m_fileOps->attachModel(_model);
+    m_transfer->attachModel(_model);
 }
 
 void Core::initComponents() {
@@ -197,8 +199,8 @@ void Core::initComponents() {
 
 void Core::connectComponents() {
 
-    connect(&m_folderViewPresenter, &DirectoryPresenter::draggedOut, this,
-            qOverload<const QList<QString> &>(&Core::onDraggedOut));
+    connect(&m_folderViewPresenter, &DirectoryPresenter::draggedOut, m_transfer,
+            qOverload<const QList<QString> &>(&TransferController::onDraggedOut));
 
     connect(&m_folderViewPresenter, &DirectoryPresenter::droppedInto, m_fileOps, &FileOpsController::interactiveMove);
 
@@ -227,12 +229,12 @@ void Core::connectComponents() {
 // window->Core legs. Headless Core skips the whole method — a windowless
 // process has no drops, no drags, no folder-view clicks, no keys.
 void Core::connectWindowComponents() {
-    connect(m_mw, &MW::droppedIn, this, &Core::onDropIn);
+    connect(m_mw, &MW::droppedIn, m_transfer, &TransferController::onDropIn);
     connect(m_mw, &MW::copyUrlsRequested, m_fileOps, &FileOpsController::interactiveCopy);
     connect(m_mw, &MW::moveUrlsRequested, m_fileOps, &FileOpsController::interactiveMove);
     connect(m_mw, &MW::sortingSelected, m_nav, &NavigationController::sortBy);
     connect(m_mw, &MW::showFoldersChanged, m_nav, &NavigationController::setFoldersDisplay);
-    connect(m_mw, &MW::draggedOut, this, qOverload<>(&Core::onDraggedOut));
+    connect(m_mw, &MW::draggedOut, m_transfer, qOverload<>(&TransferController::onDraggedOut));
     connect(m_mw, &MW::playbackFinished, m_nav, &NavigationController::onPlaybackFinished);
     connect(m_mw, &MW::scalingRequested, this, &Core::scalingRequest);
     m_thumbPanelPresenter.setView(m_mw->getThumbnailPanel());
@@ -273,8 +275,8 @@ void Core::initActions() {
     actionManager->connectAction("documentView", m_nav, &NavigationController::enableDocumentView);
     actionManager->connectAction("toggleFolderView", m_nav, &NavigationController::toggleFolderView);
     actionManager->connectAction("reloadImage", m_fileOps, qOverload<>(&FileOpsController::reloadImage));
-    actionManager->connectAction("copyFileClipboard", this, &Core::copyFileClipboard);
-    actionManager->connectAction("copyPathClipboard", this, &Core::copyPathClipboard);
+    actionManager->connectAction("copyFileClipboard", m_transfer, &TransferController::copyFileClipboard);
+    actionManager->connectAction("copyPathClipboard", m_transfer, &TransferController::copyPathClipboard);
     actionManager->connectAction("renameFile", m_fileOps, &FileOpsController::showRenameDialog);
     actionManager->connectAction("sortByName", m_nav, &NavigationController::sortByName);
     actionManager->connectAction("sortByTime", m_nav, &NavigationController::sortByTime);
@@ -289,7 +291,7 @@ void Core::initActions() {
     actionManager->connectAction("prevDirectory", m_nav, qOverload<>(&NavigationController::prevDirectory));
     actionManager->connectAction("print", this, &Core::print);
     actionManager->connectAction("toggleFullscreenInfoBar", this, &Core::toggleFullscreenInfoBar);
-    actionManager->connectAction("pasteFile", this, &Core::openFromClipboard);
+    actionManager->connectAction("pasteFile", m_transfer, &TransferController::openFromClipboard);
     // the folder grid's scope actions, landed on the proxy the same way the
     // viewer commands land on ViewerWidget
     if(m_mw)
@@ -343,10 +345,10 @@ void Core::connectWindowActions() {
     actionManager->connectAction("gridSelectLast", m_mw->getFolderView(), &FolderView::gridSelectLast);
     actionManager->connectAction("gridSelectAll", m_mw->getFolderView(), &FolderView::gridSelectAll);
     actionManager->connectAction("gridOpen", m_mw->getFolderView(), &FolderView::activateCurrent);
-    // the folder view's Ctrl+V. Landed on Core, not the grid: the destination
-    // is the model's directory and the work is interactiveCopy, both of which
-    // the grid surface has no business owning.
-    actionManager->connectAction("pasteFilesHere", this, &Core::pasteFilesToCurrentDirectory);
+    // the folder view's Ctrl+V. Landed on the transfer controller, not the
+    // grid: the destination is the model's directory and the work is
+    // interactiveCopy, both of which the grid surface has no business owning.
+    actionManager->connectAction("pasteFilesHere", m_transfer, &TransferController::pasteFilesToCurrentDirectory);
 }
 
 void Core::loadTranslation() {

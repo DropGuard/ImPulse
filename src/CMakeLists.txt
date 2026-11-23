@@ -103,7 +103,7 @@ target_sources(qimgv_gui PRIVATE
     fileopscontroller.cpp
     selectionquery.cpp
     core_editing.cpp
-    core_clipboard.cpp
+    transfercontroller.cpp
     proxystyle.cpp
     resources.qrc
     gui/windowshell.cpp

@@ -306,8 +306,8 @@ TEST_F(TestEditSave, theEditedImageExportGetsAUniqueTempFileOwnedByItsMime) {
     auto image = core().directoryModel()->getImage(img);
     EXPECT_TRUE(image->isEdited());
 
-    QMimeData *first = core().getMimeDataForImage(image, TARGET_DROP);
-    QMimeData *second = core().getMimeDataForImage(image, TARGET_DROP);
+    QMimeData *first = core().transfer().getMimeDataForImage(image, TARGET_DROP);
+    QMimeData *second = core().transfer().getMimeDataForImage(image, TARGET_DROP);
     const QString firstPath = QUrl(first->urls().value(0)).toLocalFile();
     const QString secondPath = QUrl(second->urls().value(0)).toLocalFile();
     EXPECT_TRUE(firstPath != secondPath) << "two exports were handed one fixed temp name";
