@@ -40,6 +40,8 @@ cmake --build build -j$(nproc)
 cmake --build build --target check
 # one suite (incremental: builds just that binary, then runs it)
 cmake --build build --target check-crop_tests
+# the same `check` on the Windows box, against HEAD; why and how: the script header
+scripts/verify-windows.sh
 
 # static-analysis gate (counts may only shrink; a new family fails; a reduction
 # ships with its fix). Per-TU cache in build/.lint-cache: ~6s warm, ~3m cold;
