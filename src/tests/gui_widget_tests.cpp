@@ -27,6 +27,8 @@
 #include <QTemporaryDir>
 #include <QTimeLine>
 #include <QScrollBar>
+#include <QCursor>
+#include <functional>
 
 #include <algorithm>
 #include <cerrno>
@@ -40,6 +42,7 @@
 #include "gui/customwidgets/floatingwidget.h"
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/customwidgets/settingsidebar.h"
+#include "gui/customwidgets/slidepanel.h"
 #include "gui/customwidgets/styledcombobox.h"
 #include "gui/dialogs/resizedialog.h"
 #include "gui/dialogs/settingsdialog.h"
@@ -566,6 +569,83 @@ TEST_F(TestGuiWidgets, aViewerSmoothScrollFrameRunsNoQueuedWorkInsideItself) {
     ASSERT_GT(posted, 0) << "no frame moved the scrollbar - this pin would pass vacuously";
     EXPECT_EQ(ran, posted);
     EXPECT_EQ(ranInsideAFrame, 0) << "queued work ran nested inside a viewer scroll frame";
+}
+
+// SlidePanel's hide animation (animationUpdate, on QTimeLine::frameChanged)
+// ended every frame with qApp->processEvents(): any queued or input event ran
+// nested in a half-finished frame, including a show() or hide() that stops
+// the very timeline whose handler is still on the stack. A frame moves the
+// panel and returns; the move's repaint is scheduled like any other. The
+// probe posts one queued call from inside each frame (the panel's move event
+// is delivered synchronously inside animationUpdate) and records whether it
+// ran before that frame's handler returned.
+namespace {
+class ProbePanel : public SlidePanel {
+  public:
+    using SlidePanel::SlidePanel;
+    QTimeLine &timeline() {
+        return m_timeline;
+    }
+    std::function<void()> onMove;
+
+  protected:
+    void moveEvent(QMoveEvent *event) override {
+        SlidePanel::moveEvent(event);
+        if(onMove)
+            onMove();
+    }
+};
+} // namespace
+
+TEST_F(TestGuiWidgets, aSlidePanelHideFrameRunsNoQueuedWorkInsideItself) {
+    // the container is also every connection's context, so no lambda below
+    // outlives the locals it captures
+    FloatingWidgetContainer container;
+    container.resize(400, 300);
+    container.show();
+    bool inFrame = false, animating = false;
+    int posted = 0, ran = 0, ranInsideAFrame = 0;
+    ProbePanel panel(&container);
+    panel.setWidget(new QWidget);
+    QCoreApplication::processEvents();
+    // the animation cancels itself while the cursor is over the panel
+    QCursor::setPos(5000, 5000);
+    panel.show();
+    QCoreApplication::processEvents();
+
+    panel.onMove = [&] {
+        if(!animating)
+            return;
+        inFrame = true;
+        ++posted;
+        QMetaObject::invokeMethod(
+            &container,
+            [&] {
+                ++ran;
+                if(inFrame)
+                    ++ranInsideAFrame;
+            },
+            Qt::QueuedConnection);
+    };
+    // connected after the panel's own handler, so this runs when that returns
+    QObject::connect(&panel.timeline(), &QTimeLine::frameChanged, &container, [&] {
+        inFrame = false;
+    });
+
+    animating = true;
+    panel.hideAnimated();
+    ASSERT_EQ(panel.timeline().state(), QTimeLine::Running) << "hideAnimated started no animation";
+    ASSERT_TRUE(QTest::qWaitFor(
+        [&] {
+            return panel.timeline().state() == QTimeLine::NotRunning;
+        },
+        5000));
+    animating = false;
+    QCoreApplication::processEvents(); // drain the last frame's post
+    ASSERT_GT(posted, 0) << "no frame moved the panel - this pin would pass vacuously";
+    EXPECT_EQ(ran, posted);
+    EXPECT_EQ(ranInsideAFrame, 0) << "queued work ran nested inside a slide-panel frame";
+    EXPECT_TRUE(panel.isHidden()) << "the animation finished without hiding the panel";
 }
 
 int main(int argc, char **argv) {

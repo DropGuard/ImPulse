@@ -112,7 +112,11 @@ void SlidePanel::animationUpdate(int frame) {
         setProperty("pos", m_startPosition + newPosOffset);
         m_fadeEffect->setOpacity(1 - value);
     }
-    qApp->processEvents();
+    // A frame moves the panel and returns. The processEvents this used to end
+    // with ran every queued and input event nested inside a half-finished
+    // frame, including a show() or hide() that stops this very timeline. The
+    // move schedules its own repaint, which lands on the loop's next turn,
+    // well inside the timeline's update interval.
 }
 
 void SlidePanel::setAnimationRange(QPoint start, QPoint end) {
