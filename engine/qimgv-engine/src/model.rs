@@ -40,7 +40,6 @@ impl Row {
 // Time/Size compare their field first and fall back to the name keys, which
 // is what SortMode::compare's natural tiebreak did.
 fn cmp_rows(mode: SortMode, a: &Row, b: &Row) -> std::cmp::Ordering {
-    use std::cmp::Ordering;
     match mode {
         SortMode::Name => a.sort_key.cmp(&b.sort_key),
         SortMode::NameDesc => b.sort_key.cmp(&a.sort_key),
@@ -149,11 +148,11 @@ impl DirectoryState {
             }
         }
         let mut identity = |entry: EntryData| {
-            if let Some((id, version, size, mtime, is_dir)) = prior.remove(&entry.path) {
-                if is_dir == entry.is_dir {
-                    let changed = size != entry.size || mtime != entry.mtime;
-                    return Row::build(entry, id, version + u64::from(changed));
-                }
+            if let Some((id, version, size, mtime, is_dir)) = prior.remove(&entry.path)
+                && is_dir == entry.is_dir
+            {
+                let changed = size != entry.size || mtime != entry.mtime;
+                return Row::build(entry, id, version + u64::from(changed));
             }
             self.new_row(entry)
         };
@@ -334,7 +333,7 @@ impl DirectoryState {
         row.entry.name = name.to_owned();
         row.entry.size = size;
         row.entry.mtime = mtime;
-        row.sort_key = sort_key(&name);
+        row.sort_key = sort_key(name);
         let index = Self::reseat(order, self.sort, index);
         self.commit();
         Some(index)

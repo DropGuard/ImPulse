@@ -270,6 +270,13 @@ pub fn apply_event_with_stats(
     if state.dir() != Some(dir) {
         return WatchAction::Ignored(IgnoreReason::WrongSubject);
     }
+    let mut cx = Ctx {
+        filter,
+        overrides,
+        show_hidden,
+        dir,
+        stats,
+    };
     match &ev.kind {
         K::Overflow => WatchAction::Reconcile {
             dir: dir.to_path_buf(),
@@ -277,26 +284,8 @@ pub fn apply_event_with_stats(
         K::WatchGone => WatchAction::DirGone {
             dir: dir.to_path_buf(),
         },
-        K::Created => arrive(
-            state,
-            filter,
-            overrides,
-            show_hidden,
-            dir,
-            ev,
-            Arrival::Created,
-            stats,
-        ),
-        K::MovedTo => arrive(
-            state,
-            filter,
-            overrides,
-            show_hidden,
-            dir,
-            ev,
-            Arrival::Moved,
-            stats,
-        ),
+        K::Created => arrive(state, &mut cx, ev, Arrival::Created),
+        K::MovedTo => arrive(state, &mut cx, ev, Arrival::Moved),
         K::Deleted | K::MovedFrom => remove_listed(state, dir, ev),
         K::Modified => {
             // A directory's own mtime carries no listing meaning (see the
@@ -308,10 +297,10 @@ pub fn apply_event_with_stats(
             restat(
                 state,
                 subject_path(dir, ev.name.as_deref().unwrap_or("")),
-                &stats,
+                stats,
             )
         }
-        K::Renamed { from } => rename(state, filter, overrides, show_hidden, dir, ev, from, stats),
+        K::Renamed { from } => rename(state, &mut cx, ev, from),
     }
 }
 
@@ -322,6 +311,19 @@ pub fn apply_event_with_stats(
 enum Arrival {
     Created,
     Moved,
+}
+
+/// What every step of applying one event reads besides the listing itself and
+/// the event: the membership rules, the user's per-path overrides, the hidden
+/// switch, the watched directory and the facts taken outside the lock. They
+/// used to travel as separate parameters through arrive, admit and rename, and
+/// each one added to the list in the same order three times.
+struct Ctx<'a> {
+    filter: &'a NameFilter,
+    overrides: &'a mut std::collections::HashSet<PathBuf>,
+    show_hidden: bool,
+    dir: &'a Path,
+    stats: &'a Prestat,
 }
 
 /// The scanner's membership rules, in the scanner's order: a hidden entry is not
@@ -353,26 +355,12 @@ fn rejection(
 /// ignore the engine caused.
 fn arrive(
     state: &mut DirectoryState,
-    filter: &NameFilter,
-    overrides: &mut std::collections::HashSet<PathBuf>,
-    show_hidden: bool,
-    dir: &Path,
+    cx: &mut Ctx<'_>,
     ev: &RawWatchEvent,
     arrival: Arrival,
-    stats: &Prestat,
 ) -> WatchAction {
     match &ev.name {
-        Some(name) => admit(
-            state,
-            filter,
-            overrides,
-            show_hidden,
-            dir,
-            name,
-            ev.is_dir,
-            arrival,
-            stats,
-        ),
+        Some(name) => admit(state, cx, name, ev.is_dir, arrival),
         None => WatchAction::Ignored(IgnoreReason::NoName),
     }
 }
@@ -381,18 +369,14 @@ fn arrive(
 /// half of a rename that came in from outside the watch.
 fn admit(
     state: &mut DirectoryState,
-    filter: &NameFilter,
-    overrides: &mut std::collections::HashSet<PathBuf>,
-    show_hidden: bool,
-    dir: &Path,
+    cx: &mut Ctx<'_>,
     name: &str,
     is_dir: bool,
     arrival: Arrival,
-    stats: &Prestat,
 ) -> WatchAction {
-    let path_str = subject_path(dir, name);
+    let path_str = subject_path(cx.dir, name);
     let path = Path::new(&path_str);
-    if let Some(reason) = rejection(is_dir, &path, name, filter, overrides, show_hidden) {
+    if let Some(reason) = rejection(is_dir, path, name, cx.filter, cx.overrides, cx.show_hidden) {
         return WatchAction::Ignored(reason);
     }
     if state.contains_path(&path_str) {
@@ -403,12 +387,12 @@ fn admit(
         // and the thumbnail cache, which validates by mtime, kept serving the
         // picture that used to be there.
         return if arrival == Arrival::Moved {
-            restat(state, path_str, stats)
+            restat(state, path_str, cx.stats)
         } else {
             WatchAction::Ignored(IgnoreReason::AlreadyListed)
         };
     }
-    let meta = match stats.stat(&path) {
+    let meta = match cx.stats.stat(path) {
         Ok(m) => m,
         // vanished already
         Err(_) => return WatchAction::Ignored(IgnoreReason::StatFailed),
@@ -514,19 +498,15 @@ fn restat(state: &mut DirectoryState, path: String, stats: &Prestat) -> WatchAct
 /// and a rename in from outside the watch is still exactly an arrival.
 fn rename(
     state: &mut DirectoryState,
-    filter: &NameFilter,
-    overrides: &mut std::collections::HashSet<PathBuf>,
-    show_hidden: bool,
-    dir: &Path,
+    cx: &mut Ctx<'_>,
     ev: &RawWatchEvent,
     from: &str,
-    stats: &Prestat,
 ) -> WatchAction {
     let Some(name) = &ev.name else {
         return WatchAction::Ignored(IgnoreReason::NoName);
     };
-    let from_path = subject_path(dir, from);
-    let to_str = subject_path(dir, name);
+    let from_path = subject_path(cx.dir, from);
+    let to_str = subject_path(cx.dir, name);
     let to_path = Path::new(&to_str);
     // Renaming a file onto the name it already has is a no-op in POSIX and
     // emits nothing, so arriving here means the kernel or a test said otherwise.
@@ -538,11 +518,18 @@ fn rename(
     let listed = state.contains_path(&from_path);
     match (
         listed,
-        rejection(ev.is_dir, &to_path, name, filter, overrides, show_hidden),
+        rejection(
+            ev.is_dir,
+            to_path,
+            name,
+            cx.filter,
+            cx.overrides,
+            cx.show_hidden,
+        ),
     ) {
         // The row is here and the new name is a member: one entry, one path.
         (true, None) => {
-            let meta = match stats.stat(&to_path) {
+            let meta = match cx.stats.stat(to_path) {
                 Ok(m) => m,
                 // Gone already: the only fact left is that the source is not
                 // here any more, which is what an unpaired MOVED_FROM said.
@@ -573,17 +560,7 @@ fn rename(
         },
         // The source was never ours: this is an arrival from wherever it came,
         // including a save's backup landing on the file it is replacing.
-        (false, None) => admit(
-            state,
-            filter,
-            overrides,
-            show_hidden,
-            dir,
-            name,
-            ev.is_dir,
-            Arrival::Moved,
-            stats,
-        ),
+        (false, None) => admit(state, cx, name, ev.is_dir, Arrival::Moved),
         (false, Some(reason)) => WatchAction::Ignored(reason),
     }
 }

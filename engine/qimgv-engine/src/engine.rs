@@ -241,15 +241,15 @@ impl Engine {
                                         _ => None,
                                     };
                                     #[cfg(any(target_os = "linux", windows))]
-                                    if let Some(job) = job {
-                                        if let Some(w) = &watcher {
-                                            w.send(watcher::WatchCmd::Enumerate {
-                                                path: job.path,
-                                                epoch: job.epoch,
-                                                dispatch: job.dispatch,
-                                                install: false,
-                                            });
-                                        }
+                                    if let Some(job) = job
+                                        && let Some(w) = &watcher
+                                    {
+                                        w.send(watcher::WatchCmd::Enumerate {
+                                            path: job.path,
+                                            epoch: job.epoch,
+                                            dispatch: job.dispatch,
+                                            install: false,
+                                        });
                                     }
                                 }
                                 Ok(Command::SetSort(mode)) => {

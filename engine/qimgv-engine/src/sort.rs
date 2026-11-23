@@ -95,10 +95,7 @@ pub fn natural(a: &str, b: &str) -> Ordering {
     // digit-run probes below walk clones while the real cursors consume.
     let mut ai = a.chars().peekable();
     let mut bi = b.chars().peekable();
-    loop {
-        let (Some(ca), Some(cb)) = (ai.peek().copied(), bi.peek().copied()) else {
-            break;
-        };
+    while let (Some(ca), Some(cb)) = (ai.peek().copied(), bi.peek().copied()) {
         let (ka, kb) = (class(ca), class(cb));
         if ka != kb {
             return ka.cmp(&kb);
