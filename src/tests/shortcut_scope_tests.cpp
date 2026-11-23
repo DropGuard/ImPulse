@@ -44,6 +44,16 @@ class TestShortcutScope : public ::testing::Test {
     }
 };
 
+namespace {
+// QApplication::sendEvent delivers synchronously and does not take the event:
+// the caller owns it. A heap event handed to it is a leak per call (LSan named
+// all ten); postEvent is the one that takes ownership.
+void sendFocus(QObject *receiver, QEvent::Type type) {
+    QFocusEvent event(type);
+    QApplication::sendEvent(receiver, &event);
+}
+} // namespace
+
 // The resolution order of the pointer funnel: the armed inspect layer, then
 // the global table. What is deliberately NOT here any more is a
 // caller-declared surface rank — the keyboard left this path entirely, and
@@ -392,14 +402,14 @@ TEST_F(TestShortcutScope, gridFocusAnswersThroughTheGridsTable) {
     // The document view owns Right/PgDown/PgUp now, and the grid owns the
     // same keys while it holds focus. The resolution follows focus, not a
     // central de-claim: the grid's table is asked first.
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
 
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+    sendFocus(grid, QEvent::FocusIn);
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)), QStringLiteral("gridPageDown"));
 
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_PageDown)), QStringLiteral("nextImage"));
 }
@@ -423,14 +433,14 @@ TEST_F(TestShortcutScope, resolverAnswersTheLiveTableWithoutADeclaimPass) {
     auto *proxy = core.mainWindow()->getFolderView();
     auto *grid = proxy->findChild<FolderGridView *>();
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+    sendFocus(grid, QEvent::FocusIn);
 
     // the grid's token is absent from the global table even while the
     // grid is live — disjointness is unconditional, not focus-dependent
     EXPECT_TRUE(!actionManager->tableForPublic(Scope::Global).contains(QStringLiteral("Right")));
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("gridSelectNext"));
 
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
     EXPECT_EQ(actionManager->actionForKeySequence(QKeySequence(Qt::Key_Right)), QStringLiteral("nextImage"));
 }
 
@@ -469,23 +479,23 @@ TEST_F(TestShortcutScope, tokenWalkAnswersThroughTheSameTables) {
     EXPECT_TRUE(grid != nullptr) << "no FolderGridView under the folder view";
 
     // keyboard token, grid unfocused: the document table answers
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
     EXPECT_EQ(actionManager->actionForToken(QStringLiteral("Right")), QStringLiteral("nextImage"));
     EXPECT_EQ(actionManager->actionForToken(QStringLiteral("Ctrl+V")), QStringLiteral("pasteFile"));
 
     // keyboard token, grid focused: the grid's table answers — the same
     // gate actionForKeySequence applies
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+    sendFocus(grid, QEvent::FocusIn);
     EXPECT_EQ(actionManager->actionForToken(QStringLiteral("Right")), QStringLiteral("gridSelectNext"));
     EXPECT_EQ(actionManager->actionForToken(QStringLiteral("Ctrl+V")), QStringLiteral("pasteFilesHere"));
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
 
     // the pointer exception: WheelDown answers the document table even
     // while the grid holds focus — the gate is a keyboard-focus question,
     // and the wheel event the funnel sees was not consumed by any surface
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusIn));
+    sendFocus(grid, QEvent::FocusIn);
     EXPECT_EQ(actionManager->actionForToken(QStringLiteral("WheelDown")), QStringLiteral("nextImage"));
-    QApplication::sendEvent(grid, new QFocusEvent(QEvent::FocusOut));
+    sendFocus(grid, QEvent::FocusOut);
 
     // the dispatch leg fires the action the walk named
     QSignalSpy next(actionManager->action("nextImage"), &QAction::triggered);

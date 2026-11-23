@@ -18,9 +18,13 @@
 
 //------------------------------------------------------------------------------
 void Settings::loadStylesheet() {
-    // the stylesheet styles widgets — a QCoreApplication run (headless test
-    // suites) has none to style, and the font metrics below need QGuiApplication
-    if(qobject_cast<QApplication *>(qApp) == nullptr)
+    // the stylesheet styles widgets — a QCoreApplication or QGuiApplication run
+    // (the headless and engine-stack suites) has none to style. Asked of the
+    // instance itself, not of qApp: with <QApplication> included, qApp is
+    // already static_cast<QApplication *>, so on any other application type
+    // the cast this check exists to make has happened before it, and UBSan
+    // reports the downcast (171 engine-stack runs went red on it).
+    if(qobject_cast<QApplication *>(QCoreApplication::instance()) == nullptr)
         return;
     // stylesheet template file
     QFile file(":/res/styles/style-template.qss");
