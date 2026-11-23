@@ -31,14 +31,14 @@ impl TryFrom<i32> for SortMode {
     }
 }
 
-/// Natural, case-insensitive name comparison, with character classes
-/// weighted the way ICU/DUCET (and therefore Dolphin) orders them:
-/// whitespace and punctuation before digits before letters. A plain
-/// codepoint comparison sorts a digit-led name before a bracket-led one,
-/// while the desktop collation puts the bracket first — the mismatch that
-/// motivated this comparator. Digit runs compare by
-/// numeric value ("2" < "10"); full ICU collation is still deliberately
-/// out of scope, this is its practical core.
+/// Natural, case-insensitive name comparison — ImPulse's own order for
+/// filename listings: character classes weighted whitespace/punctuation <
+/// digits < letters, digit runs by numeric value ("2" < "10"), letters
+/// case-blind with the raw name as the final tiebreak. Locale-free and
+/// deterministic by design — one directory, one order, on every machine
+/// and under every UI language; desktop collations (ICU and friends)
+/// instead follow the locale and the CLDR version, so any resemblance to
+/// them on a given corpus is incidental, not a goal.
 // The class weight behind both natural() and sort_key(): punctuation before
 // digits before letters, ASCII by range check, the rest by the Unicode
 // tables.

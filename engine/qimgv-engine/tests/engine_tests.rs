@@ -174,13 +174,12 @@ fn rapid_open_dir_keeps_only_latest() {
     }
 }
 
-// A real-world mismatch that motivated this comparator: the desktop collation
-// (ICU/DUCET) orders a bracket-led name first; a codepoint comparison puts a
-// digit-led one first. The comparator weights character classes
-// punctuation < digits < letters, case-insensitively, with numeric runs by
-// value.
+// The comparator's contract, pinned: character classes weighted
+// punctuation < digits < letters — a bracket-led name heads a listing, a
+// digit-led one follows (the pair that motivated the weights) — with
+// numeric runs by value and case-blind letters.
 #[test]
-fn natural_orders_classes_like_the_desktop_and_runs_digits_by_value() {
+fn natural_weights_punctuation_before_digits_and_runs_digits_by_value() {
     let bracket = "[Album] VOL.003 title_a [12P-34.5 MB]_00004.jpg";
     let digit_led = "0gallery1234567890 (2)_00-00-26.367.jpg";
     assert_eq!(
