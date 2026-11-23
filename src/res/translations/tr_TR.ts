@@ -109,26 +109,6 @@
         <translation> sürüm </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>Karıştırma modu: KAPALI</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>Karıştırma modu: AÇIK</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>Slayt gösterisi: KAPALI</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>Slayt gösterisi: AÇIK</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation type="unfinished"></translation>
@@ -300,21 +280,6 @@
         <translation>Dosya yolu açılamadı: </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>Klasör yüklenemedi: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>Dizin sonu.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>Yükleme başarısız: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>Hata: Görüntü yüklenemedi.</translation>
@@ -396,6 +361,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>İptal</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>Dosyayı farklı kaydet...</translation>
     </message>
 </context>
 <context>
@@ -584,11 +556,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="565"/>
-        <source>Save File as...</source>
-        <translation>Dosyayı farklı kaydet...</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="800"/>
         <source>Folder view</source>
         <translation>Klasör görünümü</translation>
@@ -615,6 +582,37 @@
         <location filename="../../gui/mainwindow.cpp" line="875"/>
         <source>Fit 1:1</source>
         <translation>Gerçek boyutta göster 1:1</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>Klasör yüklenemedi: </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>Dizin sonu.</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>Yükleme başarısız: </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>Karıştırma modu: KAPALI</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>Karıştırma modu: AÇIK</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>Slayt gösterisi: KAPALI</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>Slayt gösterisi: AÇIK</translation>
     </message>
 </context>
 <context>
@@ -993,41 +991,34 @@
     </message>
 </context>
 <context>
-    <name>SSideBar</name>
+    <name>SettingsSidebar</name>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="9"/>
-        <source>General</source>
-        <translation>Genel</translation>
+        <source>About</source>
+        <translation>Hakkında</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="10"/>
-        <source>View</source>
-        <translation>Görünüm</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="11"/>
-        <source>Theme</source>
-        <translation>Tema</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="12"/>
-        <source>Controls</source>
-        <translation>Kontroller</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="13"/>
-        <source>Scripts</source>
-        <translation>Komut dosyaları</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="14"/>
         <source>Advanced</source>
         <translation>Gelişmiş</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="15"/>
-        <source>About</source>
-        <translation>Hakkında</translation>
+        <source>Controls</source>
+        <translation>Kontroller</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Genel</translation>
+    </message>
+    <message>
+        <source>Scripts</source>
+        <translation>Komut dosyaları</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Tema</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Görünüm</translation>
     </message>
 </context>
 <context>

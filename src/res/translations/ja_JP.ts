@@ -109,26 +109,6 @@
         <translation> バージョン </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>シャッフルモード: OFF</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>シャッフルモード: ON</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>スライドショー: OFF</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>スライドショー: ON</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation> </translation>
@@ -300,21 +280,6 @@
         <translation>パスを開けませんでした: </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>フォルダを読み込めませんでした: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>ディレクトリの終わり。</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>読み込みに失敗しました: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>エラー: 画像を読み込めませんでした。</translation>
@@ -396,6 +361,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>名前を付けてファイルを保存</translation>
     </message>
 </context>
 <context>
@@ -584,11 +556,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="565"/>
-        <source>Save File as...</source>
-        <translation>名前を付けてファイルを保存</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="800"/>
         <source>Folder view</source>
         <translation>フォルダービュー</translation>
@@ -615,6 +582,37 @@
         <location filename="../../gui/mainwindow.cpp" line="875"/>
         <source>Fit 1:1</source>
         <translation>1:1表示</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>フォルダを読み込めませんでした: </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>ディレクトリの終わり。</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>読み込みに失敗しました: </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>シャッフルモード: OFF</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>シャッフルモード: ON</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>スライドショー: OFF</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>スライドショー: ON</translation>
     </message>
 </context>
 <context>
@@ -993,41 +991,34 @@
     </message>
 </context>
 <context>
-    <name>SSideBar</name>
+    <name>SettingsSidebar</name>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="9"/>
-        <source>General</source>
-        <translation>一般</translation>
+        <source>About</source>
+        <translation>概要</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="10"/>
-        <source>View</source>
-        <translation>表示</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="11"/>
-        <source>Theme</source>
-        <translation>テーマ</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="12"/>
-        <source>Controls</source>
-        <translation>コントロール</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="13"/>
-        <source>Scripts</source>
-        <translation>スクリプト</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="14"/>
         <source>Advanced</source>
         <translation>詳細</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="15"/>
-        <source>About</source>
-        <translation>概要</translation>
+        <source>Controls</source>
+        <translation>コントロール</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>一般</translation>
+    </message>
+    <message>
+        <source>Scripts</source>
+        <translation>スクリプト</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>テーマ</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>表示</translation>
     </message>
 </context>
 <context>

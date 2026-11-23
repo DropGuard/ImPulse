@@ -113,26 +113,6 @@
         <translation> 版本 </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>随机模式: 关闭</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>随机模式: 启用</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>幻灯片播放：关闭</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>幻灯片播放：启用</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation>永久删除 </translation>
@@ -304,21 +284,6 @@
         <translation>不能打开的路径: </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>不能载入的目录: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>目录末尾.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>加载失败: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>错误: 不能载入图片.</translation>
@@ -400,6 +365,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>取消</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>文件另存为...</translation>
     </message>
 </context>
 <context>
@@ -588,11 +560,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="536"/>
-        <source>Save File as...</source>
-        <translation>文件另存为...</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="771"/>
         <source>Folder view</source>
         <translation>文件夹视图</translation>
@@ -619,6 +586,37 @@
         <location filename="../../gui/mainwindow.cpp" line="846"/>
         <source>Fit 1:1</source>
         <translation>适应 1:1</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>不能载入的目录: </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>目录末尾.</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>加载失败: </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>随机模式: 关闭</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>随机模式: 启用</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>幻灯片播放：关闭</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>幻灯片播放：启用</translation>
     </message>
 </context>
 <context>

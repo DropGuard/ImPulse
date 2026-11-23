@@ -109,26 +109,6 @@
         <translation> версія </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>Режим перемішування: Вимкнено</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>Режим перемішування: Увімкнено</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>Слайд-шоу: Вимкнено</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>Слайд-шоу: Увімкнено</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation>Видалити </translation>
@@ -300,21 +280,6 @@
         <translation>Не вдалося відкрити шлях: </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>Не вдалося завантажити теку: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>Кінець директорії.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>Завантаження не вдалося: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>Помилка: не вдалося завантажити зображення.</translation>
@@ -396,6 +361,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>Відмінити</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>Зберегти файл як...</translation>
     </message>
 </context>
 <context>
@@ -584,11 +556,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="536"/>
-        <source>Save File as...</source>
-        <translation>Зберегти файл як...</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="771"/>
         <source>Folder view</source>
         <translation>Галерея</translation>
@@ -615,6 +582,37 @@
         <location filename="../../gui/mainwindow.cpp" line="846"/>
         <source>Fit 1:1</source>
         <translation>Режим 1:1</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>Не вдалося завантажити теку: </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>Кінець директорії.</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>Завантаження не вдалося: </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>Режим перемішування: Вимкнено</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>Режим перемішування: Увімкнено</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>Слайд-шоу: Вимкнено</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>Слайд-шоу: Увімкнено</translation>
     </message>
 </context>
 <context>
@@ -993,41 +991,34 @@
     </message>
 </context>
 <context>
-    <name>SSideBar</name>
+    <name>SettingsSidebar</name>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="9"/>
-        <source>General</source>
-        <translation>Загальні</translation>
+        <source>About</source>
+        <translation>О програмі</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="10"/>
-        <source>View</source>
-        <translation>Перегляд</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="11"/>
-        <source>Theme</source>
-        <translation>Тема</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="12"/>
-        <source>Controls</source>
-        <translation>Керування</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="13"/>
-        <source>Scripts</source>
-        <translation>Скріпти</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="14"/>
         <source>Advanced</source>
         <translation>Продвинуті</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="15"/>
-        <source>About</source>
-        <translation>О програмі</translation>
+        <source>Controls</source>
+        <translation>Керування</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Загальні</translation>
+    </message>
+    <message>
+        <source>Scripts</source>
+        <translation>Скріпти</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Тема</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Перегляд</translation>
     </message>
 </context>
 <context>

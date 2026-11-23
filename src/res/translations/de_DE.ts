@@ -109,26 +109,6 @@
         <translation> Version </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>Zufallswiedergabe: AUS</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>Zufallswiedergabe: AN</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>Diashiow: AUS</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>Diashow: EIN</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation>Lösche </translation>
@@ -300,21 +280,6 @@
         <translation>Pfad konnte nicht geöffnet werden: </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>Ordner konnte nicht geladen werden: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>Ende des Ordners.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>Laden fehlgeschlagen: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>Fehler: Das Bild konnte nicht geladen werden.</translation>
@@ -397,6 +362,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>Abbruch</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>Speichere Datei als...</translation>
     </message>
 </context>
 <context>
@@ -589,11 +561,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="565"/>
-        <source>Save File as...</source>
-        <translation>Speichere Datei als...</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="800"/>
         <source>Folder view</source>
         <translation>Ordneransicht</translation>
@@ -620,6 +587,37 @@
         <location filename="../../gui/mainwindow.cpp" line="875"/>
         <source>Fit 1:1</source>
         <translation>Auf 1:1 skalieren</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>Ordner konnte nicht geladen werden: </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>Ende des Ordners.</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>Laden fehlgeschlagen: </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>Zufallswiedergabe: AUS</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>Zufallswiedergabe: AN</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>Diashiow: AUS</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>Diashow: EIN</translation>
     </message>
 </context>
 <context>
@@ -999,41 +997,34 @@
     </message>
 </context>
 <context>
-    <name>SSideBar</name>
+    <name>SettingsSidebar</name>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="9"/>
-        <source>General</source>
-        <translation>Allgemein</translation>
+        <source>About</source>
+        <translation>Über</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="10"/>
-        <source>View</source>
-        <translation>Ansicht</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="11"/>
-        <source>Theme</source>
-        <translation>Thema</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="12"/>
-        <source>Controls</source>
-        <translation>Steuerung</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="13"/>
-        <source>Scripts</source>
-        <translation>Skripte</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="14"/>
         <source>Advanced</source>
         <translation>Fortgeschritten</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="15"/>
-        <source>About</source>
-        <translation>Über</translation>
+        <source>Controls</source>
+        <translation>Steuerung</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Allgemein</translation>
+    </message>
+    <message>
+        <source>Scripts</source>
+        <translation>Skripte</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Thema</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Ansicht</translation>
     </message>
 </context>
 <context>

@@ -109,26 +109,6 @@
         <translation> version </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="268"/>
-        <source>Shuffle mode: OFF</source>
-        <translation>Mode aléatoire : OFF</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="271"/>
-        <source>Shuffle mode: ON</source>
-        <translation>Mode aléatoire : ON</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="280"/>
-        <source>Slideshow: OFF</source>
-        <translation>Diaporama : OFF</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="284"/>
-        <source>Slideshow: ON</source>
-        <translation>Diaporama : ON</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="355"/>
         <source>Delete </source>
         <translation>Effacer </translation>
@@ -300,21 +280,6 @@
         <translation>Impossible d&apos;ouvrir le chemin : </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="1260"/>
-        <source>Could not load folder: </source>
-        <translation>Impossible de charger le dossier : </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1413"/>
-        <source>End of directory.</source>
-        <translation>Fin du répertoire.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="1452"/>
-        <source>Load failed: </source>
-        <translation>Échec du chargement : </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="1496"/>
         <source>Error: could not load image.</source>
         <translation>Erreur : impossible de charger l&apos;image.</translation>
@@ -396,6 +361,13 @@
         <location filename="../../gui/panels/croppanel/croppanel.ui" line="527"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
+    </message>
+</context>
+<context>
+    <name>DialogHost</name>
+    <message>
+        <source>Save File as...</source>
+        <translation>Enregistrer le fichier sous...</translation>
     </message>
 </context>
 <context>
@@ -584,11 +556,6 @@
 <context>
     <name>MW</name>
     <message>
-        <location filename="../../gui/mainwindow.cpp" line="565"/>
-        <source>Save File as...</source>
-        <translation>Enregistrer le fichier sous...</translation>
-    </message>
-    <message>
         <location filename="../../gui/mainwindow.cpp" line="800"/>
         <source>Folder view</source>
         <translation>Affichage dossier</translation>
@@ -615,6 +582,37 @@
         <location filename="../../gui/mainwindow.cpp" line="875"/>
         <source>Fit 1:1</source>
         <translation>Ajuster 1:1</translation>
+    </message>
+</context>
+<context>
+    <name>NavigationController</name>
+    <message>
+        <source>Could not load folder: </source>
+        <translation>Impossible de charger le dossier : </translation>
+    </message>
+    <message>
+        <source>End of directory.</source>
+        <translation>Fin du répertoire.</translation>
+    </message>
+    <message>
+        <source>Load failed: </source>
+        <translation>Échec du chargement : </translation>
+    </message>
+    <message>
+        <source>Shuffle mode: OFF</source>
+        <translation>Mode aléatoire : OFF</translation>
+    </message>
+    <message>
+        <source>Shuffle mode: ON</source>
+        <translation>Mode aléatoire : ON</translation>
+    </message>
+    <message>
+        <source>Slideshow: OFF</source>
+        <translation>Diaporama : OFF</translation>
+    </message>
+    <message>
+        <source>Slideshow: ON</source>
+        <translation>Diaporama : ON</translation>
     </message>
 </context>
 <context>
@@ -993,41 +991,34 @@
     </message>
 </context>
 <context>
-    <name>SSideBar</name>
+    <name>SettingsSidebar</name>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="9"/>
-        <source>General</source>
-        <translation>Général</translation>
+        <source>About</source>
+        <translation>À propos</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="10"/>
-        <source>View</source>
-        <translation>Affichage</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="11"/>
-        <source>Theme</source>
-        <translation>Thème</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="12"/>
-        <source>Controls</source>
-        <translation>Contrôles</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="13"/>
-        <source>Scripts</source>
-        <translation>Scripts</translation>
-    </message>
-    <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="14"/>
         <source>Advanced</source>
         <translation>Avancé</translation>
     </message>
     <message>
-        <location filename="../../gui/customwidgets/ssidebar.cpp" line="15"/>
-        <source>About</source>
-        <translation>À propos</translation>
+        <source>Controls</source>
+        <translation>Contrôles</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Général</translation>
+    </message>
+    <message>
+        <source>Scripts</source>
+        <translation>Scripts</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Thème</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Affichage</translation>
     </message>
 </context>
 <context>
