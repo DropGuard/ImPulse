@@ -16,12 +16,6 @@ void Video::load() {
     m_loadAttempted = true;
 }
 
-bool Video::save(QString destPath, int) {
-    Q_UNUSED(destPath)
-    qDebug() << "Saving video is unsupported.";
-    return false;
-}
-
 std::shared_ptr<const QImage> Video::getImage() {
     qDebug() << "[Video] getImage() is not implemented.";
     //TODO: find out some easy way to get frames from video source

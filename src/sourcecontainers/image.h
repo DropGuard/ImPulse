@@ -30,7 +30,6 @@ class Image {
     virtual QSize originalSize() {
         return size();
     }
-    virtual bool save(QString destPath, int jpegQuality) = 0;
     QString fileName() const;
     QString baseName() const;
     bool isEdited() const;

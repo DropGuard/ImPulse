@@ -32,26 +32,6 @@ int ImageAnimated::frameCount() {
     return m_frameCount;
 }
 
-// TODO: overwrite (self included)
-bool ImageAnimated::save(QString destPath, int) {
-    QFile file(m_path);
-    if(file.exists()) {
-        if(!file.copy(destPath)) {
-            qDebug() << "Unable to save file.";
-            return false;
-        } else {
-            qDebug() << destPath << this->filePath();
-            if(destPath == this->filePath()) {
-                m_docInfo->refresh();
-            }
-            return true;
-        }
-    } else {
-        qDebug() << "Unable to save file. Perhaps the source file was deleted?";
-        return false;
-    }
-}
-
 // in case of gif returns current frame
 
 std::shared_ptr<const QImage> ImageAnimated::getImage() {

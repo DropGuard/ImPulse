@@ -119,7 +119,19 @@ DirectoryModel::SaveResult DirectoryModel::saveFile(const QString &filePath, con
     if(id.isNull()) {
         if(!m_dirManager.containsFile(filePath))
             return SaveResult::Failed;
-        auto image = m_cache.get(filePath);
+        const auto cached = m_cache.get(filePath);
+        if(!cached)
+            return SaveResult::Failed;
+        // An unedited animation is its file: Save As writes a byte copy, since
+        // re-encoding one frame would drop the rest. QFile::copy refuses an
+        // existing destination, the same refusal ImageAnimated::save carried
+        // (its "TODO: overwrite (self included)"); this keeps that behavior
+        // rather than widening it. A video has nothing to save, as before.
+        if(cached->type() == DocumentType::ANIMATED)
+            return QFile::copy(filePath, destPath) ? SaveResult::Saved : SaveResult::Failed;
+        // only a static image has pixels to write, and only ImageStatic
+        // carries a save()
+        const auto image = std::dynamic_pointer_cast<ImageStatic>(cached);
         return image && image->save(destPath, settings->JPEGSaveQuality()) ? SaveResult::Saved : SaveResult::Failed;
     }
 

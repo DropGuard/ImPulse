@@ -15,9 +15,6 @@ class Video : public Image {
     int width() override;
     QSize size() override;
 
-  public slots:
-    bool save(QString destPath, int jpegQuality) override;
-
   private:
     void load() override;
 

@@ -104,7 +104,7 @@ void ImageStatic::loadICO() {
     m_loadAttempted = true;
 }
 
-bool ImageStatic::save(QString destPath, int jpegQuality) {
+bool ImageStatic::save(const QString &destPath, int jpegQuality) {
     // The backup, the extension/quality decision and the rollback live in
     // FileOperations::saveWithBackup now, shared with the clipboard import:
     // two copies of that sequence had already diverged once.

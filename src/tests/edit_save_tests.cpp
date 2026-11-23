@@ -321,6 +321,50 @@ TEST_F(TestEditSave, theEditedImageExportGetsAUniqueTempFileOwnedByItsMime) {
     EXPECT_TRUE(!QFile::exists(secondPath)) << "the temp file outlived its mime data";
 }
 
+// Save As on an unedited animation writes a byte copy of its file: there are
+// no pixels to encode, and re-encoding one frame would drop the rest. This
+// used to live in ImageAnimated::save; when save() left the Image interface
+// for ImageStatic alone, the model's cast turned the copy into "Could not
+// save file" and no suite noticed, because nothing had pinned it.
+TEST_F(TestEditSave, saveAsOnAnUneditedAnimationCopiesTheFileByteForByte) {
+    // minimal two-frame GIF89a, the same fixture machinery_tests decodes
+    const QByteArray gif =
+        QByteArray::fromBase64("R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACw"
+                               "AAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAIBgABCAQ"
+                               "QEAA7");
+    const QString src = QDir(m_alpha).filePath("anim.gif");
+    {
+        QFile f(src);
+        EXPECT_TRUE(f.open(QIODevice::WriteOnly));
+        f.write(gif);
+    }
+    EXPECT_TRUE(core().loadPath(src));
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core().isSettled();
+        },
+        10000));
+    EXPECT_TRUE(QTest::qWaitFor(
+        [&] {
+            return core().directoryModel()->isLoaded(src);
+        },
+        10000));
+    auto image = core().directoryModel()->getImage(src);
+    ASSERT_NE(image, nullptr);
+    EXPECT_EQ(image->type(), DocumentType::ANIMATED);
+    EXPECT_TRUE(!image->isEdited());
+
+    const QString dest = QDir(m_base).filePath("copy.gif");
+    core().saveCurrentFileAs(dest);
+
+    QFile out(dest);
+    EXPECT_TRUE(out.open(QIODevice::ReadOnly)) << "Save As of an animation wrote nothing";
+    EXPECT_EQ(out.readAll(), gif);
+    QFile orig(src);
+    EXPECT_TRUE(orig.open(QIODevice::ReadOnly));
+    EXPECT_EQ(orig.readAll(), gif);
+}
+
 int main(int argc, char **argv) {
     // QApplication, not QCoreApplication: the tested paths still touch no
     // widget — the save contract is pinned through FakeInteractions, the mode

@@ -34,7 +34,7 @@ class ImageStatic : public Image {
 
   public slots:
     void crop(QRect newRect);
-    bool save(QString destPath, int jpegQuality) override;
+    bool save(const QString &destPath, int jpegQuality);
 
   private:
     ImageStatic(const ImageStatic &source, const QString &path, std::shared_ptr<const QImage> pixels);

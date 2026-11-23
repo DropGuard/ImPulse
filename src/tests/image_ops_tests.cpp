@@ -321,7 +321,9 @@ TEST_F(TestImageOps, failedSaveToAnotherPathDoesNotTouchTheOriginal) {
         t.write(targetBefore);
     }
 
-    auto image = *ImageFactory::createImage(m_fixtureDir + "/orig.png", false, loadPolicy());
+    auto image = std::dynamic_pointer_cast<ImageStatic>(
+        *ImageFactory::createImage(m_fixtureDir + "/orig.png", false, loadPolicy()));
+    ASSERT_NE(image, nullptr);
     EXPECT_TRUE(!image->save(m_fixtureDir + "/target.xyz", 95)); // "xyz" is not encodable
 
     QFile after(m_fixtureDir + "/orig.png");
@@ -342,7 +344,7 @@ TEST_F(TestImageOps, failedSaveKeepsTheUnsavedEdit) {
     EXPECT_TRUE(writeBigImage(m_fixtureDir + "/orig.png", "png", QSize(24, 24)));
     auto image = std::dynamic_pointer_cast<ImageStatic>(
         *ImageFactory::createImage(m_fixtureDir + "/orig.png", false, loadPolicy()));
-    EXPECT_TRUE(image != nullptr);
+    ASSERT_NE(image, nullptr);
     image->setEditedImage(std::make_unique<const QImage>(image->getImage()->copy(QRect(0, 0, 8, 8))));
     EXPECT_TRUE(image->isEdited());
     EXPECT_TRUE(!image->save(m_fixtureDir + "/orig.xyz", 95));
@@ -368,7 +370,8 @@ TEST_F(TestImageOps, imageStaticSaveRoundTripAndQuality) {
 
     auto loaded = ImageFactory::createImage(srcPath, false, loadPolicy());
     EXPECT_TRUE(loaded.has_value());
-    auto imgStatic = *loaded;
+    auto imgStatic = std::dynamic_pointer_cast<ImageStatic>(*loaded);
+    ASSERT_NE(imgStatic, nullptr);
     EXPECT_TRUE(imgStatic->getImage() != nullptr);
 
     EXPECT_TRUE(imgStatic->save(saveDir + "/round.png", 95));

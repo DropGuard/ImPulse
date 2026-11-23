@@ -18,8 +18,6 @@ class ImageAnimated : public Image {
     bool isEdited();
 
     int frameCount();
-  public slots:
-    bool save(QString destPath, int jpegQuality) override;
 
   private:
     void load() override;
