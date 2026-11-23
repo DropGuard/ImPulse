@@ -185,7 +185,13 @@ impl SendPtr {
     }
 }
 
+// SAFETY: the pointer is an opaque token this crate never dereferences; it is
+// only handed back to the notify callback. Moving it across threads is sound
+// because the C++ side's contract is that the callback and the `user` pointer
+// it receives may be used from any thread (the callback only wakes the GUI).
 unsafe impl Send for SendPtr {}
+// SAFETY: shared access is only `get`, which copies the address out; there is
+// no interior state to race on. Same caller contract as the Send impl above.
 unsafe impl Sync for SendPtr {}
 
 type NotifyCb = extern "C" fn(user: *mut c_void);
@@ -214,6 +220,10 @@ fn read_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
     if ptr.is_null() {
         return Err(QIMGV_ERR_INVALID);
     }
+    // SAFETY: `ptr` was checked non-null just above; the function's contract
+    // (see # Safety) is that it points to a NUL-terminated string that stays
+    // valid for the duration of this call. The borrow does not outlive it:
+    // the result is copied into an owned PathBuf.
     let s = unsafe { CStr::from_ptr(ptr) };
     match s.to_str() {
         Ok(s) if !s.is_empty() => Ok(PathBuf::from(s)),
@@ -225,6 +235,11 @@ fn read_path(ptr: *const c_char) -> Result<PathBuf, c_int> {
 fn write_str(buf: *mut c_char, cap: usize, s: &str) -> Result<(), c_int> {
     fits(buf, cap, s)?;
     let bytes = s.as_bytes();
+    // SAFETY: `fits` returned Ok, so `buf` is non-null and `cap` is at least
+    // bytes.len() + 1. The caller guarantees `buf` is writable for `cap`
+    // bytes, so both the copy and the terminator write (at offset
+    // bytes.len() < cap) stay inside the buffer. `bytes` is a Rust slice, so
+    // it cannot overlap the caller's C buffer.
     unsafe {
         std::ptr::copy_nonoverlapping(bytes.as_ptr().cast::<c_char>(), buf, bytes.len());
         buf.add(bytes.len()).write(0);
@@ -239,7 +254,7 @@ fn fits(buf: *mut c_char, cap: usize, s: &str) -> Result<(), c_int> {
     if buf.is_null() {
         return Err(QIMGV_ERR_INVALID);
     }
-    if s.as_bytes().len() + 1 > cap {
+    if s.len() + 1 > cap {
         return Err(QIMGV_ERR_TRUNCATED);
     }
     Ok(())
@@ -248,6 +263,9 @@ fn fits(buf: *mut c_char, cap: usize, s: &str) -> Result<(), c_int> {
 /// # Safety
 /// `engine` must be a live pointer returned by `qimgv_engine_new`, not yet freed.
 fn with_engine<T>(engine: *mut QimgvEngine, f: impl FnOnce(&Engine) -> T) -> T {
+    // SAFETY: the function's contract (see # Safety) is a live pointer from
+    // qimgv_engine_new that has not been freed. Only a shared reference is
+    // taken, and the engine's mutable state is behind its own locks.
     let eng = unsafe { &*engine };
     let guard = eng.engine.lock().unwrap_or_else(|p| p.into_inner());
     f(&guard)
@@ -274,6 +292,9 @@ pub unsafe extern "C" fn qimgv_engine_new(
             // documented as "NULL to accept everything" in qimgv_engine.h
             NameFilter::from_extensions(std::iter::empty::<&str>())
         } else {
+            // SAFETY: the branch above checked non-null; the caller guarantees
+            // a NUL-terminated string valid for this call, and it is copied
+            // into owned data (NameFilter) before the call returns.
             let joined = unsafe { CStr::from_ptr(formats_extensions_utf8) }
                 .to_str()
                 .map_err(|_| "extension list is not valid UTF-8".to_string())?;
@@ -321,6 +342,10 @@ pub unsafe extern "C" fn qimgv_engine_free(engine: *mut QimgvEngine) {
     if engine.is_null() {
         return;
     }
+    // SAFETY: `engine` is non-null (checked above) and, by the caller's
+    // contract, came from qimgv_engine_new and is freed exactly once: the
+    // Box was created by Box::into_raw in that function, so from_raw restores
+    // the same allocation. No other call may use the pointer afterwards.
     if catch_unwind(AssertUnwindSafe(|| unsafe { drop(Box::from_raw(engine)) })).is_err() {
         set_last_error("panic in qimgv_engine_free");
     }
@@ -368,6 +393,8 @@ pub unsafe extern "C" fn qimgv_engine_open_dir(
             e.send(Command::OpenDir { path, sort, epoch })
                 .map(|_| {
                     if !epoch_out.is_null() {
+                        // SAFETY: non-null checked on the line above; the
+                        // caller guarantees a writable u64.
                         unsafe { *epoch_out = epoch };
                     }
                     QIMGV_OK
@@ -540,6 +567,10 @@ fn entry_at(
             };
             write_str(name_buf, name_cap, &entry.name)?;
             write_str(path_buf, path_cap, &entry.path)?;
+            // SAFETY: `out` was checked non-null at the top of entry_at; the
+            // caller guarantees it is valid and writable for one
+            // QimgvEntryMeta (a plain repr(C) struct of Copy fields, so the
+            // assignment drops nothing).
             unsafe {
                 *out = QimgvEntryMeta {
                     size: entry.size,
@@ -630,9 +661,17 @@ pub unsafe extern "C" fn qimgv_engine_export_listing(
             } else if buf.is_null() {
                 return Err(QIMGV_ERR_INVALID);
             } else {
+                // SAFETY: `buf` is non-null here and the caller guarantees it
+                // is valid for reads and writes of `cap` bytes with no other
+                // reference alive for this call; u8 has no invalid bit
+                // patterns, so an uninitialized caller buffer is not read as
+                // anything but bytes the engine then overwrites.
                 unsafe { std::slice::from_raw_parts_mut(buf, cap) }
             };
             let (needed, fc, dc, revision) = e.export_listing(slice);
+            // SAFETY: all four out pointers were checked non-null at the top of
+            // this closure; the caller guarantees each is valid and writable
+            // for its type (u32, u32, u32, u64).
             unsafe {
                 *needed_out = needed as u32;
                 *file_count_out = fc as u32;
@@ -675,6 +714,9 @@ pub unsafe extern "C" fn qimgv_engine_probe(
         }
         let p = read_path(path)?;
         let info = qimgv_engine::meta::probe(&p).map_err(|e| map_engine_error(&e))?;
+        // SAFETY: `out` was checked non-null at the top of this closure; the
+        // caller guarantees it is valid and writable for one QimgvProbeResult
+        // (a repr(C) struct of c_int fields).
         unsafe {
             *out = QimgvProbeResult {
                 format: info.format as c_int,
@@ -777,6 +819,9 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
         return QIMGV_ERR_INVALID;
     }
     let r = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: `engine` was checked non-null at the top of the function;
+        // the caller guarantees it is live and not freed concurrently. Only a
+        // shared reference is taken; the stash and engine are locked below.
         let eng = unsafe { &*engine };
         // Lock order is stashed then engine, everywhere; take_event is the only
         // function that touches both.
@@ -801,6 +846,9 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         if !notice_only {
                             write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
                         }
+                        // SAFETY: `out` was checked non-null at the top of
+                        // take_event; the caller guarantees it is valid and
+                        // writable for one QimgvEvent.
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_DIR_LISTED,
@@ -820,6 +868,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         if !notice_only {
                             write_str(subject_buf, subject_cap, &dir.to_string_lossy())?;
                         }
+                        // SAFETY: same `out` contract as the DIR_LISTED arm.
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_SORT_CHANGED,
@@ -837,6 +886,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                         }
                         let code = map_engine_error(error);
                         set_last_error(&error.to_string());
+                        // SAFETY: same `out` contract as the DIR_LISTED arm.
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_OPEN_FAILED,
@@ -883,6 +933,9 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                             qimgv_engine::WatchChangeKind::Renamed { .. } => QIMGV_MUT_RENAMED,
                         };
                         if !mutation.is_null() {
+                            // SAFETY: non-null checked on the line above; the
+                            // caller guarantees it is valid and writable for
+                            // one QimgvMutation.
                             unsafe {
                                 *mutation = QimgvMutation {
                                     kind: mkind,
@@ -893,6 +946,7 @@ pub unsafe extern "C" fn qimgv_engine_take_event(
                                 };
                             }
                         }
+                        // SAFETY: same `out` contract as the DIR_LISTED arm.
                         unsafe {
                             *out = QimgvEvent {
                                 kind: QIMGV_EVENT_DIR_MUTATED,

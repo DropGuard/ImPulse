@@ -57,6 +57,7 @@ use super::{WatchCmd, dispatch, enumerate_and_report};
 // --- the Win32 surface this file is allowed to touch (bounded: no -sys crate
 // --- — the whole kernel32 contract is the list below, reviewable at once) ---
 
+#[allow(clippy::upper_case_acronyms)] // the Win32 name, as every call site and doc reads it
 type HANDLE = usize;
 
 #[repr(C)]
@@ -110,6 +111,12 @@ mod mask {
     pub const ISDIR: u32 = 0x4000_0000;
 }
 
+// SAFETY: this block is the whole kernel32 surface the watcher uses. Each
+// declaration matches the documented Win32 signature (HANDLE as the
+// pointer-sized integer alias above, BOOL as i32, wide strings as *const u16),
+// and the "system" ABI is stdcall on x86 and the single Windows ABI elsewhere.
+// A wrong signature here is undefined behavior at every call site, which is
+// why the block is kept small and in one place.
 unsafe extern "system" {
     fn CreateEventW(attrs: *mut c_void, manual: i32, initial: i32, name: *const u16) -> HANDLE;
     fn SetEvent(event: HANDLE) -> i32;
@@ -152,10 +159,15 @@ unsafe extern "system" {
 /// One kernel event object, closed exactly once by ownership (the fd.rs
 /// OwnedFd discipline — nothing releases a handle by hand).
 struct OsEvent(HANDLE);
+// SAFETY: a kernel event handle is a process-wide token, not tied to the
+// creating thread, and every Win32 call made on it here is thread-agnostic.
+// The wrapper is moved to the watcher thread, never shared by reference.
 unsafe impl Send for OsEvent {}
 
 impl OsEvent {
     fn new(manual: bool) -> Option<OsEvent> {
+        // SAFETY: all-null attributes and name are the documented "default
+        // security, anonymous event" form; the result is checked below.
         let h = unsafe { CreateEventW(std::ptr::null_mut(), manual as i32, 0, std::ptr::null()) };
         if h == 0 || h == INVALID_HANDLE_VALUE {
             None
@@ -164,9 +176,12 @@ impl OsEvent {
         }
     }
     fn set(&self) {
+        // SAFETY: `self.0` is a valid event handle owned by this wrapper; it is
+        // closed only in Drop.
         unsafe { SetEvent(self.0) };
     }
     fn reset(&self) {
+        // SAFETY: same as `set`.
         unsafe { ResetEvent(self.0) };
     }
     fn raw(&self) -> HANDLE {
@@ -176,6 +191,8 @@ impl OsEvent {
 
 impl Drop for OsEvent {
     fn drop(&mut self) {
+        // SAFETY: the handle is valid and owned here, and Drop runs once, so
+        // this is its only close.
         unsafe { CloseHandle(self.0) };
     }
 }
@@ -259,6 +276,10 @@ impl Drop for WatcherHandle {
 fn open_dir(path: &Path) -> Result<HANDLE, std::io::Error> {
     let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
     wide.push(0);
+    // SAFETY: `wide` is a live, NUL-terminated UTF-16 string for the whole
+    // call; the security-attributes and template-handle arguments are the
+    // documented null/0. The returned handle is checked against
+    // INVALID_HANDLE_VALUE below.
     let h = unsafe {
         CreateFileW(
             wide.as_ptr(),
@@ -290,10 +311,20 @@ fn arm_read(
     buffer: &mut NotifierBuffer,
     overlapped: &mut Overlapped,
 ) -> bool {
+    // SAFETY: `completion` is the watcher's live event handle.
     unsafe { ResetEvent(completion) };
+    // SAFETY: Overlapped is a plain C struct of integers, pointers and
+    // handles, for which all-zero is the documented initial state.
     *overlapped = unsafe { std::mem::zeroed() };
     overlapped.event = completion;
     let mut unused: u32 = 0;
+    // SAFETY: `dir` is a live directory handle opened with
+    // FILE_FLAG_OVERLAPPED; `buffer` and `overlapped` are exclusively
+    // borrowed and, per the contract in this function's doc, stay alive and
+    // unmoved until the read completes or is retired through cancel plus
+    // drain (see retire_watch / drain_aborted). `unused` is a live local and
+    // is not read: with an overlapped handle the byte count is not returned
+    // here.
     let queued = unsafe {
         ReadDirectoryChangesW(
             dir,
@@ -333,6 +364,8 @@ fn drain_aborted(dir: HANDLE, overlapped: &mut Overlapped) {
     let deadline = std::time::Instant::now() + RETIRE_DRAIN;
     loop {
         let mut drained: u32 = 0;
+        // SAFETY: `dir` and `overlapped` are the pair the read was armed
+        // with; `drained` is a live local; wait=0, so the call never blocks.
         let done = unsafe { GetOverlappedResult(dir, overlapped, &mut drained, 0) };
         if done != 0 || std::time::Instant::now() >= deadline {
             return;
@@ -344,14 +377,22 @@ fn drain_aborted(dir: HANDLE, overlapped: &mut Overlapped) {
 fn retire_watch(watch: Option<Watch>, overlapped: &mut Overlapped, armed: bool) {
     if let Some(w) = watch {
         if armed {
+            // SAFETY: `w.dir` is the live handle of the watch being retired;
+            // a null overlapped pointer cancels every pending read on it.
             unsafe { CancelIoEx(w.dir, std::ptr::null_mut()) };
             drain_aborted(w.dir, overlapped);
         }
+        // SAFETY: the pending read (if any) was cancelled and drained, bounded
+        // by RETIRE_DRAIN; `w` is consumed here, so this is the handle's only
+        // close.
         unsafe { CloseHandle(w.dir) };
     }
 }
 
 fn u32_at(buf: &[u8], off: usize) -> u32 {
+    // SAFETY: callers only pass an `off` with off + 12 <= buf.len() (the
+    // loop guard in the parser), so the 4 bytes read lie inside `buf`.
+    // read_unaligned makes no alignment assumption.
     unsafe { core::ptr::read_unaligned(buf.as_ptr().add(off) as *const u32) }
 }
 
@@ -386,6 +427,10 @@ fn drain_records(
             // from_raw_parts would have to assume it
             let mut words = Vec::with_capacity(units);
             for k in 0..units {
+                // SAFETY: units = name_len / 2 and the guard above ensured
+                // off + 12 + name_len <= buffer.len(), so every 2-byte read
+                // at off + 12 + 2k lies inside `buffer`; unaligned read, no
+                // alignment assumed.
                 words.push(unsafe {
                     core::ptr::read_unaligned(buffer.as_ptr().add(off + 12 + k * 2) as *const u16)
                 });
@@ -402,8 +447,7 @@ fn drain_records(
     let mut records: Vec<super::Record> = Vec::with_capacity(raw.len());
     // (index of a seen OLD half, the cookie it was given)
     let mut held: Option<(usize, u32)> = None;
-    for i in 0..raw.len() {
-        let (action, name) = &raw[i];
+    for (i, (action, name)) in raw.iter().enumerate() {
         let bits = match *action {
             FILE_ACTION_ADDED => mask::CREATE,
             FILE_ACTION_REMOVED => mask::DELETE,
@@ -461,8 +505,12 @@ fn retire_gone(
     let Some(w) = watch.take() else { return };
     let generation = w.id;
     let dir = w.path.clone();
+    // SAFETY: `w.dir` is the live handle of the watch just taken out of
+    // `watch`, so nothing else retires it.
     unsafe { CancelIoEx(w.dir, std::ptr::null_mut()) };
     drain_aborted(w.dir, overlapped);
+    // SAFETY: the read was cancelled and drained (bounded); `w` is owned
+    // here, so this is the handle's only close.
     unsafe { CloseHandle(w.dir) };
     let live_wd = Some(generation);
     let rec = super::Record {
@@ -506,10 +554,13 @@ fn watcher_loop(
     let mut next_id: i32 = 0;
     let mut next_cookie: u32 = 0;
     let mut buffer = NotifierBuffer([0u8; 64 * 1024]);
+    // SAFETY: all-zero is the documented initial state of the plain C struct.
     let mut overlapped: Overlapped = unsafe { std::mem::zeroed() };
 
     while running.load(Ordering::Relaxed) {
         let handles = [completion.raw(), wake];
+        // SAFETY: `handles` is a live array of exactly the 2 handles the count
+        // states, both open for the life of this thread.
         let waited = unsafe { WaitForMultipleObjects(2, handles.as_ptr(), 0, 500) };
         if waited == WAIT_FAILED {
             log::warn!("watcher: wait failed: {}", std::io::Error::last_os_error());
@@ -524,6 +575,11 @@ fn watcher_loop(
                 armed = false;
                 let dir_handle = watch.as_ref().map(|w| w.dir).unwrap_or(0);
                 let mut transferred: u32 = 0;
+                // SAFETY: `armed` was true, so a read is outstanding on this
+                // watch's handle with this `overlapped`, and `watch` holds the
+                // handle (the 0 fallback is a defensive value, not a reachable
+                // state). `transferred` is a live local; wait=0, so the call
+                // never blocks.
                 let completed = unsafe {
                     GetOverlappedResult(dir_handle, &mut overlapped, &mut transferred, 0)
                 };
@@ -624,6 +680,7 @@ fn watcher_loop(
 
         if waited == WAIT_OBJECT_0 + 1 {
             // commands: reset the wake, then drain the channel
+            // SAFETY: `wake` is the live command event this thread was given.
             unsafe { ResetEvent(wake) };
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
@@ -663,6 +720,10 @@ fn watcher_loop(
                                             path,
                                             std::io::Error::last_os_error()
                                         );
+                                        // SAFETY: the arm failed, so no read
+                                        // is pending on `w.dir`, and `w` was
+                                        // never stored in `watch`: this is the
+                                        // handle's only close.
                                         unsafe { CloseHandle(w.dir) };
                                     }
                                 }

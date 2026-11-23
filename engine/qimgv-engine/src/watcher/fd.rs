@@ -62,6 +62,11 @@ impl WatcherHandle {
     pub(crate) fn send(&self, cmd: WatchCmd) {
         let _ = self.cmd_tx.send(cmd);
         let one: u64 = 1;
+        // SAFETY: `one` is a live local u64, so the pointer is valid for the 8
+        // bytes written; `self.wake` is an eventfd owned by this handle, open
+        // for as long as `self` is. The result is deliberately ignored: the fd
+        // is non-blocking, and EAGAIN means the counter is already non-zero --
+        // a wake is pending, which is all this write is for.
         unsafe {
             libc::write(
                 self.wake.as_raw_fd(),
@@ -79,6 +84,8 @@ impl WatcherHandle {
         self.running.store(false, Ordering::Relaxed);
         let _ = self.cmd_tx.send(WatchCmd::Stop);
         let one: u64 = 1;
+        // SAFETY: same as in `send`: a live local u64 written to the eventfd
+        // this handle owns; a failed write means a wake is already pending.
         unsafe {
             libc::write(
                 self.wake.as_raw_fd(),
@@ -94,8 +101,12 @@ impl WatcherHandle {
 
 fn new_eventfd() -> OwnedFd {
     // CLOEXEC so the wake pipe cannot leak into a process the app spawns
+    // SAFETY: eventfd takes no pointers; the return value is checked below.
     let fd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
     assert!(fd >= 0, "eventfd for the watcher wake pipe failed");
+    // SAFETY: `fd` was just returned by eventfd and checked non-negative, so
+    // it is an open descriptor that nothing else owns; OwnedFd takes the sole
+    // ownership and closes it exactly once.
     unsafe { OwnedFd::from_raw_fd(fd) }
 }
 
@@ -146,6 +157,8 @@ fn watcher_loop(
                 revents: 0,
             },
         ];
+        // SAFETY: `fds` is a live, exclusively borrowed array of exactly the 2
+        // pollfd entries the count argument states.
         let ready = unsafe { libc::poll(fds.as_mut_ptr(), 2, 500) };
         if ready < 0 {
             let err = std::io::Error::last_os_error();
@@ -203,6 +216,10 @@ fn watcher_loop(
         if fds[1].revents & libc::POLLIN != 0 {
             // commands: drain the wake counter, then the channel
             let mut buf = [0u8; 8];
+            // SAFETY: `buf` is a live 8-byte buffer and the length passed is 8;
+            // `wake` is the eventfd this thread holds for the whole loop. The
+            // loop ends on the first short or failed read (EAGAIN once the
+            // counter is drained).
             unsafe {
                 while libc::read(wake.as_raw_fd(), buf.as_mut_ptr().cast(), 8) as isize == 8 {}
             }
