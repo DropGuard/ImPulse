@@ -114,65 +114,9 @@
         <translation> </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="355"/>
-        <source> items permanently?</source>
-        <translation>個のアイテムを完全に削除しますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="357"/>
-        <source>Delete item permanently?</source>
-        <translation>アイテムを完全に削除しますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="358"/>
-        <source>Delete permanently</source>
-        <translation>完全に削除</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="374"/>
-        <source>File removed</source>
-        <translation>ファイルを削除しました</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <source>Removed: </source>
-        <translation>削除済み: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <location filename="../../core.cpp" line="408"/>
-        <source> files</source>
-        <translation> 個のファイル</translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="389"/>
         <source>Move </source>
         <translation> </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="389"/>
-        <source> items to trash?</source>
-        <translation>個のアイテムをゴミ箱へ移動しますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="391"/>
-        <source>Move item to trash?</source>
-        <translation>アイテムをゴミ箱へ移動しますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="392"/>
-        <source>Move to trash</source>
-        <translation>ゴミ箱へ移動</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="404"/>
-        <source>Moved to trash</source>
-        <translation>ゴミ箱に移動しました</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="408"/>
-        <source>Moved to trash: </source>
-        <translation>ゴミ箱に移動しました: </translation>
     </message>
     <message>
         <location filename="../../core.cpp" line="463"/>
@@ -183,40 +127,6 @@
         <location filename="../../core.cpp" line="470"/>
         <source>Path copied</source>
         <translation>パスがコピーされました</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>File exists</source>
-        <translation>ファイルは存在します</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <source>Overwrite file?</source>
-        <translation>ファイルを上書きしますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="812"/>
-        <location filename="../../core.cpp" line="880"/>
-        <source>Could not create directory </source>
-        <translation>ディレクトリを作成できませんでした </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="916"/>
-        <source>File moved.</source>
-        <translation>ファイルが移動されました。</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>Destination file exists. Overwrite?</source>
-        <translation>移動先にファイルが存在します。上書きしますか？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="937"/>
-        <source>File copied.</source>
-        <translation>ファイルがコピーされました。</translation>
     </message>
     <message>
         <location filename="../../core.cpp" line="984"/>
@@ -368,6 +278,77 @@
     <message>
         <source>Save File as...</source>
         <translation>名前を付けてファイルを保存</translation>
+    </message>
+</context>
+<context>
+    <name>FileOpsController</name>
+    <message>
+        <source> files</source>
+        <translation> 個のファイル</translation>
+    </message>
+    <message>
+        <source> items permanently?</source>
+        <translation>個のアイテムを完全に削除しますか？</translation>
+    </message>
+    <message>
+        <source> items to trash?</source>
+        <translation>個のアイテムをゴミ箱へ移動しますか？</translation>
+    </message>
+    <message>
+        <source>Could not create directory </source>
+        <translation>ディレクトリを作成できませんでした </translation>
+    </message>
+    <message>
+        <source>Delete item permanently?</source>
+        <translation>アイテムを完全に削除しますか？</translation>
+    </message>
+    <message>
+        <source>Delete permanently</source>
+        <translation>完全に削除</translation>
+    </message>
+    <message>
+        <source>Destination file exists. Overwrite?</source>
+        <translation>移動先にファイルが存在します。上書きしますか？</translation>
+    </message>
+    <message>
+        <source>File copied.</source>
+        <translation>ファイルがコピーされました。</translation>
+    </message>
+    <message>
+        <source>File exists</source>
+        <translation>ファイルは存在します</translation>
+    </message>
+    <message>
+        <source>File moved.</source>
+        <translation>ファイルが移動されました。</translation>
+    </message>
+    <message>
+        <source>File removed</source>
+        <translation>ファイルを削除しました</translation>
+    </message>
+    <message>
+        <source>Move item to trash?</source>
+        <translation>アイテムをゴミ箱へ移動しますか？</translation>
+    </message>
+    <message>
+        <source>Move to trash</source>
+        <translation>ゴミ箱へ移動</translation>
+    </message>
+    <message>
+        <source>Moved to trash</source>
+        <translation>ゴミ箱に移動しました</translation>
+    </message>
+    <message>
+        <source>Moved to trash: </source>
+        <translation>ゴミ箱に移動しました: </translation>
+    </message>
+    <message>
+        <source>Overwrite file?</source>
+        <translation>ファイルを上書きしますか？</translation>
+    </message>
+    <message>
+        <source>Removed: </source>
+        <translation>削除済み: </translation>
     </message>
 </context>
 <context>

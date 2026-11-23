@@ -20,6 +20,8 @@
 #include "gui/icoreview.h"
 #include "gui/icropsurface.h"
 #include "navigationcontroller.h"
+#include "fileopscontroller.h"
+#include "selectionquery.h"
 #include "gui/dialoghost.h"
 #include "gui/ioverlayhost.h"
 #include "components/directorymodel.h"
@@ -101,8 +103,13 @@ class Core : public QObject, public INavigationHost {
     // The dialog provider: production points this at MainWindow, a test at a
     // scripted fake. Set after construction because the provider is the window
     // in production, and the window does not exist until initGui ran.
+    //
+    // A replacement reaches every controller that asks through the seam: they
+    // borrow it, so a pointer copied once at construction would keep answering
+    // to the provider this replaced.
     void setUserInteractions(IUserInteractions *ui) {
         m_ui = ui;
+        m_fileOps->setUserInteractions(ui);
     }
     IUserInteractions *userInteractions() const {
         return m_ui;
@@ -110,6 +117,7 @@ class Core : public QObject, public INavigationHost {
     // The overlay surface, for the same reason and with the same lifetime rule.
     void setOverlayHost(IOverlayHost *host) {
         m_overlays = host;
+        m_fileOps->setOverlayHost(host);
     }
     IOverlayHost *overlayHost() const {
         return m_overlays;
@@ -144,10 +152,16 @@ class Core : public QObject, public INavigationHost {
     bool slideshowLoops() const {
         return m_nav->slideshowLoops();
     }
-    // The paths currently selected, in view order. Public because every command
-    // that acts on "the selection" is public and this is how a caller confirms
-    // what one acted on.
-    QList<QString> currentSelection();
+    // "The selection" every command acts on. Public because every command that
+    // acts on it is public and this is how a caller confirms what one acted on.
+    const SelectionQuery &selection() const {
+        return m_selection;
+    }
+    // The file operations. A caller drives them here the way a key press or an
+    // overlay does; the controller is a QObject child of Core.
+    FileOpsController &fileOps() const {
+        return *m_fileOps;
+    }
 
     // The folder view's presenter, for the tests that drive grid commands and
     // assert on what the view was told. Read-only for the same reason as the
@@ -233,6 +247,9 @@ class Core : public QObject, public INavigationHost {
     // (see navigationcontroller.h). QObject-child of Core — destroyed by the
     // tree, so member order does not matter here.
     NavigationController *m_nav = nullptr;
+    // the file operations: delete, trash, rename, copy, move, reveal. Same
+    // ownership as the navigation object — a QObject child of Core.
+    FileOpsController *m_fileOps = nullptr;
 
     // the slideshow→player loop relay, bound once in the constructor: every
     // slideshow flip reaches the view seam — the window's player in
@@ -253,13 +270,14 @@ class Core : public QObject, public INavigationHost {
     Thumbnailer m_thumbnailer;
 
     DirectoryPresenter m_thumbPanelPresenter, m_folderViewPresenter;
+    // reads State and the folder presenter; declared after both
+    SelectionQuery m_selection{m_state, m_folderViewPresenter};
 
     void rotateByDegrees(int degrees);
 
     QTranslator *m_translator = nullptr;
 
     void attachModel(DirectoryModel *_model);
-    QString selectedPath();
     void guiSetImage(std::shared_ptr<Image> img) override;
     bool saveFile(const QString &filePath, const QString &newPath);
     bool saveFile(const QString &filePath);
@@ -267,9 +285,6 @@ class Core : public QObject, public INavigationHost {
     template <typename... Args>
     void edit_template(const std::function<std::unique_ptr<const QImage>(std::shared_ptr<const QImage>, Args...)> &func,
                        Args &&...as);
-
-    void doInteractiveCopy(const QString &path, const QString &destDirectory, DialogResult &overwriteAllFiles);
-    void doInteractiveMove(const QString &path, const QString &destDirectory, DialogResult &overwriteAllFiles);
 
   public slots:
     // ---------------------------------------------------------------------
@@ -284,10 +299,6 @@ class Core : public QObject, public INavigationHost {
     void saveCurrentFileAs(const QString &destPath);
     void crop(QRect rect);
     void cropAndSave(QRect rect);
-    void copyCurrentFile(const QString &destDirectory);
-    void moveCurrentFile(const QString &destDirectory);
-    void interactiveCopy(const QList<QString> &paths, const QString &destDirectory);
-    void interactiveMove(const QList<QString> &paths, const QString &destDirectory);
     // the two adjacent-folder commands; the bool is "land on the last file"
     void prevDirectory(bool selectLast) {
         m_nav->prevDirectory(selectLast);
@@ -325,8 +336,6 @@ class Core : public QObject, public INavigationHost {
     void requestSavePath();
     void saveCurrentFile();
     void setWallpaper();
-    void removePermanent();
-    void moveToTrash();
     void copyFileClipboard();
     void openFromClipboard();
     // The folder view's Ctrl+V: the clipboard holds file paths, so this copies
@@ -358,8 +367,6 @@ class Core : public QObject, public INavigationHost {
     // what a drag or clipboard entry carries for one image
     QMimeData *getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget target);
     void resize(QSize size);
-    void movePathsTo(const QList<QString> &paths, const QString &destDirectory);
-    void renameCurrentSelection(const QString &newName);
     // The wallpaper command dispatch, as a pure function of (session, path):
     // what the audit test pins. Public because it is the seam for that test and
     // hiding it behind a friend declaration was the only thing making it
@@ -371,13 +378,9 @@ class Core : public QObject, public INavigationHost {
     void close();
     void scalingRequest(QSize, ScalingFilter);
     void onScalingFinished(std::shared_ptr<const QImage> scaled, const ScalerRequest &req);
-    void copyPathsTo(const QList<QString> &paths, const QString &destDirectory);
-    FileOpResult removeFile(const QString &fileName, bool trash);
     void showResizeDialog();
     void toggleFullscreenInfoBar();
     void runScript(const QString &);
-    void reloadImage();
-    void reloadImage(const QString &fileName);
     void copyPathClipboard();
     void sortByName() {
         m_nav->sortByName();
@@ -388,13 +391,7 @@ class Core : public QObject, public INavigationHost {
     void sortBySize() {
         m_nav->sortBySize();
     }
-    void showRenameDialog();
     void onDraggedOut(); // the action's no-argument form; the paths form is public
-    void outputError(const FileOpResult &error) const;
-    void reportBatchRemoval(const QString &doneVerb, int total, int successCount) const;
-    void showOpenDialog();
     void recoverEdits();
-    void showInDirectory();
-    void quickCopyToFixedDirectory();
     void print();
 };

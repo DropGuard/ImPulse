@@ -1,34 +1,62 @@
 /*
- * Core's file-operations half: delete/trash, rename, copy and move (quick and
- * interactive), the clipboard legs and drag-and-drop. Same class, partial
- * implementation — core.cpp keeps composition, wiring and the display sink.
+ * Core's file operations, as an object: delete and trash, rename, reload,
+ * copy and move (quick, current-file and interactive, files and directory
+ * trees), reveal in the file manager, the open dialog. Owns no state of its
+ * own: it reads State and the selection, acts on the model, and asks the
+ * user through the dialog and overlay seams. The coordinator's kernel — the
+ * display sink and the info projection — is NOT owned: a failed move or
+ * remove restores the image through INavigationHost. The listing
+ * materializes on first load, so the model arrives via attachModel.
+ *
+ * A QObject because showInDirectory parents its DBus watcher here, and
+ * because the action and signal connects in core.cpp land on its slots.
  */
 
-#include "core.h"
+#include "fileopscontroller.h"
 #include <utility>
 
-#include "utils/folderend.h"
-
-#include "gui/windowshell.h"
-#include "gui/overlayhost.h"
+#include "appstate.h"
+#include "selectionquery.h"
+#include "navigationcontroller.h" // INavigationHost
+#include "components/directorymodel.h"
+#include "gui/icoreview.h"
+#include "gui/ioverlayhost.h"
+#include "gui/iuserinteractions.h"
 #include "gui/dialoghost.h"
-#include "gui/crop/cropcontroller.h"
+#include "settings.h"
 
-#include <QThread>
-#include <QDrag>
-#include <QTemporaryFile>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFileInfo>
+#include <QProcess>
+#include <QUrl>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 
-#ifdef _WIN32
-#include <tchar.h>
-#endif
+FileOpsController::FileOpsController(const State &state, const SelectionQuery &selection, INavigationHost *host,
+                                     ICoreView *view, DialogHost *dialogs, IUserInteractions *ui,
+                                     IOverlayHost *overlays, QObject *parent)
+    : QObject(parent), m_state(state), m_selection(selection), m_host(host), m_view(view), m_dialogs(dialogs), m_ui(ui),
+      m_overlays(overlays) {
+}
 
-void Core::removePermanent() {
-    const auto paths = currentSelection();
+void FileOpsController::attachModel(DirectoryModel *model) {
+    m_model = model;
+}
+
+void FileOpsController::setUserInteractions(IUserInteractions *ui) {
+    m_ui = ui;
+}
+
+void FileOpsController::setOverlayHost(IOverlayHost *overlays) {
+    m_overlays = overlays;
+}
+
+void FileOpsController::removePermanent() {
+    const auto paths = m_selection.currentSelection();
     if(!paths.count())
         return;
     // unconditional: the confirmDelete setting is gone — an unrecoverable
@@ -63,8 +91,8 @@ void Core::removePermanent() {
     }
 }
 
-void Core::moveToTrash() {
-    const auto paths = currentSelection();
+void FileOpsController::moveToTrash() {
+    const auto paths = m_selection.currentSelection();
     if(!paths.count())
         return;
     if(settings->confirmTrash()) {
@@ -95,21 +123,22 @@ void Core::moveToTrash() {
     }
 }
 
-void Core::reloadImage() {
-    reloadImage(selectedPath());
+void FileOpsController::reloadImage() {
+    reloadImage(m_selection.selectedPath());
 }
 
-void Core::reloadImage(const QString &filePath) {
+void FileOpsController::reloadImage(const QString &filePath) {
     if(m_model->listing().isEmpty())
         return;
     m_model->reload(filePath);
 }
 
-void Core::renameCurrentSelection(const QString &newName) {
-    // Nothing is armed here: the watcher pairs the move into one Renamed event,
-    // and Core::onFileRenamed follows it for the file on screen — an in-app
-    // rename and an external one take the same path and get the same result.
-    const QString oldPath = selectedPath();
+void FileOpsController::renameCurrentSelection(const QString &newName) {
+    // Nothing is armed here: the watcher pairs the move into one displacement,
+    // and NavigationController::onFilesReconciled follows it for the file on
+    // screen — an in-app rename and an external one take the same path and get
+    // the same result.
+    const QString oldPath = m_selection.selectedPath();
     if(!m_model->listing().fileCount() || newName.isEmpty() || oldPath.isEmpty())
         return;
     FileOpResult result;
@@ -127,7 +156,7 @@ void Core::renameCurrentSelection(const QString &newName) {
     outputError(result);
 }
 
-FileOpResult Core::removeFile(const QString &filePath, bool trash) {
+FileOpResult FileOpsController::removeFile(const QString &filePath, bool trash) {
     if(m_model->listing().isEmpty())
         return FileOpResult::NOTHING_TO_DO;
 
@@ -143,11 +172,11 @@ FileOpResult Core::removeFile(const QString &filePath, bool trash) {
     FileOpResult result;
     m_model->removeFile(filePath, trash, result);
     if(result != FileOpResult::SUCCESS && reopen)
-        guiSetImage(img);
+        m_host->guiSetImage(img);
     return result;
 }
 
-void Core::outputError(const FileOpResult &error) const {
+void FileOpsController::outputError(const FileOpResult &error) const {
     if(error == FileOpResult::SUCCESS || error == FileOpResult::NOTHING_TO_DO)
         return;
     m_overlays->showError(FileOperations::decodeResult(error));
@@ -159,7 +188,7 @@ void Core::outputError(const FileOpResult &error) const {
 // count, and the refusals vanished. Both numbers in one message — a second
 // call would replace the first — error-styled whenever anything failed, so
 // the success styling keeps meaning "all of it worked".
-void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCount) const {
+void FileOpsController::reportBatchRemoval(const QString &doneVerb, int total, int successCount) const {
     const int failedCount = total - successCount;
     if(failedCount == 0)
         m_overlays->showMessageSuccess(doneVerb + QString::number(successCount) + tr(" files"));
@@ -168,11 +197,11 @@ void Core::reportBatchRemoval(const QString &doneVerb, int total, int successCou
                               tr(" failed"));
 }
 
-void Core::showOpenDialog() {
+void FileOpsController::showOpenDialog() {
     m_dialogs->showOpenDialog(m_model->listing().directoryPath());
 }
 
-void Core::showInDirectory() {
+void FileOpsController::showInDirectory() {
     if(!m_model)
         return;
 #if defined(__linux__) || defined(__FreeBSD__)
@@ -186,7 +215,8 @@ void Core::showInDirectory() {
     // An empty selection reveals the directory itself (selected in its
     // parent); a session without the contract gets a message, not a list
     // of guessed binaries.
-    QString reveal = selectedPath().isEmpty() ? m_model->listing().directoryPath() : selectedPath();
+    QString reveal =
+        m_selection.selectedPath().isEmpty() ? m_model->listing().directoryPath() : m_selection.selectedPath();
     QDBusMessage msg = QDBusMessage::createMethodCall(
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("/org/freedesktop/FileManager1"),
         QStringLiteral("org.freedesktop.FileManager1"), QStringLiteral("ShowItems"));
@@ -205,7 +235,7 @@ void Core::showInDirectory() {
     // this branch never compiled and every platform fell through to the
     // QDesktopServices fallback below.
     QStringList args;
-    args << "/select," << QDir::toNativeSeparators(selectedPath());
+    args << "/select," << QDir::toNativeSeparators(m_selection.selectedPath());
     QProcess::startDetached("explorer", args);
 #else
     QDesktopServices::openUrl(QUrl::fromLocalFile(m_model->listing().directoryPath()));
@@ -215,15 +245,15 @@ void Core::showInDirectory() {
 // upstream issue #636, promoted from the author's own external script: one
 // keypress copies the current file into the configured folder — no dialog,
 // no clobbering. Unconfigured, it says so instead of guessing.
-void Core::quickCopyToFixedDirectory() {
-    if(!m_model || m_model->listing().isEmpty() || selectedPath().isEmpty())
+void FileOpsController::quickCopyToFixedDirectory() {
+    if(!m_model || m_model->listing().isEmpty() || m_selection.selectedPath().isEmpty())
         return;
     QString destDir = settings->quickCopyDirectory();
     if(destDir.isEmpty()) {
         m_overlays->showMessage(tr("Set the quick copy folder in settings first"));
         return;
     }
-    QFileInfo srcFi(selectedPath());
+    QFileInfo srcFi(m_selection.selectedPath());
     if(!srcFi.isFile()) {
         m_overlays->showMessage(tr("Quick copy: not a regular file"));
         return;
@@ -234,14 +264,14 @@ void Core::quickCopyToFixedDirectory() {
         return;
     }
     FileOpResult result;
-    FileOperations::copyFileTo(selectedPath(), destDir, false, result);
+    FileOperations::copyFileTo(m_selection.selectedPath(), destDir, false, result);
     if(result == FileOpResult::SUCCESS)
         m_overlays->showMessage(tr("Copied to ") + destDir);
     else
         m_overlays->showError(FileOperations::decodeResult(result));
 }
 
-void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
+void FileOpsController::interactiveCopy(const QList<QString> &paths, const QString &destDirectory) {
     DialogResult overwriteFiles;
     for(const auto &path : paths) {
         doInteractiveCopy(path, destDirectory, overwriteFiles);
@@ -251,7 +281,8 @@ void Core::interactiveCopy(const QList<QString> &paths, const QString &destDirec
 }
 
 // todo: replacing DIR with a FILE?
-void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, DialogResult &overwriteFiles) {
+void FileOpsController::doInteractiveCopy(const QString &path, const QString &destDirectory,
+                                          DialogResult &overwriteFiles) {
     QFileInfo srcFi(path);
     // SINGLE FILE COPY ===========================================================================
     if(!srcFi.isDir()) {
@@ -348,7 +379,7 @@ void Core::doInteractiveCopy(const QString &path, const QString &destDirectory, 
     }
 }
 
-void Core::interactiveMove(const QList<QString> &paths, const QString &destDirectory) {
+void FileOpsController::interactiveMove(const QList<QString> &paths, const QString &destDirectory) {
     DialogResult overwriteFiles;
     for(const auto &path : paths) {
         doInteractiveMove(path, destDirectory, overwriteFiles);
@@ -358,7 +389,8 @@ void Core::interactiveMove(const QList<QString> &paths, const QString &destDirec
 }
 
 // todo: replacing DIR with a FILE?
-void Core::doInteractiveMove(const QString &path, const QString &destDirectory, DialogResult &overwriteFiles) {
+void FileOpsController::doInteractiveMove(const QString &path, const QString &destDirectory,
+                                          DialogResult &overwriteFiles) {
     QFileInfo srcFi(path);
     // SINGLE FILE MOVE ===========================================================================
     if(!srcFi.isDir()) {
@@ -461,15 +493,7 @@ void Core::doInteractiveMove(const QString &path, const QString &destDirectory, 
     m_model->removeDir(srcDir.absolutePath(), false, false, dirRmRes);
 }
 
-void Core::copyPathsTo(const QList<QString> &paths, const QString &destDirectory) {
-    interactiveCopy(paths, destDirectory);
-}
-
-void Core::movePathsTo(const QList<QString> &paths, const QString &destDirectory) {
-    interactiveMove(paths, destDirectory);
-}
-
-void Core::moveCurrentFile(const QString &destDirectory) {
+void FileOpsController::moveCurrentFile(const QString &destDirectory) {
     if(m_model->listing().isEmpty())
         return;
     // pause updates to avoid flicker
@@ -477,16 +501,16 @@ void Core::moveCurrentFile(const QString &destDirectory) {
     // move fails during file playback, so we close it temporarily
     m_view->closeImage();
     FileOpResult result;
-    m_model->moveFileTo(selectedPath(), destDirectory, false, result);
+    m_model->moveFileTo(m_selection.selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
         m_overlays->showMessageSuccess(tr("File moved."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
         if(m_ui->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
-            m_model->moveFileTo(selectedPath(), destDirectory, true, result);
+            m_model->moveFileTo(m_selection.selectedPath(), destDirectory, true, result);
     }
     if(result != FileOpResult::SUCCESS) {
-        guiSetImage(m_model->getImage(selectedPath()));
-        updateInfoString();
+        m_host->guiSetImage(m_model->getImage(m_selection.selectedPath()));
+        m_host->updateInfoString();
         if(result != FileOpResult::DESTINATION_FILE_EXISTS) {
             // a move whose copy landed but whose source could not be removed is
             // a warning with an accurate message, not a plain error
@@ -500,24 +524,24 @@ void Core::moveCurrentFile(const QString &destDirectory) {
     m_view->repaintView();
 }
 
-void Core::copyCurrentFile(const QString &destDirectory) {
+void FileOpsController::copyCurrentFile(const QString &destDirectory) {
     if(m_model->listing().isEmpty())
         return;
     FileOpResult result;
-    m_model->copyFileTo(selectedPath(), destDirectory, false, result);
+    m_model->copyFileTo(m_selection.selectedPath(), destDirectory, false, result);
     if(result == FileOpResult::SUCCESS) {
         m_overlays->showMessageSuccess(tr("File copied."));
     } else if(result == FileOpResult::DESTINATION_FILE_EXISTS) {
         if(m_ui->showConfirmation(tr("File exists"), tr("Destination file exists. Overwrite?")))
-            m_model->copyFileTo(selectedPath(), destDirectory, true, result);
+            m_model->copyFileTo(m_selection.selectedPath(), destDirectory, true, result);
     }
     if(result != FileOpResult::SUCCESS && result != FileOpResult::DESTINATION_FILE_EXISTS)
         outputError(result);
 }
 
-void Core::showRenameDialog() {
+void FileOpsController::showRenameDialog() {
     if(m_model->listing().isEmpty())
         return;
-    QFileInfo fi(selectedPath());
+    QFileInfo fi(m_selection.selectedPath());
     m_overlays->toggleRenameOverlay(fi.fileName());
 }

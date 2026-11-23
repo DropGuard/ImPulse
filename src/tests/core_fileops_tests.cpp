@@ -161,7 +161,7 @@ TEST_F(TestCoreFileOps, moveCurrentFileRelandsOnDiskAndCopyKeepsTheOriginal) {
         EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core().copyCurrentFile(copyDst);
+    core().fileOps().copyCurrentFile(copyDst);
     EXPECT_TRUE(QFileInfo::exists(copyDst + QStringLiteral("/moving.png")))
         << "copy did not produce the file at the destination";
     EXPECT_TRUE(QFileInfo::exists(file)) << "copy consumed the original";
@@ -172,7 +172,7 @@ TEST_F(TestCoreFileOps, moveCurrentFileRelandsOnDiskAndCopyKeepsTheOriginal) {
     // overwrite decision, and the production provider (the main window)
     // blocks on a real modal dialog — the test does not fail, it hangs
     // until the QTest watchdog kills the process at 300 s.
-    core().moveCurrentFile(moveDst);
+    core().fileOps().moveCurrentFile(moveDst);
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
@@ -206,13 +206,13 @@ TEST_F(TestCoreFileOps, declinedCollisionLeavesBothFilesWhereTheyWere) {
         EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core().moveCurrentFile(dst);
+    core().fileOps().moveCurrentFile(dst);
 
     EXPECT_EQ(m_ui.confirmCalls, 1);
     EXPECT_TRUE(QFileInfo::exists(file)) << "a declined overwrite still moved the file";
     EXPECT_TRUE(QFileInfo::exists(clash));
 
-    core().copyCurrentFile(dst);
+    core().fileOps().copyCurrentFile(dst);
     EXPECT_EQ(m_ui.confirmCalls, 2);
     // the destination kept its own bytes: the declined copy never wrote
     EXPECT_EQ(coretest::contentOf(clash), clashBytes);
@@ -224,7 +224,7 @@ TEST_F(TestCoreFileOps, interactiveCopyPlacesFileWithoutDialogs) {
     const QString destDir = QDir(m_base).filePath("dst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core().interactiveCopy({src}, destDir);
+    core().fileOps().interactiveCopy({src}, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 0); // no collision, nothing to ask
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("f1.txt")), QByteArray("one"));
@@ -253,7 +253,7 @@ TEST_F(TestCoreFileOps, interactiveCopyDoesNotFollowDirectorySymlinks) {
     const QString destDir = QDir(m_base).filePath("linkdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core().interactiveCopy({srcDir}, destDir);
+    core().fileOps().interactiveCopy({srcDir}, destDir);
 
     // the real directory and its file arrive; the links arrive as links (or
     // are skipped), and nothing recurses through them
@@ -274,7 +274,7 @@ TEST_F(TestCoreFileOps, interactiveCopyOverwritesWhenScriptedYes) {
     makeTxt(destDir, "f1.txt", "old");
     m_ui.replaceAnswers << DialogResult{true, false, false};
 
-    core().interactiveCopy({src}, destDir);
+    core().fileOps().interactiveCopy({src}, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(m_ui.replaceArgs.at(0).first, src); // asked about THIS file
@@ -291,7 +291,7 @@ TEST_F(TestCoreFileOps, interactiveCopyYesToAllSticksAcrossTheBatch) {
     }
     m_ui.replaceAnswers << DialogResult{true, true, false}; // one answer, whole batch
 
-    core().interactiveCopy(sources, destDir);
+    core().fileOps().interactiveCopy(sources, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1); // the sticky answer suppresses the rest
     for(const char *n : {"f1", "f2", "f3"})
@@ -308,7 +308,7 @@ TEST_F(TestCoreFileOps, interactiveCopyNoToAllSkipsTheRestWithoutAsking) {
     }
     m_ui.replaceAnswers << DialogResult{false, true, false}; // no + apply to all
 
-    core().interactiveCopy(sources, destDir);
+    core().fileOps().interactiveCopy(sources, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1); // asked once for the first collision only
     for(const char *n : {"f1", "f2", "f3"})
@@ -326,7 +326,7 @@ TEST_F(TestCoreFileOps, interactiveCopyPlainYesAsksAgainForEachCollision) {
     for(int i = 0; i < 3; ++i)
         m_ui.replaceAnswers << DialogResult{true, false, false}; // plain yes, no all
 
-    core().interactiveCopy(sources, destDir);
+    core().fileOps().interactiveCopy(sources, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 3); // the yes resets: one question per file
     for(const char *n : {"f1", "f2", "f3"})
@@ -343,7 +343,7 @@ TEST_F(TestCoreFileOps, interactiveCopyCancelStopsTheBatch) {
     }
     m_ui.replaceAnswers << DialogResult{false, false, true}; // cancel
 
-    core().interactiveCopy(sources, destDir);
+    core().fileOps().interactiveCopy(sources, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1); // the batch unwound at the first collision
     for(const char *n : {"f1", "f2", "f3"})
@@ -359,7 +359,7 @@ TEST_F(TestCoreFileOps, interactiveCopyOverwritesADirectoryCollisionWhenScripted
     makeTxt(destDir, "sdir", "old file");                    // a FILE where the directory lands
     m_ui.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
 
-    core().interactiveCopy({srcDir}, destDir);
+    core().fileOps().interactiveCopy({srcDir}, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir/inner.txt")), QByteArray("inner"));
@@ -374,7 +374,7 @@ TEST_F(TestCoreFileOps, interactiveCopyDeclinedDirectoryOverwriteKeepsTheFile) {
     makeTxt(destDir, "sdir", "old file");
     m_ui.replaceAnswers << DialogResult{false, false, false}; // no
 
-    core().interactiveCopy({srcDir}, destDir);
+    core().fileOps().interactiveCopy({srcDir}, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir")), QByteArray("old file")); // intact
@@ -396,7 +396,7 @@ TEST_F(TestCoreFileOps, interactiveMoveDoesNotFollowDirectorySymlinks) {
     const QString destDir = QDir(m_base).filePath("mvdst");
     EXPECT_TRUE(QDir().mkpath(destDir));
 
-    core().interactiveMove({srcDir}, destDir);
+    core().fileOps().interactiveMove({srcDir}, destDir);
 
     EXPECT_TRUE(QFileInfo::exists(QDir(destDir).filePath("mvsrcdir/real/inside.txt")));
     // The links moved as links, so nothing recursed. The source directory
@@ -415,7 +415,7 @@ TEST_F(TestCoreFileOps, interactiveMoveOverwritesADirectoryCollisionWhenScripted
     makeTxt(destDir, "sdir", "old file");
     m_ui.replaceAnswers << DialogResult{true, false, false}; // DIR_TO_FILE: yes
 
-    core().movePathsTo({srcDir}, destDir);
+    core().fileOps().interactiveMove({srcDir}, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1);
     EXPECT_EQ(coretest::contentOf(QDir(destDir).filePath("sdir/inner.txt")), QByteArray("inner"));
@@ -440,7 +440,7 @@ TEST_F(TestCoreFileOps, interactiveMoveYesToAllSticksAcrossTheBatch) {
     }
     m_ui.replaceAnswers << DialogResult{true, true, false};
 
-    core.movePathsTo(sources, destDir);
+    core.fileOps().interactiveMove(sources, destDir);
 
     EXPECT_EQ(m_ui.replaceCalls, 1);
     for(const char *n : {"m1", "m2", "m3"}) {
@@ -463,7 +463,7 @@ TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
     makeTxt(root, "thetop/Another normal name/6. This is a file with a prefix and extension.png", "x");
     EXPECT_TRUE(QDir().mkpath(root + "/otherdir"));
 
-    core().interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
+    core().fileOps().interactiveMove({QDir(root).filePath("thetop")}, QDir(root).filePath("otherdir"));
 
     // dotted directory names survive the move whole
     EXPECT_TRUE(QDir(root + "/otherdir/thetop/1. What/3. This is weird/X. Okay whatever").exists());
@@ -474,7 +474,7 @@ TEST_F(TestCoreFileOps, directoryMoveKeepsDottedNamesAndRefusesSelfMoves) {
     EXPECT_TRUE(!QFileInfo::exists(root + "/thetop"));        // moved, not copied
 
     // a directory dropped into its own subtree is refused flat
-    core().interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
+    core().fileOps().interactiveMove({root + "/otherdir/thetop"}, root + "/otherdir/thetop/1. What");
     EXPECT_TRUE(QDir(root + "/otherdir/thetop/1. What/3. This is weird").exists());
     EXPECT_TRUE(!QDir(root + "/otherdir/thetop/1. What/thetop").exists());
     EXPECT_TRUE(!QDir(root + "/otherdir/thetop/1. What/1").exists());
@@ -495,7 +495,7 @@ TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
     }
     const int before = core().directoryModel()->listing().fileCount();
 
-    core().removePermanent();
+    core().fileOps().removePermanent();
 
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -508,6 +508,45 @@ TEST_F(TestCoreFileOps, removePermanentDeletesAfterScriptedConfirmation) {
     }
     EXPECT_TRUE(!QFileInfo::exists(QDir(m_alpha).filePath("a.png"))) << "the confirmed removal never reached the disk";
     EXPECT_EQ(m_ui.confirmCalls, 1);
+}
+
+// The dialog and overlay seams are replaceable after construction
+// (Core::setUserInteractions / setOverlayHost), and the file operations now
+// live in a controller Core builds in its constructor. A controller that
+// copied the two pointers once would keep asking the provider the caller
+// just replaced: the confirmation would go to the old fake and the message
+// to the old host. This pins that a replacement reaches the file operations.
+TEST_F(TestCoreFileOps, aSeamReplacedAfterConstructionReachesTheFileOperations) {
+    EXPECT_TRUE(core().loadPath(QDir(m_alpha).filePath("a.png")));
+    {
+        const bool qt_test_held = QTest::qWaitFor(
+            [&] {
+                return core().isSettled();
+            },
+            10000);
+        EXPECT_TRUE(core().isSettled()) << (qt_test_held ? "" : "the condition did not hold before the deadline");
+    }
+
+    coretest::FakeInteractions replacementUi;
+    replacementUi.confirmAnswer = false; // the fixture's fake would say yes
+    coretest::FakeOverlayHost replacementOverlays;
+    core().setUserInteractions(&replacementUi);
+    core().setOverlayHost(&replacementOverlays);
+
+    core().fileOps().removePermanent();
+    EXPECT_EQ(replacementUi.confirmCalls, 1) << "the confirmation never reached the replacement";
+    EXPECT_EQ(m_ui.confirmCalls, 0) << "the confirmation went to the replaced provider";
+    EXPECT_TRUE(QFileInfo::exists(QDir(m_alpha).filePath("a.png"))) << "the replaced provider's yes deleted the file";
+
+    settings->setQuickCopyDirectory(QString()); // unconfigured: the command answers with a message
+    const int oldHostMessages = m_overlays.messageCalls;
+    core().fileOps().quickCopyToFixedDirectory();
+    EXPECT_EQ(replacementOverlays.messageCalls, 1) << "the message never reached the replacement host";
+    EXPECT_EQ(m_overlays.messageCalls, oldHostMessages) << "the message went to the replaced host";
+
+    // the fixture's fakes outlive the test body; the replacements do not
+    core().setUserInteractions(&m_ui);
+    core().setOverlayHost(&m_overlays);
 }
 
 TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
@@ -523,7 +562,7 @@ TEST_F(TestCoreFileOps, moveToTrashKeepsFilesWhenConfirmationDeclined) {
     }
     const int before = core().directoryModel()->listing().fileCount();
 
-    core().moveToTrash();
+    core().fileOps().moveToTrash();
 
     EXPECT_EQ(m_ui.confirmCalls, 1);
     EXPECT_EQ(core().directoryModel()->listing().fileCount(), before);
@@ -597,7 +636,7 @@ TEST_F(TestCoreFileOps, headlessCoreConstructsWithoutAnyWidget) {
     }
     EXPECT_EQ(m_view.lastImageSize, QSize(8, 8));
 
-    core().copyCurrentFile(QStringLiteral("/nonexistent-dir-xyz/nowhere"));
+    core().fileOps().copyCurrentFile(QStringLiteral("/nonexistent-dir-xyz/nowhere"));
     EXPECT_TRUE(m_overlays.errorCalls > 0) << "the failed copy never reached the injected host";
 
     core().enableFolderView();
@@ -619,7 +658,7 @@ TEST_F(TestCoreFileOps, renameCurrentSelectionForcesAfterScriptedConfirmation) {
     writeImage(colliding);
     const QByteArray original = coretest::contentOf(QDir(m_alpha).filePath("a.png"));
 
-    core().renameCurrentSelection("renamed.png");
+    core().fileOps().renameCurrentSelection("renamed.png");
 
     {
         const bool qt_test_held = QTest::qWaitFor(
@@ -655,7 +694,7 @@ TEST_F(TestCoreFileOps, renamingTheCurrentFileConvergesTheListingAndLandsOnTheNe
     }
     EXPECT_EQ(core().directoryModel()->listing().fileCount(), 2);
 
-    core().renameCurrentSelection("renamed.png");
+    core().fileOps().renameCurrentSelection("renamed.png");
 
     // isSettled() cannot wait for this: it asks about pending model work,
     // not about whether the watch events arrived, and it is already true

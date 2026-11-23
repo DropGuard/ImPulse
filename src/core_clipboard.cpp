@@ -33,7 +33,7 @@ void Core::copyFileClipboard() {
     if(m_model->listing().isEmpty())
         return;
 
-    QMimeData *mimeData = getMimeDataForImage(m_model->getImage(selectedPath()), TARGET_CLIPBOARD);
+    QMimeData *mimeData = getMimeDataForImage(m_model->getImage(m_selection.selectedPath()), TARGET_CLIPBOARD);
 
     // mimeData->text() should already contain an url
     QByteArray gnomeFormat = QByteArray("copy\n").append(QUrl(mimeData->text()).toEncoded());
@@ -47,7 +47,7 @@ void Core::copyFileClipboard() {
 void Core::copyPathClipboard() {
     if(m_model->listing().isEmpty())
         return;
-    QApplication::clipboard()->setText(selectedPath());
+    QApplication::clipboard()->setText(m_selection.selectedPath());
     m_overlays->showMessage(tr("Path copied"));
 }
 
@@ -87,7 +87,7 @@ void Core::pasteFilesToCurrentDirectory() {
     }
     if(paths.isEmpty())
         return;
-    interactiveCopy(paths, destDir);
+    m_fileOps->interactiveCopy(paths, destDir);
 }
 
 void Core::openFromClipboard() {
@@ -145,7 +145,7 @@ void Core::onDropIn(const QMimeData *mimeData, QObject *source) {
 // drag'n'drop
 // drag image out of the program
 void Core::onDraggedOut() {
-    onDraggedOut(currentSelection());
+    onDraggedOut(m_selection.currentSelection());
 }
 
 QMimeData *Core::mimeDataForPaths(const QList<QString> &paths) {

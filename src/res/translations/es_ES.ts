@@ -109,72 +109,6 @@
         <translation> versión </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="355"/>
-        <source>Delete </source>
-        <translation>Eliminar </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="355"/>
-        <source> items permanently?</source>
-        <translation> ítems permanentemente?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="357"/>
-        <source>Delete item permanently?</source>
-        <translation>Eliminar permanentemente?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="358"/>
-        <source>Delete permanently</source>
-        <translation>Eliminar permanentemente</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="374"/>
-        <source>File removed</source>
-        <translation>Archivo eliminado</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <source>Removed: </source>
-        <translation>Eliminado: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <location filename="../../core.cpp" line="408"/>
-        <source> files</source>
-        <translation> archivos</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="389"/>
-        <source>Move </source>
-        <translation>Mover </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="389"/>
-        <source> items to trash?</source>
-        <translation> ítems a la papelera?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="391"/>
-        <source>Move item to trash?</source>
-        <translation>Mover ítem a la papelera?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="392"/>
-        <source>Move to trash</source>
-        <translation>Mover a la papelera</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="404"/>
-        <source>Moved to trash</source>
-        <translation>Movido a la papelera</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="408"/>
-        <source>Moved to trash: </source>
-        <translation>Movido a la papelera: </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="463"/>
         <source>File copied</source>
         <translation>Archivo copiado</translation>
@@ -183,40 +117,6 @@
         <location filename="../../core.cpp" line="470"/>
         <source>Path copied</source>
         <translation>Ruta copiada</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>File exists</source>
-        <translation>Archivo existente</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <source>Overwrite file?</source>
-        <translation>Sobre escribir archivo?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="812"/>
-        <location filename="../../core.cpp" line="880"/>
-        <source>Could not create directory </source>
-        <translation>No se pudo crear la carpeta </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="916"/>
-        <source>File moved.</source>
-        <translation>Archivo movido.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>Destination file exists. Overwrite?</source>
-        <translation>El archivo de destino existe. Sobre escribe?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="937"/>
-        <source>File copied.</source>
-        <translation>Archivo copiado.</translation>
     </message>
     <message>
         <location filename="../../core.cpp" line="984"/>
@@ -368,6 +268,85 @@
     <message>
         <source>Save File as...</source>
         <translation>Guardar como...</translation>
+    </message>
+</context>
+<context>
+    <name>FileOpsController</name>
+    <message>
+        <source> files</source>
+        <translation> archivos</translation>
+    </message>
+    <message>
+        <source> items permanently?</source>
+        <translation> ítems permanentemente?</translation>
+    </message>
+    <message>
+        <source> items to trash?</source>
+        <translation> ítems a la papelera?</translation>
+    </message>
+    <message>
+        <source>Could not create directory </source>
+        <translation>No se pudo crear la carpeta </translation>
+    </message>
+    <message>
+        <source>Delete </source>
+        <translation>Eliminar </translation>
+    </message>
+    <message>
+        <source>Delete item permanently?</source>
+        <translation>Eliminar permanentemente?</translation>
+    </message>
+    <message>
+        <source>Delete permanently</source>
+        <translation>Eliminar permanentemente</translation>
+    </message>
+    <message>
+        <source>Destination file exists. Overwrite?</source>
+        <translation>El archivo de destino existe. Sobre escribe?</translation>
+    </message>
+    <message>
+        <source>File copied.</source>
+        <translation>Archivo copiado.</translation>
+    </message>
+    <message>
+        <source>File exists</source>
+        <translation>Archivo existente</translation>
+    </message>
+    <message>
+        <source>File moved.</source>
+        <translation>Archivo movido.</translation>
+    </message>
+    <message>
+        <source>File removed</source>
+        <translation>Archivo eliminado</translation>
+    </message>
+    <message>
+        <source>Move </source>
+        <translation>Mover </translation>
+    </message>
+    <message>
+        <source>Move item to trash?</source>
+        <translation>Mover ítem a la papelera?</translation>
+    </message>
+    <message>
+        <source>Move to trash</source>
+        <translation>Mover a la papelera</translation>
+    </message>
+    <message>
+        <source>Moved to trash</source>
+        <translation>Movido a la papelera</translation>
+    </message>
+    <message>
+        <source>Moved to trash: </source>
+        <translation>Movido a la papelera: </translation>
+    </message>
+    <message>
+        <source>Overwrite file?</source>
+        <translation>Sobre escribir archivo?</translation>
+    </message>
+    <message>
+        <source>Removed: </source>
+        <translation>Eliminado: </translation>
     </message>
 </context>
 <context>

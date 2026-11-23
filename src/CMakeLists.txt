@@ -100,7 +100,8 @@ add_library(qimgv_gui OBJECT)
 target_sources(qimgv_gui PRIVATE
     core.cpp
     navigationcontroller.cpp
-    core_fileops.cpp
+    fileopscontroller.cpp
+    selectionquery.cpp
     core_editing.cpp
     core_clipboard.cpp
     proxystyle.cpp

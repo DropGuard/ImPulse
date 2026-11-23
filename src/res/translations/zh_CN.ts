@@ -113,72 +113,6 @@
         <translation> 版本 </translation>
     </message>
     <message>
-        <location filename="../../core.cpp" line="355"/>
-        <source>Delete </source>
-        <translation>永久删除 </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="355"/>
-        <source> items permanently?</source>
-        <translation> 个项目?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="357"/>
-        <source>Delete item permanently?</source>
-        <translation>是否永久删除它们？</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="358"/>
-        <source>Delete permanently</source>
-        <translation>永久删除</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="374"/>
-        <source>File removed</source>
-        <translation>文件已删除</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <source>Removed: </source>
-        <translation>成功删除: </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="378"/>
-        <location filename="../../core.cpp" line="408"/>
-        <source> files</source>
-        <translation> 个文件</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="389"/>
-        <source>Move </source>
-        <translation>移动 </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="389"/>
-        <source> items to trash?</source>
-        <translation> 个项目到回收站?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="391"/>
-        <source>Move item to trash?</source>
-        <translation>确认删除到回收站?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="392"/>
-        <source>Move to trash</source>
-        <translation>删除到回收站</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="404"/>
-        <source>Moved to trash</source>
-        <translation>删除到回收站</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="408"/>
-        <source>Moved to trash: </source>
-        <translation>移动到回收站： </translation>
-    </message>
-    <message>
         <location filename="../../core.cpp" line="463"/>
         <source>File copied</source>
         <translation>文件已拷贝</translation>
@@ -187,40 +121,6 @@
         <location filename="../../core.cpp" line="470"/>
         <source>Path copied</source>
         <translation>目录已拷贝</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>File exists</source>
-        <translation>文件已经存在</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="644"/>
-        <source>Overwrite file?</source>
-        <translation>覆盖文件吗?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="812"/>
-        <location filename="../../core.cpp" line="880"/>
-        <source>Could not create directory </source>
-        <translation>不能建立该目录 </translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="916"/>
-        <source>File moved.</source>
-        <translation>文件已移动.</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="918"/>
-        <location filename="../../core.cpp" line="939"/>
-        <source>Destination file exists. Overwrite?</source>
-        <translation>目标文件已经存在. 覆盖吗?</translation>
-    </message>
-    <message>
-        <location filename="../../core.cpp" line="937"/>
-        <source>File copied.</source>
-        <translation>文件已拷贝.</translation>
     </message>
     <message>
         <location filename="../../core.cpp" line="984"/>
@@ -372,6 +272,85 @@
     <message>
         <source>Save File as...</source>
         <translation>文件另存为...</translation>
+    </message>
+</context>
+<context>
+    <name>FileOpsController</name>
+    <message>
+        <source> files</source>
+        <translation> 个文件</translation>
+    </message>
+    <message>
+        <source> items permanently?</source>
+        <translation> 个项目?</translation>
+    </message>
+    <message>
+        <source> items to trash?</source>
+        <translation> 个项目到回收站?</translation>
+    </message>
+    <message>
+        <source>Could not create directory </source>
+        <translation>不能建立该目录 </translation>
+    </message>
+    <message>
+        <source>Delete </source>
+        <translation>永久删除 </translation>
+    </message>
+    <message>
+        <source>Delete item permanently?</source>
+        <translation>是否永久删除它们？</translation>
+    </message>
+    <message>
+        <source>Delete permanently</source>
+        <translation>永久删除</translation>
+    </message>
+    <message>
+        <source>Destination file exists. Overwrite?</source>
+        <translation>目标文件已经存在. 覆盖吗?</translation>
+    </message>
+    <message>
+        <source>File copied.</source>
+        <translation>文件已拷贝.</translation>
+    </message>
+    <message>
+        <source>File exists</source>
+        <translation>文件已经存在</translation>
+    </message>
+    <message>
+        <source>File moved.</source>
+        <translation>文件已移动.</translation>
+    </message>
+    <message>
+        <source>File removed</source>
+        <translation>文件已删除</translation>
+    </message>
+    <message>
+        <source>Move </source>
+        <translation>移动 </translation>
+    </message>
+    <message>
+        <source>Move item to trash?</source>
+        <translation>确认删除到回收站?</translation>
+    </message>
+    <message>
+        <source>Move to trash</source>
+        <translation>删除到回收站</translation>
+    </message>
+    <message>
+        <source>Moved to trash</source>
+        <translation>删除到回收站</translation>
+    </message>
+    <message>
+        <source>Moved to trash: </source>
+        <translation>移动到回收站： </translation>
+    </message>
+    <message>
+        <source>Overwrite file?</source>
+        <translation>覆盖文件吗?</translation>
+    </message>
+    <message>
+        <source>Removed: </source>
+        <translation>成功删除: </translation>
     </message>
 </context>
 <context>

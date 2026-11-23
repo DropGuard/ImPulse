@@ -55,7 +55,7 @@ void Core::toggleCropPanel() {
 void Core::requestSavePath() {
     if(!m_mw || m_model->listing().isEmpty())
         return;
-    const QString path = selectedPath();
+    const QString path = m_selection.selectedPath();
     // an edited image earns a fresh target: Save As's quick path writes a
     // copy, and the original survives until Ctrl+S deliberately says
     // otherwise — the same law that keeps the disk off the bare keys
@@ -84,7 +84,7 @@ void Core::showResizeDialog() {
         m_nav->refuseEdit();
         return;
     }
-    auto img = m_model->getImage(selectedPath());
+    auto img = m_model->getImage(m_selection.selectedPath());
     if(img)
         m_dialogs->showResizeDialog(img->size());
 }
@@ -116,7 +116,7 @@ void Core::edit_template(
     case NavigationController::InteractionState::FolderView:
     case NavigationController::InteractionState::Document: break;
     }
-    const auto selection = currentSelection();
+    const auto selection = m_selection.currentSelection();
     for(const auto &path : selection)
         m_model->editImage(path, [&](auto pixels) {
             return editFunc(std::move(pixels), as...);
@@ -155,7 +155,7 @@ void Core::crop(QRect rect) {
 
 void Core::cropAndSave(QRect rect) {
     edit_template({ImageLib::cropped}, rect);
-    saveFile(selectedPath());
+    saveFile(m_selection.selectedPath());
     updateInfoString();
 }
 
@@ -184,13 +184,13 @@ bool Core::saveFile(const QString &filePath, const QString &newPath) {
 }
 
 void Core::saveCurrentFile() {
-    saveCurrentFileAs(selectedPath());
+    saveCurrentFileAs(m_selection.selectedPath());
 }
 
 void Core::saveCurrentFileAs(const QString &destPath) {
     if(m_model->listing().isEmpty())
         return;
-    if(saveFile(selectedPath(), destPath)) {
+    if(saveFile(m_selection.selectedPath(), destPath)) {
         m_overlays->showMessageSuccess(tr("File saved"));
         updateInfoString();
     }
@@ -200,7 +200,7 @@ void Core::discardEdits() {
     if(m_model->listing().isEmpty())
         return;
 
-    m_model->discardEdit(selectedPath());
+    m_model->discardEdit(m_selection.selectedPath());
     m_overlays->hideSaveOverlay();
 }
 

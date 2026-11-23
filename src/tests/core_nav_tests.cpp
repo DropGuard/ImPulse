@@ -1069,17 +1069,17 @@ TEST_F(TestCoreNav, gridActionsDriveTheGridThroughTheFullChain) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.currentSelection().count() == 1;
+                return core.selection().currentSelection().count() == 1;
             },
             10000);
-        EXPECT_TRUE(core.currentSelection().count() == 1)
+        EXPECT_TRUE(core.selection().currentSelection().count() == 1)
             << "precondition broken: the folder view holds no selection"
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
     EXPECT_TRUE(actionManager->invokeAction(QStringLiteral("gridSelectNext")));
-    EXPECT_EQ(core.currentSelection().count(), 1);
-    EXPECT_EQ(core.currentSelection().constFirst(), QDir(dir).filePath("b.png"));
+    EXPECT_EQ(core.selection().currentSelection().count(), 1);
+    EXPECT_EQ(core.selection().currentSelection().constFirst(), QDir(dir).filePath("b.png"));
 
     EXPECT_TRUE(actionManager->invokeAction(QStringLiteral("gridOpen")));
     {
@@ -1175,15 +1175,15 @@ TEST_F(TestCoreNav, batchTrashReportsHowManyFailed) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.currentSelection().count() == 2;
+                return core.selection().currentSelection().count() == 2;
             },
             10000);
-        EXPECT_TRUE(core.currentSelection().count() == 2)
+        EXPECT_TRUE(core.selection().currentSelection().count() == 2)
             << "precondition broken: the folder view holds no two-file selection"
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core.moveToTrash();
+    core.fileOps().moveToTrash();
 
     EXPECT_TRUE(QFileInfo::exists(longFile)) << "the refused file vanished anyway";
     EXPECT_TRUE(overlayFake.errorCalls > 0) << "the failure report never reached the injected host";
@@ -1230,15 +1230,15 @@ TEST_F(TestCoreNav, batchTrashAllSuccessStillReportsTheCount) {
     {
         const bool qt_test_held = QTest::qWaitFor(
             [&] {
-                return core.currentSelection().count() == 2;
+                return core.selection().currentSelection().count() == 2;
             },
             10000);
-        EXPECT_TRUE(core.currentSelection().count() == 2)
+        EXPECT_TRUE(core.selection().currentSelection().count() == 2)
             << "precondition broken: the folder view holds no two-file selection"
             << (qt_test_held ? "" : "the condition did not hold before the deadline");
     }
 
-    core.moveToTrash();
+    core.fileOps().moveToTrash();
 
     EXPECT_TRUE(!QFileInfo::exists(QDir(dir).filePath("a.png")));
     EXPECT_TRUE(!QFileInfo::exists(QDir(dir).filePath("b.png")));
