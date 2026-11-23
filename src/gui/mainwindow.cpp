@@ -481,7 +481,6 @@ void MW::refreshInfoViews() {
     setWindowTitle(windowTitle);
 }
 
-// TODO!!! buffer this in mw
 ViewerWidget *MW::viewer() {
     return m_viewerWidget;
 }

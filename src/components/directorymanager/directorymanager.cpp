@@ -250,7 +250,8 @@ QDateTime DirectoryManager::lastModified(const QString &filePath) const {
     return info.lastModified();
 }
 
-// TODO: what about symlinks?
+// Symlinks are followed: exists() and is_regular_file() both resolve the link,
+// so a link to a regular file is a file and a dangling one is not.
 inline bool DirectoryManager::isSupportedFile(const QString &path) const {
     return (isFile(path) && m_regex.match(path).hasMatch());
 }

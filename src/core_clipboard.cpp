@@ -195,8 +195,8 @@ QMimeData *Core::getMimeDataForImage(std::shared_ptr<Image> img, MimeDataTarget 
             // other's pixels. The file is now a uniquely-named QTemporaryFile
             // parented to the QMimeData it serves: it lives exactly as long
             // as the drag gesture or the clipboard entry does, and the
-            // autoremove takes it away with that — the "cleanup temp files"
-            // TODO was about this path, and it is now true by construction.
+            // autoremove takes it away with that, so the file never outlives
+            // the consumer that was handed it.
             auto *tmp = new QTemporaryFile(QDir(settings->tmpDir()).filePath("image-XXXXXX.png"), mimeData);
             tmp->setAutoRemove(true);
             // use faster compression for drag'n'drop
