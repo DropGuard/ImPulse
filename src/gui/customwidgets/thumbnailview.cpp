@@ -226,8 +226,12 @@ void ThumbnailView::show() {
 
 void ThumbnailView::showEvent(QShowEvent *event) {
     QGraphicsView::showEvent(event);
-    // ensure we are properly resized
-    qApp->processEvents();
+    // No wait for the size: show() has already activated the visible
+    // parent's layout, so the view is at its final size here, and a later
+    // window-manager size arrives as a resizeEvent, which the subclasses
+    // handle. The processEvents this used to run in here bought no size
+    // (measured on offscreen, xcb and wayland), only every queued and input
+    // event nested inside the show.
     updateSceneExtent();
     updateScrollbarIndicator();
     loadVisibleThumbnails();

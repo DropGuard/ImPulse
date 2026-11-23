@@ -43,6 +43,10 @@
 #include "gui/customwidgets/floatingwidgetcontainer.h"
 #include "gui/customwidgets/settingsidebar.h"
 #include "gui/customwidgets/slidepanel.h"
+#include "gui/panels/mainpanel/thumbnailstrip.h"
+#include <QVBoxLayout>
+#include <QSignalSpy>
+#include <QTest>
 #include "gui/customwidgets/styledcombobox.h"
 #include "gui/dialogs/resizedialog.h"
 #include "gui/dialogs/settingsdialog.h"
@@ -704,6 +708,104 @@ TEST_F(TestGuiWidgets, anInfoOverlayFitsItsNewRowsWithoutRunningTheEventLoop) {
         EXPECT_EQ(ran, before + 1) << "the probe's queued call never ran - this pin would pass vacuously";
         EXPECT_EQ(overlay->height(), expected) << "the event loop changed the fit afterwards (" << count << " rows)";
     }
+}
+
+// A showEvent used to "ensure we are properly resized" by running the whole
+// event loop from inside itself, in both the viewer and the thumbnail views.
+// Measured on offscreen, xcb and wayland (Qt 6.10): a widget already has its
+// final size when its showEvent runs, because show() activates the visible
+// parent's layout synchronously first; and where it does not yet (a window
+// maximized on first show), that nested loop never delivered the window
+// manager's size either - the resizeEvent after it does. The loop bought no
+// size, only every queued and input event nested inside a show. These pins
+// hold both halves: no queued call runs inside show(), and what showEvent is
+// for has happened by the time show() returns.
+TEST_F(TestGuiWidgets, aViewerShowSettlesItsViewWithoutRunningTheEventLoop) {
+    // resizeEvent reads parentWidget(); the host is also the probe's context
+    QWidget host;
+    auto *layout = new QVBoxLayout(&host);
+    layout->setContentsMargins(0, 0, 0, 0);
+    auto *viewer = new ImageViewerV2(&host);
+    layout->addWidget(viewer);
+    host.resize(400, 300);
+    host.show();
+    auto pixmap = std::make_unique<QPixmap>(3000, 3000);
+    pixmap->fill(Qt::darkGray);
+    viewer->showImage(std::move(pixmap));
+    viewer->setFitOriginal();
+    QCoreApplication::processEvents();
+    // inspect somewhere off the start position, the way a user does in fit original
+    const int start = viewer->verticalScrollBar()->value();
+    for(int i = 0; i < 4; ++i) {
+        viewer->scrollDown();
+        ASSERT_TRUE(QTest::qWaitFor(
+            [&] {
+                const QList<QTimeLine *> timelines = viewer->findChildren<QTimeLine *>();
+                for(const QTimeLine *timeline : timelines)
+                    if(timeline->state() == QTimeLine::Running)
+                        return false;
+                return true;
+            },
+            5000));
+    }
+    ASSERT_NE(viewer->verticalScrollBar()->value(), start) << "the scrolls moved nothing";
+
+    viewer->hide();
+    host.resize(600, 500); // the window changes while the viewer is away
+    QCoreApplication::processEvents();
+
+    int ran = 0;
+    QMetaObject::invokeMethod(
+        &host,
+        [&] {
+            ++ran;
+        },
+        Qt::QueuedConnection);
+    viewer->show();
+    EXPECT_EQ(ran, 0) << "the viewer's show ran queued work nested inside itself";
+    EXPECT_EQ(viewer->size(), QSize(600, 500)) << "not at its final size inside show()";
+    const int h = viewer->horizontalScrollBar()->value();
+    const int v = viewer->verticalScrollBar()->value();
+    QCoreApplication::processEvents();
+    EXPECT_EQ(ran, 1) << "the probe's queued call never ran - this pin would pass vacuously";
+    EXPECT_EQ(viewer->horizontalScrollBar()->value(), h) << "the event loop moved the view afterwards";
+    EXPECT_EQ(viewer->verticalScrollBar()->value(), v) << "the event loop moved the view afterwards";
+}
+
+TEST_F(TestGuiWidgets, aThumbnailStripShowRequestsItsVisibleThumbnailsWithoutRunningTheEventLoop) {
+    QWidget host;
+    auto *layout = new QVBoxLayout(&host);
+    layout->setContentsMargins(0, 0, 0, 0);
+    auto *strip = new ThumbnailStrip(&host);
+    layout->addWidget(strip);
+    strip->hide();
+    host.resize(800, 160);
+    host.show();
+    const int rows = 200;
+    strip->populate(rows);
+    QCoreApplication::processEvents();
+    QSignalSpy requested(strip, &ThumbnailView::thumbnailsRequested);
+    ASSERT_TRUE(requested.isValid());
+    ASSERT_EQ(requested.count(), 0) << "a hidden strip requested thumbnails";
+
+    int ran = 0;
+    QMetaObject::invokeMethod(
+        &host,
+        [&] {
+            ++ran;
+        },
+        Qt::QueuedConnection);
+    strip->show();
+    EXPECT_EQ(ran, 0) << "the strip's show ran queued work nested inside itself";
+    EXPECT_EQ(strip->size(), QSize(800, 160)) << "not at its final size inside show()";
+    ASSERT_GE(requested.count(), 1) << "show() returned before asking for the visible thumbnails";
+    const QList<int> indices = requested.constFirst().constFirst().value<QList<int>>();
+    EXPECT_FALSE(indices.isEmpty());
+    EXPECT_LT(indices.size(), rows) << "the request was not limited to what fits the shown strip";
+    for(const int index : indices)
+        EXPECT_TRUE(index >= 0 && index < rows) << index;
+    QCoreApplication::processEvents();
+    EXPECT_EQ(ran, 1) << "the probe's queued call never ran - this pin would pass vacuously";
 }
 
 int main(int argc, char **argv) {

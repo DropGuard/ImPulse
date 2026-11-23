@@ -670,8 +670,12 @@ void ImageViewerV2::wheelEvent(QWheelEvent *event) {
 
 void ImageViewerV2::showEvent(QShowEvent *event) {
     QGraphicsView::showEvent(event);
-    // ensure we are properly resized
-    qApp->processEvents();
+    // No wait for the size: show() has already activated the visible
+    // parent's layout, so the viewer is at its final size here, and a size
+    // the window manager hands over later (a window maximized on first show)
+    // arrives as a resizeEvent - which the processEvents this used to run in
+    // here never caught either (measured on offscreen, xcb and wayland). It
+    // only ran every queued and input event nested inside the show.
     // the window-ready moment: whatever scaling was suppressed while hidden
     // is re-requested here with fresh parameters — this is "ready, then act"
     if(m_pixmap)
