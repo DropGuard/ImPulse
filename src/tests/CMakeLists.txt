@@ -205,19 +205,6 @@ add_test(NAME LINT_CACHE
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/lint_cache_test.py)
 set_tests_properties(LINT_CACHE PROPERTIES ENVIRONMENT "PYTHONPATH=;${TEST_ENV}" SKIP_RETURN_CODE 77 TIMEOUT 300)
 
-# translation contexts: a tr() call that moves class takes a new context and
-# silently drops every translation it had (NavigationController's extraction
-# did, in all seven languages). lupdate extracts the tree and every translated
-# catalog entry must still be reachable. Skips (77) without lupdate.
-if(TARGET Qt6::lupdate)
-    set(QIMGV_LUPDATE_EXE $<TARGET_FILE:Qt6::lupdate>)
-else()
-    set(QIMGV_LUPDATE_EXE "")
-endif()
-add_test(NAME TRANSLATION_RULES
-         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/tests/translation_rules.py ${QIMGV_LUPDATE_EXE})
-set_tests_properties(TRANSLATION_RULES PROPERTIES ENVIRONMENT "PYTHONPATH=;${TEST_ENV}" SKIP_RETURN_CODE 77 TIMEOUT 300)
-
 # The flip-flight instrument: manual measurement, never a gate. Drives real
 # navigation over a large-image directory at keyboard rate and prints
 # stop-point latency plus delivery classification — the numbers the

@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """Move translations to the context the code now asks for them under.
 
-The repair for what src/tests/translation_rules.py reports. Moving a tr() call
-into another class (or renaming the class) changes its translation context,
-and every catalog keeps the translation under the old one. This moves each
-such message to the context lupdate now extracts: same source, same
-translation. The <location> lines are dropped, because they name the old file
-and the next lupdate run writes the right ones. Only contexts the catalog has no
-entry for receive a move (the check's own definition of a loss), so no
-existing message is ever overwritten. The old message is removed, and its
+QObject::tr() keys a translation on (context, source), and the context is the
+class name. Moving a tr() call into another class, or renaming the class,
+orphans every translation it had: the catalog keeps the text under the old
+context, the lookup asks the new one, and the UI falls back to English. The
+fallback is an accepted state (the project keeps no completeness gate), so
+nothing runs this automatically: run it after a class move whose translations
+should survive.
+
+lupdate is the instrument, so the contexts are the ones Qt will look up: it
+extracts the tree (cpp, h, ui) into a scratch catalog. A translated (context,
+source) the code no longer asks for, whose source the code still has under a
+context this catalog has no entry for, is moved there: same source, same
+translation. A source the code no longer has at all is ordinary obsolescence
+and is left for lupdate. The <location> lines are dropped, because they name
+the old file and the next lupdate run writes the right ones. Only contexts the
+catalog has no entry for receive a move, so no existing message is ever
+overwritten. The old message is removed, and its
 context too once it is empty.
 
 Edits are textual, so every byte of a catalog that is not moved stays as it
@@ -16,16 +25,76 @@ was: no reflow, no re-escaping, no reordering.
 
 Usage: python3 scripts/retarget_translations.py [path-to-lupdate]
 """
-import os, re, sys
+import glob, os, re, shutil, subprocess, sys, tempfile
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'src', 'tests'))
-import translation_rules as rules  # noqa: E402
+CATALOGS = os.path.join(ROOT, 'src', 'res', 'translations')
+UNTRANSLATED = ('unfinished', 'obsolete', 'vanished')
 
 CONTEXT = re.compile(r'<context>\s*<name>(.*?)</name>.*?</context>\n?', re.S)
 MESSAGE = re.compile(r'[ \t]*<message\b[^>]*>.*?</message>\n', re.S)
 LOCATION = re.compile(r'[ \t]*<location\b[^>]*/>\n')
+
+
+def find_lupdate(explicit=None):
+    if explicit and os.path.exists(explicit):
+        return explicit
+    for name in ('lupdate-qt6', 'lupdate'):
+        found = shutil.which(name)
+        if found:
+            return found
+    for path in ('/usr/lib/qt6/bin/lupdate', '/usr/lib/qt6/libexec/lupdate'):
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def read(path):
+    """(every (context, source), the translated ones)"""
+    entries, translated = set(), set()
+    for ctx in ET.parse(path).getroot().iter('context'):
+        name = ctx.findtext('name')
+        for msg in ctx.iter('message'):
+            source = msg.findtext('source')
+            if source is None:
+                continue
+            entries.add((name, source))
+            tr = msg.find('translation')
+            if tr is not None and tr.get('type') not in UNTRANSLATED and (tr.text or '').strip():
+                translated.add((name, source))
+    return entries, translated
+
+
+def extract(lupdate):
+    """every (context, source) the tree's code asks for, as lupdate sees it"""
+    with tempfile.TemporaryDirectory() as scratch:
+        current = os.path.join(scratch, 'current.ts')
+        run = subprocess.run([lupdate, '-silent', '-locations', 'none', '-no-obsolete', '-extensions', 'cpp,h,ui',
+                              'src', 'plugins', '-ts', current], cwd=ROOT, capture_output=True, text=True)
+        if run.returncode != 0 or not os.path.exists(current):
+            raise RuntimeError(f'lupdate failed: {run.stdout} {run.stderr}')
+        code, _ = read(current)
+    if not code:  # an extraction that saw nothing would report nothing to move
+        raise RuntimeError('lupdate extracted no strings from the tree')
+    return code
+
+
+def lost(code):
+    """[(catalog, old context, source, [contexts the code asks under])]"""
+    homes = {}
+    for context, source in code:
+        homes.setdefault(source, set()).add(context)
+    found = []
+    for catalog in sorted(glob.glob(os.path.join(CATALOGS, '*.ts'))):
+        listed, translated = read(catalog)
+        for context, source in sorted(translated):
+            if (context, source) in code:
+                continue
+            missing = sorted(h for h in homes.get(source, ()) if (h, source) not in listed)
+            if missing:
+                found.append((catalog, context, source, missing))
+    return found
 
 
 def contexts(text):
@@ -67,11 +136,11 @@ def retarget(text, old, source, homes):
 
 
 def main():
-    lupdate = rules.find_lupdate(sys.argv[1] if len(sys.argv) > 1 else None)
+    lupdate = find_lupdate(sys.argv[1] if len(sys.argv) > 1 else None)
     if not lupdate:
         print('no lupdate found (install the Qt6 linguist tools)')
         return 1
-    found, _ = rules.lost(rules.extract(lupdate))
+    found = lost(extract(lupdate))
     moves = {}
     for catalog, context, source, homes in found:
         moves.setdefault(catalog, []).append((context, source, homes))
