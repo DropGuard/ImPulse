@@ -57,6 +57,7 @@
 #include "gui/overlayhost.h"
 #include "gui/overlays/renameoverlay.h"
 #include "gui/overlays/floatingmessageproxy.h"
+#include "gui/overlays/imageinfooverlay.h"
 #include "gui/overlays/imageinfooverlayproxy.h"
 #include "gui/overlays/saveconfirmoverlay.h"
 #include "gui/overlays/videocontrols.h"
@@ -646,6 +647,63 @@ TEST_F(TestGuiWidgets, aSlidePanelHideFrameRunsNoQueuedWorkInsideItself) {
     EXPECT_EQ(ran, posted);
     EXPECT_EQ(ranInsideAFrame, 0) << "queued work ran nested inside a slide-panel frame";
     EXPECT_TRUE(panel.isHidden()) << "the animation finished without hiding the panel";
+}
+
+// ImageInfoOverlay::setExifInfo refits the overlay when the tag count
+// changes. It used to "wait for layout change" by running the whole event
+// loop from inside itself: a row added to the layout of a visible widget is
+// shown by a queued call (QLayout::addChildWidget) and a hidden row takes no
+// space, so the size came out right only once those calls had landed, along
+// with every other queued and input event, nested inside the update. The
+// probe pins both halves: no queued call runs inside setExifInfo, and the
+// geometry already fits the new rows when it returns, growing, shrinking and
+// down to the no-metadata stub.
+TEST_F(TestGuiWidgets, anInfoOverlayFitsItsNewRowsWithoutRunningTheEventLoop) {
+    // the container is also the probe's context, so no queued lambda outlives
+    // the locals it captures
+    FloatingWidgetContainer container;
+    container.resize(800, 600);
+    container.show();
+    const auto tags = [](int n) {
+        QMap<QString, QString> info;
+        for(int i = 0; i < n; ++i)
+            info.insert(QStringLiteral("tag%1").arg(i), QStringLiteral("value"));
+        return info;
+    };
+    auto *overlay = new ImageInfoOverlay(&container); // owned by the container
+    overlay->setExifInfo(tags(2));
+    overlay->show();
+    QCoreApplication::processEvents();
+    const int row = 30;                            // EntryInfoItem's fixed height
+    const int stub = 48;                           // the no-metadata label's fixed height
+    const int frame = overlay->height() - 2 * row; // header and margins
+    ASSERT_GT(frame, 0);
+    const auto placedRight = [&] {
+        // FloatingWidgetPosition::RIGHT with the default 20 px margin
+        return overlay->geometry() == QRect(container.width() - overlay->width() - 20,
+                                            (container.height() - overlay->height()) / 2, overlay->width(),
+                                            overlay->height());
+    };
+    ASSERT_TRUE(placedRight()) << "the overlay was misplaced before the probe began";
+
+    int ran = 0;
+    for(const int count : {5, 1, 0, 3}) {
+        const int expected = frame + (count ? count * row : stub);
+        const int before = ran;
+        QMetaObject::invokeMethod(
+            &container,
+            [&] {
+                ++ran;
+            },
+            Qt::QueuedConnection);
+        overlay->setExifInfo(tags(count));
+        EXPECT_EQ(ran, before) << "setExifInfo ran queued work nested inside itself (" << count << " rows)";
+        EXPECT_EQ(overlay->height(), expected) << "not refitted on return (" << count << " rows)";
+        EXPECT_TRUE(placedRight()) << "not repositioned on return (" << count << " rows)";
+        QCoreApplication::processEvents();
+        EXPECT_EQ(ran, before + 1) << "the probe's queued call never ran - this pin would pass vacuously";
+        EXPECT_EQ(overlay->height(), expected) << "the event loop changed the fit afterwards (" << count << " rows)";
+    }
 }
 
 int main(int argc, char **argv) {

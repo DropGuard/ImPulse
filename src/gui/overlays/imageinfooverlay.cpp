@@ -1,6 +1,8 @@
 #include "imageinfooverlay.h"
 #include "ui_imageinfooverlay.h"
 
+#include <utility>
+
 ImageInfoOverlay::ImageInfoOverlay(FloatingWidgetContainer *parent)
     : OverlayWidget(parent), m_ui(new Ui::ImageInfoOverlay) {
     m_ui->setupUi(this);
@@ -55,9 +57,16 @@ void ImageInfoOverlay::setExifInfo(QMap<QString, QString> info) {
     }
 
     if(!isHidden() && entryCount != info.count()) {
-        // wait for layout change
-        qApp->processEvents();
-        // reposition
+        // A row added to the layout of a visible widget is shown by a queued
+        // call (QLayout::addChildWidget), and a hidden row takes no space. The
+        // rows are shown and the layout sized here, synchronously: the
+        // processEvents this used to wait with ran every queued and input
+        // event nested inside this update.
+        for(EntryInfoItem *entry : std::as_const(m_entries))
+            entry->show();
+        if(m_entries.isEmpty())
+            m_entryStub.show();
+        layout()->activate();
         recalculateGeometry();
     }
 }
