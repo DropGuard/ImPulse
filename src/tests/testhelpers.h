@@ -8,6 +8,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QCoreApplication>
+#include <optional>
 
 #include <QImage>
 #include <QColor>
@@ -69,14 +70,12 @@ class IsolatedHome {
         // -- which is the other reason to have it: the day someone scopes one of
         // these to a function (the way FreshSettings is used), the code after it
         // must not keep running against a directory that was just deleted.
-        m_savedHome = qgetenv("HOME");
-        m_savedCache = qgetenv("XDG_CACHE_HOME");
-        m_savedConfig = qgetenv("XDG_CONFIG_HOME");
+        m_savedHome = capture("HOME");
+        m_savedCache = capture("XDG_CACHE_HOME");
+        m_savedConfig = capture("XDG_CONFIG_HOME");
+        m_savedData = capture("XDG_DATA_HOME");
         m_savedOrg = QCoreApplication::organizationName();
         m_savedApp = QCoreApplication::applicationName();
-        m_hadHome = qEnvironmentVariableIsSet("HOME");
-        m_hadCache = qEnvironmentVariableIsSet("XDG_CACHE_HOME");
-        m_hadConfig = qEnvironmentVariableIsSet("XDG_CONFIG_HOME");
         qputenv("HOME", m_dir.path().toUtf8());
         // HOME alone no longer isolates the cache: the thumbnail store lives in
         // the shared freedesktop location, and QStandardPaths prefers
@@ -86,14 +85,24 @@ class IsolatedHome {
         // the isolation true regardless of the caller's session.
         qputenv("XDG_CACHE_HOME", QDir(m_dir.path()).filePath("cache").toUtf8());
         qputenv("XDG_CONFIG_HOME", QDir(m_dir.path()).filePath("config").toUtf8());
+        // The data home is isolated for the same reason as the cache, and it
+        // must EXIST: Qt's trash creates <data home>/Trash with a
+        // non-recursive mkdir, so a redirected HOME without .local/share made
+        // every trash success test skip as "no writable trash" on a host that
+        // has one. Left unset-or-real, a test would trash into the user's own
+        // trash.
+        const QString dataHome = QDir(m_dir.path()).filePath(".local/share");
+        QDir().mkpath(dataHome);
+        qputenv("XDG_DATA_HOME", dataHome.toUtf8());
         QCoreApplication::setOrganizationName("ImPulse");
         QCoreApplication::setApplicationName("impulse");
     }
 
     ~IsolatedHome() {
-        restore("HOME", m_savedHome, m_hadHome);
-        restore("XDG_CACHE_HOME", m_savedCache, m_hadCache);
-        restore("XDG_CONFIG_HOME", m_savedConfig, m_hadConfig);
+        restore("HOME", m_savedHome);
+        restore("XDG_CACHE_HOME", m_savedCache);
+        restore("XDG_CONFIG_HOME", m_savedConfig);
+        restore("XDG_DATA_HOME", m_savedData);
         QCoreApplication::setOrganizationName(m_savedOrg);
         QCoreApplication::setApplicationName(m_savedApp);
     }
@@ -106,16 +115,23 @@ class IsolatedHome {
     }
 
   private:
-    static void restore(const char *name, const QByteArray &value, bool wasSet) {
-        if(wasSet)
-            qputenv(name, value);
+    // nullopt is "was not set", which qgetenv alone cannot say: it answers an
+    // empty array for both unset and set-to-empty, and the two restore differently.
+    static std::optional<QByteArray> capture(const char *name) {
+        if(!qEnvironmentVariableIsSet(name))
+            return std::nullopt;
+        return qgetenv(name);
+    }
+
+    static void restore(const char *name, const std::optional<QByteArray> &value) {
+        if(value)
+            qputenv(name, *value);
         else
             qunsetenv(name);
     }
 
-    QByteArray m_savedHome, m_savedCache, m_savedConfig;
+    std::optional<QByteArray> m_savedHome, m_savedCache, m_savedConfig, m_savedData;
     QString m_savedOrg, m_savedApp;
-    bool m_hadHome = false, m_hadCache = false, m_hadConfig = false;
     QTemporaryDir m_dir;
 };
 
